@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SHIFTS } from '../data/initialData';
 
-export default function ShiftInput({ value, onChange }) {
+export default function ShiftInput({ value, onChange, rowIndex, colIndex }) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value === 'off' ? '' : value);
   const wrapperRef = useRef(null);
@@ -33,6 +33,29 @@ export default function ShiftInput({ value, onChange }) {
     setIsOpen(false);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (isOpen) setIsOpen(false);
+      
+      let nextRow = rowIndex;
+      let nextCol = colIndex;
+
+      if (e.key === 'ArrowDown' || e.key === 'Enter') nextRow++;
+      if (e.key === 'ArrowUp') nextRow = Math.max(0, nextRow - 1);
+      if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) nextCol = Math.max(0, nextCol - 1);
+      if (e.key === 'ArrowRight' && e.target.selectionStart === inputValue.length) nextCol++;
+
+      // Nếu có sự thay đổi tọa độ
+      if (nextRow !== rowIndex || nextCol !== colIndex) {
+        e.preventDefault(); // Ngăn hành vi mặc định (cuộn trang)
+        const nextCell = document.getElementById(`cell-${nextRow}-${nextCol}`);
+        if (nextCell) {
+          nextCell.focus();
+        }
+      }
+    }
+  };
+
   // Determine current color for the input cell
   const currentShift = SHIFTS[value];
   const isOff = value === 'off' || !value;
@@ -45,10 +68,15 @@ export default function ShiftInput({ value, onChange }) {
   return (
     <div className="relative w-full h-full" ref={wrapperRef}>
       <input
+        id={`cell-${rowIndex}-${colIndex}`}
         type="text"
         value={inputValue}
         onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
+        onFocus={(e) => {
+          setIsOpen(true);
+          e.target.select();
+        }}
+        onKeyDown={handleKeyDown}
         placeholder="-"
         style={inputStyle}
         className="excel-select w-full h-full px-1 py-1 text-center font-bold outline-none focus:ring-2 focus:ring-blue-500 rounded-sm"

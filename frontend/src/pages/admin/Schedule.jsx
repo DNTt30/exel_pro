@@ -214,31 +214,36 @@ export default function Schedule() {
               {Object.keys(groupedEmps).length === 0 ? (
                 <tr><td colSpan={11} className="p-8 text-center text-slate-400">Không tìm thấy nhân viên nào</td></tr>
               ) : (
-                Object.entries(groupedEmps).map(([dept, emps]) => (
-                  <React.Fragment key={dept}>
-                    {/* Department Header Row */}
-                    <tr className="bg-blue-50">
-                      <td colSpan={11} className="font-bold text-blue-800 sticky left-0 z-10 border-r-0">
-                        🏬 Cửa hàng: {dept}
-                      </td>
-                    </tr>
-                    
-                    {/* Employees Rows */}
-                    {emps.map((emp, idx) => {
-                      const empSched = weekSchedule[emp.id] || {};
-                      return (
-                        <EmployeeRow 
-                          key={emp.id + (emp.isBorrowedTo ? '_borrowed' : '')}
-                          emp={emp}
-                          empSched={empSched}
-                          idx={idx}
-                          handleShiftChange={handleShiftChange}
-                          isAdmin={isAdmin}
-                        />
-                      );
-                    })}
-                  </React.Fragment>
-                ))
+                (() => {
+                  let absoluteRowIdx = 0;
+                  return Object.entries(groupedEmps).map(([dept, emps]) => (
+                    <React.Fragment key={dept}>
+                      {/* Department Header Row */}
+                      <tr className="bg-blue-50">
+                        <td colSpan={11} className="font-bold text-blue-800 sticky left-0 z-10 border-r-0">
+                          🏬 Cửa hàng: {dept}
+                        </td>
+                      </tr>
+                      
+                      {/* Employees Rows */}
+                      {emps.map((emp, idx) => {
+                        const empSched = weekSchedule[emp.id] || {};
+                        const currentRow = absoluteRowIdx++;
+                        return (
+                          <EmployeeRow 
+                            key={emp.id + (emp.isBorrowedTo ? '_borrowed' : '')}
+                            emp={emp}
+                            empSched={empSched}
+                            idx={idx} // relative idx for STT column
+                            absoluteRowIdx={currentRow} // absolute for Excel nav
+                            handleShiftChange={handleShiftChange}
+                            isAdmin={isAdmin}
+                          />
+                        );
+                      })}
+                    </React.Fragment>
+                  ));
+                })()
               )}
             </tbody>
           </table>

@@ -2,10 +2,11 @@ import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
 import { SHIFTS } from '../data/initialData';
 import { useStore } from '../store/useStore';
+import { Edit2 } from 'lucide-react';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) => {
+const EmployeeRow = memo(({ emp, empSched, idx, absoluteRowIdx, handleShiftChange, isAdmin }) => {
   const updateEmployee = useStore(state => state.updateEmployee);
   
   const [isEditingName, setIsEditingName] = useState(false);
@@ -103,9 +104,9 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) =>
   }
 
   return (
-    <tr className="hover:bg-slate-50 group">
+    <tr className="hover:bg-slate-50 group/row">
       <td className="text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-      <td className="sticky-col-1 group-hover:bg-slate-50" style={{ left: 0 }}>
+      <td className="sticky-col-1 group-hover/row:bg-slate-50" style={{ left: 0 }}>
         <div className="flex items-center gap-1 w-52 overflow-hidden">
           {isEditingName ? (
             <input 
@@ -118,11 +119,12 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) =>
             />
           ) : (
             <div 
-              className={`font-bold text-slate-800 truncate ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded' : ''}`}
-              title={isAdmin && !emp.isBorrowedTo ? "Click đúp để sửa" : emp.name}
-              onDoubleClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
+              className={`font-bold text-slate-800 truncate flex items-center gap-1 ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded group/name' : ''}`}
+              title={isAdmin && !emp.isBorrowedTo ? "Click để sửa" : emp.name}
+              onClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
             >
               {emp.name} 
+              {isAdmin && !emp.isBorrowedTo && <Edit2 size={12} className="opacity-0 group-hover/name:opacity-100 text-blue-500" />}
               {emp.isBorrowedTo && <span className="text-xs text-orange-600 font-normal italic ml-1">(Hỗ trợ)</span>}
               {validationWarning && (
                 <span title={validationWarning} className="text-red-500 cursor-help flex-shrink-0 ml-1">⚠️</span>
@@ -150,16 +152,17 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) =>
           </select>
         ) : (
           <span 
-            className={`bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''}`}
-            title={isAdmin && !emp.isBorrowedTo ? "Click đúp để sửa" : ''}
-            onDoubleClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
+            className={`inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 group/role ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''}`}
+            title={isAdmin && !emp.isBorrowedTo ? "Click để sửa" : ''}
+            onClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
           >
             {emp.role || emp.type}
+            {isAdmin && !emp.isBorrowedTo && <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500" />}
           </span>
         )}
       </td>
       
-      {WEEK_DAYS.map(day => {
+      {WEEK_DAYS.map((day, dIdx) => {
         const val = empSched[day] || '';
         const { display, colorClass } = parseShiftForCell(emp, val);
         
@@ -168,6 +171,8 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) =>
             <ShiftInput 
               value={display}
               onChange={(newVal) => handleShiftChange(emp, day, newVal)}
+              rowIndex={absoluteRowIdx}
+              colIndex={dIdx}
             />
           </td>
         );
@@ -180,7 +185,7 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) =>
     </tr>
   );
 }, (prevProps, nextProps) => {
-  return prevProps.empSched === nextProps.empSched && prevProps.emp === nextProps.emp && prevProps.idx === nextProps.idx && prevProps.isAdmin === nextProps.isAdmin;
+  return prevProps.empSched === nextProps.empSched && prevProps.emp === nextProps.emp && prevProps.idx === nextProps.idx && prevProps.isAdmin === nextProps.isAdmin && prevProps.absoluteRowIdx === nextProps.absoluteRowIdx;
 });
 
 export default EmployeeRow;

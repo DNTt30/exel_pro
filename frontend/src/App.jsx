@@ -58,7 +58,7 @@ function App() {
             )}
 
             {/* Employee Routes */}
-            {(user?.role === 'employee' && !user?.isManager) && (
+            {(user?.role !== 'admin' && !user?.isManager) && (
               <>
                 <Route index element={<Navigate to="/employee/schedule" replace />} />
                 <Route path="employee/schedule" element={<EmployeeSchedule />} />

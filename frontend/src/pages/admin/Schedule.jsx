@@ -188,7 +188,7 @@ export default function Schedule() {
 
       <div className="hidden print:block text-center mb-6">
         <h1 className="text-2xl font-bold uppercase">Lịch Làm Việc - Tuần {currentWeek}</h1>
-        {(effectiveFilterDept && effectiveFilterDept !== 'ALL') && <h2 className="text-lg font-semibold mt-1">Cửa hàng: {effectiveFilterDept}</h2>}
+        {(isAdmin ? filterDept : user?.dept) !== 'ALL' && <h2 className="text-lg font-semibold mt-1">Cửa hàng: {isAdmin ? filterDept : user?.dept}</h2>}
       </div>
       
       <AddEmployeeModal isOpen={showAddEmp} onClose={() => setShowAddEmp(false)} />

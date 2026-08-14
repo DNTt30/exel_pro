@@ -108,43 +108,48 @@ export default function EmployeeFeedback() {
         </div>
 
         {/* Lịch sử Feedback */}
-        <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="font-bold text-lg mb-4">Lịch sử Báo Cáo của tôi</h3>
-          
-          {myFeedbacks.length === 0 ? (
-            <div className="text-center text-slate-500 py-10 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-              Bạn chưa có báo cáo nào.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {myFeedbacks.map(fb => (
-                <div key={fb.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-slate-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className="font-bold text-slate-800">{fb.issue}</span>
-                      <span className="text-xs text-slate-500 ml-2">Ngày: {fb.date}</span>
-                    </div>
-                    {getStatusBadge(fb.status)}
-                  </div>
-                  
-                  <p className="text-sm text-slate-600 mb-2">{fb.note}</p>
-                  
-                  {fb.imageUrl && (
-                    <a href={fb.imageUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 mb-2">
-                      <ImageIcon size={12}/> Xem ảnh đính kèm
-                    </a>
-                  )}
-
-                  {fb.resolutionNote && (
-                    <div className="mt-3 bg-white p-3 rounded border border-slate-200 text-sm">
-                      <strong className="text-slate-700">Quản lý phản hồi:</strong>
-                      <p className="text-slate-600 mt-1">{fb.resolutionNote}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="md:col-span-2 bg-slate-100 p-2 rounded-xl shadow-sm border border-slate-200 overflow-auto">
+          <div className="bg-white shadow border border-slate-300 inline-block min-w-full">
+            <table className="excel-table w-full">
+              <thead>
+                <tr className="bg-slate-200">
+                  <th className="w-10">STT</th>
+                  <th className="w-24">Ngày lỗi</th>
+                  <th className="w-40">Vấn đề</th>
+                  <th className="w-48">Ghi chú</th>
+                  <th className="w-24">Trạng thái</th>
+                  <th className="w-48">Phản hồi của QL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myFeedbacks.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center p-8 text-slate-400">Bạn chưa có báo cáo nào.</td>
+                  </tr>
+                ) : (
+                  myFeedbacks.map((fb, idx) => (
+                    <tr key={fb.id} className="hover:bg-slate-50">
+                      <td className="text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                      <td className="text-center font-mono text-xs">{fb.date}</td>
+                      <td className="font-semibold text-slate-700 text-sm">{fb.issue}</td>
+                      <td className="text-xs text-slate-600">
+                        {fb.note}
+                        {fb.imageUrl && (
+                          <div className="mt-1">
+                            <a href={fb.imageUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                              <ImageIcon size={12}/> Xem ảnh
+                            </a>
+                          </div>
+                        )}
+                      </td>
+                      <td className="text-center">{getStatusBadge(fb.status)}</td>
+                      <td className="text-xs text-slate-700 font-semibold">{fb.resolutionNote || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

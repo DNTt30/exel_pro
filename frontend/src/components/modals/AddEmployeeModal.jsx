@@ -60,18 +60,23 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
             {stores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}
           </select>
         </div>
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Loại</label>
-            <select className="w-full p-2 border border-slate-300 rounded-lg" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-              <option value="FULLTIME">Full-time (FT)</option>
-              <option value="PARTTIME">Part-time (PT)</option>
-            </select>
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Chức vụ</label>
-            <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" placeholder="STFT, CSR, SM..." value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
-          </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Vị trí / Chức vụ</label>
+          <select 
+            className="w-full p-2 border border-slate-300 rounded-lg" 
+            value={formData.role} 
+            onChange={e => {
+              const role = e.target.value;
+              const type = role.includes('PT') ? 'PARTTIME' : 'FULLTIME';
+              setFormData({...formData, role, type});
+            }}
+          >
+            <option value="STFT">STFT (Nhân viên Full-time)</option>
+            <option value="PT">PT (Nhân viên Part-time)</option>
+            <option value="CSR">CSR (Chăm sóc khách hàng)</option>
+            <option value="Cửa hàng trưởng">Cửa hàng trưởng</option>
+            <option value="SM">SM (Quản lý khu vực)</option>
+          </select>
         </div>
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">Giờ tối đa/tuần</label>

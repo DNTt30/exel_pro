@@ -233,6 +233,7 @@ export default function Schedule() {
                           empSched={empSched}
                           idx={idx}
                           handleShiftChange={handleShiftChange}
+                          isAdmin={isAdmin}
                         />
                       );
                     })}

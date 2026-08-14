@@ -1,10 +1,42 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
 import { SHIFTS } from '../data/initialData';
+import { useStore } from '../store/useStore';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange }) => {
+const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange, isAdmin }) => {
+  const updateEmployee = useStore(state => state.updateEmployee);
+  
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState(emp.name);
+  
+  const [isEditingRole, setIsEditingRole] = useState(false);
+  const [editRole, setEditRole] = useState(emp.role || emp.type);
+
+  const handleNameBlur = () => {
+    setIsEditingName(false);
+    if (editName !== emp.name && editName.trim()) {
+      updateEmployee(emp.id, { name: editName.trim() });
+    } else {
+      setEditName(emp.name);
+    }
+  };
+
+  const handleRoleBlur = () => {
+    setIsEditingRole(false);
+    if (editRole !== (emp.role || emp.type) && editRole.trim()) {
+      const type = editRole.includes('PT') ? 'PARTTIME' : 'FULLTIME';
+      updateEmployee(emp.id, { role: editRole.trim(), type });
+    } else {
+      setEditRole(emp.role || emp.type);
+    }
+  };
+
+  const handleKeyDown = (e, blurFn) => {
+    if (e.key === 'Enter') blurFn();
+  };
+
   let totalH = 0;
   let totalShifts = 0;
   
@@ -73,17 +105,58 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange }) => {
   return (
     <tr className="hover:bg-slate-50 group">
       <td className="text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-      <td className="sticky-col-1 font-bold text-slate-800 group-hover:bg-slate-50" style={{ left: 0 }}>
-        <div className="truncate w-52 flex items-center gap-1" title={emp.name}>
-          {emp.name} {emp.isBorrowedTo && <span className="text-xs text-orange-600 font-normal italic">(Hỗ trợ)</span>}
-          {validationWarning && (
-            <span title={validationWarning} className="text-red-500 cursor-help flex-shrink-0">⚠️</span>
+      <td className="sticky-col-1 group-hover:bg-slate-50" style={{ left: 0 }}>
+        <div className="flex items-center gap-1 w-52 overflow-hidden">
+          {isEditingName ? (
+            <input 
+              autoFocus
+              className="w-full text-sm font-bold text-slate-800 border-b-2 border-blue-500 outline-none bg-white px-1"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              onBlur={handleNameBlur}
+              onKeyDown={e => handleKeyDown(e, handleNameBlur)}
+            />
+          ) : (
+            <div 
+              className={`font-bold text-slate-800 truncate ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded' : ''}`}
+              title={isAdmin && !emp.isBorrowedTo ? "Click đúp để sửa" : emp.name}
+              onDoubleClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
+            >
+              {emp.name} 
+              {emp.isBorrowedTo && <span className="text-xs text-orange-600 font-normal italic ml-1">(Hỗ trợ)</span>}
+              {validationWarning && (
+                <span title={validationWarning} className="text-red-500 cursor-help flex-shrink-0 ml-1">⚠️</span>
+              )}
+            </div>
           )}
         </div>
         <div className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">{emp.id}</div>
       </td>
-      <td className="sticky-col-2 text-center" style={{ left: '224px' }}>
-        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200">{emp.role || emp.type}</span>
+      <td className="sticky-col-2 text-center align-middle" style={{ left: '224px' }}>
+        {isEditingRole ? (
+          <select 
+            autoFocus
+            className="w-full bg-white text-slate-600 px-1 py-0.5 rounded text-[10px] font-bold border-2 border-blue-500 outline-none"
+            value={editRole}
+            onChange={e => setEditRole(e.target.value)}
+            onBlur={handleRoleBlur}
+            onKeyDown={e => handleKeyDown(e, handleRoleBlur)}
+          >
+            <option value="STFT">STFT</option>
+            <option value="PT">PT</option>
+            <option value="CSR">CSR</option>
+            <option value="Cửa hàng trưởng">Cửa hàng trưởng</option>
+            <option value="SM">SM</option>
+          </select>
+        ) : (
+          <span 
+            className={`bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''}`}
+            title={isAdmin && !emp.isBorrowedTo ? "Click đúp để sửa" : ''}
+            onDoubleClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
+          >
+            {emp.role || emp.type}
+          </span>
+        )}
       </td>
       
       {WEEK_DAYS.map(day => {
@@ -107,9 +180,7 @@ const EmployeeRow = memo(({ emp, empSched, idx, handleShiftChange }) => {
     </tr>
   );
 }, (prevProps, nextProps) => {
-  // Custom memo comparison function:
-  // Only re-render if empSched object ref changed, or emp object ref changed
-  return prevProps.empSched === nextProps.empSched && prevProps.emp === nextProps.emp && prevProps.idx === nextProps.idx;
+  return prevProps.empSched === nextProps.empSched && prevProps.emp === nextProps.emp && prevProps.idx === nextProps.idx && prevProps.isAdmin === nextProps.isAdmin;
 });
 
 export default EmployeeRow;

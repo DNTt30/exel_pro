@@ -10,6 +10,7 @@ const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 import AddEmployeeModal from '../../components/modals/AddEmployeeModal';
 import AddStoreModal from '../../components/modals/AddStoreModal';
 import TransferModal from '../../components/modals/TransferModal';
+import EmployeeRow from '../../components/EmployeeRow';
 
 export default function Schedule() {
   const { employees, schedule, updateShift, currentWeek, user } = useStore();
@@ -74,14 +75,14 @@ export default function Schedule() {
     return groups;
   }, [employees, search, filterDept, filterRole, weekSchedule, isAdmin, user?.dept]);
 
-  const handleShiftChange = (emp, day, value) => {
+  const handleShiftChange = React.useCallback((emp, day, value) => {
     let saveVal = value;
     // Nếu đang sửa ở bảng cửa hàng đích (mượn) và không rỗng
     if (emp.isBorrowedTo && value && !value.includes('_')) {
       saveVal = `${value}_${emp.isBorrowedTo}`;
     }
     updateShift(currentWeek, emp.id, day, saveVal);
-  };
+  }, [currentWeek, updateShift]);
 
   const getShiftColor = (shiftCode) => {
     if (!shiftCode || shiftCode === 'off') return 'bg-white text-slate-400';
@@ -225,85 +226,14 @@ export default function Schedule() {
                     {/* Employees Rows */}
                     {emps.map((emp, idx) => {
                       const empSched = weekSchedule[emp.id] || {};
-                      let totalH = 0;
-                      let totalShifts = 0;
-                      WEEK_DAYS.forEach(d => {
-                        const s = empSched[d];
-                        if (s && s !== 'off') {
-                          // Nếu đang đếm ở bảng mượn thì chỉ đếm ngày mượn
-                          if (emp.isBorrowedTo && (!s.includes('_' + emp.isBorrowedTo))) return;
-                          // Nếu đang đếm ở bảng gốc thì không đếm ngày đi mượn
-                          if (!emp.isBorrowedTo && s.includes('_')) return;
-                          
-                          let actualShift = s;
-                          if (s.includes('_')) actualShift = s.split('_')[0];
-                          if (actualShift === 'off') return;
-
-                          totalShifts++;
-                          if (SHIFTS[actualShift]) {
-                            totalH += SHIFTS[actualShift].hours;
-                          } else {
-                            // Try to parse custom shift like "10-18" or "10h-18h"
-                            const match = actualShift.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
-                            if (match) {
-                              let start = parseInt(match[1], 10);
-                              let end = parseInt(match[2], 10);
-                              if (end < start) end += 24;
-                              totalH += (end - start);
-                            }
-                          }
-                        }
-                      });
-                      
-                      const isOvertime = totalH > (emp.maxH || 48);
-                      const isMissing = totalH === 0;
-                      
-                      let validationWarning = null;
-                      const role = emp.role || emp.type || '';
-                      // Không validate ca/giờ đối với nhân viên đi mượn (để bảng đích không báo lỗi oan)
-                      if (!emp.isBorrowedTo) {
-                        if (role.includes('PT') && totalH > 0 && totalH < 16) {
-                          validationWarning = 'Thiếu giờ (Min 16h)';
-                        } else if ((role.includes('FT') || role.includes('CSR')) && totalShifts > 0 && totalShifts !== 6) {
-                          validationWarning = `Sai số ca (${totalShifts}/6)`;
-                        }
-                      }
-
                       return (
-                        <tr key={emp.id + (emp.isBorrowedTo ? '_borrowed' : '')} className="hover:bg-slate-50 group">
-                          <td className="text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                          <td className="sticky-col-1 font-bold text-slate-800 group-hover:bg-slate-50" style={{ left: 0 }}>
-                            <div className="truncate w-52 flex items-center gap-1" title={emp.name}>
-                              {emp.name} {emp.isBorrowedTo && <span className="text-xs text-orange-600 font-normal italic">(Hỗ trợ)</span>}
-                              {validationWarning && (
-                                <span title={validationWarning} className="text-red-500 cursor-help flex-shrink-0">⚠️</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">{emp.id}</div>
-                          </td>
-                          <td className="sticky-col-2 text-center" style={{ left: '224px' }}>
-                            <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200">{emp.role || emp.type}</span>
-                          </td>
-                          
-                          {WEEK_DAYS.map(day => {
-                            const val = empSched[day] || '';
-                            const { display, colorClass } = parseShiftForCell(emp, val);
-                            
-                            return (
-                              <td key={day} className={`p-0 border-r border-b border-slate-300 ${colorClass}`}>
-                                <ShiftInput 
-                                  value={display}
-                                  onChange={(newVal) => handleShiftChange(emp, day, newVal)}
-                                />
-                              </td>
-                            );
-                          })}
-                          
-                          <td className={`text-center font-bold ${isOvertime || validationWarning ? 'bg-red-50 text-red-600' : isMissing ? 'text-amber-500' : 'text-emerald-600'}`}>
-                            {totalH}h
-                            {validationWarning && <div className="text-[9px] font-normal leading-none mt-1">{validationWarning}</div>}
-                          </td>
-                        </tr>
+                        <EmployeeRow 
+                          key={emp.id + (emp.isBorrowedTo ? '_borrowed' : '')}
+                          emp={emp}
+                          empSched={empSched}
+                          idx={idx}
+                          handleShiftChange={handleShiftChange}
+                        />
                       );
                     })}
                   </React.Fragment>

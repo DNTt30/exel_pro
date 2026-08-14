@@ -1,0 +1,72 @@
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useStore } from './store/useStore';
+import Login from './pages/Login';
+import AppLayout from './components/layout/AppLayout';
+import Schedule from './pages/admin/Schedule';
+import Timesheet from './pages/admin/Timesheet';
+import FeedbackCB from './pages/admin/FeedbackCB';
+import EmployeeSchedule from './pages/employee/EmployeeSchedule';
+import EmployeeTimesheet from './pages/employee/EmployeeTimesheet';
+import EmployeeFeedback from './pages/employee/EmployeeFeedback';
+
+const PrivateRoute = ({ children, allowedRoles }) => {
+  const user = useStore(state => state.user);
+  
+  if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+};
+
+function App() {
+  const user = useStore(state => state.user);
+  const initializeData = useStore(state => state.initializeData);
+  const isInitializing = useStore(state => state.isInitializing);
+
+  useEffect(() => {
+    initializeData();
+  }, [initializeData]);
+
+  if (isInitializing) {
+    return <div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải dữ liệu từ Cloud...</div></div>;
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        
+        <Route path="/" element={
+          <PrivateRoute>
+            <AppLayout />
+          </PrivateRoute>
+        }>
+          {/* Admin & Manager Routes */}
+          {(user?.role === 'admin' || user?.isManager) && (
+            <>
+              <Route index element={<Navigate to="/admin/schedule" replace />} />
+              <Route path="admin/schedule" element={<Schedule />} />
+              <Route path="admin/timesheet" element={<Timesheet />} />
+              <Route path="admin/feedback" element={<FeedbackCB />} />
+            </>
+          )}
+
+          {/* Employee Routes */}
+          {(user?.role === 'employee' && !user?.isManager) && (
+            <>
+              <Route index element={<Navigate to="/employee/schedule" replace />} />
+              <Route path="employee/schedule" element={<EmployeeSchedule />} />
+              <Route path="employee/timesheet" element={<EmployeeTimesheet />} />
+              <Route path="employee/feedback" element={<EmployeeFeedback />} />
+            </>
+          )}
+        </Route>
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;

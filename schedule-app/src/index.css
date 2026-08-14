@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  /* Type */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Neutrals — cool slate, not the default warm-cream/near-black clichés */
+  --color-surface: #f4f6f8;
+  --color-surface-raised: #ffffff;
+  --color-ink: #1c2230;
+  --color-ink-soft: #5b6472;
+  --color-line: #e2e6ec;
+  --color-line-strong: #c9cfd9;
+
+  /* Brand / chrome accent */
+  --color-accent: #2b4c7e;
+  --color-accent-soft: #e7edf7;
+
+  /* Shift-type palette — the disciplined, single-source-of-truth legend.
+     Every color in the app is derived from THIS list. Nothing is hand-painted. */
+  --color-ca1: #2f8f5b;
+  --color-ca1-soft: #e4f4ec;
+  --color-ca2: #1f8f97;
+  --color-ca2-soft: #e1f2f3;
+  --color-ca3: #3c4f9e;
+  --color-ca3-soft: #e6e9f7;
+  --color-csrnew: #c85a41;
+  --color-csrnew-soft: #f8e6e1;
+  --color-support: #b8862b;
+  --color-support-soft: #f6ecd9;
+  --color-training: #7c5a96;
+  --color-training-soft: #ede4f1;
+  --color-off: #8891a0;
+  --color-off-soft: #eceef1;
+  --color-unset: #b0b6c0;
+
+  /* Status */
+  --color-critical: #b3392c;
+  --color-critical-soft: #fbe8e5;
+  --color-warning: #a8701f;
+  --color-warning-soft: #f7ecd9;
+  --color-ok: #2f7d4f;
+  --color-ok-soft: #e3f2e8;
+}
+
+html {
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible keyboard focus everywhere, per accessibility floor */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

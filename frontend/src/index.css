@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+}
+
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --border: #e2e8f0;
+  --text: #334155;
+  --text2: #475569;
+  --text3: #94a3b8;
+  --bg: #f8fafc;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #ca8a04;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer components {
+  /* Buttons */
+  .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .btn-primary { background-color: #2563eb; color: white; border: 1px solid #1d4ed8; }
+  .btn-primary:hover { background-color: #1d4ed8; }
+  .btn-outline { background-color: white; border: 1px solid #cbd5e1; color: #334155; }
+  .btn-outline:hover { background-color: #f8fafc; }
+  .btn-danger { background-color: #dc2626; color: white; border: 1px solid #b91c1c; }
+  .btn-danger:hover { background-color: #b91c1c; }
+
+  /* Excel-like Table Utilities */
+  .excel-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.8125rem; /* 13px, dense like Excel */
+    background: white;
+  }
+  .excel-table th, .excel-table td {
+    border: 1px solid #cbd5e1; /* slate-300 */
+    padding: 4px 6px;
+    vertical-align: middle;
+  }
+  .excel-table th {
+    background-color: #f1f5f9; /* slate-100 */
+    color: #334155;
+    font-weight: 700;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid #94a3b8; /* thicker bottom border for header */
+  }
+  
+  /* Sticky Left Columns */
+  .sticky-col-1 {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 5;
+  }
+  .sticky-col-2 {
+    position: sticky;
+    left: 200px; /* Adjust based on col 1 width */
+    background-color: white;
+    z-index: 5;
+  }
+  
+  .excel-table th.sticky-col-1, 
+  .excel-table th.sticky-col-2 {
+    z-index: 15; /* Above both rows and normal sticky header */
+    background-color: #f1f5f9;
+  }
+
+  /* Form Elements for Excel */
+  .excel-select {
+    width: 100%;
+    height: 100%;
+    min-height: 24px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 0.75rem; /* 12px */
+    font-weight: 700;
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .excel-select:hover {
+    border-color: #94a3b8;
+  }
+  .excel-select:focus {
+    border-color: #2563eb;
+    background-color: white;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+}

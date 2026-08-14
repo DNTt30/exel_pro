@@ -1,0 +1,1 @@
+export default function EmployeeTimesheet() { return <div className="p-4">EmployeeTimesheet Component</div>; }

@@ -220,8 +220,7 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
           <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; mso-number-format: '\\@';">${emp.id}</td>
           <td style="border: 1px solid #94a3b8; text-align: left; font-weight: bold; padding-left: 8px;">${emp.name}</td>
           <td style="border: 1px solid #94a3b8; text-align: center; color: #2563eb; font-weight: bold;">${dept}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center;">${emp.role || 'CSR'}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center;">${emp.type || 'STPT'}</td>
+          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold;">${emp.role || emp.type || 'STPT'}</td>
           ${dayCells}
           <td style="border: 1px solid #94a3b8; text-align: center; background-color: #f8fafc; font-weight: bold;">${!isPT ? (total / 8).toFixed(1) : '-'}</td>
           <td style="border: 1px solid #94a3b8; text-align: center; ${ptStyle}">${isPT ? (isOver91 ? `⚠️ ${total}h` : `${total}h`) : '-'}</td>
@@ -247,12 +246,12 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
       <table>
         <thead>
           <tr>
-            <th colspan="${activeDays.length + 9}" class="main-title" style="border: 1px solid #1e3a8a;">
+            <th colspan="${activeDays.length + 8}" class="main-title" style="border: 1px solid #1e3a8a;">
               BẢNG CHẤM CÔNG CHU KỲ (26 THÁNG TRƯỚC → 25 THÁNG NÀY)
             </th>
           </tr>
           <tr>
-            <th colspan="${activeDays.length + 9}" class="sub-info" style="border: 1px solid #cbd5e1;">
+            <th colspan="${activeDays.length + 8}" class="sub-info" style="border: 1px solid #cbd5e1;">
               Cửa hàng: <strong>${deptName || 'Toàn bộ cửa hàng'}</strong> | Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Đơn vị: Chuỗi Cửa Hàng OFC
             </th>
           </tr>
@@ -261,8 +260,7 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
             <th style="width: 85px; border: 1px solid #94a3b8;">Mã NV</th>
             <th style="width: 170px; text-align: left; padding-left: 8px; border: 1px solid #94a3b8;">Họ và Tên</th>
             <th style="width: 75px; border: 1px solid #94a3b8;">Bộ phận</th>
-            <th style="width: 65px; border: 1px solid #94a3b8;">Vị trí</th>
-            <th style="width: 70px; border: 1px solid #94a3b8;">Loại HĐ</th>
+            <th style="width: 85px; border: 1px solid #94a3b8;">Vị trí</th>
             ${activeDays.map(day => `<th style="width: 45px; border: 1px solid #94a3b8;">${day}</th>`).join('')}
             <th style="width: 65px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Công FT</th>
             <th style="width: 65px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Công PT</th>

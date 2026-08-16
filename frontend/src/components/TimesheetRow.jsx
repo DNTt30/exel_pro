@@ -1,8 +1,9 @@
 import React, { memo } from 'react';
 import { SHIFTS } from '../data/initialData';
+import { getRoleBadgeInfo } from '../data/constants';
 
 const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
-  // Tính toán Auto-sum (Mock logic)
+  // Tính toán Auto-sum
   let totalPT = 0;
   let totalFT = 0;
   
@@ -21,15 +22,27 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
 
   const isPTOvertimed = isPT && totalPT > 91;
   const tongCong = totalPT + totalFT;
+  const badgeInfo = getRoleBadgeInfo(emp.role || emp.type);
 
   return (
     <tr className="hover:bg-slate-50 border-b border-slate-200 group/row">
-      <td className="text-center text-slate-400 font-mono min-w-[40px] w-[40px] max-w-[40px] md:sticky left-0 z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300">{idx + 1}</td>
-      <td className="hidden md:table-cell text-center font-mono text-slate-600 min-w-[96px] w-[96px] max-w-[96px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '40px' }}>{emp.id}</td>
-      <td className="font-bold text-slate-800 min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] sticky md:z-10 z-20 bg-white group-hover/row:bg-slate-50 border-r border-slate-300 truncate px-2 left-0 md:left-[136px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{emp.name}</td>
-      <td className="hidden md:table-cell text-center font-semibold text-slate-600 min-w-[80px] w-[80px] max-w-[80px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '328px' }}>{emp.dept}</td>
-      <td className="hidden lg:table-cell text-center text-slate-600 min-w-[128px] w-[128px] max-w-[128px] lg:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300 truncate px-1" style={{ left: '408px' }}>{emp.role || 'CSR'}</td>
-      <td className="hidden xl:table-cell text-center font-bold text-slate-700 min-w-[80px] w-[80px] max-w-[80px] xl:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-400" style={{ left: '536px' }}>{emp.type}</td>
+      <td className="text-center text-slate-400 font-mono min-w-[40px] w-[40px] max-w-[40px] md:sticky left-0 z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300">
+        {idx + 1}
+      </td>
+      <td className="hidden md:table-cell text-center font-mono text-slate-600 min-w-[96px] w-[96px] max-w-[96px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '40px' }}>
+        {emp.id}
+      </td>
+      <td className="font-bold text-slate-800 min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] sticky md:z-10 z-20 bg-white group-hover/row:bg-slate-50 border-r border-slate-300 truncate px-2 left-0 md:left-[136px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+        {emp.name}
+      </td>
+      <td className="hidden md:table-cell text-center font-semibold text-slate-600 min-w-[80px] w-[80px] max-w-[80px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '328px' }}>
+        {emp.dept}
+      </td>
+      <td className="hidden lg:table-cell text-center min-w-[120px] w-[120px] max-w-[120px] lg:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-400 px-1" style={{ left: '408px' }}>
+        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeInfo.badgeCls}`}>
+          {badgeInfo.id}
+        </span>
+      </td>
       
       {/* 31 Ngày */}
       {activeDays.map(day => {

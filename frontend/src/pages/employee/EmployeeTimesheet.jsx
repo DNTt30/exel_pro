@@ -207,8 +207,7 @@ export default function EmployeeTimesheet() {
                 <th rowSpan={2} className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center md:sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '40px' }}>Mã NV</th>
                 <th rowSpan={2} className="min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] text-left md:sticky z-20 bg-slate-200 border-r border-slate-300 px-2 left-0 md:left-[136px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Họ và Tên</th>
                 <th rowSpan={2} className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center md:sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '328px' }}>Bộ phận</th>
-                <th rowSpan={2} className="hidden lg:table-cell min-w-[128px] w-[128px] max-w-[128px] text-center lg:sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '408px' }}>Vị trí</th>
-                <th rowSpan={2} className="hidden xl:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center xl:sticky z-20 bg-slate-200 border-r border-slate-400" style={{ left: '536px' }}>Loại HĐ</th>
+                <th rowSpan={2} className="hidden lg:table-cell min-w-[120px] w-[120px] max-w-[120px] text-center lg:sticky z-20 bg-slate-200 border-r border-slate-400" style={{ left: '408px' }}>Vị trí / Chức vụ</th>
 
                 {/* 31 Cột Ngày */}
                 <th colSpan={31} className="text-center border-r border-slate-400 bg-slate-100 py-1">

@@ -87,7 +87,7 @@ export default function Timesheet() {
             <thead>
               {/* Header Tầng 1: Nhóm Cột */}
               <tr className="bg-slate-300 border-b border-slate-400">
-                <th colSpan={6} className="border-r border-slate-400 sticky left-0 z-20 bg-slate-300">THÔNG TIN NHÂN VIÊN</th>
+                <th colSpan={5} className="border-r border-slate-400 sticky left-0 z-20 bg-slate-300">THÔNG TIN NHÂN VIÊN</th>
                 <th colSpan={31} className="border-r border-slate-400 bg-blue-100 text-blue-800">NGÀY CÔNG TRONG THÁNG (26 - 25)</th>
                 <th colSpan={12} className="border-r border-slate-400 bg-emerald-100 text-emerald-800">TỔNG HỢP CÔNG & PHÉP</th>
                 <th colSpan={3} className="border-r border-slate-400 bg-amber-100 text-amber-800">OT - CA NGÀY</th>
@@ -101,8 +101,7 @@ export default function Timesheet() {
                 <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] border-r border-slate-300 md:sticky z-20 bg-slate-200" style={{ left: '40px' }}>Mã NV</th>
                 <th className="min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] border-r border-slate-300 sticky md:z-20 z-30 bg-slate-200 left-0 md:left-[136px]">Họ và Tên</th>
                 <th className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] border-r border-slate-300 md:sticky z-20 bg-slate-200" style={{ left: '328px' }}>Phòng ban</th>
-                <th className="hidden lg:table-cell min-w-[128px] w-[128px] max-w-[128px] border-r border-slate-300 lg:sticky z-20 bg-slate-200" style={{ left: '408px' }}>Chức vụ</th>
-                <th className="hidden xl:table-cell min-w-[80px] w-[80px] max-w-[80px] border-r border-slate-400 xl:sticky z-20 bg-slate-200" style={{ left: '536px' }}>Loại NV</th>
+                <th className="hidden lg:table-cell min-w-[120px] w-[120px] max-w-[120px] border-r border-slate-400 lg:sticky z-20 bg-slate-200" style={{ left: '408px' }}>Vị trí / Chức vụ</th>
                 
                 {/* 31 Ngày */}
                 {activeDays.map(day => (

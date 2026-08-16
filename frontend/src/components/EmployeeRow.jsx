@@ -2,7 +2,7 @@ import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
 import { useStore } from '../store/useStore';
 import { Edit2 } from 'lucide-react';
-import { EMPLOYEE_TYPES } from '../data/constants';
+import { EMPLOYEE_TYPES, STANDARD_ROLES, getRoleBadgeInfo } from '../data/constants';
 import { 
   parseShiftForCell, 
   calculateEmployeeWeeklyHours, 
@@ -38,11 +38,12 @@ const EmployeeRow = memo(({
   const handleRoleBlur = () => {
     setIsEditingRole(false);
     if (editRole !== (emp.role || emp.type) && editRole.trim()) {
-      let type = EMPLOYEE_TYPES.STFT;
-      if (editRole.includes('PT')) type = EMPLOYEE_TYPES.STPT;
-      else if (editRole.includes('CSR')) type = EMPLOYEE_TYPES.CSR_NEW;
-      
-      updateEmployee(emp.id, { role: editRole.trim(), type });
+      const roleInfo = STANDARD_ROLES.find(r => r.id === editRole.trim()) || { type: 'STFT', defaultMaxH: 48 };
+      updateEmployee(emp.id, { 
+        role: editRole.trim(), 
+        type: roleInfo.type, 
+        maxH: roleInfo.defaultMaxH 
+      });
     } else {
       setEditRole(emp.role || emp.type);
     }
@@ -116,31 +117,34 @@ const EmployeeRow = memo(({
         {isEditingRole ? (
           <select 
             autoFocus
-            className="w-full bg-white text-slate-600 px-1 py-0.5 rounded text-[10px] font-bold border-2 border-blue-500 outline-none"
+            className="w-full bg-white text-slate-700 px-1 py-0.5 rounded text-[10px] font-bold border-2 border-blue-500 outline-none"
             value={editRole}
             onChange={e => setEditRole(e.target.value)}
             onBlur={handleRoleBlur}
             onKeyDown={e => handleKeyDown(e, handleRoleBlur)}
           >
-            <option value="STFT">STFT (Full-time)</option>
-            <option value="STPT">STPT (Part-time)</option>
-            <option value="CSR_NEW">CSR_NEW (Chăm sóc KH)</option>
-            <option value="Cửa hàng trưởng">Cửa hàng trưởng</option>
-            <option value="SM">SM</option>
+            {STANDARD_ROLES.map(r => (
+              <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
           </select>
         ) : (
-          <span 
-            className={`inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 group/role ${
-              isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''
-            }`}
-            title={isAdmin && !emp.isBorrowedTo ? "Click để sửa vị trí" : ''}
-            onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
-          >
-            <span className="truncate">{emp.role || emp.type}</span>
-            {isAdmin && !emp.isBorrowedTo && (
-              <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500 flex-shrink-0" />
-            )}
-          </span>
+          (() => {
+            const badge = getRoleBadgeInfo(emp.role || emp.type);
+            return (
+              <span 
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${badge.badgeCls} group/role ${
+                  isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:brightness-95' : ''
+                }`}
+                title={isAdmin && !emp.isBorrowedTo ? "Click để sửa vị trí" : ''}
+                onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
+              >
+                <span className="truncate">{badge.id}</span>
+                {isAdmin && !emp.isBorrowedTo && (
+                  <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500 flex-shrink-0" />
+                )}
+              </span>
+            );
+          })()
         )}
       </td>
       

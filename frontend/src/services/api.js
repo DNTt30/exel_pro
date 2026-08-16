@@ -109,14 +109,20 @@ export async function getFeedbacks() {
   }
   return data.map(f => ({
     id: f.id,
-    empId: f.emp_id,
-    name: f.name,
+    empId: f.emp_id || f.empId,
+    empName: f.emp_name || f.empName || f.name || '',
+    name: f.emp_name || f.empName || f.name || '',
     dept: f.dept,
+    empRole: f.emp_role || f.empRole || f.role || 'STPT',
+    empType: f.emp_type || f.empType || f.type || 'STPT',
     date: f.date,
     shift: f.shift,
     hours: f.hours,
-    reason: f.reason,
-    status: f.status
+    reason: f.reason || f.issue || '',
+    issue: f.issue || f.reason || '',
+    note: f.note || '',
+    imageUrl: f.image_url || f.imageUrl || '',
+    status: f.status || 'pending'
   }));
 }
 

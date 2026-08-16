@@ -454,7 +454,29 @@ export default function EmployeeFeedback() {
                     return (
                       <tr key={fb.id} className={`hover:bg-slate-50 ${isPTOver ? 'bg-red-50/40' : ''}`}>
                         <td className="p-2 text-center font-mono text-slate-400 sticky left-0 z-10 bg-white border-r border-slate-300">{idx + 1}</td>
-                        <td className="p-2 text-center font-mono font-semibold text-slate-700 border-r border-slate-300">{fb.date}</td>
+                        <td className="p-2 text-center font-mono font-semibold text-slate-700 border-r border-slate-300 whitespace-nowrap">
+                          {(() => {
+                            if (!fb.date) return '-';
+                            let d;
+                            if (fb.date.includes('/')) {
+                              const parts = fb.date.split('/').map(Number);
+                              d = new Date(parts[2], parts[1] - 1, parts[0]);
+                            } else if (fb.date.includes('-')) {
+                              const parts = fb.date.split('-').map(Number);
+                              d = parts[0] > 1000 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(parts[2], parts[1] - 1, parts[0]);
+                            }
+                            if (!d || isNaN(d.getTime())) return fb.date;
+                            const map = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                            const dayKey = map[d.getDay()];
+                            const formatted = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                            return (
+                              <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-xs">
+                                <span className="font-bold text-blue-700">{dayKey}</span>
+                                <span className="text-slate-600">{formatted}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="p-2 font-bold text-slate-800 border-r border-slate-300">
                           {isPTOver ? (
                             <span className="inline-flex items-center gap-1 text-red-700 font-bold">

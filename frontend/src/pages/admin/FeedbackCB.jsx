@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { CheckCircle2, XCircle, Search, Filter, Image as ImageIcon } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
+import StatusBadge from '../../components/ui/StatusBadge';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-const FeedbackRow = ({ fb, idx, getStatusBadge, resolveFeedback }) => {
+const FeedbackRow = ({ fb, idx, resolveFeedback }) => {
   const [targetDay, setTargetDay] = useState('T2');
   const [newShift, setNewShift] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
@@ -29,12 +30,22 @@ const FeedbackRow = ({ fb, idx, getStatusBadge, resolveFeedback }) => {
       <td className="text-center font-semibold text-slate-700">{fb.dept}</td>
       <td className="text-center font-mono text-xs text-slate-500">{fb.empId}</td>
       <td className="font-bold text-slate-800">{fb.empName}</td>
+      <td className="text-center text-xs text-slate-600">{fb.empRole || 'CSR'}</td>
+      <td className="text-center text-xs font-semibold text-slate-700">{fb.empType || 'STPT'}</td>
       <td className="text-center font-mono text-xs text-slate-700">{fb.date}</td>
-      <td className="text-sm text-red-600 font-semibold">{fb.issue}</td>
+      <td className="text-sm font-semibold">
+        {(fb.isPTOvertime || (fb.issue && fb.issue.includes('91h'))) ? (
+          <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded-full text-xs font-black">
+            <span>⚠️</span> {fb.issue}
+          </span>
+        ) : (
+          <span className="text-slate-800">{fb.issue}</span>
+        )}
+      </td>
       <td className="text-xs text-slate-600 truncate max-w-[200px]" title={fb.note}>{fb.note}</td>
       <td className="text-center">
         {fb.imageUrl ? (
-          <a href={fb.imageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:underline">
+          <a href={fb.imageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:underline font-bold">
             <ImageIcon size={14} className="mr-1"/> Xem ảnh
           </a>
         ) : (
@@ -42,7 +53,7 @@ const FeedbackRow = ({ fb, idx, getStatusBadge, resolveFeedback }) => {
         )}
       </td>
       <td className="text-center">
-        {getStatusBadge(fb.status)}
+        <StatusBadge status={fb.status} />
       </td>
       <td className="p-1 align-middle">
         {fb.status === 'pending' ? (
@@ -112,11 +123,7 @@ export default function FeedbackCB() {
     return true;
   });
 
-  const getStatusBadge = (status) => {
-    if (status === 'approved') return <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold">ĐÃ DUYỆT</span>;
-    if (status === 'rejected') return <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">TỪ CHỐI</span>;
-    return <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">CHỜ DUYỆT</span>;
-  };
+
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
@@ -143,6 +150,11 @@ export default function FeedbackCB() {
         }
       />
 
+      <div className="bg-red-50 text-red-700 p-2 text-xs text-center border-b border-red-200 shadow-sm flex flex-col items-center justify-center">
+        <span className="font-bold flex items-center gap-1"><XCircle size={14} /> CHÚ Ý QUAN TRỌNG:</span>
+        <span>C&B chốt dữ thông tin Feedback lương vào 17h30 ngày 10 hằng tháng. Vui lòng kiểm tra và xử lý toàn bộ báo cáo trước thời hạn này.</span>
+      </div>
+
       <div className="flex-1 overflow-auto bg-slate-100 p-2">
         <div className="bg-white shadow border border-slate-300 inline-block min-w-full">
           <table className="excel-table">
@@ -152,6 +164,8 @@ export default function FeedbackCB() {
                 <th className="w-24">Cửa hàng</th>
                 <th className="w-20">Mã NV</th>
                 <th className="w-48">Họ và Tên</th>
+                <th className="w-24">Chức vụ</th>
+                <th className="w-20">Loại NV</th>
                 <th className="w-28">Ngày bị lỗi</th>
                 <th className="w-48">Vấn đề / Lý do</th>
                 <th className="w-64">Ghi chú của NV</th>
@@ -163,7 +177,7 @@ export default function FeedbackCB() {
             <tbody>
               {filteredFeedbacks.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center p-8 text-slate-400">Không có dữ liệu báo cáo</td>
+                  <td colSpan={12} className="text-center p-8 text-slate-400">Không có dữ liệu báo cáo</td>
                 </tr>
               ) : (
                 filteredFeedbacks.map((fb, idx) => (
@@ -171,7 +185,6 @@ export default function FeedbackCB() {
                     key={fb.id} 
                     fb={fb} 
                     idx={idx} 
-                    getStatusBadge={getStatusBadge} 
                     resolveFeedback={resolveFeedback}
                   />
                 ))

@@ -39,84 +39,104 @@ export default function Stores() {
     }
   };
 
+  const getRegionBadge = (region) => {
+    switch (region) {
+      case 'Miền Bắc':
+        return <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-bold">Miền Bắc</span>;
+      case 'Miền Trung':
+        return <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[11px] font-bold">Miền Trung</span>;
+      case 'Miền Nam':
+        return <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[11px] font-bold">Miền Nam</span>;
+      default:
+        return <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-bold">{region}</span>;
+    }
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-6 h-full flex flex-col">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Quản lý Cửa hàng</h2>
-          <p className="text-sm text-slate-500 mt-1">Quản lý danh sách các cửa hàng trong hệ thống</p>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">Quản lý Cửa hàng</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Danh sách các chi nhánh / cửa hàng trong chuỗi ({stores.length} cửa hàng)</p>
         </div>
         <button 
           onClick={() => { setIsAdding(true); setFormData({ id: '', name: '', region: 'Miền Bắc' }); }}
-          className="btn btn-primary text-sm"
+          className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap"
         >
-          <Plus size={16} /> Thêm cửa hàng
+          <Plus size={15} /> Thêm cửa hàng
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse">
+      <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="bg-slate-50 text-left border-y border-slate-200">
-              <th className="p-3 text-sm font-semibold text-slate-600">Mã Cửa hàng</th>
-              <th className="p-3 text-sm font-semibold text-slate-600">Tên Cửa hàng</th>
-              <th className="p-3 text-sm font-semibold text-slate-600">Khu vực</th>
-              <th className="p-3 text-sm font-semibold text-slate-600 text-right">Thao tác</th>
+            <tr className="bg-slate-100/80 text-left border-b border-slate-200 sticky top-0 z-10 text-xs font-bold text-slate-600">
+              <th className="p-3">Mã Cửa hàng</th>
+              <th className="p-3">Tên Cửa hàng</th>
+              <th className="p-3">Khu vực</th>
+              <th className="p-3 text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100 text-xs">
             {isAdding && (
-              <tr className="border-b border-slate-100 bg-blue-50/50">
-                <td className="p-2"><input type="text" className="w-full p-2 border rounded" placeholder="VD: VN0485" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} /></td>
-                <td className="p-2"><input type="text" className="w-full p-2 border rounded" placeholder="Tên hiển thị" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></td>
-                <td className="p-2">
-                  <select className="w-full p-2 border rounded" value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})}>
+              <tr className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
+                <td className="p-2.5"><input type="text" className="w-full p-1.5 border border-blue-300 rounded bg-white font-mono text-xs outline-none" placeholder="VD: VN0485" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} /></td>
+                <td className="p-2.5"><input type="text" className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs font-semibold outline-none" placeholder="Tên hiển thị" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></td>
+                <td className="p-2.5">
+                  <select className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-medium" value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})}>
                     <option>Miền Bắc</option>
                     <option>Miền Trung</option>
                     <option>Miền Nam</option>
                   </select>
                 </td>
-                <td className="p-2 text-right">
-                  <button onClick={handleSaveAdd} className="text-emerald-600 p-2 hover:bg-emerald-50 rounded"><Save size={18} /></button>
-                  <button onClick={() => setIsAdding(false)} className="text-slate-400 p-2 hover:bg-slate-100 rounded ml-1"><X size={18} /></button>
+                <td className="p-2.5 text-right whitespace-nowrap">
+                  <button onClick={handleSaveAdd} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded font-bold mr-1" title="Lưu"><Save size={15} /></button>
+                  <button onClick={() => setIsAdding(false)} className="text-slate-600 bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded font-bold" title="Hủy"><X size={15} /></button>
                 </td>
               </tr>
             )}
             
             {stores.map(st => (
-              <tr key={st.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="p-3 font-mono font-bold text-slate-700">{st.id}</td>
-                <td className="p-3">
+              <tr key={st.id} className="hover:bg-slate-50 transition-colors">
+                <td className="p-3 font-mono font-bold text-slate-800">{st.id}</td>
+                <td className="p-3 font-semibold text-slate-800">
                   {editingId === st.id ? (
-                    <input type="text" className="w-full p-2 border rounded" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                    <input type="text" className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs font-bold outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                   ) : st.name}
                 </td>
                 <td className="p-3">
                   {editingId === st.id ? (
-                    <select className="w-full p-2 border rounded" value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})}>
+                    <select className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs" value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})}>
                       <option>Miền Bắc</option>
                       <option>Miền Trung</option>
                       <option>Miền Nam</option>
                     </select>
-                  ) : <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-600">{st.region}</span>}
+                  ) : getRegionBadge(st.region)}
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right whitespace-nowrap">
                   {editingId === st.id ? (
                     <>
-                      <button onClick={handleSaveEdit} className="text-emerald-600 p-2 hover:bg-emerald-50 rounded"><Save size={18} /></button>
-                      <button onClick={() => setEditingId(null)} className="text-slate-400 p-2 hover:bg-slate-100 rounded ml-1"><X size={18} /></button>
+                      <button onClick={handleSaveEdit} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1.5 rounded mr-1" title="Lưu"><Save size={15} /></button>
+                      <button onClick={() => setEditingId(null)} className="text-slate-500 bg-slate-100 hover:bg-slate-200 p-1.5 rounded" title="Hủy"><X size={15} /></button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => { setEditingId(st.id); setFormData(st); }} className="text-blue-600 p-2 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
-                      <button onClick={() => handleDelete(st.id)} className="text-red-500 p-2 hover:bg-red-50 rounded ml-1"><Trash2 size={16} /></button>
+                      <button onClick={() => { setEditingId(st.id); setFormData(st); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
+                      <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>
                     </>
                   )}
                 </td>
               </tr>
             ))}
             {stores.length === 0 && !isAdding && (
-              <tr><td colSpan={4} className="p-8 text-center text-slate-400">Chưa có cửa hàng nào.</td></tr>
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="text-2xl">🏬</span>
+                    <span className="font-medium text-xs">Chưa có cửa hàng nào trong hệ thống.</span>
+                  </div>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

@@ -5,9 +5,12 @@ import { lazy, Suspense } from 'react';
 
 const Login = lazy(() => import('./pages/Login'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const Schedule = lazy(() => import('./pages/admin/Schedule'));
 const Timesheet = lazy(() => import('./pages/admin/Timesheet'));
 const FeedbackCB = lazy(() => import('./pages/admin/FeedbackCB'));
+const Employees = lazy(() => import('./pages/admin/Employees'));
+const Stores = lazy(() => import('./pages/admin/Stores'));
 const EmployeeSchedule = lazy(() => import('./pages/employee/EmployeeSchedule'));
 const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'));
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
@@ -21,6 +24,15 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   }
   
   return children;
+};
+
+const IndexRedirect = () => {
+  const user = useStore(state => state.user);
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'admin' || user.isManager) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  return <Navigate to="/employee/schedule" replace />;
 };
 
 function App() {
@@ -47,26 +59,24 @@ function App() {
               <AppLayout />
             </PrivateRoute>
           }>
+            {/* Index Route */}
+            <Route index element={<IndexRedirect />} />
+            
             {/* Admin & Manager Routes */}
-            {(user?.role === 'admin' || user?.isManager) && (
-              <>
-                <Route index element={<Navigate to="/admin/schedule" replace />} />
-                <Route path="admin/schedule" element={<Schedule />} />
-                <Route path="admin/timesheet" element={<Timesheet />} />
-                <Route path="admin/feedback" element={<FeedbackCB />} />
-              </>
-            )}
+            <Route path="admin/dashboard" element={<Dashboard />} />
+            <Route path="admin/schedule" element={<Schedule />} />
+            <Route path="admin/timesheet" element={<Timesheet />} />
+            <Route path="admin/feedback" element={<FeedbackCB />} />
+            <Route path="admin/employees" element={<Employees />} />
+            <Route path="admin/stores" element={<Stores />} />
 
             {/* Employee Routes */}
-            {(user?.role !== 'admin' && !user?.isManager) && (
-              <>
-                <Route index element={<Navigate to="/employee/schedule" replace />} />
-                <Route path="employee/schedule" element={<EmployeeSchedule />} />
-                <Route path="employee/timesheet" element={<EmployeeTimesheet />} />
-                <Route path="employee/feedback" element={<EmployeeFeedback />} />
-              </>
-            )}
+            <Route path="employee/schedule" element={<EmployeeSchedule />} />
+            <Route path="employee/timesheet" element={<EmployeeTimesheet />} />
+            <Route path="employee/feedback" element={<EmployeeFeedback />} />
           </Route>
+          
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
     </Router>

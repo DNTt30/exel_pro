@@ -1,12 +1,23 @@
 import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
-import { SHIFTS } from '../data/initialData';
 import { useStore } from '../store/useStore';
 import { Edit2 } from 'lucide-react';
+import { EMPLOYEE_TYPES } from '../data/constants';
+import { 
+  parseShiftForCell, 
+  calculateEmployeeWeeklyHours, 
+  validateEmployeeSchedule 
+} from '../utils/shiftHelper';
 
-const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-
-const EmployeeRow = memo(({ emp, empSched, idx, absoluteRowIdx, handleShiftChange, isAdmin }) => {
+const EmployeeRow = memo(({ 
+  emp, 
+  empSched, 
+  idx, 
+  absoluteRowIdx, 
+  handleShiftChange, 
+  isAdmin, 
+  days 
+}) => {
   const updateEmployee = useStore(state => state.updateEmployee);
   
   const [isEditingName, setIsEditingName] = useState(false);
@@ -27,7 +38,10 @@ const EmployeeRow = memo(({ emp, empSched, idx, absoluteRowIdx, handleShiftChang
   const handleRoleBlur = () => {
     setIsEditingRole(false);
     if (editRole !== (emp.role || emp.type) && editRole.trim()) {
-      const type = editRole.includes('PT') ? 'PARTTIME' : 'FULLTIME';
+      let type = EMPLOYEE_TYPES.STFT;
+      if (editRole.includes('PT')) type = EMPLOYEE_TYPES.STPT;
+      else if (editRole.includes('CSR')) type = EMPLOYEE_TYPES.CSR_NEW;
+      
       updateEmployee(emp.id, { role: editRole.trim(), type });
     } else {
       setEditRole(emp.role || emp.type);
@@ -38,103 +52,67 @@ const EmployeeRow = memo(({ emp, empSched, idx, absoluteRowIdx, handleShiftChang
     if (e.key === 'Enter') blurFn();
   };
 
-  let totalH = 0;
-  let totalShifts = 0;
-  
-  const parseShiftForCell = (emp, val) => {
-    if (!val) return { display: '', isBorrowedSlot: false, colorClass: '' };
-    if (val.includes('_')) {
-      const parts = val.split('_');
-      const targetStore = parts.pop();
-      const actualShift = parts.join('_');
-      
-      if (emp.isBorrowedTo) {
-        if (targetStore === emp.isBorrowedTo) {
-          return { display: actualShift === 'off' ? '' : actualShift, isBorrowedSlot: true, colorClass: 'bg-orange-50 text-orange-700' };
-        } else {
-          return { display: '', isBorrowedSlot: false, colorClass: 'bg-slate-100' };
-        }
-      } else {
-        return { display: actualShift === 'off' ? `off ${targetStore}` : `${actualShift} ${targetStore}`, isBorrowedSlot: true, colorClass: 'bg-slate-100 text-slate-500 italic text-[10px]' };
-      }
-    } else {
-      if (emp.isBorrowedTo) {
-        return { display: '', isBorrowedSlot: false, colorClass: 'bg-slate-100' };
-      }
-      return { display: val, isBorrowedSlot: false, colorClass: '' };
-    }
-  };
+  const isMonthView = days.length > 7;
 
-  WEEK_DAYS.forEach(d => {
-    const s = empSched[d];
-    if (s && s !== 'off') {
-      if (emp.isBorrowedTo && (!s.includes('_' + emp.isBorrowedTo))) return;
-      if (!emp.isBorrowedTo && s.includes('_')) return;
-      
-      let actualShift = s;
-      if (s.includes('_')) actualShift = s.split('_')[0];
-      if (actualShift === 'off') return;
+  // Tính toán trực tiếp tổng giờ & tổng số ca từ lịch thực tế
+  const { totalHours, totalShifts } = calculateEmployeeWeeklyHours(emp, empSched, days);
 
-      totalShifts++;
-      if (SHIFTS[actualShift]) {
-        totalH += SHIFTS[actualShift].hours;
-      } else {
-        const match = actualShift.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
-        if (match) {
-          let start = parseInt(match[1], 10);
-          let end = parseInt(match[2], 10);
-          if (end < start) end += 24;
-          totalH += (end - start);
-        }
-      }
-    }
-  });
-  
-  const isOvertime = totalH > (emp.maxH || 48);
-  const isMissing = totalH === 0;
-  
-  let validationWarning = null;
-  const role = emp.role || emp.type || '';
-  if (!emp.isBorrowedTo) {
-    if (role.includes('PT') && totalH > 0 && totalH < 16) {
-      validationWarning = 'Thiếu giờ (Min 16h)';
-    } else if ((role.includes('FT') || role.includes('CSR')) && totalShifts > 0 && totalShifts !== 6) {
-      validationWarning = `Sai số ca (${totalShifts}/6)`;
-    }
-  }
+  // Validate theo rules (PT min/max, FT min hours/shifts)
+  const validation = validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthView);
 
   return (
-    <tr className="hover:bg-slate-50 group/row">
-      <td className="text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-      <td className="sticky-col-1 group-hover/row:bg-slate-50" style={{ left: 0 }}>
-        <div className="flex items-center gap-1 w-52 overflow-hidden">
-          {isEditingName ? (
-            <input 
-              autoFocus
-              className="w-full text-sm font-bold text-slate-800 border-b-2 border-blue-500 outline-none bg-white px-1"
-              value={editName}
-              onChange={e => setEditName(e.target.value)}
-              onBlur={handleNameBlur}
-              onKeyDown={e => handleKeyDown(e, handleNameBlur)}
-            />
-          ) : (
-            <div 
-              className={`font-bold text-slate-800 truncate flex items-center gap-1 ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded group/name' : ''}`}
-              title={isAdmin && !emp.isBorrowedTo ? "Click để sửa" : emp.name}
-              onClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
-            >
-              {emp.name} 
-              {isAdmin && !emp.isBorrowedTo && <Edit2 size={12} className="opacity-0 group-hover/name:opacity-100 text-blue-500" />}
-              {emp.isBorrowedTo && <span className="text-xs text-orange-600 font-normal italic ml-1">(Hỗ trợ)</span>}
-              {validationWarning && (
-                <span title={validationWarning} className="text-red-500 cursor-help flex-shrink-0 ml-1">⚠️</span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">{emp.id}</div>
+    <tr className="hover:bg-slate-50 group/row h-8">
+      {/* STT */}
+      <td className="text-center text-slate-400 font-mono text-xs min-w-[48px] w-[48px] max-w-[48px] sticky left-0 z-10 group-hover/row:bg-slate-50 bg-white border-r border-b border-slate-300 p-0">
+        {idx + 1}
       </td>
-      <td className="sticky-col-2 text-center align-middle" style={{ left: '224px' }}>
+
+      {/* Mã Nhân Viên */}
+      <td className="hidden md:table-cell text-center font-mono text-slate-600 text-xs min-w-[96px] w-[96px] max-w-[96px] sticky left-[48px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0 align-middle">
+        {emp.id}
+      </td>
+
+      {/* Họ và Tên */}
+      <td className="min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] sticky left-[48px] md:left-[144px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0">
+        <div className="flex flex-col justify-center h-full">
+          <div className="flex items-center gap-1 w-full overflow-hidden px-1">
+            {isEditingName ? (
+              <input 
+                autoFocus
+                className="w-full text-sm font-bold text-slate-800 border-b-2 border-blue-500 outline-none bg-white px-1"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onBlur={handleNameBlur}
+                onKeyDown={e => handleKeyDown(e, handleNameBlur)}
+              />
+            ) : (
+              <div 
+                className={`font-bold text-slate-800 truncate flex items-center gap-1 ${
+                  isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded group/name' : ''
+                }`}
+                title={isAdmin && !emp.isBorrowedTo ? "Click để sửa họ tên" : emp.name}
+                onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
+              >
+                {emp.name} 
+                {isAdmin && !emp.isBorrowedTo && (
+                  <Edit2 size={12} className="opacity-0 group-hover/name:opacity-100 text-blue-500 flex-shrink-0" />
+                )}
+                {emp.isBorrowedTo && (
+                  <span className="text-xs text-orange-600 font-normal italic ml-1 flex-shrink-0">
+                    (Hỗ trợ)
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* Vị trí / Loại hình */}
+      <td 
+        className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center align-middle sticky z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0" 
+        style={{ left: '336px' }}
+      >
         {isEditingRole ? (
           <select 
             autoFocus
@@ -144,48 +122,94 @@ const EmployeeRow = memo(({ emp, empSched, idx, absoluteRowIdx, handleShiftChang
             onBlur={handleRoleBlur}
             onKeyDown={e => handleKeyDown(e, handleRoleBlur)}
           >
-            <option value="STFT">STFT</option>
-            <option value="PT">PT</option>
-            <option value="CSR">CSR</option>
+            <option value="STFT">STFT (Full-time)</option>
+            <option value="STPT">STPT (Part-time)</option>
+            <option value="CSR_NEW">CSR_NEW (Chăm sóc KH)</option>
             <option value="Cửa hàng trưởng">Cửa hàng trưởng</option>
             <option value="SM">SM</option>
           </select>
         ) : (
           <span 
-            className={`inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 group/role ${isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''}`}
-            title={isAdmin && !emp.isBorrowedTo ? "Click để sửa" : ''}
-            onClick={() => { if(isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
+            className={`inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold border border-slate-200 group/role ${
+              isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 hover:border-slate-300' : ''
+            }`}
+            title={isAdmin && !emp.isBorrowedTo ? "Click để sửa vị trí" : ''}
+            onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
           >
-            {emp.role || emp.type}
-            {isAdmin && !emp.isBorrowedTo && <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500" />}
+            <span className="truncate">{emp.role || emp.type}</span>
+            {isAdmin && !emp.isBorrowedTo && (
+              <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500 flex-shrink-0" />
+            )}
           </span>
         )}
       </td>
       
-      {WEEK_DAYS.map((day, dIdx) => {
-        const val = empSched[day] || '';
-        const { display, colorClass } = parseShiftForCell(emp, val);
+      {/* Dynamic Day Shift Cells */}
+      {days.map((day, dIdx) => {
+        const rawVal = empSched[day] || '';
+        const { display, colorClass } = parseShiftForCell(emp, rawVal);
         
         return (
           <td key={day} className={`p-0 border-r border-b border-slate-300 ${colorClass}`}>
             <ShiftInput 
               value={display}
+              rawValue={rawVal}
               onChange={(newVal) => handleShiftChange(emp, day, newVal)}
               rowIndex={absoluteRowIdx}
               colIndex={dIdx}
+              readOnly={!isAdmin}
             />
           </td>
         );
       })}
       
-      <td className={`text-center font-bold ${isOvertime || validationWarning ? 'bg-red-50 text-red-600' : isMissing ? 'text-amber-500' : 'text-emerald-600'}`}>
-        {totalH}h
-        {validationWarning && <div className="text-[9px] font-normal leading-none mt-1">{validationWarning}</div>}
+      {/* Total Hours Cell with Dynamic Warning Badges */}
+      <td className={`text-center font-bold border-b border-slate-300 relative group/totalcell ${
+        validation.hasErrors 
+          ? 'bg-red-100 text-red-700 font-extrabold cursor-help' 
+          : validation.hasWarnings 
+            ? 'bg-amber-50 text-amber-800 font-semibold cursor-help' 
+            : totalHours === 0 
+              ? 'text-slate-400 bg-slate-50' 
+              : 'text-emerald-700 bg-emerald-50/50'
+      }`}>
+        <div className="flex items-center justify-center gap-1">
+          {validation.hasErrors && <span className="text-[11px] text-red-600 animate-pulse">⚠️</span>}
+          {!validation.hasErrors && validation.hasWarnings && <span className="text-[11px] text-amber-500">⚡</span>}
+          <span>{totalHours}h</span>
+          {validation.isFT && !isMonthView && (
+            <span className="text-[10px] font-normal text-slate-500">({totalShifts}ca)</span>
+          )}
+        </div>
+
+        {/* Warning Tooltip */}
+        {validation.warnings.length > 0 && (
+          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-1 hidden group-hover/totalcell:block bg-slate-900 text-white text-[11px] font-medium py-2 px-3 rounded-xl shadow-2xl z-30 whitespace-nowrap pointer-events-none border border-slate-700 min-w-[200px] text-left">
+            <div className="font-bold text-amber-300 border-b border-slate-700 pb-1 mb-1 flex items-center gap-1">
+              <span>CẢNH BÁO QUY CHUẨN XẾP CA:</span>
+            </div>
+            <ul className="space-y-1 text-slate-200">
+              {validation.warnings.map((w, wIdx) => (
+                <li key={wIdx} className={`flex items-start gap-1.5 ${w.type === 'error' ? 'text-red-300' : 'text-amber-200'}`}>
+                  <span>•</span>
+                  <span>{w.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </td>
     </tr>
   );
 }, (prevProps, nextProps) => {
-  return prevProps.empSched === nextProps.empSched && prevProps.emp === nextProps.emp && prevProps.idx === nextProps.idx && prevProps.isAdmin === nextProps.isAdmin && prevProps.absoluteRowIdx === nextProps.absoluteRowIdx;
+  return (
+    prevProps.empSched === nextProps.empSched && 
+    prevProps.emp === nextProps.emp && 
+    prevProps.idx === nextProps.idx && 
+    prevProps.isAdmin === nextProps.isAdmin && 
+    prevProps.absoluteRowIdx === nextProps.absoluteRowIdx && 
+    prevProps.days === nextProps.days
+  );
 });
 
 export default EmployeeRow;

@@ -116,3 +116,101 @@ body {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
   }
 }
+
+/* ============================================================
+   PRINT MEDIA STYLES - Fix for PDF & Print Layout
+   ============================================================ */
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm 6mm;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+  }
+
+  html, body, #root {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reset all flex/scroll containers to normal block flow */
+  div, main, aside, section, article, table {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Remove sticky offsets that cause browsers to hide print tables */
+  .sticky, [style*="position: sticky"], th, td {
+    position: static !important;
+    box-shadow: none !important;
+    left: auto !important;
+    top: auto !important;
+  }
+
+  /* Show columns that are hidden on mobile breakpoints */
+  .hidden.md\:table-cell,
+  .hidden.lg\:table-cell,
+  .hidden.xl\:table-cell {
+    display: table-cell !important;
+  }
+
+  /* Excel Table in Print */
+  .excel-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1.5px solid #000000 !important;
+    table-layout: auto !important;
+    font-size: 10px !important;
+    background: #ffffff !important;
+    page-break-inside: auto;
+  }
+
+  .excel-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .excel-table th, 
+  .excel-table td {
+    border: 1px solid #475569 !important;
+    color: #000000 !important;
+    padding: 3px 2px !important;
+    vertical-align: middle !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .excel-table th {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+    font-weight: 800 !important;
+  }
+
+  /* Department title header row in print */
+  tr.bg-blue-50, 
+  tr.bg-blue-50 td {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+    font-weight: 800 !important;
+  }
+
+  /* Hide UI elements */
+  header, aside, .print\:hidden, [class*="print:hidden"] {
+    display: none !important;
+  }
+
+  .print\:block, [class*="print:block"] {
+    display: block !important;
+  }
+}
+

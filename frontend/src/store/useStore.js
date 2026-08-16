@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as api from '../services/api';
-import { DEFAULT_PT_OVERTIME } from '../data/initialData';
 
 export const useStore = create(
   persist(
@@ -17,11 +16,14 @@ export const useStore = create(
         } else {
           const emp = get().employees.find(e => e.id === userId);
           if (emp) {
-            // Chấp nhận mật khẩu là '1' cho tất cả nhân viên (theo yêu cầu)
+            // Mật khẩu mặc định là '1' cho toàn bộ nhân viên (Theo quy ước Hướng B)
             if (password === '1') {
               const roleName = emp.role || '';
               const typeName = emp.type || '';
-              const isManager = roleName.toLowerCase().includes('quản lý') || roleName.toLowerCase().includes('cửa hàng trưởng') || roleName === 'SM' || typeName === 'SM';
+              const isManager = roleName.toLowerCase().includes('quản lý') || 
+                                roleName.toLowerCase().includes('cửa hàng trưởng') || 
+                                roleName === 'SM' || 
+                                typeName === 'SM';
               
               set({ user: { id: emp.id, role: 'employee', ...emp, isManager } });
             } else {
@@ -34,14 +36,13 @@ export const useStore = create(
       },
       logout: () => set({ user: null }),
 
-      // Data
+      // Data State
       isInitializing: false,
-      currentWeek: '2026-8-10',
+      currentWeek: '2026-08-10', // ISO YYYY-MM-DD với số 0 đứng trước
       stores: [],
       employees: [],
       feedbacks: [],
-      ptOvertime: DEFAULT_PT_OVERTIME, // Tạm thời giữ nguyên mock data cảnh báo
-      schedule: {}, // { '2026-8-10': { 'empId': { T2: '6-14' } } }
+      schedule: {}, // { '2026-08-10': { 'empId': { T2: '6-14', T3: { shift: '14-22', covering_store: 'VN0485' } } } }
       
       // Async Actions
       initializeData: async () => {
@@ -107,21 +108,27 @@ export const useStore = create(
 
       setCurrentWeek: async (week) => {
         set({ currentWeek: week });
-        const scheds = await api.getSchedulesByWeek(week);
-        set(state => ({
-          schedule: {
-            ...state.schedule,
-            [week]: scheds
-          }
-        }));
+        try {
+          const scheds = await api.getSchedulesByWeek(week);
+          set(state => ({
+            schedule: {
+              ...state.schedule,
+              [week]: scheds
+            }
+          }));
+        } catch (err) {
+          console.error("Lỗi khi tải lịch của tuần:", err);
+        }
       },
 
+      // Optimistic update với cơ chế rollback an toàn khi lưu lỗi
       updateShift: async (weekDate, empId, day, shiftCode) => {
-        // Cập nhật UI ngay lập tức (Optimistic Update)
         const weekSched = get().schedule[weekDate] || {};
         const empSched = weekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+        const previousShifts = { ...empSched };
         const updatedShifts = { ...empSched, [day]: shiftCode };
         
+        // 1. Cập nhật UI ngay lập tức
         set((state) => ({
           schedule: {
             ...state.schedule,
@@ -129,11 +136,19 @@ export const useStore = create(
           }
         }));
 
-        // Gửi lên server ở background
+        // 2. Gửi request lưu lên server
         try {
           await api.saveEmployeeSchedule(weekDate, empId, updatedShifts);
         } catch (err) {
-          // Rollback nếu cần thiết (hiện tại bỏ qua)
+          console.error("Lỗi khi lưu lịch làm việc:", err);
+          // 3. Rollback lại state cũ nếu có lỗi
+          set((state) => ({
+            schedule: {
+              ...state.schedule,
+              [weekDate]: { ...weekSched, [empId]: previousShifts }
+            }
+          }));
+          alert(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
         }
       },
 
@@ -154,27 +169,35 @@ export const useStore = create(
           return { feedbacks: updatedFeedbacks };
         });
         
-        // Nếu duyệt và có truyền data cập nhật lịch mới
         if (status === 'approved' && newShiftData) {
           get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
         }
       },
 
       updateFeedbackStatus: async (id, status) => {
+        const previousFeedbacks = get().feedbacks;
         // Optimistic Update
         set((state) => ({
           feedbacks: state.feedbacks.map(f => f.id === id ? { ...f, status } : f)
         }));
-        await api.updateFeedback(id, status);
+        try {
+          await api.updateFeedback(id, status);
+        } catch (err) {
+          console.error("Lỗi khi cập nhật trạng thái phản hồi:", err);
+          // Rollback
+          set({ feedbacks: previousFeedbacks });
+          alert(`Không thể cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
+        }
       }
     }),
     {
       name: 'schedule-storage',
       partialize: (state) => ({ 
+        user: state.user,
         employees: state.employees, 
         stores: state.stores, 
         schedule: state.schedule,
-        feedbacks: state.feedbacks // Lưu cả feedback
+        feedbacks: state.feedbacks
       }),
     }
   )

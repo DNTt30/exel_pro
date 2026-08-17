@@ -3,6 +3,8 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Shield, Briefcase } from 'lucide-react';
 
+import NotificationBell from './NotificationBell';
+
 export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
@@ -16,7 +18,7 @@ export default function AppLayout() {
 
   const adminLinks = [
     { to: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard & Cảnh báo' },
-    { to: '/admin/schedule', icon: <CalendarDays size={18} />, label: 'Xếp lịch (Realtime)' },
+    { to: '/admin/schedule', icon: <CalendarDays size={18} />, label: 'Xếp lịch làm việc' },
     { to: '/admin/timesheet', icon: <Clock size={18} />, label: 'Bảng công lương' },
     { to: '/admin/feedback', icon: <FileText size={18} />, label: 'Feedback C&B' },
     { to: '/admin/employees', icon: <Users size={18} />, label: 'Quản lý Nhân sự' },
@@ -32,9 +34,10 @@ export default function AppLayout() {
   const links = (user?.role === 'admin' || user?.isManager) ? adminLinks : employeeLinks;
 
   const getRoleLabel = () => {
-    if (user?.role === 'admin') return { label: 'Admin', color: 'bg-purple-100 text-purple-700 border-purple-200' };
-    if (user?.isManager) return { label: `Quản lý (${user?.dept})`, color: 'bg-blue-100 text-blue-700 border-blue-200' };
-    return { label: `Nhân viên (${user?.dept})`, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    if (user?.role === 'admin' || user?.isManager) {
+      return { label: `Admin (SM - ${user?.dept || 'OFC'})`, color: 'bg-purple-100 text-purple-700 border-purple-200' };
+    }
+    return { label: `NV (${user?.dept || 'OFC'})`, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   };
 
   const roleInfo = getRoleLabel();
@@ -64,7 +67,10 @@ export default function AppLayout() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Notification Bell */}
+          <NotificationBell />
+
           <div className="flex items-center gap-2 bg-slate-50 pl-2.5 pr-3 py-1 rounded-full border border-slate-200 shadow-2xs">
             <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={14} />}
@@ -79,7 +85,7 @@ export default function AppLayout() {
           
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-red-100"
+            className="flex items-center gap-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-transparent hover:border-red-100 cursor-pointer"
             title="Đăng xuất"
           >
             <LogOut size={16} />

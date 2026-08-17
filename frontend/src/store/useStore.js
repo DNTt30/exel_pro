@@ -153,12 +153,36 @@ export const useStore = create(
       },
 
       feedbacks: [],
-      addFeedback: (feedback) => {
+      addFeedback: async (feedback) => {
+        const tempId = Date.now().toString();
+        const optimisticFb = { id: tempId, status: 'pending', createdAt: new Date().toISOString(), ...feedback };
+        
+        // Optimistic UI update
         set(state => ({
-          feedbacks: [{ id: Date.now().toString(), status: 'pending', createdAt: new Date().toISOString(), ...feedback }, ...state.feedbacks]
+          feedbacks: [optimisticFb, ...state.feedbacks]
         }));
+
+        try {
+          const created = await api.addFeedback(feedback);
+          // Thay id tạm bằng id thực từ DB
+          set(state => ({
+            feedbacks: state.feedbacks.map(f => f.id === tempId ? created : f)
+          }));
+          return created;
+        } catch (err) {
+          console.error("Lỗi khi gửi feedback lên Supabase:", err);
+          // Rollback nếu lỗi
+          set(state => ({
+            feedbacks: state.feedbacks.filter(f => f.id !== tempId)
+          }));
+          alert(`Không thể gửi phản hồi: ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
+          throw err;
+        }
       },
-      resolveFeedback: (feedbackId, status, resolutionNote, newShiftData = null) => {
+      resolveFeedback: async (feedbackId, status, resolutionNote, newShiftData = null) => {
+        const previousFeedbacks = get().feedbacks;
+        
+        // Optimistic UI Update
         set(state => {
           const updatedFeedbacks = state.feedbacks.map(fb => {
             if (fb.id === feedbackId) {
@@ -169,8 +193,54 @@ export const useStore = create(
           return { feedbacks: updatedFeedbacks };
         });
         
-        if (status === 'approved' && newShiftData) {
-          get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
+        try {
+          await api.updateFeedback(feedbackId, status, resolutionNote);
+          if (status === 'approved' && newShiftData) {
+            get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
+          }
+        } catch (err) {
+          console.error("Lỗi khi duyệt feedback:", err);
+          set({ feedbacks: previousFeedbacks });
+          alert(`Lỗi khi cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
+        }
+      },
+
+      shiftSwaps: [],
+      addShiftSwap: (swapData) => {
+        const newSwap = {
+          id: 'swap_' + Date.now().toString(),
+          status: 'pending_partner', // 'pending_partner' -> 'pending_manager' -> 'approved' / 'rejected'
+          createdAt: new Date().toISOString(),
+          ...swapData
+        };
+        set(state => ({
+          shiftSwaps: [newSwap, ...(state.shiftSwaps || [])]
+        }));
+        return newSwap;
+      },
+      respondShiftSwap: (swapId, newStatus, note = '') => {
+        const currentSwaps = get().shiftSwaps || [];
+        const targetSwap = currentSwaps.find(s => s.id === swapId);
+        if (!targetSwap) return;
+
+        const updated = currentSwaps.map(s => {
+          if (s.id === swapId) {
+            return {
+              ...s,
+              status: newStatus,
+              managerNote: note || s.managerNote,
+              resolvedAt: (newStatus === 'approved' || newStatus === 'rejected') ? new Date().toISOString() : s.resolvedAt
+            };
+          }
+          return s;
+        });
+
+        set({ shiftSwaps: updated });
+
+        // Nếu Quản lý duyệt: TỰ ĐỘNG HOÁN ĐỔI 2 CA TRÊN BẢNG LỊCH
+        if (newStatus === 'approved') {
+          get().updateShift(targetSwap.week, targetSwap.fromEmpId, targetSwap.fromDay, targetSwap.toShift || 'off');
+          get().updateShift(targetSwap.week, targetSwap.toEmpId, targetSwap.toDay, targetSwap.fromShift || 'off');
         }
       },
 
@@ -197,7 +267,8 @@ export const useStore = create(
         employees: state.employees, 
         stores: state.stores, 
         schedule: state.schedule,
-        feedbacks: state.feedbacks
+        feedbacks: state.feedbacks,
+        shiftSwaps: state.shiftSwaps
       }),
     }
   )

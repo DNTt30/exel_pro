@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { SHIFTS } from '../../data/initialData';
 import { WEEK_DAYS } from '../../data/constants';
-import { Save, Download, Printer } from 'lucide-react';
+import { Save, Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { 
@@ -17,12 +18,20 @@ import AddEmployeeModal from '../../components/modals/AddEmployeeModal';
 import AddStoreModal from '../../components/modals/AddStoreModal';
 import TransferModal from '../../components/modals/TransferModal';
 import PTOvertimeModal from '../../components/modals/PTOvertimeModal';
+import ImportScheduleModal from '../../components/modals/ImportScheduleModal';
+import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
+import AISchedulerModal from '../../components/modals/AISchedulerModal';
+import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
+import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
+import * as api from '../../services/api';
 
 export default function Schedule() {
-  const { employees, schedule, updateShift, currentWeek, user } = useStore();
+  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
   
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const isAdmin = user?.role === 'admin';
   const isManager = user?.isManager;
   
@@ -34,6 +43,24 @@ export default function Schedule() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showPTOvertime, setShowPTOvertime] = useState(false);
+  const [showImportSchedule, setShowImportSchedule] = useState(false);
+  const [showSwapList, setShowSwapList] = useState(false);
+  const [showAIScheduler, setShowAIScheduler] = useState(false);
+  const [showAICopilot, setShowAICopilot] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
+
+  // Tự động mở modal đơn đổi ca nếu có URL param ?openSwaps=true
+  useEffect(() => {
+    if (searchParams.get('openSwaps') === 'true') {
+      setShowSwapList(true);
+      searchParams.delete('openSwaps');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const pendingManagerSwapsCount = useMemo(() => {
+    return (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (isAdmin || s.store === user?.dept)).length;
+  }, [shiftSwaps, isAdmin, user?.dept]);
 
   // Nhóm nhân viên theo cửa hàng + xử lý mượn nhân sự
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole, weekSchedule);
@@ -75,6 +102,73 @@ export default function Schedule() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Sao chép nhanh lịch làm việc từ tuần trước sang tuần này
+  const handleCopyPreviousWeek = async () => {
+    const parts = currentWeek.split('-').map(Number);
+    const prevMon = new Date(parts[0], parts[1] - 1, parts[2]);
+    prevMon.setDate(prevMon.getDate() - 7);
+    const prevWeekKey = `${prevMon.getFullYear()}-${String(prevMon.getMonth() + 1).padStart(2, '0')}-${String(prevMon.getDate()).padStart(2, '0')}`;
+
+    const prevSun = new Date(prevMon);
+    prevSun.setDate(prevMon.getDate() + 6);
+    const prevRange = `${String(prevMon.getDate()).padStart(2, '0')}/${String(prevMon.getMonth() + 1).padStart(2, '0')} → ${String(prevSun.getDate()).padStart(2, '0')}/${String(prevSun.getMonth() + 1).padStart(2, '0')}`;
+
+    const curSun = new Date(parts[0], parts[1] - 1, parts[2]);
+    curSun.setDate(curSun.getDate() + 6);
+    const curRange = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')} → ${String(curSun.getDate()).padStart(2, '0')}/${String(curSun.getMonth() + 1).padStart(2, '0')}`;
+
+    const confirmed = window.confirm(`Sao chép toàn bộ ca làm việc từ tuần trước (${prevRange}) sang tuần này (${curRange})?`);
+    if (!confirmed) return;
+
+    setIsCopying(true);
+    try {
+      let sourceSched = schedule[prevWeekKey];
+      if (!sourceSched || Object.keys(sourceSched).length === 0) {
+        sourceSched = await api.getSchedulesByWeek(prevWeekKey);
+      }
+
+      if (!sourceSched || Object.keys(sourceSched).length === 0) {
+        return alert(`Tuần trước (${prevRange}) chưa có lịch làm việc nào để sao chép!`);
+      }
+
+      let targetEmps = employees;
+      if (filterDept && filterDept !== 'ALL') {
+        targetEmps = targetEmps.filter(e => e.dept === filterDept);
+      }
+
+      const destSched = { ...(schedule[currentWeek] || {}) };
+      let copiedCount = 0;
+
+      const bulkUpdates = {};
+      for (const emp of targetEmps) {
+        if (sourceSched[emp.id]) {
+          destSched[emp.id] = { ...sourceSched[emp.id] };
+          bulkUpdates[emp.id] = destSched[emp.id];
+          copiedCount++;
+        }
+      }
+
+      // Lưu hàng loạt lên Supabase thay vì N+1 request
+      if (copiedCount > 0) {
+        await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
+      }
+
+      useStore.setState(state => ({
+        schedule: {
+          ...state.schedule,
+          [currentWeek]: destSched
+        }
+      }));
+
+      alert(`✅ Đã sao chép lịch làm việc của ${copiedCount} nhân sự sang tuần này (${curRange})!`);
+    } catch (err) {
+      console.error('Lỗi sao chép lịch:', err);
+      alert('Không thể sao chép lịch: ' + (err.message || 'Lỗi kết nối'));
+    } finally {
+      setIsCopying(false);
+    }
   };
 
   // Tổng hợp chỉ số KPI
@@ -124,6 +218,28 @@ export default function Schedule() {
       <AddStoreModal isOpen={showAddStore} onClose={() => setShowAddStore(false)} />
       <TransferModal isOpen={showTransfer} onClose={() => setShowTransfer(false)} />
       <PTOvertimeModal isOpen={showPTOvertime} onClose={() => setShowPTOvertime(false)} />
+      <ImportScheduleModal 
+        isOpen={showImportSchedule} 
+        onClose={() => setShowImportSchedule(false)} 
+        currentWeek={currentWeek}
+      />
+      <ShiftSwapListModal
+        isOpen={showSwapList}
+        onClose={() => setShowSwapList(false)}
+        currentWeek={currentWeek}
+      />
+      <AISchedulerModal
+        isOpen={showAIScheduler}
+        onClose={() => setShowAIScheduler(false)}
+        currentWeek={currentWeek}
+        storeId={filterDept}
+      />
+      <AICopilotDrawer
+        isOpen={showAICopilot}
+        onClose={() => setShowAICopilot(false)}
+        currentWeek={currentWeek}
+        storeId={filterDept}
+      />
 
       {/* 2. Top Toolbar */}
       <div className="print:hidden">
@@ -143,9 +259,9 @@ export default function Schedule() {
         />
       </div>
 
-      {/* 3. KPI Summary Bar */}
+      {/* 3. KPI Summary Bar & Actions */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-4 text-xs flex-wrap">
           <div className="flex items-center gap-1.5 font-bold text-slate-700">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
             <span>Tổng nhân sự: <strong className="font-mono text-slate-900">{summaryMetrics.totalEmps}</strong> ({summaryMetrics.totalFT} FT, {summaryMetrics.totalPT} PT)</span>
@@ -165,24 +281,96 @@ export default function Schedule() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Nút AI Xếp Lịch Thông Minh */}
+          <button
+            type="button"
+            onClick={() => setShowAIScheduler(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-black transition-all shadow-sm shadow-indigo-500/25 cursor-pointer"
+            title="AI tự động phân bổ ca tuần hoặc quét lỗi vi phạm"
+          >
+            <Sparkles size={13} className="text-amber-300 animate-spin" style={{ animationDuration: '4s' }} />
+            <span>✨ AI Xếp Lịch</span>
+          </button>
+
+          {/* Nút Trợ lý AI Copilot */}
+          <button
+            type="button"
+            onClick={() => setShowAICopilot(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="Mở trợ lý AI giải đáp thắc mắc và phân tích tình hình nhân sự"
+          >
+            <Bot size={13} className="text-purple-600" />
+            <span>Trợ lý AI</span>
+          </button>
+
+          {/* Nút Đơn Đổi Ca */}
+          <button
+            type="button"
+            onClick={() => setShowSwapList(true)}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="Xem và duyệt các yêu cầu đổi ca"
+          >
+            <span>🔄 Đơn đổi ca</span>
+            {pendingManagerSwapsCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-red-600 text-white rounded-full text-[10px] font-black animate-pulse">
+                {pendingManagerSwapsCount}
+              </span>
+            )}
+          </button>
+
+          {/* Nút Sao Chép Tuần Trước */}
           <button 
+            type="button"
+            onClick={handleCopyPreviousWeek}
+            disabled={isCopying}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+            title="Sao chép toàn bộ ca làm việc từ tuần trước sang tuần này"
+          >
+            <Copy size={13} />
+            <span>{isCopying ? 'Đang sao chép...' : 'Sao chép tuần trước'}</span>
+          </button>
+
+          {/* Nút Nhập Excel */}
+          <button 
+            type="button"
+            onClick={() => setShowImportSchedule(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="Nhập lịch từ file Excel hoặc CSV"
+          >
+            <Upload size={13} />
+            <span>Nhập Excel</span>
+          </button>
+
+          {/* Nút Xuất Excel */}
+          <button 
+            type="button"
             onClick={handleExportExcel}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Xuất file Excel chuẩn"
           >
-            <Download size={14} />
-            <span>Xuất Excel (.xls)</span>
+            <Download size={13} />
+            <span>Xuất Excel</span>
           </button>
+
+          {/* Nút In */}
           <button 
+            type="button"
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
           >
-            <Printer size={14} />
+            <Printer size={13} />
             <span>In / PDF</span>
           </button>
         </div>
       </div>
+
+      {/* 3.5 Staffing Gap Analysis Widget */}
+      <StaffingGapTable 
+        employees={employees} 
+        weekSchedule={weekSchedule} 
+        filterDept={filterDept} 
+      />
 
       {/* 4. Main Schedule Grid Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none">

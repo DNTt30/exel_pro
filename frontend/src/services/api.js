@@ -100,6 +100,24 @@ export async function saveEmployeeSchedule(weekDate, empId, shifts) {
   }
 }
 
+// Lưu HÀNG LOẠT lịch của nhiều nhân viên (giải quyết lỗi N+1 query)
+export async function saveBulkEmployeeSchedules(weekDate, scheduleMap) {
+  const payload = Object.entries(scheduleMap).map(([empId, shifts]) => ({
+    week_date: weekDate,
+    emp_id: empId,
+    shifts: shifts
+  }));
+
+  if (payload.length === 0) return;
+
+  const { error } = await supabase.from('schedules').upsert(payload, { onConflict: 'week_date,emp_id' });
+  
+  if (error) {
+    console.error('Lỗi lưu lịch làm việc hàng loạt:', error);
+    throw error;
+  }
+}
+
 // Lấy danh sách Feedback
 export async function getFeedbacks() {
   const { data, error } = await supabase.from('feedbacks').select('*').order('created_at', { ascending: false });
@@ -121,13 +139,62 @@ export async function getFeedbacks() {
     reason: f.reason || f.issue || '',
     issue: f.issue || f.reason || '',
     note: f.note || '',
+    resolutionNote: f.resolution_note || f.resolutionNote || '',
     imageUrl: f.image_url || f.imageUrl || '',
-    status: f.status || 'pending'
+    status: f.status || 'pending',
+    createdAt: f.created_at
   }));
 }
 
+// Thêm Feedback mới vào Supabase
+export async function addFeedback(payload) {
+  const row = {
+    emp_id: payload.empId,
+    emp_name: payload.empName || payload.name || '',
+    dept: payload.dept,
+    emp_role: payload.empRole || payload.role || 'STPT',
+    emp_type: payload.empType || payload.type || 'STPT',
+    date: payload.date,
+    shift: payload.shift || '',
+    hours: payload.hours || 0,
+    reason: payload.reason || payload.issue || '',
+    note: payload.note || '',
+    image_url: payload.imageUrl || '',
+    status: payload.status || 'pending'
+  };
+
+  const { data, error } = await supabase.from('feedbacks').insert([row]).select().single();
+  if (error) {
+    console.error('Lỗi lưu feedback vào Supabase:', error);
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    empId: data.emp_id,
+    empName: data.emp_name,
+    name: data.emp_name,
+    dept: data.dept,
+    empRole: data.emp_role,
+    empType: data.emp_type,
+    date: data.date,
+    shift: data.shift,
+    hours: data.hours,
+    reason: data.reason,
+    issue: data.reason,
+    note: data.note,
+    resolutionNote: data.resolution_note || '',
+    imageUrl: data.image_url,
+    status: data.status,
+    createdAt: data.created_at
+  };
+}
+
 // Cập nhật trạng thái Feedback
-export async function updateFeedback(id, status) {
-  const { error } = await supabase.from('feedbacks').update({ status }).eq('id', id);
+export async function updateFeedback(id, status, resolutionNote = '') {
+  const updatePayload = { status };
+  if (resolutionNote) updatePayload.resolution_note = resolutionNote;
+  const { error } = await supabase.from('feedbacks').update(updatePayload).eq('id', id);
   if (error) throw error;
 }
+

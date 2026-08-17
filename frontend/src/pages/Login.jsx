@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { LogIn, UserCircle, Lock, Eye, EyeOff, Sparkles, Building2 } from 'lucide-react';
+import { LogIn, UserCircle, Lock, Eye, EyeOff, Building2 } from 'lucide-react';
 
 export default function Login() {
   const [empId, setEmpId] = useState('');
@@ -16,23 +16,6 @@ export default function Login() {
     setError('');
     try {
       login(empId, password);
-      const user = useStore.getState().user;
-      if (user.role === 'admin' || user.isManager) {
-        navigate('/admin/schedule');
-      } else {
-        navigate('/employee/schedule');
-      }
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleQuickLogin = (id, pass = '1') => {
-    setEmpId(id);
-    setPassword(pass);
-    setError('');
-    try {
-      login(id, pass);
       const user = useStore.getState().user;
       if (user.role === 'admin' || user.isManager) {
         navigate('/admin/schedule');
@@ -120,31 +103,11 @@ export default function Login() {
             Đăng Nhập
           </button>
         </form>
-        
-        {/* Quick Demo Accounts */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
-            <Sparkles size={12} className="text-amber-500" />
-            <span>Tài khoản thử nghiệm nhanh (Click để vào):</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin', '1')}
-              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold text-left transition-colors flex flex-col"
-            >
-              <span>👑 Quản trị viên</span>
-              <span className="text-[10px] text-purple-500 font-mono font-normal">admin (pass: 1)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('260520021', '1')}
-              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold text-left transition-colors flex flex-col"
-            >
-              <span>👤 Hoàng Thị Huyền</span>
-              <span className="text-[10px] text-blue-500 font-mono font-normal">260520021 (pass: 1)</span>
-            </button>
-          </div>
+
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+          <p className="text-[11px] text-slate-400">
+            Hệ thống quản lý nội bộ chuỗi cửa hàng OFC. Vui lòng liên hệ Quản lý chi nhánh (SM) nếu quên mật khẩu.
+          </p>
         </div>
       </div>
     </div>

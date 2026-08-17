@@ -3,9 +3,11 @@ import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { WEEK_DAYS } from '../../data/constants';
+import { isShiftsOverlapping, normalizeShift } from '../../utils/shiftHelper';
 
 export default function TransferModal({ isOpen, onClose }) {
-  const { employees, stores, updateShift, currentWeek, user } = useStore();
+  const { employees, stores, schedule, updateShift, currentWeek, user } = useStore();
+  const weekSched = schedule[currentWeek] || {};
   const isAdmin = user?.role === 'admin';
   const isManager = user?.isManager;
   
@@ -31,12 +33,29 @@ export default function TransferModal({ isOpen, onClose }) {
     return employees.filter(e => e.dept === sourceStore);
   }, [employees, sourceStore]);
 
+  const selectedEmp = useMemo(() => {
+    return employees.find(e => e.id === selectedEmpId);
+  }, [employees, selectedEmpId]);
+
   const handleTransfer = async () => {
     if (!selectedEmpId || !targetStore) {
       return alert('Vui lòng chọn nhân viên và cửa hàng đích');
     }
     if (targetStore === sourceStore) {
       return alert('Cửa hàng đích phải khác cửa hàng gốc của nhân viên');
+    }
+
+    // 1. Kiểm tra chống trùng ca chéo cửa hàng (LOGIC-01)
+    const existingRaw = weekSched[selectedEmpId]?.[targetDay];
+    if (existingRaw) {
+      const { shift: existingShift } = normalizeShift(existingRaw);
+      if (existingShift && existingShift !== 'off') {
+        if (isShiftsOverlapping(existingShift, targetShift)) {
+          return alert(
+            `❌ Xung đột giờ làm: Nhân viên "${selectedEmp?.name || selectedEmpId}" đã được xếp ca "${existingShift}" vào ngày ${targetDay}. Ca chi viện "${targetShift}" bị trùng khung thời gian!`
+          );
+        }
+      }
     }
 
     setLoading(true);

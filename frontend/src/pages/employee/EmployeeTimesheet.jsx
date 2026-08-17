@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import TimesheetRow from '../../components/TimesheetRow';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
+import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
 
 export default function EmployeeTimesheet() {
   const { user, schedule, currentWeek, employees } = useStore();
@@ -24,6 +25,7 @@ export default function EmployeeTimesheet() {
 
   const [search, setSearch] = useState('');
   const [filterOnlyMe, setFilterOnlyMe] = useState(false);
+  const [showPersonalSlip, setShowPersonalSlip] = useState(false);
 
   // Tính toán 31 ngày chu kỳ 26 tháng trước -> 25 tháng này
   const activeDays = useMemo(() => {
@@ -80,6 +82,14 @@ export default function EmployeeTimesheet() {
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">
+      {/* Modal Phiếu Chấm Công Cá Nhân */}
+      <PersonalTimesheetModal
+        isOpen={showPersonalSlip}
+        onClose={() => setShowPersonalSlip(false)}
+        user={user}
+        activeDays={activeDays}
+        weekSchedule={weekSchedule}
+      />
       
       {/* Top Toolbar (Full-Width Matching Admin Timesheet) */}
       <div className="print:hidden">
@@ -103,12 +113,6 @@ export default function EmployeeTimesheet() {
               )}
             </div>
 
-            {/* Store Badge */}
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700">
-              <Building2 size={14} className="text-blue-600" />
-              <span>Cửa hàng: <strong>{myDept}</strong></span>
-            </div>
-
             {/* Toggle Only Me */}
             <button
               onClick={() => setFilterOnlyMe(!filterOnlyMe)}
@@ -128,6 +132,16 @@ export default function EmployeeTimesheet() {
               <AlertCircle size={14} className="text-amber-600" />
               <span>Chốt C&B: <strong>17h30 Ngày 10</strong></span>
             </div>
+
+            {/* Nút Xem Phiếu Công Cá Nhân */}
+            <button
+              type="button"
+              onClick={() => setShowPersonalSlip(true)}
+              className="btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs py-1 px-2.5 rounded-lg font-bold shadow-2xs flex items-center gap-1 cursor-pointer"
+            >
+              <FileText size={13} className="text-indigo-600" />
+              <span>Phiếu công cá nhân</span>
+            </button>
 
             <Link
               to="/employee/feedback"

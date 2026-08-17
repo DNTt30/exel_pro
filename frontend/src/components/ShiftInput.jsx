@@ -91,11 +91,11 @@ export default function ShiftInput({
       >
         {/* Option: Chưa xếp ca */}
         <option value="" className="bg-white text-slate-400 font-normal">
-          - Chưa xếp -
+          -
         </option>
         {/* Option: OFF / Nghỉ */}
         <option value="off" className="bg-slate-100 text-slate-700 font-bold">
-          OFF (Nghỉ)
+          OFF
         </option>
         {/* Standard Shifts */}
         {Object.entries(SHIFTS).filter(([code]) => code !== 'off').map(([code, info]) => (
@@ -105,7 +105,7 @@ export default function ShiftInput({
             className="font-bold py-1"
             style={{ backgroundColor: info.bg, color: info.text }}
           >
-            {code} ({info.hours}h)
+            {code}
           </option>
         ))}
       </select>

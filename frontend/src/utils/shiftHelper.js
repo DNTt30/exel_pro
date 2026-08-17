@@ -202,3 +202,75 @@ export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthVi
     warnings
   };
 }
+
+/**
+ * Phân tích khoảng thời gian bắt đầu và kết thúc của một ca làm việc
+ * Hỗ trợ cả ca đêm (ví dụ: 22-6 => 22:00 đến 30:00)
+ */
+export function parseShiftTimeRange(shiftCode) {
+  if (!shiftCode || shiftCode === 'off' || shiftCode === '-') return null;
+  const match = shiftCode.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
+  if (!match) return null;
+  let start = parseInt(match[1], 10);
+  let end = parseInt(match[2], 10);
+  if (end <= start) end += 24; // Ca đêm 22-6 => start: 22, end: 30
+  return { start, end };
+}
+
+/**
+ * Kiểm tra xem 2 ca làm việc có bị TRÙNG / XUNG ĐỘT khung giờ hay không
+ * Hai khoảng [startA, endA] và [startB, endB] xung đột khi:
+ * Math.max(startA, startB) < Math.min(endA, endB)
+ */
+export function isShiftsOverlapping(shiftCodeA, shiftCodeB) {
+  const rangeA = parseShiftTimeRange(shiftCodeA);
+  const rangeB = parseShiftTimeRange(shiftCodeB);
+  if (!rangeA || !rangeB) return false;
+
+  return Math.max(rangeA.start, rangeB.start) < Math.min(rangeA.end, rangeB.end);
+}
+
+/**
+ * Tính toán Staffing Gap (Định biên nhân sự) theo từng ca cho cửa hàng
+ * @param {Array} employees Danh sách nhân sự
+ * @param {Object} weekSched Lịch tuần
+ * @param {string} dayKey 'T2' | 'T3' ...
+ * @param {string} storeId 'VN0485'
+ * @param {Object} requiredMatrix Định biên yêu cầu { '6-14': 2, '14-22': 2, '22-6': 1 }
+ */
+export function calculateStaffingGap(employees, weekSched, dayKey, storeId, requiredMatrix = { '6-14': 2, '14-22': 2, '22-6': 1 }) {
+  const result = {};
+
+  Object.entries(requiredMatrix).forEach(([shiftCode, requiredCount]) => {
+    let actualCount = 0;   // Nhân sự cơ hữu tại cửa hàng
+    let supportCount = 0;  // Nhân sự chi viện từ nơi khác tới
+
+    employees.forEach(emp => {
+      const raw = weekSched[emp.id]?.[dayKey];
+      if (!raw) return;
+      const { shift, covering_store } = normalizeShift(raw);
+      if (shift !== shiftCode) return;
+
+      if (emp.dept === storeId && !covering_store) {
+        actualCount++;
+      } else if (covering_store === storeId) {
+        supportCount++;
+      }
+    });
+
+    const totalAvailable = actualCount + supportCount;
+    const gap = totalAvailable - requiredCount; // Âm là thiếu, 0 là đủ, Dương là dư
+
+    result[shiftCode] = {
+      required: requiredCount,
+      actual: actualCount,
+      support: supportCount,
+      total: totalAvailable,
+      gap,
+      status: gap < 0 ? 'deficit' : gap === 0 ? 'balanced' : 'surplus'
+    };
+  });
+
+  return result;
+}
+

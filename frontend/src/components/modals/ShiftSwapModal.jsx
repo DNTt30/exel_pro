@@ -108,30 +108,33 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   const selectedPartnerShift = partnerShiftsList.find(s => s.dayKey === toDay) || partnerShiftsList[0];
   const selectedPartnerObj = colleaguesWithShifts.find(c => c.id === toEmpId);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMyShift) return alert('Bạn không có ca làm việc nào để thực hiện đổi ca.');
     if (!toEmpId) return alert('Vui lòng chọn đồng nghiệp muốn đổi ca.');
     if (!selectedPartnerShift) return alert('Đồng nghiệp được chọn không có ca làm việc nào để đổi sang.');
 
-    addShiftSwap({
-      week: currentWeek,
-      store: user?.dept,
-      fromEmpId: user?.id,
-      fromEmpName: user?.name,
-      fromDay: selectedMyShift.dayKey,
-      fromDayLabel: selectedMyShift.dayLabel,
-      fromShift: selectedMyShift.shift,
-      toEmpId,
-      toEmpName: selectedPartnerObj?.name || toEmpId,
-      toDay: selectedPartnerShift.dayKey,
-      toDayLabel: selectedPartnerShift.dayLabel,
-      toShift: selectedPartnerShift.shift,
-      reason: reason.trim()
-    });
-
-    alert('✅ Đã gửi yêu cầu đổi ca thành công! Yêu cầu đang chờ đồng nghiệp của bạn xác nhận.');
-    onClose();
+    try {
+      await addShiftSwap({
+        week: currentWeek,
+        store: user?.dept,
+        fromEmpId: user?.id,
+        fromEmpName: user?.name,
+        fromDay: selectedMyShift.dayKey,
+        fromDayLabel: selectedMyShift.dayLabel,
+        fromShift: selectedMyShift.shift,
+        toEmpId,
+        toEmpName: selectedPartnerObj?.name || toEmpId,
+        toDay: selectedPartnerShift.dayKey,
+        toDayLabel: selectedPartnerShift.dayLabel,
+        toShift: selectedPartnerShift.shift,
+        reason: reason.trim()
+      });
+      alert('Đã gửi yêu cầu đổi ca. Đang chờ đồng nghiệp xác nhận.');
+      onClose();
+    } catch (err) {
+      alert('Không thể gửi đơn đổi ca: ' + (err.message || 'Lỗi kết nối'));
+    }
   };
 
   const hasNoMyShifts = myShiftsList.length === 0;

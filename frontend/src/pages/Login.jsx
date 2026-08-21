@@ -8,15 +8,16 @@ export default function Login() {
   const [password, setPassword] = useState('1');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const login = useStore(state => state.login);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     if (e) e.preventDefault();
     setError('');
+    setSubmitting(true);
     try {
-      login(empId, password);
-      const user = useStore.getState().user;
+      const user = await login(empId, password);
       if (user.role === 'admin' || user.isManager) {
         navigate('/admin/schedule');
       } else {
@@ -24,6 +25,8 @@ export default function Login() {
       }
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -97,10 +100,11 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full flex justify-center items-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+            disabled={submitting}
+            className="w-full flex justify-center items-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60"
           >
             <LogIn size={18} />
-            Đăng Nhập
+            {submitting ? 'Đang đăng nhập...' : 'Đăng Nhập'}
           </button>
         </form>
 

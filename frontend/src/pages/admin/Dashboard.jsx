@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
+import { getShiftCode } from '../../utils/shiftHelper';
+import ManagerActionList from '../../components/ManagerActionList';
 import { 
   AlertTriangle, 
   Users, 
@@ -189,9 +191,8 @@ export default function Dashboard() {
 
   // Format ca: 14-22 -> 14:00-22:00
   const formatShiftForOFC = (s) => {
-    if (!s || s === 'off') return '';
-    let actual = s.includes('_') ? s.split('_')[0] : s;
-    if (actual === 'off') return '';
+    const actual = getShiftCode(s);
+    if (!actual || actual === 'off') return '';
     const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
     if (match) {
       return `${match[1]}:00-${match[2]}:00`;
@@ -217,7 +218,7 @@ export default function Dashboard() {
       cycleDates.forEach(({ key, weekKey, dayKey }) => {
         // Tìm ca trong schedule[weekKey] hoặc fallback từ empWeekSched[dayKey]
         const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empWeekSched[dayKey];
-        let actual = s ? (s.includes('_') ? s.split('_')[0] : s) : '';
+        const actual = getShiftCode(s);
         if (actual && actual !== 'off') {
           monthShifts[key] = formatShiftForOFC(actual);
           if (SHIFTS[actual]) monthTotalHours += SHIFTS[actual].hours;
@@ -240,7 +241,7 @@ export default function Dashboard() {
       const weekShifts = {};
       WEEK_DAYS.forEach(day => {
         const s = empWeekSched[day];
-        let actual = s ? (s.includes('_') ? s.split('_')[0] : s) : '';
+        const actual = getShiftCode(s);
         if (actual && actual !== 'off') {
           weekShifts[day] = formatShiftForOFC(actual);
           if (SHIFTS[actual]) weekTotalHours += SHIFTS[actual].hours;
@@ -322,7 +323,7 @@ export default function Dashboard() {
       if (viewMode === 'month') {
         cycleDates.forEach(({ weekKey, dayKey }) => {
           const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empSched[dayKey];
-          let actual = s ? (s.includes('_') ? s.split('_')[0] : s) : '';
+          const actual = getShiftCode(s);
           if (actual && actual !== 'off') {
             if (SHIFTS[actual]) empHours += SHIFTS[actual].hours;
             else {
@@ -339,7 +340,7 @@ export default function Dashboard() {
       } else {
         WEEK_DAYS.forEach(day => {
           const s = empSched[day];
-          let actual = s ? (s.includes('_') ? s.split('_')[0] : s) : '';
+          const actual = getShiftCode(s);
           if (actual && actual !== 'off') {
             if (SHIFTS[actual]) empHours += SHIFTS[actual].hours;
             else {
@@ -396,6 +397,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
+      <ManagerActionList />
       
       {/* Page Header & View Mode Switcher */}
       <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-4">

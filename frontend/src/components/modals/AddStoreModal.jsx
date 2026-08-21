@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
+import StaffingMatrixFields from '../StaffingMatrixFields';
+import StoreDemandFields from '../StoreDemandFields';
+import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 
 export default function AddStoreModal({ isOpen, onClose }) {
   const { addStore } = useStore();
-  const [formData, setFormData] = useState({ id: '', name: '', region: 'Miền Bắc' });
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    region: 'Miền Bắc',
+    staffing: normalizeStaffingConfig(),
+    demand: normalizeStoreDemand()
+  });
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -13,7 +22,13 @@ export default function AddStoreModal({ isOpen, onClose }) {
     try {
       await addStore(formData);
       onClose();
-      setFormData({ id: '', name: '', region: 'Miền Bắc' });
+      setFormData({
+        id: '',
+        name: '',
+        region: 'Miền Bắc',
+        staffing: normalizeStaffingConfig(),
+        demand: normalizeStoreDemand()
+      });
     } catch (e) {
       alert('Lỗi: ' + e.message);
     } finally {
@@ -39,6 +54,21 @@ export default function AddStoreModal({ isOpen, onClose }) {
             <option>Miền Trung</option>
             <option>Miền Nam</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">GS25 Direct — lượt khách / doanh số TB</label>
+          <StoreDemandFields
+            demand={formData.demand}
+            onChange={demand => setFormData({ ...formData, demand })}
+            onSuggest={staffing => setFormData({ ...formData, staffing })}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Định biên ca (số NV tối thiểu)</label>
+          <StaffingMatrixFields
+            staffing={formData.staffing}
+            onChange={staffing => setFormData({ ...formData, staffing })}
+          />
         </div>
         
         <div className="pt-4 flex justify-end gap-2">

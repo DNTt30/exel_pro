@@ -11,6 +11,7 @@ const Timesheet = lazy(() => import('./pages/admin/Timesheet'));
 const FeedbackCB = lazy(() => import('./pages/admin/FeedbackCB'));
 const Employees = lazy(() => import('./pages/admin/Employees'));
 const Stores = lazy(() => import('./pages/admin/Stores'));
+const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
 const EmployeeSchedule = lazy(() => import('./pages/employee/EmployeeSchedule'));
 const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'));
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
@@ -52,8 +53,12 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   const user = useStore(state => state.user);
   
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+  if (allowedRoles && allowedRoles.length > 0) {
+    const hasRole = allowedRoles.includes(user.role);
+    const managerGetsAdmin = user.isManager && allowedRoles.includes('admin');
+    if (!hasRole && !managerGetsAdmin) {
+      return <Navigate to="/" replace />;
+    }
   }
   
   return children;
@@ -74,16 +79,18 @@ function App() {
   const isInitializing = useStore(state => state.isInitializing);
 
   useEffect(() => {
-    initializeData();
-  }, [initializeData]);
+    if (user) initializeData();
+  }, [user, initializeData]);
 
   if (isInitializing) {
     return <div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải dữ liệu từ Cloud...</div></div>;
   }
 
+  const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
+
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename={routerBasename}>
         <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải trang...</div></div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -97,17 +104,18 @@ function App() {
               <Route index element={<IndexRedirect />} />
               
               {/* Admin & Manager Routes */}
-              <Route path="admin/dashboard" element={<Dashboard />} />
-              <Route path="admin/schedule" element={<Schedule />} />
-              <Route path="admin/timesheet" element={<Timesheet />} />
-              <Route path="admin/feedback" element={<FeedbackCB />} />
-              <Route path="admin/employees" element={<Employees />} />
-              <Route path="admin/stores" element={<Stores />} />
+              <Route path="admin/dashboard" element={<PrivateRoute allowedRoles={['admin']}><Dashboard /></PrivateRoute>} />
+              <Route path="admin/schedule" element={<PrivateRoute allowedRoles={['admin']}><Schedule /></PrivateRoute>} />
+              <Route path="admin/timesheet" element={<PrivateRoute allowedRoles={['admin']}><Timesheet /></PrivateRoute>} />
+              <Route path="admin/feedback" element={<PrivateRoute allowedRoles={['admin']}><FeedbackCB /></PrivateRoute>} />
+              <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
+              <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']}><Stores /></PrivateRoute>} />
+              <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']}><AdminLogs /></PrivateRoute>} />
 
               {/* Employee Routes */}
-              <Route path="employee/schedule" element={<EmployeeSchedule />} />
-              <Route path="employee/timesheet" element={<EmployeeTimesheet />} />
-              <Route path="employee/feedback" element={<EmployeeFeedback />} />
+              <Route path="employee/schedule" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSchedule /></PrivateRoute>} />
+              <Route path="employee/timesheet" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeTimesheet /></PrivateRoute>} />
+              <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />
             </Route>
             
             <Route path="*" element={<Navigate to="/login" replace />} />

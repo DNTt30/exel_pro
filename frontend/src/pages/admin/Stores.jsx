@@ -1,20 +1,35 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import StaffingMatrixFields from '../../components/StaffingMatrixFields';
+import StoreDemandFields from '../../components/StoreDemandFields';
+import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 
 export default function Stores() {
   const { stores, addStore, updateStore, deleteStore } = useStore();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
-  const [formData, setFormData] = useState({ id: '', name: '', region: 'Miền Bắc' });
+  const emptyStoreForm = () => ({
+    id: '',
+    name: '',
+    region: 'Miền Bắc',
+    staffing: normalizeStaffingConfig(),
+    demand: normalizeStoreDemand()
+  });
+
+  const [formData, setFormData] = useState(emptyStoreForm());
 
   const handleSaveAdd = async () => {
     if (!formData.id || !formData.name) return alert('Vui lòng nhập đủ Mã và Tên');
     try {
-      await addStore(formData);
+      await addStore({
+        ...formData,
+        staffing: normalizeStaffingConfig(formData.staffing),
+        demand: normalizeStoreDemand(formData.demand)
+      });
       setIsAdding(false);
-      setFormData({ id: '', name: '', region: 'Miền Bắc' });
+      setFormData(emptyStoreForm());
     } catch (e) {
       alert('Lỗi: ' + e.message);
     }
@@ -22,7 +37,12 @@ export default function Stores() {
 
   const handleSaveEdit = async () => {
     try {
-      await updateStore(editingId, { name: formData.name, region: formData.region });
+      await updateStore(editingId, {
+        name: formData.name,
+        region: formData.region,
+        staffing: normalizeStaffingConfig(formData.staffing),
+        demand: normalizeStoreDemand(formData.demand)
+      });
       setEditingId(null);
     } catch (e) {
       alert('Lỗi: ' + e.message);
@@ -60,7 +80,7 @@ export default function Stores() {
           <p className="text-xs text-slate-500 mt-0.5">Danh sách các chi nhánh / cửa hàng trong chuỗi ({stores.length} cửa hàng)</p>
         </div>
         <button 
-          onClick={() => { setIsAdding(true); setFormData({ id: '', name: '', region: 'Miền Bắc' }); }}
+          onClick={() => { setIsAdding(true); setFormData(emptyStoreForm()); }}
           className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap"
         >
           <Plus size={15} /> Thêm cửa hàng
@@ -95,9 +115,31 @@ export default function Stores() {
                 </td>
               </tr>
             )}
+            {isAdding && (
+              <tr className="bg-blue-50/40">
+                <td colSpan={4} className="p-3 space-y-3">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">GS25 Direct — lượt khách / doanh số TB ngày</div>
+                    <StoreDemandFields
+                      demand={formData.demand}
+                      onChange={demand => setFormData({ ...formData, demand })}
+                      onSuggest={staffing => setFormData({ ...formData, staffing })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">Định biên ca (số NV tối thiểu)</div>
+                    <StaffingMatrixFields
+                      staffing={formData.staffing}
+                      onChange={staffing => setFormData({ ...formData, staffing })}
+                    />
+                  </div>
+                </td>
+              </tr>
+            )}
             
             {stores.map(st => (
-              <tr key={st.id} className="hover:bg-slate-50 transition-colors">
+              <React.Fragment key={st.id}>
+              <tr className="hover:bg-slate-50 transition-colors">
                 <td className="p-3 font-mono font-bold text-slate-800">{st.id}</td>
                 <td className="p-3 font-semibold text-slate-800">
                   {editingId === st.id ? (
@@ -121,12 +163,34 @@ export default function Stores() {
                     </>
                   ) : (
                     <>
-                      <button onClick={() => { setEditingId(st.id); setFormData(st); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
+                      <button onClick={() => { setEditingId(st.id); setFormData({ ...st, staffing: normalizeStaffingConfig(st.staffing), demand: normalizeStoreDemand(st.demand) }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
                       <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>
                     </>
                   )}
                 </td>
               </tr>
+              {editingId === st.id && (
+                <tr className="bg-blue-50/40">
+                  <td colSpan={4} className="p-3 space-y-3">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">GS25 Direct — lượt khách / doanh số TB ngày</div>
+                      <StoreDemandFields
+                        demand={formData.demand}
+                        onChange={demand => setFormData({ ...formData, demand })}
+                        onSuggest={staffing => setFormData({ ...formData, staffing })}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">Định biên ca (số NV tối thiểu)</div>
+                      <StaffingMatrixFields
+                        staffing={formData.staffing}
+                        onChange={staffing => setFormData({ ...formData, staffing })}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
             {stores.length === 0 && !isAdding && (
               <tr>

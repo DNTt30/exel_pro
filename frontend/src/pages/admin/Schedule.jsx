@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { SHIFTS } from '../../data/initialData';
-import { WEEK_DAYS } from '../../data/constants';
+import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { Save, Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
@@ -27,13 +27,14 @@ import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
 
 export default function Schedule() {
-  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps } = useStore();
+  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
   
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isAdmin = user?.role === 'admin';
   const isManager = user?.isManager;
+  const canEditGrid = isAdmin || isManager;
   
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : user?.dept);
@@ -66,6 +67,19 @@ export default function Schedule() {
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole, weekSchedule);
 
   // Xử lý thay đổi ca làm việc (Lưu dạng Object nếu là ca chi viện)
+  const [viewMode, setViewMode] = useState('week');
+
+  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const cycleDates = useMemo(
+    () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
+    [payrollCycle]
+  );
+
+  useEffect(() => {
+    if (viewMode !== 'month') return;
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+  }, [viewMode, cycleDates, ensureWeeksLoaded]);
+
   const handleShiftChange = useCallback((emp, day, value) => {
     let saveVal = value;
     if (emp.isBorrowedTo && value && value !== 'off') {
@@ -74,20 +88,17 @@ export default function Schedule() {
         covering_store: emp.isBorrowedTo
       };
     }
+    if (viewMode === 'month') {
+      const cell = cycleDates.find(d => d.key === day);
+      if (cell) {
+        updateShift(cell.weekKey, emp.id, cell.dayKey, saveVal);
+        return;
+      }
+    }
     updateShift(currentWeek, emp.id, day, saveVal);
-  }, [currentWeek, updateShift]);
+  }, [currentWeek, updateShift, viewMode, cycleDates]);
 
-  const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
-
-  const activeDays = useMemo(() => {
-    if (viewMode === 'week') return WEEK_DAYS;
-    
-    // Tạo 31 ngày chu kỳ lương 26 -> 25
-    const days = [];
-    for (let i = 26; i <= 31; i++) days.push(`${i}`);
-    for (let i = 1; i <= 25; i++) days.push(`${i}`);
-    return days;
-  }, [viewMode]);
+  const activeDays = viewMode === 'week' ? WEEK_DAYS : cycleDates.map(d => d.key);
 
   // Xuất file Excel (.xls) có đầy đủ định dạng
   const handleExportExcel = () => {
@@ -153,6 +164,7 @@ export default function Schedule() {
       // Lưu hàng loạt lên Supabase thay vì N+1 request
       if (copiedCount > 0) {
         await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
+        useStore.getState().appendAdminLog('Sao chép lịch tuần', currentWeek, `${copiedCount} nhân sự`);
       }
 
       useStore.setState(state => ({
@@ -186,11 +198,12 @@ export default function Schedule() {
         if (isPartTime) totalPT++;
         else totalFT++;
 
-        const empSched = weekSchedule[emp.id] || {};
         let empHours = 0;
+        const cells = viewMode === 'month'
+          ? cycleDates.map(d => schedule[d.weekKey]?.[emp.id]?.[d.dayKey])
+          : activeDays.map(d => (weekSchedule[emp.id] || {})[d]);
 
-        activeDays.forEach(d => {
-          const rawVal = empSched[d];
+        cells.forEach(rawVal => {
           if (!rawVal) return;
           const { shift, covering_store } = normalizeShift(rawVal);
           if (!shift || shift === 'off') return;
@@ -209,7 +222,7 @@ export default function Schedule() {
     });
 
     return { totalEmps, totalHours, totalFT, totalPT, ptOver91Count };
-  }, [groupedEmps, weekSchedule, activeDays, viewMode]);
+  }, [groupedEmps, weekSchedule, activeDays, viewMode, cycleDates, schedule]);
 
   return (
     <div className="space-y-4">
@@ -396,7 +409,12 @@ export default function Schedule() {
                 {activeDays.map((day, idx) => {
                   let isToday = false;
                   let dateStr = '';
-                  if (viewMode === 'week' && currentWeek) {
+                  if (viewMode === 'month') {
+                    const cell = cycleDates[idx];
+                    dateStr = cell?.display || '';
+                    const now = new Date();
+                    isToday = cell && cell.dateObj.toDateString() === now.toDateString();
+                  } else if (currentWeek) {
                     const parts = currentWeek.split('-');
                     const y = parseInt(parts[0], 10);
                     const m = parseInt(parts[1], 10);
@@ -454,7 +472,9 @@ export default function Schedule() {
                       
                       {/* Employees Rows */}
                       {emps.map((emp, idx) => {
-                        const empSched = weekSchedule[emp.id] || {};
+                        const empSched = viewMode === 'month'
+                          ? Object.fromEntries(cycleDates.map(d => [d.key, schedule[d.weekKey]?.[emp.id]?.[d.dayKey] || '']))
+                          : (weekSchedule[emp.id] || {});
                         const currentRow = absoluteRowIdx++;
                         return (
                           <EmployeeRow 
@@ -465,6 +485,7 @@ export default function Schedule() {
                             absoluteRowIdx={currentRow}
                             handleShiftChange={handleShiftChange}
                             isAdmin={isAdmin}
+                            canEdit={canEditGrid}
                             days={activeDays}
                           />
                         );

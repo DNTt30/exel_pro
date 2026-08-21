@@ -15,6 +15,7 @@ import {
   BarChart2
 } from 'lucide-react';
 import { SHIFTS } from '../data/initialData';
+import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const DAY_FULL_NAMES = {
@@ -62,10 +63,10 @@ export default function DashboardCharts({
       weekKeys.forEach(wKey => {
         employees.forEach(emp => {
           const s = schedule[wKey]?.[emp.id]?.[day];
-          if (s && s !== 'off') {
+          const actual = getShiftCode(s);
+          if (actual && actual !== 'off') {
             sumShifts++;
-            const actual = s.includes('_') ? s.split('_')[0] : s;
-            if (s.includes('_')) sumTransfer++;
+            if (getCoveringStore(s)) sumTransfer++;
 
             if (SHIFTS[actual]) {
               sumHours += SHIFTS[actual].hours;
@@ -135,10 +136,10 @@ export default function DashboardCharts({
 
       employees.forEach(emp => {
         const s = schedule[weekKey]?.[emp.id]?.[dayKey];
-        if (s && s !== 'off') {
+        const actual = getShiftCode(s);
+        if (actual && actual !== 'off') {
           shiftCount++;
-          const actual = s.includes('_') ? s.split('_')[0] : s;
-          if (s.includes('_')) transferCount++;
+          if (getCoveringStore(s)) transferCount++;
 
           if (SHIFTS[actual]) {
             totalHours += SHIFTS[actual].hours;
@@ -226,8 +227,8 @@ export default function DashboardCharts({
         let empHrs = 0;
         daysList.forEach(({ dKey, wKey }) => {
           const s = schedule[wKey]?.[emp.id]?.[dKey];
-          if (s && s !== 'off') {
-            const actual = s.includes('_') ? s.split('_')[0] : s;
+          const actual = getShiftCode(s);
+          if (actual && actual !== 'off') {
             if (SHIFTS[actual]) empHrs += SHIFTS[actual].hours;
             else {
               const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
@@ -247,8 +248,8 @@ export default function DashboardCharts({
       employees.forEach(emp => {
         daysList.forEach(({ dKey, wKey }) => {
           const s = schedule[wKey]?.[emp.id]?.[dKey];
-          if (s && s !== 'off') {
-            const actual = s.includes('_') ? s.split('_')[0] : s;
+          const actual = getShiftCode(s);
+          if (actual && actual !== 'off') {
             if (SHIFTS[actual]) monthHours += SHIFTS[actual].hours;
             else {
               const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);

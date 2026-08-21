@@ -1,27 +1,39 @@
-import { WEEK_DAYS, DAY_FULL_NAMES, SCHEDULE_RULES } from '../data/constants';
+import { WEEK_DAYS, DAY_FULL_NAMES, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
 import { getShiftHours, normalizeShift, parseShiftTimeRange, isShiftsOverlapping } from './shiftHelper';
 
 /**
- * OFC AI SCHEDULER & AUDITING ENGINE (V3.5 - TOÀN DIỆN TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ C&B)
+ * GS25 AI SCHEDULER & AUDITING ENGINE (V3.5 - TOÀN DIỆN TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ C&B GS25)
  */
 
 /**
- * BỘ TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ NỘI BỘ OFC (KNOWLEDGE BASE)
+ * BỘ TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ NỘI BỘ GS25 (KNOWLEDGE BASE)
  */
-export const OFC_LABOR_RULES_KNOWLEDGE = {
-  // 1. Nghỉ giữa ca (Break time)
-  breakTime: {
-    title: 'Quy định Thời gian Nghỉ giữa ca (Nghỉ ngơi, ăn uống)',
-    lawRef: 'Điều 109 Bộ luật Lao động 2019',
+export const GS25_LABOR_RULES_KNOWLEDGE = {
+  // 1. Khung ca làm việc chuẩn tại hệ thống GS25 (Shift standard)
+  shiftStandards: {
+    title: 'Khung Ca Làm Việc Tiêu Chuẩn Chuỗi Cửa Hàng Tiện Lợi GS25',
+    lawRef: 'Quy định Vận hành Tiện ích 24/7 GS25 Việt Nam',
     details: [
-      '☕ **Ca ban ngày 8 tiếng (6-14, 14-22, 10-18)**: Được nghỉ giữa giờ ít nhất **30 phút** (thường chia thành 1 lần ăn chính 20-30 phút hoặc 2 lần nghỉ ngắn 15 phút).',
-      '🌙 **Ca ban đêm (22-6)**: Được nghỉ giữa giờ ít nhất **45 phút liên tục**.',
-      '⚡ **Làm thêm giờ (Tăng ca > 2 tiếng)**: Được nghỉ thêm ít nhất **30 phút** trước khi vào ca làm thêm.',
-      '🏢 **Tại chuỗi OFC**: Nhân viên luân phiên nghỉ ăn để luôn duy trì ít nhất 1 nhân sự trực quầy thu ngân và trông coi cửa hàng.'
+      '🕒 **Ca 8 tiếng (Ca chuẩn)**: Gồm ca Sáng (6:00 - 14:00), Chiều (14:00 - 22:00), Đêm (22:00 - 6:00) và ca Hành chính/Giao nhận (10:00 - 18:00). Phù hợp cho nhân viên Full-time (STFT) và Part-time đăng ký đủ ca.',
+      '⏱️ **Ca 4 tiếng (Ca linh hoạt / Part-time)**: Gồm ca 6:00 - 10:00, 10:00 - 14:00, 14:00 - 18:00, 18:00 - 22:00. Tối ưu cho sinh viên xoay ca theo lịch học và bổ sung giờ cao điểm đông khách.',
+      '🌙 **Ca đêm 8 tiếng (22:00 - 6:00)**: Phục vụ mô hình mở cửa xuyên suốt 24/7, luôn duy trì tối thiểu 1 nhân sự cứng trực quầy POS, trông coi an ninh và nhận hàng Fresh Food / Dry Food ca đêm.'
     ]
   },
 
-  // 2. Nghỉ chuyển ca (Daily Rest)
+  // 2. Nghỉ giữa ca (Break time)
+  breakTime: {
+    title: 'Quy định Thời gian Nghỉ giữa ca (Nghỉ ngơi, ăn uống)',
+    lawRef: 'Điều 109 Bộ luật Lao động 2019 & Nội quy GS25',
+    details: [
+      '☕ **Ca ban ngày 8 tiếng (6-14, 14-22, 10-18)**: Được nghỉ giữa giờ ít nhất **30 phút** (thường chia thành 1 lần ăn chính 20-30 phút hoặc 2 lần nghỉ ngắn 15 phút).',
+      '🌙 **Ca ban đêm (22-6)**: Được nghỉ giữa giờ ít nhất **45 phút liên tục**.',
+      '⏳ **Ca ngắn 4 tiếng**: Được nghỉ giải lao linh động **10 - 15 phút** vào thời điểm lưu lượng khách thấp.',
+      '⚡ **Làm thêm giờ (Tăng ca > 2 tiếng)**: Được nghỉ thêm ít nhất **30 phút** trước khi vào ca làm thêm.',
+      '🏪 **Tại cửa hàng GS25**: Nhân viên luân phiên nghỉ ăn để luôn duy trì nhân sự trực quầy thu ngân (POS) và khu vực chế biến đồ ăn nhanh (Fresh Food).'
+    ]
+  },
+
+  // 3. Nghỉ chuyển ca (Daily Rest)
   dailyRest: {
     title: 'Quy định Thời gian Nghỉ chuyển giữa 2 ca liên tiếp',
     lawRef: 'Điều 110 Bộ luật Lao động 2019',
@@ -32,7 +44,7 @@ export const OFC_LABOR_RULES_KNOWLEDGE = {
     ]
   },
 
-  // 3. Nghỉ hàng tuần (Weekly Rest)
+  // 4. Nghỉ hàng tuần (Weekly Rest)
   weeklyRest: {
     title: 'Quy định Ngày Nghỉ Hàng Tuần (OFF)',
     lawRef: 'Điều 111 Bộ luật Lao động 2019',
@@ -42,7 +54,7 @@ export const OFC_LABOR_RULES_KNOWLEDGE = {
     ]
   },
 
-  // 4. Lương ca đêm & Làm thêm giờ (Overtime & Night Shift Pay)
+  // 5. Lương ca đêm & Làm thêm giờ (Overtime & Night Shift Pay)
   salaryRules: {
     title: 'Chế độ Tiền Lương Ca Đêm & Tăng Ca (OT)',
     lawRef: 'Điều 98 Bộ luật Lao động 2019',
@@ -55,14 +67,26 @@ export const OFC_LABOR_RULES_KNOWLEDGE = {
     ]
   },
 
-  // 5. Định mức Part-Time & Full-Time OFC
+  // 6. Định mức Part-Time & Full-Time GS25
   headcountRules: {
-    title: 'Định Mức Giờ Công Chuỗi Cửa Hàng OFC',
-    lawRef: 'Quy chế C&B Nội Bộ',
+    title: 'Định Mức Giờ Công Chuỗi Cửa Hàng GS25',
+    lawRef: 'Quy chế C&B Nội Bộ GS25',
     details: [
       '💼 **Full-Time (STFT)**: Chuẩn 48h/tuần (6 ca 8h + 1 OFF). Tự động bù vào các ca thiếu người của cửa hàng.',
-      '⏳ **Part-Time (STPT)**: Định mức an toàn từ **16h đến 23h/tuần**, không vượt quá **91h/tháng** để tuân thủ hợp đồng thời vụ.',
-      '👥 **Nhân viên mới (CSR_NEW)**: Dưới 1 tháng kinh nghiệm bắt buộc phải có 1 Bạn Cứng (STFT/SM/Kinh nghiệm >=1 tháng) kèm cặp trong ca.'
+      '⏳ **Part-Time (STPT)**: Định mức an toàn từ **16h đến 23h/tuần**, giới hạn tối đa không vượt quá **91h/tháng** để tuân thủ hợp đồng thời vụ GS25.',
+      '👥 **Nhân viên mới (CSR_NEW)**: Dưới 1 tháng kinh nghiệm bắt buộc phải có 1 Bạn Cứng (STFT/SM/Kinh nghiệm >=1 tháng) kèm cặp trong ca, tuyệt đối không trực solo.'
+    ]
+  },
+
+  // 7. Quy định Đồng phục & Văn hóa Chào khách GS25
+  uniformAndServiceRules: {
+    title: 'Tiêu Chuẩn Đồng Phục & Văn Hóa Chào Khách GS25',
+    lawRef: 'Sổ tay Văn hóa Dịch vụ Khách hàng GS25',
+    details: [
+      '👕 **Đồng phục chuẩn**: Luôn mặc áo đồng phục GS25 phẳng phiu, sơ vin gọn gàng, đeo bảng tên bên ngực trái, mang giày đen/tối màu kín mũi.',
+      '🧢 **Tạp dề & Mũ**: Bắt buộc đeo tạp dề sạch và đội mũ GS25 đúng quy cách khi đứng quầy Fresh Food và chuẩn bị thức ăn nhanh.',
+      '🗣️ **Tiêu chuẩn câu chào khách**: Khi khách bước vào cửa hàng, tất cả nhân viên trong ca tươi cười và chào to rõ ràng: **"GS25 xin chào!"**. Khi khách thanh toán xong và ra về: **"GS25 cảm ơn và hẹn gặp lại quý khách!"**.',
+      '📵 **Tác phong làm việc**: Tuyệt đối không bấm điện thoại cá nhân trong giờ làm, giữ gìn quầy thu ngân và khu vực ăn uống luôn sạch sẽ, ngăn nắp.'
     ]
   }
 };
@@ -138,7 +162,8 @@ export function generateAISchedule(employees, storeId, options = {}) {
   }
 
   const {
-    requiredMatrix = { '6-14': 2, '14-22': 2, '22-6': 1 },
+    requiredMatrix = DEFAULT_STAFFING_MATRIX.weekday,
+    requiredMatrixByDay = {},
     existingSchedule = {},
     nightShiftVolunteers = []
   } = options;
@@ -202,7 +227,8 @@ export function generateAISchedule(employees, storeId, options = {}) {
   // GIAI ĐOẠN 1: PHÂN BỔ THEO NGUYỆN VỌNG & ƯU TIÊN PART-TIME
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
     shiftPriorities.forEach(shiftCode => {
-      const neededCount = requiredMatrix[shiftCode] || 0;
+      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+      const neededCount = dayMatrix[shiftCode] || 0;
       let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
       if (shiftCode === '22-6') {
@@ -273,7 +299,8 @@ export function generateAISchedule(employees, storeId, options = {}) {
   // GIAI ĐOẠN 2: FULL-TIME BÙ VÀO TẤT CẢ CÁC CA THIẾU
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
     shiftPriorities.forEach(shiftCode => {
-      const neededCount = requiredMatrix[shiftCode] || 0;
+      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+      const neededCount = dayMatrix[shiftCode] || 0;
       let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
       if (assignedCount < neededCount) {
@@ -576,11 +603,27 @@ export function askAICopilot(question, context = {}) {
     return `👥 **Quy tắc kèm cặp (${newEmps.length} bạn mới, ${seniorEmps.length} bạn cứng):**\n• Mọi ca có bạn mới **bắt buộc có 1 bạn cứng kèm**.\n• Bạn mới tuyệt đối **không trực solo**. Bạn cứng được phép trực 1 mình.`;
   }
 
+  // 1.8 ĐỒNG PHỤC & VĂN HÓA CHÀO KHÁCH GS25
+  if (q.includes('đồng phục') || q.includes('chào') || q.includes('xin chào') || q.includes('tác phong') || q.includes('mũ') || q.includes('bảng tên') || q.includes('thẻ tên') || q.includes('tạp dề') || q.includes('gs25')) {
+    return `🏪 **Quy định Đồng phục & Chào khách GS25:**\n• **Câu chào chuẩn**: Luôn tươi cười và chào to rõ ràng: *"GS25 xin chào!"* khi khách vào cửa hàng và *"GS25 cảm ơn và hẹn gặp lại quý khách!"* khi khách ra về.\n• **Đồng phục**: Mặc áo GS25 phẳng phiu sơ vin, đeo bảng tên bên ngực trái, mang giày tối màu kín mũi; đội mũ và đeo tạp dề sạch khi đứng quầy Fresh Food.\n• **Tác phong**: Tuyệt đối không bấm điện thoại cá nhân trong giờ làm việc.`;
+  }
+
+  // 1.9 KHUNG CA LÀM VIỆC GS25 (Ca 4h & Ca 8h)
+  if (q.includes('khung ca') || q.includes('ca 4') || q.includes('ca 8') || (q.includes('ca làm') && (q.includes('mấy') || q.includes('loại')))) {
+    return `🕒 **Khung ca làm việc GS25:**\n• **Ca 8 tiếng (Ca chuẩn)**: 6-14 (Sáng), 14-22 (Chiều), 22-6 (Đêm), 10-18 (Hành chính/Giao nhận).\n• **Ca 4 tiếng (Part-time linh hoạt)**: 6-10, 10-14, 14-18, 18-22.\n• **Ca đêm 24/7**: 22:00 - 6:00 (luôn có ít nhất 1 bạn cứng trực quầy).`;
+  }
+
   // 1.8 HỎI GIỜ / NGÀY HIỆN TẠI VÀ TƯƠNG LAI
   const isTimeQuery = q.includes('mấy giờ') || q.includes('bây giờ') || q.includes('thời gian');
   const isDateQuery = (q.includes('ngày') || q.includes('thứ') || q.includes('hôm')) && (q.includes('mấy') || q.includes('nào') || q.includes('bao nhiêu'));
-  
-  if (isTimeQuery || isDateQuery) {
+  const looksLikePersonQuery = employees.some(e => {
+    const parts = (e.name || '').toLowerCase().replace(/\([^)]*\)/g, '').trim().split(/\s+/);
+    const firstName = parts[parts.length - 1];
+    return (firstName && firstName.length >= 2 && q.includes(firstName)) ||
+      (e.id && q.includes(String(e.id).toLowerCase()));
+  }) || q.includes('làm ca');
+
+  if ((isTimeQuery || isDateQuery) && !looksLikePersonQuery) {
     let targetDate = new Date();
     let prefix = "⏰ Thời gian hiện tại:";
     
@@ -609,23 +652,48 @@ export function askAICopilot(question, context = {}) {
   // =========================================================================
 
   // 2.1 TRA CỨU CHI TIẾT THEO TÊN NHÂN VIÊN HOẶC MÃ NHÂN VIÊN (BẢNG employees + schedules)
-  const matchedEmp = employees.find(e => {
+  const paddedQ = ' ' + q.replace(/[?!,.]/g, '') + ' ';
+
+  let matchedEmps = employees.filter(e => {
     const nameLower = (e.name || '').toLowerCase();
     const cleanName = nameLower.replace(/\([^)]*\)/g, '').trim();
-    const idStr = (e.id || '').toString();
-    if (idStr && q.includes(idStr)) return true;
+    const idStr = (e.id || '').toString().toLowerCase();
     
+    // Exact ID match
+    if (idStr && paddedQ.includes(' ' + idStr + ' ')) return true;
+    
+    // Full name match
     if (cleanName && q.includes(cleanName)) return true;
-    if (nameLower && q.includes(nameLower)) return true;
 
+    // First name match
     const nameParts = cleanName.split(/\s+/).filter(Boolean);
     const firstName = nameParts[nameParts.length - 1]; // Tên chính
     if (firstName && firstName.length >= 2 && q.includes(firstName)) return true;
+    
     return false;
   });
 
-  const paddedQ = ' ' + q.replace(/[?!,.]/g, '') + ' ';
-  const hasScheduleIntent = q.includes('làm') || q.includes('lịch') || q.includes('thông tin') || q.includes('hồ sơ') || paddedQ.includes(' ca ') || paddedQ.includes(' ai ') || paddedQ.includes(' mã ');
+  // Nếu tìm thấy nhiều người, ưu tiên người khớp chính xác cả họ tên hoặc ID
+  if (matchedEmps.length > 1) {
+    const exactMatch = matchedEmps.find(e => q.includes((e.name || '').toLowerCase()) || paddedQ.includes(' ' + (e.id || '').toString().toLowerCase() + ' '));
+    if (exactMatch) {
+      matchedEmps = [exactMatch];
+    }
+  }
+
+  // Nhận diện ý định hỏi lịch: Nếu nhập nguyên mã NV hoặc tên, tự hiểu là muốn xem lịch
+  let hasScheduleIntent = q.includes('làm') || q.includes('lịch') || q.includes('thông tin') || q.includes('hồ sơ') || paddedQ.includes(' ca ') || paddedQ.includes(' ai ') || paddedQ.includes(' mã ');
+  if (matchedEmps.length > 0) {
+    const isDirectAnswer = matchedEmps.some(e => q.includes(e.id.toString().toLowerCase()) || q === (e.name || '').toLowerCase() || q === e.name.split(' ').pop().toLowerCase());
+    if (isDirectAnswer) hasScheduleIntent = true;
+  }
+
+  if (matchedEmps.length > 1 && hasScheduleIntent) {
+    const empList = matchedEmps.map(e => `• **${e.name}** (Mã NV: ${e.id})`).join('\n');
+    return `🧐 Dạ sếp, Tú tìm thấy tới **${matchedEmps.length} người** cùng tên này trong hệ thống:\n${empList}\n\nSếp muốn xem lịch của ai ạ? (Gõ kèm **Mã NV** hoặc **Họ tên đầy đủ** để Tú lọc nhé!)`;
+  }
+
+  const matchedEmp = matchedEmps.length === 1 ? matchedEmps[0] : null;
 
   if (matchedEmp && hasScheduleIntent) {
     const empSched = weekSchedule[matchedEmp.id] || {};
@@ -723,7 +791,7 @@ export function askAICopilot(question, context = {}) {
     }
   }
 
-  if (targetDayKey && (q.includes('ai làm') || q.includes('ca nào') || q.includes('danh sách') || q.includes('có ai') || q.includes('ca gì'))) {
+  if (targetDayKey && (q.includes('ai làm') || q.includes('ca nào') || q.includes('danh sách') || q.includes('có ai') || q.includes('ca gì') && !q.includes('rảnh') && !q.includes('nghỉ'))) {
     const workingToday = storeEmps.filter(e => {
       const { shift } = normalizeShift(weekSchedule[e.id]?.[targetDayKey]);
       return shift && shift !== 'off';
@@ -739,6 +807,21 @@ export function askAICopilot(question, context = {}) {
     }).join('\n');
 
     return `📅 **Danh sách làm việc ngày ${targetDayKey} (${workingToday.length} nhân sự):**\n${listByShift}`;
+  }
+
+  // 2.5.1 TRA CỨU AI RẢNH / OFF THEO NGÀY CỤ THỂ (Dùng để tìm người đổi ca)
+  if (targetDayKey && (q.includes('ai rảnh') || q.includes('ai nghỉ') || q.includes('ai off') || q.includes('đổi ca'))) {
+    const offToday = storeEmps.filter(e => {
+      const { shift } = normalizeShift(weekSchedule[e.id]?.[targetDayKey]);
+      return !shift || shift === 'off';
+    });
+
+    if (offToday.length === 0) {
+      return `📅 Ngày **${targetDayKey}**: Không có ai đang nghỉ (OFF). Toàn bộ nhân sự đều có lịch làm việc.`;
+    }
+
+    const listOff = offToday.map(e => `• **${e.name}** (${e.type})`).join('\n');
+    return `📅 **Danh sách đang rảnh/nghỉ (OFF) ngày ${targetDayKey} (${offToday.length} bạn):**\n${listOff}\n\n👉 Bạn có thể nhắn các bạn này để nhờ đi làm thay hoặc xin đổi ca nhé!`;
   }
 
   // 2.6 TOP GIỜ LÀM NHIỀU NHẤT
@@ -776,4 +859,115 @@ export function askAICopilot(question, context = {}) {
 
   // 15. TRẢ LỜI MẶC ĐỊNH
   return `🤖 **Trợ lý AI Cửa hàng ${storeId}:**\n• Tra cứu nhân viên theo tên hoặc mã NV.\n• Tra cứu lịch làm việc theo ngày (T2 -> CN).\n• Tra cứu đơn đổi ca & báo bù công C&B.\n• Xếp lịch & giải đáp luật lao động.\n\n*Hỏi trực tiếp câu hỏi ngắn để nhận câu trả lời ngay!*`;
+}
+
+/**
+ * AI COPILOT QUERY ENGINE (SỬ DỤNG LLM OLLAMA)
+ * Thay vì dùng Regex cứng, hàm này gửi toàn bộ Context và Chat History cho Ollama Local xử lý.
+ */
+export async function askOllamaCopilot(question, context = {}, chatHistory = []) {
+  const { 
+    employees = [], 
+    weekSchedule = {}, 
+    storeId = 'VN0485'
+  } = context;
+
+  // Lược bớt dữ liệu để gửi cho LLM (tránh bị tràn token)
+  const storeEmps = employees.filter(e => e.dept === storeId);
+  const compactEmployees = storeEmps.map(e => ({
+    id: e.id, name: e.name, type: e.type, role: e.role
+  }));
+  
+  let textSchedule = '';
+  const dailySummary = {};
+  const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  
+  WEEK_DAYS.forEach(day => { dailySummary[day] = {}; });
+
+  storeEmps.forEach(e => {
+    if (weekSchedule[e.id]) {
+      // Ép kiểu Lịch cá nhân thành chuỗi Text rõ ràng để AI không đọc sai JSON
+      const daysStr = WEEK_DAYS.map(day => {
+        const rawShift = weekSchedule[e.id][day];
+        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
+        return `${day}(${shiftStr})`;
+      }).join(', ');
+      
+      textSchedule += `- [${e.id}] ${e.name}: ${daysStr}\n`;
+      
+      // Xây dựng danh sách ai làm ca nào trong ngày để LLM dễ đọc
+      WEEK_DAYS.forEach(day => {
+        const rawShift = weekSchedule[e.id][day];
+        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
+        const cleanShift = shiftStr.toUpperCase();
+        if (cleanShift && cleanShift !== 'OFF' && cleanShift !== 'AL' && cleanShift !== 'U') {
+          if (!dailySummary[day][cleanShift]) dailySummary[day][cleanShift] = [];
+          dailySummary[day][cleanShift].push(e.name);
+        }
+      });
+    }
+  });
+
+  const now = new Date();
+  const timeStr = new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }).format(now);
+
+  const systemPrompt = `Bạn là TÚ mini, trợ lý AI thông minh tại chuỗi cửa hàng tiện lợi GS25 (Chi nhánh ${storeId}).
+
+THỜI GIAN HIỆN TẠI TẠI CỬA HÀNG: ${timeStr}
+(Luôn dùng thời gian này làm gốc để trả lời các câu hỏi về "hôm nay", "ngày mai", "bây giờ").
+
+DỮ LIỆU NHÂN SỰ & LỊCH LÀM VIỆC:
+1. Thông tin nhân sự: ${JSON.stringify(compactEmployees)}
+2. Lịch cá nhân từng người (Từ T2 đến CN):
+${textSchedule}
+3. Danh sách ca trực theo ngày (RẤT QUAN TRỌNG): ${JSON.stringify(dailySummary)}
+
+HƯỚNG DẪN ĐỌC LỊCH:
+- Khi được hỏi "Lịch làm việc của X" hoặc "X làm ca nào": BẮT BUỘC phải liệt kê đầy đủ từng ngày trong tuần của người đó (Từ T2 đến CN) dựa vào [Lịch cá nhân từng người]. Tuyệt đối KHÔNG ĐƯỢC gộp chung chung "cả tuần" hay bỏ sót ngày. Tuyệt đối ghi ĐÚNG HỌ TÊN, không tự chế tên.
+- Để trả lời "ai làm cùng ai vào ngày X", hãy nhìn vào [Danh sách ca trực theo ngày], chọn ngày X, tìm xem nhân viên đó đang làm ca nào, và những ai đang có cùng ca đó. Phải đọc dữ liệu tuyệt đối CHÍNH XÁC, không đoán mò!
+- Nếu hỏi "ai nghỉ/rảnh", tìm những nhân viên không có tên trong bất kỳ ca nào của ngày hôm đó.
+
+NGUYÊN TẮC XỬ LÝ NGỮ CẢNH:
+1. Theo dõi toàn bộ lịch sử hội thoại, không chỉ tin nhắn gần nhất.
+2. Giải quyết tham chiếu ngầm định ("cái đó", "hôm đó", "như lúc nãy"...).
+3. Giữ nhất quán vai trò "TÚ mini" (hài hước, xưng hô sếp - em hoặc Tú - bạn).
+
+Yêu cầu định dạng:
+- Trả lời bằng tiếng Việt. Dùng Markdown in đậm những thông tin quan trọng.
+- Xuống dòng rõ ràng, có thể dùng emoji (🥸) cho sinh động.`;
+
+  // Format lịch sử chat
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...chatHistory.map(m => ({
+      role: m.sender === 'ai' ? 'assistant' : 'user',
+      content: m.text
+    })),
+    { role: 'user', content: question }
+  ];
+
+  try {
+    const response = await fetch('http://localhost:11434/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen2.5-coder:7b',
+        messages: messages,
+        stream: false
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Ollama Server Not Running');
+    }
+    
+    const data = await response.json();
+    return data.message.content;
+  } catch (error) {
+    console.error('Lỗi kết nối Ollama:', error);
+    throw error;
+  }
 }

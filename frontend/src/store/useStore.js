@@ -1,44 +1,79 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as api from '../services/api';
+import { getCurrentMondayWeek, normalizeStaffingConfig, normalizeStoreDemand } from '../data/constants';
+import { buildSwappedSchedules, mergeAiSchedule } from '../utils/shiftHelper';
+import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp } from '../lib/authSession';
+
+function assertCanEditShift(state, empId) {
+  const user = state.user;
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (user.role === 'admin') return;
+  if (user.isManager) {
+    const emp = (state.employees || []).find(e => e.id === empId);
+    if (emp && emp.dept && user.dept && emp.dept !== user.dept && empId !== user.id) {
+      throw new Error('Không có quyền sửa lịch cửa hàng khác');
+    }
+    return;
+  }
+  if (empId !== user.id) {
+    throw new Error('Bạn chỉ được đăng ký ca của mình');
+  }
+}
+
+function assertCanManageStaff(state) {
+  const user = state.user;
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (user.role === 'admin' || user.isManager) return;
+  throw new Error('Không có quyền quản lý nhân sự');
+}
+
+async function bindAuthSession(user) {
+  const result = await ensureAuthSession(user, { allowSignUp: user?.id === 'admin' });
+  if (result.ok) return null;
+  if (result.reason === 'no-client' || result.reason === 'no-user') return null;
+  console.warn('Supabase Auth chưa sẵn sàng:', result.reason);
+  return result.reason;
+}
 
 export const useStore = create(
   persist(
     (set, get) => ({
       user: null, 
-      login: (userId, password) => {
+      login: async (userId, password) => {
+        let nextUser = null;
+
         if (userId === 'admin') {
-          if (password === '1') {
-            set({ user: { id: 'admin', role: 'admin', name: 'Quản trị viên' } });
-          } else {
-            throw new Error('Mật khẩu không chính xác');
-          }
+          if (password !== '1') throw new Error('Mật khẩu không chính xác');
+          nextUser = { id: 'admin', role: 'admin', name: 'Quản trị viên' };
         } else {
-          const emp = get().employees.find(e => e.id === userId);
-          if (emp) {
-            // Mật khẩu mặc định là '1' cho toàn bộ nhân viên (Theo quy ước Hướng B)
-            if (password === '1') {
-              const roleName = emp.role || '';
-              const typeName = emp.type || '';
-              const isManager = roleName.toLowerCase().includes('quản lý') || 
-                                roleName.toLowerCase().includes('cửa hàng trưởng') || 
-                                roleName === 'SM' || 
-                                typeName === 'SM';
-              
-              set({ user: { id: emp.id, role: 'employee', ...emp, isManager } });
-            } else {
-              throw new Error('Mật khẩu không chính xác');
-            }
-          } else {
-            throw new Error('Không tìm thấy mã nhân viên');
+          if (!get().employees.length) {
+            const emps = await api.getEmployees();
+            set({ employees: emps });
           }
+
+          const emp = get().employees.find(e => e.id === userId);
+          if (!emp) throw new Error('Không tìm thấy mã nhân viên');
+          if (password !== '1') throw new Error('Mật khẩu không chính xác');
+
+          nextUser = { ...emp, id: emp.id, role: 'employee', isManager: isManagerFromEmp(emp) };
         }
+
+        const authWarning = await bindAuthSession(nextUser);
+        set({ user: nextUser, authWarning });
+        get().appendAdminLog('Đăng nhập', nextUser.id, nextUser.role === 'admin' ? 'Admin' : (nextUser.isManager ? 'Quản lý' : 'Nhân viên'));
+        return nextUser;
       },
-      logout: () => set({ user: null }),
+      logout: async () => {
+        await signOutAuth();
+        set({ user: null, authWarning: null });
+      },
 
       // Data State
+      authWarning: null,
+      adminLogs: [],
       isInitializing: false,
-      currentWeek: '2026-08-10', // ISO YYYY-MM-DD với số 0 đứng trước
+      currentWeek: getCurrentMondayWeek(),
       stores: [],
       employees: [],
       feedbacks: [],
@@ -48,19 +83,32 @@ export const useStore = create(
       initializeData: async () => {
         set({ isInitializing: true });
         try {
-          const [emps, fbs, scheds, st] = await Promise.all([
+          const user = get().user;
+          if (user) {
+            const authWarning = await bindAuthSession(user);
+            if (authWarning) set({ authWarning });
+            else set({ authWarning: null });
+          }
+          const week = get().currentWeek;
+          const canReadLogs = user?.role === 'admin' || user?.isManager;
+          const [emps, fbs, scheds, st, swaps, logs] = await Promise.all([
             api.getEmployees(),
             api.getFeedbacks(),
-            api.getSchedulesByWeek(get().currentWeek),
-            api.getStores()
+            api.getSchedulesByWeek(week),
+            api.getStores(),
+            api.getShiftSwaps(),
+            canReadLogs ? api.getAdminLogs() : Promise.resolve([])
           ]);
+          const prev = get();
           set({ 
-            employees: emps, 
+            employees: emps.length ? emps : prev.employees, 
             feedbacks: fbs,
-            stores: st,
+            stores: st.length ? st : prev.stores,
+            shiftSwaps: swaps,
+            adminLogs: logs,
             schedule: {
-              ...get().schedule,
-              [get().currentWeek]: scheds
+              ...prev.schedule,
+              [week]: scheds
             }
           });
         } catch (err) {
@@ -70,40 +118,136 @@ export const useStore = create(
         }
       },
       
+      ensureWeeksLoaded: async (weekKeys = []) => {
+        const unique = [...new Set(weekKeys.filter(Boolean))];
+        const missing = unique.filter(k => get().schedule[k] === undefined);
+        if (missing.length === 0) return;
+        const entries = await Promise.all(
+          missing.map(async (k) => [k, await api.getSchedulesByWeek(k)])
+        );
+        set(state => {
+          const schedule = { ...state.schedule };
+          entries.forEach(([k, data]) => {
+            schedule[k] = data;
+          });
+          return { schedule };
+        });
+      },
+
+      appendAdminLog: async (action, target = '', detail = '') => {
+        const user = get().user;
+        const entry = {
+          actorId: user?.id || '',
+          actorName: user?.name || user?.id || '',
+          action,
+          target: String(target || ''),
+          detail: String(detail || '')
+        };
+        try {
+          const saved = await api.addAdminLog(entry);
+          set(state => ({ adminLogs: [saved, ...(state.adminLogs || [])].slice(0, 300) }));
+        } catch {
+          set(state => ({
+            adminLogs: [{
+              ...entry,
+              id: 'local_' + Date.now(),
+              createdAt: new Date().toISOString()
+            }, ...(state.adminLogs || [])].slice(0, 300)
+          }));
+        }
+      },
+
+      applyBulkSchedule: async (weekDate, scheduleMap) => {
+        assertCanManageStaff(get());
+        await api.saveBulkEmployeeSchedules(weekDate, scheduleMap);
+        set(state => ({
+          schedule: {
+            ...state.schedule,
+            [weekDate]: {
+              ...(state.schedule[weekDate] || {}),
+              ...scheduleMap
+            }
+          }
+        }));
+        get().appendAdminLog('Lưu lịch hàng loạt', weekDate, `${Object.keys(scheduleMap).length} nhân sự`);
+      },
+
+      applyAiSchedule: async (weekDate, aiSchedule, storeId) => {
+        assertCanManageStaff(get());
+        const existing = get().schedule[weekDate] || {};
+        const merged = mergeAiSchedule(existing, aiSchedule, storeId);
+        await api.saveBulkEmployeeSchedules(weekDate, merged);
+        set(state => ({
+          schedule: {
+            ...state.schedule,
+            [weekDate]: merged
+          }
+        }));
+        get().appendAdminLog('Áp lịch AI', storeId || weekDate, `Tuần ${weekDate}`);
+      },
+
       // CRUD Employees
       addEmployee: async (emp) => {
+        assertCanManageStaff(get());
         await api.addEmployee(emp);
+        const provisioned = await provisionAuthUser(emp);
         set((state) => ({ employees: [...state.employees, emp] }));
+        get().appendAdminLog('Thêm nhân viên', emp.id, `${emp.name} · ${emp.dept} · ${emp.role || emp.type}`);
+        if (!provisioned.ok) {
+          return {
+            ok: true,
+            provisionWarning: `Đã lưu nhân viên ${emp.id} nhưng chưa tạo user đăng nhập: ${provisioned.reason}`
+          };
+        }
+        return { ok: true };
       },
       updateEmployee: async (id, updates) => {
+        assertCanManageStaff(get());
         await api.updateEmployeeInfo(id, updates);
         set((state) => ({
           employees: state.employees.map(e => e.id === id ? { ...e, ...updates } : e)
         }));
+        get().appendAdminLog('Sửa nhân viên', id, JSON.stringify(updates));
       },
       deleteEmployee: async (id) => {
+        assertCanManageStaff(get());
         await api.deleteEmployeeData(id);
         set((state) => ({
           employees: state.employees.filter(e => e.id !== id)
         }));
+        get().appendAdminLog('Xóa nhân viên', id);
       },
 
       // CRUD Stores
       addStore: async (store) => {
-        await api.addStore(store);
-        set((state) => ({ stores: [...state.stores, store] }));
+        assertCanManageStaff(get());
+        const payload = {
+          ...store,
+          staffing: normalizeStaffingConfig(store.staffing),
+          demand: normalizeStoreDemand(store.demand)
+        };
+        await api.addStore(payload);
+        set((state) => ({ stores: [...state.stores, payload] }));
+        get().appendAdminLog('Thêm cửa hàng', payload.id, payload.name);
       },
       updateStore: async (id, updates) => {
-        await api.updateStore(id, updates);
+        assertCanManageStaff(get());
+        const payload = { ...updates };
+        if (payload.staffing) payload.staffing = normalizeStaffingConfig(payload.staffing);
+        if (payload.demand) payload.demand = normalizeStoreDemand(payload.demand);
+        await api.updateStore(id, payload);
         set((state) => ({
-          stores: state.stores.map(s => s.id === id ? { ...s, ...updates } : s)
+          stores: state.stores.map(s => s.id === id ? { ...s, ...payload } : s)
         }));
+        get().appendAdminLog('Sửa cửa hàng', id, payload.staffing ? 'Cập nhật định biên / thông tin' : (payload.name || ''));
       },
       deleteStore: async (id) => {
+        assertCanManageStaff(get());
         await api.deleteStore(id);
         set((state) => ({
           stores: state.stores.filter(s => s.id !== id)
         }));
+        get().appendAdminLog('Xóa cửa hàng', id);
       },
 
       setCurrentWeek: async (week) => {
@@ -123,6 +267,7 @@ export const useStore = create(
 
       // Optimistic update với cơ chế rollback an toàn khi lưu lỗi
       updateShift: async (weekDate, empId, day, shiftCode) => {
+        assertCanEditShift(get(), empId);
         const weekSched = get().schedule[weekDate] || {};
         const empSched = weekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
         const previousShifts = { ...empSched };
@@ -152,7 +297,6 @@ export const useStore = create(
         }
       },
 
-      feedbacks: [],
       addFeedback: async (feedback) => {
         const tempId = Date.now().toString();
         const optimisticFb = { id: tempId, status: 'pending', createdAt: new Date().toISOString(), ...feedback };
@@ -198,6 +342,7 @@ export const useStore = create(
           if (status === 'approved' && newShiftData) {
             get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
           }
+          get().appendAdminLog('Duyệt feedback', feedbackId, status);
         } catch (err) {
           console.error("Lỗi khi duyệt feedback:", err);
           set({ feedbacks: previousFeedbacks });
@@ -206,22 +351,41 @@ export const useStore = create(
       },
 
       shiftSwaps: [],
-      addShiftSwap: (swapData) => {
-        const newSwap = {
+      addShiftSwap: async (swapData) => {
+        const optimistic = {
           id: 'swap_' + Date.now().toString(),
-          status: 'pending_partner', // 'pending_partner' -> 'pending_manager' -> 'approved' / 'rejected'
+          status: 'pending_partner',
           createdAt: new Date().toISOString(),
           ...swapData
         };
         set(state => ({
-          shiftSwaps: [newSwap, ...(state.shiftSwaps || [])]
+          shiftSwaps: [optimistic, ...(state.shiftSwaps || [])]
         }));
-        return newSwap;
+
+        try {
+          const created = await api.addShiftSwap(optimistic);
+          set(state => ({
+            shiftSwaps: (state.shiftSwaps || []).map(s => s.id === optimistic.id ? created : s)
+          }));
+          get().appendAdminLog('Tạo đơn đổi ca', created.fromEmpId, `${created.fromEmpName} ⇄ ${created.toEmpName}`);
+          return created;
+        } catch (err) {
+          set(state => ({
+            shiftSwaps: (state.shiftSwaps || []).filter(s => s.id !== optimistic.id)
+          }));
+          throw err;
+        }
       },
-      respondShiftSwap: (swapId, newStatus, note = '') => {
+      respondShiftSwap: async (swapId, newStatus, note = '') => {
         const currentSwaps = get().shiftSwaps || [];
         const targetSwap = currentSwaps.find(s => s.id === swapId);
         if (!targetSwap) return;
+
+        const previousSwaps = currentSwaps;
+        const previousSchedule = get().schedule;
+        const resolvedAt = (newStatus === 'approved' || newStatus === 'rejected')
+          ? new Date().toISOString()
+          : targetSwap.resolvedAt;
 
         const updated = currentSwaps.map(s => {
           if (s.id === swapId) {
@@ -229,7 +393,7 @@ export const useStore = create(
               ...s,
               status: newStatus,
               managerNote: note || s.managerNote,
-              resolvedAt: (newStatus === 'approved' || newStatus === 'rejected') ? new Date().toISOString() : s.resolvedAt
+              resolvedAt
             };
           }
           return s;
@@ -237,10 +401,39 @@ export const useStore = create(
 
         set({ shiftSwaps: updated });
 
-        // Nếu Quản lý duyệt: TỰ ĐỘNG HOÁN ĐỔI 2 CA TRÊN BẢNG LỊCH
-        if (newStatus === 'approved') {
-          get().updateShift(targetSwap.week, targetSwap.fromEmpId, targetSwap.fromDay, targetSwap.toShift || 'off');
-          get().updateShift(targetSwap.week, targetSwap.toEmpId, targetSwap.toDay, targetSwap.fromShift || 'off');
+        try {
+          if (newStatus === 'approved') {
+            const week = targetSwap.week;
+            const weekSched = get().schedule[week] || {};
+            const swapped = buildSwappedSchedules(
+              weekSched[targetSwap.fromEmpId] || {},
+              weekSched[targetSwap.toEmpId] || {},
+              targetSwap
+            );
+            await api.saveBulkEmployeeSchedules(week, swapped);
+            set(state => ({
+              schedule: {
+                ...state.schedule,
+                [week]: {
+                  ...(state.schedule[week] || {}),
+                  ...swapped
+                }
+              }
+            }));
+          }
+
+          if (!String(swapId).startsWith('swap_')) {
+            await api.updateShiftSwap(swapId, {
+              status: newStatus,
+              managerNote: note || targetSwap.managerNote || '',
+              resolvedAt: resolvedAt || null
+            });
+          }
+          get().appendAdminLog('Xử lý đổi ca', swapId, newStatus);
+        } catch (err) {
+          console.error('Lỗi khi cập nhật đơn đổi ca:', err);
+          set({ shiftSwaps: previousSwaps, schedule: previousSchedule });
+          alert(`Không thể cập nhật đơn đổi ca: ${err.message || 'Lỗi kết nối'}`);
         }
       },
 
@@ -262,13 +455,14 @@ export const useStore = create(
     }),
     {
       name: 'schedule-storage',
-      partialize: (state) => ({ 
-        user: state.user,
-        employees: state.employees, 
-        stores: state.stores, 
-        schedule: state.schedule,
-        feedbacks: state.feedbacks,
-        shiftSwaps: state.shiftSwaps
+      version: 2,
+      partialize: (state) => ({
+        currentWeek: state.currentWeek,
+        user: state.user
+      }),
+      migrate: (persisted) => ({
+        currentWeek: persisted?.currentWeek || getCurrentMondayWeek(),
+        user: persisted?.user || null
       }),
     }
   )

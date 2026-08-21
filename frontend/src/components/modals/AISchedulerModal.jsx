@@ -12,14 +12,15 @@ import {
   ArrowRight, 
   Wand2 
 } from 'lucide-react';
-import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { WEEK_DAYS, DAY_FULL_NAMES, buildStaffingByDay, DEFAULT_STAFFING_MATRIX } from '../../data/constants';
 import { generateAISchedule, auditSchedule } from '../../utils/aiSchedulerEngine';
 import { getShiftHours, normalizeShift } from '../../utils/shiftHelper';
 
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
-  const { employees, schedule, updateShift, user } = useStore();
+  const { employees, schedule, applyAiSchedule, user, stores } = useStore();
   const weekSched = schedule[currentWeek] || {};
-  const activeStoreId = storeId === 'ALL' ? (user?.dept || 'VN0485') : storeId;
+  const activeStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || 'VN0485') : storeId;
+  const activeStore = stores.find(s => s.id === activeStoreId);
 
   const [activeTab, setActiveTab] = useState('generate'); // 'generate' | 'audit'
   const [isGenerating, setIsGenerating] = useState(false);
@@ -43,7 +44,8 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
       // Giả lập xử lý AI trong 400ms để tạo hiệu ứng phân tích mượt mà
       setTimeout(() => {
         const result = generateAISchedule(employees, activeStoreId, {
-          requiredMatrix: { '6-14': 2, '14-22': 2, '22-6': 1 }
+          requiredMatrix: DEFAULT_STAFFING_MATRIX.weekday,
+          requiredMatrixByDay: buildStaffingByDay(activeStore)
         });
         setAiResult(result);
         setIsGenerating(false);
@@ -63,12 +65,8 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
 
     setIsApplying(true);
     try {
-      for (const [empId, shifts] of Object.entries(aiResult.schedule)) {
-        for (const [dayKey, shiftCode] of Object.entries(shifts)) {
-          await updateShift(currentWeek, empId, dayKey, shiftCode);
-        }
-      }
-      alert('🎉 Đã áp dụng toàn bộ lịch làm việc tối ưu của AI thành công!');
+      await applyAiSchedule(currentWeek, aiResult.schedule, activeStoreId);
+      alert('Đã áp dụng lịch AI (giữ nguyên ca chi viện sang cửa hàng khác).');
       onClose();
     } catch (err) {
       alert('Lỗi khi lưu lịch AI: ' + err.message);

@@ -29,7 +29,9 @@ export default function ShiftInput({
   if (isBorrowed) {
     cellBg = '#eab308'; // Vàng cho ca chi viện
     cellText = '#ffffff';
-    displayLabel = shiftCode === 'off' ? `off ${normalized.covering_store}` : `${shiftCode}`;
+    displayLabel = shiftCode === 'off'
+      ? `off ${normalized.covering_store}`
+      : `${shiftCode} ${normalized.covering_store}`;
   } else if (isOff) {
     cellBg = '#f1f5f9'; // Xám nhạt cho OFF
     cellText = '#64748b'; // Xám đậm
@@ -85,7 +87,10 @@ export default function ShiftInput({
           backgroundColor: cellBg,
           color: cellText,
         }}
-        className={`w-full h-full text-xs font-bold text-center appearance-none cursor-pointer outline-none border-0 transition-colors select-none px-0.5 py-0 ${
+        title={isBorrowed ? `Hỗ trợ ${normalized.covering_store}` : undefined}
+        className={`w-full h-full font-bold text-center appearance-none cursor-pointer outline-none border-0 transition-colors select-none px-0.5 py-0 ${
+          isBorrowed ? 'text-[9px] leading-tight pb-2' : 'text-xs'
+        } ${
           readOnly ? 'cursor-default' : 'hover:brightness-95 focus:ring-2 focus:ring-blue-500 focus:z-20'
         } ${isUnset ? 'font-normal italic' : 'font-extrabold'}`}
       >
@@ -109,6 +114,15 @@ export default function ShiftInput({
           </option>
         ))}
       </select>
+
+      {isBorrowed && (
+        <span
+          className="pointer-events-none absolute left-0 right-0 bottom-0 text-[8px] font-black text-center bg-amber-800/75 text-white truncate print:hidden"
+          title={`Hỗ trợ ${normalized.covering_store}`}
+        >
+          {normalized.covering_store}
+        </span>
+      )}
 
       {/* Print View Text */}
       <div 

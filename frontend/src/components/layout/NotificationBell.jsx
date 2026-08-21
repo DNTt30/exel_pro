@@ -10,7 +10,8 @@ import {
   CalendarDays, 
   Sparkles, 
   ChevronRight, 
-  CheckCheck 
+  CheckCheck,
+  ArrowRightLeft
 } from 'lucide-react';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { WEEK_DAYS } from '../../data/constants';

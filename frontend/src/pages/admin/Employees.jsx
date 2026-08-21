@@ -47,11 +47,14 @@ export default function Employees() {
     }
 
     try {
-      await addEmployee({
+      const result = await addEmployee({
         ...formData,
         id: trimmedId,
         name: trimmedName
       });
+      if (result?.provisionWarning) {
+        alert(result.provisionWarning);
+      }
       setIsAdding(false);
       setFormData({ id: '', name: '', dept: stores[0]?.id || '', role: 'STFT', type: 'STFT', maxH: 48 });
     } catch (e) {

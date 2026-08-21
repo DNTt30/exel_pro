@@ -1,5 +1,5 @@
 import { SHIFTS } from '../data/initialData';
-import { SCHEDULE_RULES } from '../data/constants';
+import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
 
 /**
  * Chuẩn hóa giá trị ca làm việc thành object thống nhất:
@@ -231,6 +231,54 @@ export function isShiftsOverlapping(shiftCodeA, shiftCodeB) {
 }
 
 /**
+ * Hoán 2 ca đổi ca: giữ nguyên object covering_store.
+ * Cùng ngày: đổi ô đó. Khác ngày: mỗi người nhận ca của đối tác ở ngày tương ứng,
+ * ô ngày mình nhường lấy giá trị hiện có của đối tác (thường là off).
+ */
+export function buildSwappedSchedules(fromSched = {}, toSched = {}, swap) {
+  const fromDay = swap.fromDay;
+  const toDay = swap.toDay;
+  const aFromRaw = fromSched[fromDay] ?? 'off';
+  const bToRaw = toSched[toDay] ?? 'off';
+  const aToRaw = fromSched[toDay] ?? 'off';
+  const bFromRaw = toSched[fromDay] ?? 'off';
+
+  const aNew = { ...fromSched };
+  const bNew = { ...toSched };
+
+  if (fromDay === toDay) {
+    aNew[fromDay] = bToRaw;
+    bNew[toDay] = aFromRaw;
+  } else {
+    aNew[fromDay] = bFromRaw;
+    aNew[toDay] = bToRaw;
+    bNew[toDay] = aToRaw;
+    bNew[fromDay] = aFromRaw;
+  }
+
+  return {
+    [swap.fromEmpId]: aNew,
+    [swap.toEmpId]: bNew
+  };
+}
+
+/** Giữ ca chi viện đi cửa hàng khác khi áp lịch AI của cửa hàng hiện tại. */
+export function mergeAiSchedule(existingWeek = {}, aiSchedule = {}, storeId) {
+  const merged = { ...existingWeek };
+  Object.entries(aiSchedule).forEach(([empId, days]) => {
+    const prev = existingWeek[empId] || {};
+    const next = { ...prev };
+    Object.entries(days).forEach(([day, code]) => {
+      const covering = getCoveringStore(prev[day]);
+      if (covering && covering !== storeId) return;
+      next[day] = code;
+    });
+    merged[empId] = next;
+  });
+  return merged;
+}
+
+/**
  * Tính toán Staffing Gap (Định biên nhân sự) theo từng ca cho cửa hàng
  * @param {Array} employees Danh sách nhân sự
  * @param {Object} weekSched Lịch tuần
@@ -238,7 +286,7 @@ export function isShiftsOverlapping(shiftCodeA, shiftCodeB) {
  * @param {string} storeId 'VN0485'
  * @param {Object} requiredMatrix Định biên yêu cầu { '6-14': 2, '14-22': 2, '22-6': 1 }
  */
-export function calculateStaffingGap(employees, weekSched, dayKey, storeId, requiredMatrix = { '6-14': 2, '14-22': 2, '22-6': 1 }) {
+export function calculateStaffingGap(employees, weekSched, dayKey, storeId, requiredMatrix = DEFAULT_STAFFING_MATRIX.weekday) {
   const result = {};
 
   Object.entries(requiredMatrix).forEach(([shiftCode, requiredCount]) => {

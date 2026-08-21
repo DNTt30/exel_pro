@@ -53,6 +53,183 @@ export const SCHEDULE_RULES = {
 // 7 ngày trong tuần
 export const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
+/** Ca dùng để tính định biên (không gồm ca 4h). Default mẫu CH 24/7. */
+export const STAFFING_SHIFT_CODES = ['6-14', '14-22', '22-6'];
+
+export const DEFAULT_STAFFING_MATRIX = {
+  weekday: { '6-14': 2, '14-22': 2, '22-6': 1 },
+  weekend: { '6-14': 2, '14-22': 2, '22-6': 1 }
+};
+
+export function isWeekendDay(dayKey) {
+  return dayKey === 'T7' || dayKey === 'CN';
+}
+
+function cloneShiftCounts(src, fallback = {}) {
+  const from = src && typeof src === 'object' ? src : {};
+  const out = {};
+  STAFFING_SHIFT_CODES.forEach(code => {
+    const n = from[code] ?? fallback[code] ?? 0;
+    out[code] = Math.max(0, Number(n) || 0);
+  });
+  return out;
+}
+
+/** Chuẩn hóa JSON staffing trên store (nhận cả dạng phẳng { '6-14': 2 }). */
+export function normalizeStaffingConfig(raw) {
+  const flat = raw && raw['6-14'] != null ? raw : null;
+  const weekday = cloneShiftCounts(raw?.weekday || flat, DEFAULT_STAFFING_MATRIX.weekday);
+  const weekend = cloneShiftCounts(raw?.weekend || flat, DEFAULT_STAFFING_MATRIX.weekend);
+  return { weekday, weekend };
+}
+
+export function getStaffingMatrix(store, dayKey) {
+  const cfg = normalizeStaffingConfig(store?.staffing);
+  return isWeekendDay(dayKey) ? { ...cfg.weekend } : { ...cfg.weekday };
+}
+
+export function buildStaffingByDay(store) {
+  const byDay = {};
+  WEEK_DAYS.forEach(day => {
+    byDay[day] = getStaffingMatrix(store, day);
+  });
+  return byDay;
+}
+
+/**
+ * Doanh số + lượt khách TB (GS25 Direct) → gợi ý định biên.
+ * Chia lưu lượng theo tỷ trọng ca 24/7: sáng 35%, chiều 45%, đêm 20%.
+ * Sau này thay bằng dữ liệu theo giờ từ Direct.
+ */
+export const DEMAND_STAFFING_RULES = {
+  shiftShare: { '6-14': 0.35, '14-22': 0.45, '22-6': 0.20 },
+  customersPerStaff: { '6-14': 90, '14-22': 90, '22-6': 70 },
+  salesPerStaff: { '6-14': 8_000_000, '14-22': 9_000_000, '22-6': 4_000_000 },
+  minStaff: { '6-14': 1, '14-22': 1, '22-6': 1 },
+  maxStaff: { '6-14': 6, '14-22': 6, '22-6': 3 }
+};
+
+export function normalizeStoreDemand(raw) {
+  const bucket = (b) => ({
+    customers: Math.max(0, Number(b?.customers) || 0),
+    sales: Math.max(0, Number(b?.sales) || 0)
+  });
+  return {
+    weekday: bucket(raw?.weekday || raw),
+    weekend: bucket(raw?.weekend)
+  };
+}
+
+export function suggestMatrixFromDemandBucket(bucket) {
+  const customers = Math.max(0, Number(bucket?.customers) || 0);
+  const sales = Math.max(0, Number(bucket?.sales) || 0);
+  if (!customers && !sales) return { ...DEFAULT_STAFFING_MATRIX.weekday };
+
+  const out = {};
+  STAFFING_SHIFT_CODES.forEach(code => {
+    const share = DEMAND_STAFFING_RULES.shiftShare[code];
+    const fromCust = customers > 0
+      ? Math.ceil((customers * share) / DEMAND_STAFFING_RULES.customersPerStaff[code])
+      : 0;
+    const fromSales = sales > 0
+      ? Math.ceil((sales * share) / DEMAND_STAFFING_RULES.salesPerStaff[code])
+      : 0;
+    const suggested = Math.max(DEMAND_STAFFING_RULES.minStaff[code], fromCust, fromSales);
+    out[code] = Math.min(DEMAND_STAFFING_RULES.maxStaff[code], suggested);
+  });
+  return out;
+}
+
+export function suggestStaffingFromDemand(demand) {
+  const d = normalizeStoreDemand(demand);
+  return {
+    weekday: suggestMatrixFromDemandBucket(d.weekday),
+    weekend: suggestMatrixFromDemandBucket(d.weekend)
+  };
+}
+
+export function formatISODate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dayNum = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dayNum}`;
+}
+
+/** Thứ Hai của tuần chứa `date`, ISO YYYY-MM-DD có số 0 (vd: 2026-08-10). */
+export function getCurrentMondayWeek(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return formatISODate(d);
+}
+
+/** weekKey = thứ Hai ISO, dayKey = T2…CN */
+export function getWeekAndDayKey(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const weekday = d.getDay();
+  const dayKey = WEEK_DAYS[weekday === 0 ? 6 : weekday - 1];
+  return { weekKey: getCurrentMondayWeek(d), dayKey };
+}
+
+/** Chu kỳ lương 26 tháng trước → 25 tháng `month` (1–12). */
+export function getPayrollCycleDates(year, month) {
+  let prevM = month - 1;
+  let prevY = year;
+  if (prevM < 1) {
+    prevM = 12;
+    prevY--;
+  }
+
+  const dates = [];
+  const daysInPrevMonth = new Date(prevY, prevM, 0).getDate();
+  for (let day = 26; day <= daysInPrevMonth; day++) {
+    const dateObj = new Date(prevY, prevM - 1, day);
+    const { weekKey, dayKey } = getWeekAndDayKey(dateObj);
+    dates.push({
+      key: String(day),
+      display: `${day}/${prevM}`,
+      dayNum: String(day),
+      weekKey,
+      dayKey,
+      dateObj
+    });
+  }
+  for (let day = 1; day <= 25; day++) {
+    const dateObj = new Date(year, month - 1, day);
+    const { weekKey, dayKey } = getWeekAndDayKey(dateObj);
+    dates.push({
+      key: String(day),
+      display: `${day}/${month}`,
+      dayNum: String(day),
+      weekKey,
+      dayKey,
+      dateObj
+    });
+  }
+  return dates;
+}
+
+export function getPayrollCycleFromWeek(weekDate) {
+  const parts = String(weekDate || '').split('-').map(Number);
+  const y = parts[0] || new Date().getFullYear();
+  const m = parts[1] || (new Date().getMonth() + 1);
+  const d = parts[2] || 1;
+  if (d >= 26) {
+    let nm = m + 1;
+    let ny = y;
+    if (nm > 12) {
+      nm = 1;
+      ny++;
+    }
+    return { year: ny, month: nm };
+  }
+  return { year: y, month: m };
+}
+
 export const DAY_FULL_NAMES = {
   'T2': 'Thứ Hai',
   'T3': 'Thứ Ba',

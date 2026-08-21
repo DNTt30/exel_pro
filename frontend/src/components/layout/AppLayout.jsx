@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Shield, Briefcase } from 'lucide-react';
+import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Shield, Briefcase, Sparkles, ScrollText, HelpCircle } from 'lucide-react';
 
 import NotificationBell from './NotificationBell';
+import AICopilotDrawer from '../ai/AICopilotDrawer';
+import HelpDrawer from '../HelpDrawer';
 
 export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
+  const currentWeek = useStore(state => state.currentWeek);
+  const authWarning = useStore(state => state.authWarning);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAIOpen, setIsAIOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -23,6 +29,7 @@ export default function AppLayout() {
     { to: '/admin/feedback', icon: <FileText size={18} />, label: 'Feedback C&B' },
     { to: '/admin/employees', icon: <Users size={18} />, label: 'Quản lý Nhân sự' },
     { to: '/admin/stores', icon: <Store size={18} />, label: 'Quản lý Cửa hàng' },
+    { to: '/admin/logs', icon: <ScrollText size={18} />, label: 'Nhật ký quản lý' },
   ];
 
   const employeeLinks = [
@@ -44,6 +51,12 @@ export default function AppLayout() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block overflow-hidden">
+      {authWarning && (
+        <div className="print:hidden bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-4 py-2">
+          Phiên Supabase chưa tạo được ({authWarning}). App vẫn chạy Hướng B. Trước khi chạy sql_rls_authenticated.sql: Authentication → Email tắt Confirm email, rồi đăng xuất/đăng nhập lại.
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="bg-white border-b border-slate-200 shadow-xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
@@ -68,7 +81,14 @@ export default function AppLayout() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          {/* Notification Bell */}
+          <button
+            type="button"
+            onClick={() => setIsHelpOpen(true)}
+            className="p-2 text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl border border-transparent hover:border-indigo-100"
+            title="Hướng dẫn sử dụng"
+          >
+            <HelpCircle size={18} />
+          </button>
           <NotificationBell />
 
           <div className="flex items-center gap-2 bg-slate-50 pl-2.5 pr-3 py-1 rounded-full border border-slate-200 shadow-2xs">
@@ -147,6 +167,28 @@ export default function AppLayout() {
         <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
           <Outlet />
         </main>
+        
+        {/* Floating AI Button cho Nhân viên */}
+        <button
+          onClick={() => setIsAIOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full shadow-2xl flex items-center justify-center text-white hover:scale-105 transition-transform z-40 print:hidden focus:ring-4 focus:ring-blue-300 group"
+          title="OFC AI Copilot"
+        >
+          <Sparkles size={24} className="text-amber-300 group-hover:animate-pulse" />
+        </button>
+
+        <HelpDrawer
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          isAdmin={user?.role === 'admin' || user?.isManager}
+        />
+
+        <AICopilotDrawer
+          isOpen={isAIOpen}
+          onClose={() => setIsAIOpen(false)}
+          currentWeek={currentWeek}
+          storeId={user?.dept || 'ALL'}
+        />
       </div>
     </div>
   );

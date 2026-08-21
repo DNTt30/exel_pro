@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { 
   getShiftHours, 
-  normalizeShift, 
-  parseShiftTimeRange, 
+  getShiftCode,
   isShiftsOverlapping, 
   calculateStaffingGap,
-  validateEmployeeSchedule 
+  validateEmployeeSchedule,
+  buildSwappedSchedules,
+  mergeAiSchedule
 } from '../utils/shiftHelper';
+import { getCurrentMondayWeek, getWeekAndDayKey, getPayrollCycleDates, getStaffingMatrix, normalizeStaffingConfig, suggestStaffingFromDemand } from '../data/constants';
 
 describe('Shift Helper Logic & Business Rules', () => {
   describe('getShiftHours', () => {
@@ -108,6 +110,103 @@ describe('Shift Helper Logic & Business Rules', () => {
       const validation = validateEmployeeSchedule(ptEmp, 20, 3, false);
       expect(validation.hasErrors).toBe(false);
       expect(validation.hasWarnings).toBe(false);
+    });
+  });
+
+  describe('getShiftCode on covering objects', () => {
+    it('reads shift from object and legacy string', () => {
+      expect(getShiftCode({ shift: '14-22', covering_store: 'VN0485' })).toBe('14-22');
+      expect(getShiftCode('6-14_VN0485')).toBe('6-14');
+      expect(getShiftCode('off')).toBe('off');
+    });
+  });
+
+  describe('buildSwappedSchedules', () => {
+    it('swaps the same day cells', () => {
+      const result = buildSwappedSchedules(
+        { T2: '6-14', T3: 'off' },
+        { T2: '14-22', T3: 'off' },
+        { fromEmpId: 'A', toEmpId: 'B', fromDay: 'T2', toDay: 'T2' }
+      );
+      expect(result.A.T2).toBe('14-22');
+      expect(result.B.T2).toBe('6-14');
+    });
+
+    it('swaps different days and keeps covering_store objects', () => {
+      const covering = { shift: '14-22', covering_store: 'VN0485' };
+      const result = buildSwappedSchedules(
+        { T2: '6-14', T5: 'off' },
+        { T2: 'off', T5: covering },
+        { fromEmpId: 'A', toEmpId: 'B', fromDay: 'T2', toDay: 'T5' }
+      );
+      expect(result.A.T2).toBe('off');
+      expect(result.A.T5).toEqual(covering);
+      expect(result.B.T5).toBe('off');
+      expect(result.B.T2).toBe('6-14');
+    });
+  });
+
+  describe('getCurrentMondayWeek', () => {
+    it('returns padded ISO Monday', () => {
+      expect(getCurrentMondayWeek(new Date(2026, 7, 19))).toBe('2026-08-17');
+      expect(getCurrentMondayWeek(new Date(2026, 7, 17))).toBe('2026-08-17');
+      expect(getCurrentMondayWeek(new Date(2026, 7, 16))).toBe('2026-08-10');
+    });
+  });
+
+  describe('payroll cycle mapping', () => {
+    it('maps a calendar date to weekKey + T2-CN', () => {
+      expect(getWeekAndDayKey(new Date(2026, 7, 17))).toEqual({ weekKey: '2026-08-17', dayKey: 'T2' });
+      expect(getWeekAndDayKey(new Date(2026, 7, 23))).toEqual({ weekKey: '2026-08-17', dayKey: 'CN' });
+    });
+
+    it('builds 26->25 cycle with week keys', () => {
+      const dates = getPayrollCycleDates(2026, 8);
+      expect(dates[0].key).toBe('26');
+      expect(dates[0].weekKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(dates.find(d => d.key === '25')).toBeTruthy();
+    });
+  });
+
+  describe('staffing config', () => {
+    it('falls back to 2-2-1 and uses weekend override', () => {
+      const empty = getStaffingMatrix({}, 'T2');
+      expect(empty['6-14']).toBe(2);
+      expect(empty['22-6']).toBe(1);
+
+      const store = {
+        staffing: normalizeStaffingConfig({
+          weekday: { '6-14': 2, '14-22': 2, '22-6': 1 },
+          weekend: { '6-14': 3, '14-22': 3, '22-6': 2 }
+        })
+      };
+      expect(getStaffingMatrix(store, 'T4')['6-14']).toBe(2);
+      expect(getStaffingMatrix(store, 'CN')['6-14']).toBe(3);
+      expect(getStaffingMatrix(store, 'T7')['22-6']).toBe(2);
+    });
+
+    it('suggests higher weekend headcount from customers and sales', () => {
+      const staffing = suggestStaffingFromDemand({
+        weekday: { customers: 250, sales: 12_000_000 },
+        weekend: { customers: 700, sales: 40_000_000 }
+      });
+      expect(staffing.weekend['14-22']).toBeGreaterThan(staffing.weekday['14-22']);
+      expect(staffing.weekend['22-6']).toBeGreaterThanOrEqual(1);
+      expect(staffing.weekday['6-14']).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('mergeAiSchedule', () => {
+    it('keeps covering_store assignments to other stores', () => {
+      const existing = {
+        A: { T2: { shift: '6-14', covering_store: 'VN0497' }, T3: '14-22' }
+      };
+      const ai = {
+        A: { T2: 'off', T3: '6-14' }
+      };
+      const merged = mergeAiSchedule(existing, ai, 'VN0485');
+      expect(merged.A.T2).toEqual({ shift: '6-14', covering_store: 'VN0497' });
+      expect(merged.A.T3).toBe('6-14');
     });
   });
 });

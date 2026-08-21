@@ -5,11 +5,12 @@ import * as api from '../../services/api';
 import * as XLSX from 'xlsx';
 import { Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, X, RefreshCw, Layers } from 'lucide-react';
 import { WEEK_DAYS, MA_RE } from '../../data/constants';
+import { provisionAuthUser } from '../../lib/authSession';
 import { SHIFTS } from '../../data/initialData';
 import { normalizeShift } from '../../utils/shiftHelper';
 
 export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
-  const { employees, stores, addEmployee } = useStore();
+  const { employees, stores, schedule } = useStore();
   const [file, setFile] = useState(null);
   const [parsedData, setParsedData] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
@@ -192,22 +193,20 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         // 1. Nếu nhân viên chưa có trong hệ thống và bật autoCreate
         if (!existingEmpIds.has(item.id) && autoCreateEmps) {
           try {
-            await api.addEmployee({
+            const newEmp = {
               id: item.id,
               name: item.name,
               dept: item.dept,
               role: item.role,
               type: item.type,
               maxH: item.type === 'STPT' ? 23 : 48
-            });
-            currentEmps.push({
-              id: item.id,
-              name: item.name,
-              dept: item.dept,
-              role: item.role,
-              type: item.type,
-              maxH: item.type === 'STPT' ? 23 : 48
-            });
+            };
+            await api.addEmployee(newEmp);
+            const provisioned = await provisionAuthUser(newEmp);
+            if (!provisioned.ok) {
+              console.warn(`NV ${item.id} đã lưu nhưng chưa tạo user Auth:`, provisioned.reason);
+            }
+            currentEmps.push(newEmp);
             existingEmpIds.add(item.id);
             addedEmpCount++;
           } catch (e) {
@@ -242,6 +241,7 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
 
       if (Object.keys(bulkUpdates).length > 0) {
         await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
+        useStore.getState().appendAdminLog('Nhập lịch Excel', currentWeek, `${updatedShiftCount} NV, thêm mới ${addedEmpCount}`);
       }
 
       // 3. Cập nhật Store

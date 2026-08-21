@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { SHIFTS } from '../data/initialData';
 import { getRoleBadgeInfo } from '../data/constants';
+import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
 const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
   // Tính toán Auto-sum
@@ -51,8 +52,8 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
         
         let badgeStyle = { backgroundColor: '#ffffff', color: '#94a3b8' };
         if (!isOff) {
-          let actual = val.includes('_') ? val.split('_')[0] : val;
-          if (val.includes('_')) {
+          const actual = getShiftCode(val);
+          if (getCoveringStore(val)) {
             badgeStyle = { backgroundColor: '#eab308', color: '#ffffff' };
           } else if (SHIFTS[actual]) {
             badgeStyle = { backgroundColor: SHIFTS[actual].bg, color: SHIFTS[actual].text };

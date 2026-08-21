@@ -5,37 +5,38 @@ import TimesheetRow from '../../components/TimesheetRow';
 import { Download, Printer } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
+import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
+import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 
 export default function Timesheet() {
-  const { employees, user, currentWeek } = useStore(); // We'll mock timesheet data locally for now
+  const { user, currentWeek, schedule, ensureWeeksLoaded } = useStore();
   
   const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : user?.dept);
   const [filterRole, setFilterRole] = useState('ALL');
 
-  // Generate 31 days (26 -> 25)
-  const activeDays = useMemo(() => {
-    const days = [];
-    for (let i = 26; i <= 31; i++) days.push(`${i}`);
-    for (let i = 1; i <= 25; i++) days.push(`${i}`);
-    return days;
-  }, []);
+  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const cycleDates = useMemo(
+    () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
+    [payrollCycle]
+  );
+  const activeDays = useMemo(() => cycleDates.map(d => d.key), [cycleDates]);
 
-  // Group employees
+  React.useEffect(() => {
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+  }, [cycleDates, ensureWeeksLoaded]);
+
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole);
 
-  // Mock timesheet data (Hardcoded for Hoàng Thị Huyền to match Excel)
-  const mockTimesheetData = {
-    '250731047': {
-      '26': 'OFF', '27': '8', '28': '8', '29': '8', '30': '8', '31': '7.98',
-      '1': '8', '2': '8', '3': '8', '4': '8', '5': '8', '6': '8',
-      '7': 'OFF', '8': 'OFF', '9': 'OFF', '10': 'OFF', '11': 'OFF', '12': 'OFF', '13': 'OFF', '14': 'OFF', '15': 'OFF', '16': 'OFF', '17': 'OFF', '18': 'OFF', '19': 'OFF', '20': 'OFF', '21': 'OFF', '22': 'OFF', '23': 'OFF', '24': 'OFF', '25': 'OFF'
-    }
-  };
-
   const getDayValue = (empId, day) => {
-    return mockTimesheetData[empId]?.[day] || '';
+    const cell = cycleDates.find(d => d.key === day);
+    if (!cell) return '';
+    const raw = schedule[cell.weekKey]?.[empId]?.[cell.dayKey];
+    const code = getShiftCode(raw);
+    if (!code || code === 'off') return 'OFF';
+    const hours = getShiftHours(code);
+    return hours > 0 ? String(hours) : code;
   };
 
   return (

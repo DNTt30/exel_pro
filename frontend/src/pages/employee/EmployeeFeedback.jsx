@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
+import { getShiftCode } from '../../utils/shiftHelper';
 
 export default function EmployeeFeedback() {
   const { user, addFeedback, feedbacks, currentWeek, schedule } = useStore();
@@ -58,18 +59,16 @@ export default function EmployeeFeedback() {
     let total = 0;
     cycleDates.forEach(dayKey => {
       const s = mySched[dayKey];
-      if (s && s !== 'off') {
-        let actual = s.includes('_') ? s.split('_')[0] : s;
-        if (actual !== 'off') {
-          if (SHIFTS[actual]) total += SHIFTS[actual].hours;
-          else {
-            const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
-            if (match) {
-              let start = parseInt(match[1], 10);
-              let end = parseInt(match[2], 10);
-              if (end < start) end += 24;
-              total += (end - start);
-            }
+      const actual = getShiftCode(s);
+      if (actual && actual !== 'off') {
+        if (SHIFTS[actual]) total += SHIFTS[actual].hours;
+        else {
+          const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
+          if (match) {
+            let start = parseInt(match[1], 10);
+            let end = parseInt(match[2], 10);
+            if (end < start) end += 24;
+            total += (end - start);
           }
         }
       }

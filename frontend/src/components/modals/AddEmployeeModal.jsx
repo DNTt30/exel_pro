@@ -50,11 +50,14 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
 
     setLoading(true);
     try {
-      await addEmployee({
+      const result = await addEmployee({
         ...formData,
         id: trimmedId,
         name: trimmedName
       });
+      if (result?.provisionWarning) {
+        alert(result.provisionWarning);
+      }
       onClose();
       setFormData({ 
         id: '', 

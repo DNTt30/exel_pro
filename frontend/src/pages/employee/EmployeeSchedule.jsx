@@ -24,7 +24,8 @@ import {
   MapPin,
   Sun,
   Moon,
-  Coffee
+  Coffee,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ShiftInput from '../../components/ShiftInput';
@@ -32,11 +33,17 @@ import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import {
+  getStoreLabel,
+  isSupportAssignment,
+  getSwapsForWeek,
+  getSwapBadgeForDay
+} from '../../utils/scheduleAnnotations';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 
 export default function EmployeeSchedule() {
-  const { user, schedule, updateShift, currentWeek, setCurrentWeek, employees, shiftSwaps } = useStore();
+  const { user, schedule, updateShift, currentWeek, setCurrentWeek, employees, shiftSwaps, stores } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
 
   const [search, setSearch] = useState('');
@@ -139,6 +146,15 @@ export default function EmployeeSchedule() {
   const isFT = !isPT;
   const isFTUnder48 = isFT && myTotalHours < 48;
 
+  const storeLabel = (id) => getStoreLabel(stores, id);
+
+  const mySwapsThisWeek = useMemo(
+    () => getSwapsForWeek(shiftSwaps, user?.id, currentWeek),
+    [shiftSwaps, currentWeek, user?.id]
+  );
+
+  const swapBadgeForDay = (dayKey) => getSwapBadgeForDay(mySwapsThisWeek, user?.id, dayKey);
+
   // 10. Danh sách 7 ngày chi tiết cho Card View
   const weekDaysCardData = useMemo(() => {
     const parts = currentWeek.split('-').map(Number);
@@ -155,6 +171,8 @@ export default function EmployeeSchedule() {
       const isOff = !shift || shift === 'off';
       const shiftInfo = SHIFTS[shift] || null;
       const hours = isOff ? 0 : getShiftHours(shift);
+      const isSupport = isSupportAssignment(rawVal, myDept);
+      const swapInfo = getSwapBadgeForDay(mySwapsThisWeek, user?.id, dayKey);
 
       const dayFullName = DAY_FULL_NAMES[dayKey] || dayKey;
       const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
@@ -167,13 +185,35 @@ export default function EmployeeSchedule() {
         isToday,
         shift,
         covering_store,
+        isSupport,
+        swapInfo,
         isOff,
         shiftInfo,
         hours,
         rawVal
       };
     });
-  }, [currentWeek, mySched]);
+  }, [currentWeek, mySched, myDept, mySwapsThisWeek, user?.id]);
+
+  const todayCard = useMemo(
+    () => weekDaysCardData.find(c => c.isToday) || null,
+    [weekDaysCardData]
+  );
+
+  const supportDaysThisWeek = useMemo(
+    () => weekDaysCardData.filter(c => c.isSupport),
+    [weekDaysCardData]
+  );
+
+  const swapDaysThisWeek = useMemo(
+    () => weekDaysCardData.filter(c => c.swapInfo),
+    [weekDaysCardData]
+  );
+
+  const swapBadgeClass = (swapInfo) =>
+    swapInfo?.pending
+      ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+      : 'bg-emerald-50 text-emerald-800 border-emerald-200';
 
   const handleExportExcel = () => {
     exportScheduleToExcel({
@@ -448,54 +488,172 @@ export default function EmployeeSchedule() {
       {/* VIEW 1: LỊCH BIỂU THẺ CÁ NHÂN (CARD VIEW - TỐI ƯU MOBILE & TRỰC QUAN) */}
       {displayView === 'card' && (
         <div className="flex-1 overflow-auto p-3 sm:p-5 space-y-4">
-          {/* Header Summary Banner */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-sm">
-                {user?.name ? user.name.charAt(0) : 'U'}
-              </div>
-              <div>
-                <div className="font-black text-base text-slate-800 flex items-center gap-2">
-                  <span>{user?.name}</span>
-                  <span className="text-xs font-mono text-slate-400">({user?.id})</span>
+          {/* Enhanced Personal Mini-Dashboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Cột 1: Thông tin cá nhân & Hôm nay */}
+            <div className="lg:col-span-1 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
+                  {user?.name ? user.name.charAt(0) : 'U'}
                 </div>
-                <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                  <span className="font-semibold text-blue-700">{myDept}</span>
-                  <span>•</span>
-                  <span>{user?.role || user?.type || 'Nhân viên'}</span>
-                  <span>•</span>
-                  <span className="font-semibold text-slate-700">{isFutureWeek ? 'Đang mở đăng ký ca ✍️' : 'Lịch đã chốt 🔒'}</span>
+                <div>
+                  <div className="font-black text-base text-slate-800 flex items-center gap-2">
+                    <span>{user?.name}</span>
+                    <span className="text-xs font-mono text-slate-400">({user?.id})</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    <span className="font-semibold text-blue-700">{myDept}</span> • {user?.role || user?.type || 'Nhân viên'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Ca hôm nay */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-3">
+                <div className="bg-blue-600 text-white p-1.5 rounded-lg"><Sun size={16} /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-blue-800 uppercase mb-0.5">Ca làm hôm nay</div>
+                  <div className="text-sm font-bold text-slate-700">
+                    {!todayCard || todayCard.isOff
+                      ? <span className="text-slate-500">Chưa xếp ca / OFF</span>
+                      : <span className="text-blue-700">{todayCard.shift}</span>}
+                  </div>
+                  {todayCard?.isSupport && (
+                    <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-0.5">
+                      <MapPin size={11} />
+                      Hỗ trợ {storeLabel(todayCard.covering_store)}
+                    </div>
+                  )}
+                  {todayCard?.swapInfo && (
+                    <div className={`mt-1 inline-flex items-center gap-1 text-[11px] font-bold border rounded-lg px-1.5 py-0.5 ${swapBadgeClass(todayCard.swapInfo)}`}>
+                      <ArrowRightLeft size={11} />
+                      {todayCard.swapInfo.label}
+                    </div>
+                  )}
+                  {!todayCard && (
+                    <div className="text-[11px] text-slate-400 mt-1">Đang xem tuần khác — không có “hôm nay”.</div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl text-center">
-                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Tổng giờ tuần</div>
-                <div className="text-lg font-black text-blue-700 font-mono">{myTotalHours}h</div>
+            {/* Cột 2: Tiến độ giờ làm & Thống kê */}
+            <div className="lg:col-span-2 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-slate-800 flex items-center gap-1.5"><Clock size={16} className="text-slate-500"/> Tiến độ tuần này</h3>
+                <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 rounded-md text-slate-600 border border-slate-200">
+                  {isFutureWeek ? 'Đang mở đăng ký ✍️' : 'Đã chốt lịch 🔒'}
+                </span>
               </div>
-              <div className="bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl text-center">
-                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Tổng số ca</div>
-                <div className="text-lg font-black text-emerald-700 font-mono">{myTotalShifts} ca</div>
-              </div>
-              <div className={`px-3.5 py-2 rounded-xl text-center border ${
-                isWeekOver23 
-                  ? 'bg-red-50 border-red-200 text-red-700'
-                  : (isWeekUnder16 || isFTUnder48)
-                    ? 'bg-amber-50 border-amber-200 text-amber-800'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              }`}>
-                <div className="text-[10px] uppercase tracking-wider font-bold opacity-80">Trạng thái</div>
-                <div className="text-xs font-black mt-1">
-                  {isWeekOver23 
-                    ? '⚠️ Vượt 23h/tuần' 
-                    : (isWeekUnder16 
-                      ? '⚠️ Thiếu giờ (<16h)' 
-                      : (isFTUnder48 ? '⚠️ Thiếu giờ (<48h)' : '✓ Đạt định mức'))}
+              
+              {/* Thanh tiến độ */}
+              <div className="mb-4">
+                <div className="flex justify-between text-xs font-bold mb-1.5">
+                  <span className="text-slate-600">Đã đăng ký: <span className="text-blue-700 text-sm">{myTotalHours}h</span> <span className="text-slate-400 font-normal">({myTotalShifts} ca)</span></span>
+                  <span className="text-slate-400">Định mức: {isPT ? '16h-23h' : '48h'}</span>
+                </div>
+                <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/50">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${isWeekOver23 ? 'bg-red-500' : (isWeekUnder16 || isFTUnder48) ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min(100, (myTotalHours / (isPT ? 23 : 48)) * 100)}%` }}
+                  ></div>
+                </div>
+                <div className="text-[11px] font-medium text-slate-500 mt-2 flex justify-between">
+                  <span>Trạng thái: 
+                    <span className={`ml-1 font-bold ${isWeekOver23 ? 'text-red-600' : (isWeekUnder16 || isFTUnder48) ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {isWeekOver23 ? 'Vượt định mức tối đa!' : (isWeekUnder16 || isFTUnder48 ? 'Chưa đủ giờ chuẩn' : 'Tuyệt vời, đạt định mức')}
+                    </span>
+                  </span>
                 </div>
               </div>
+
+              {/* Quick Actions / Alerts */}
+              <div className="flex items-center gap-2 mt-auto">
+                {pendingMySwapsCount > 0 ? (
+                  <button onClick={() => setShowSwapListModal(true)} className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer hover:bg-amber-100 transition-colors shadow-sm">
+                    <AlertTriangle size={14}/> Bạn có {pendingMySwapsCount} đơn đổi ca chờ xác nhận!
+                  </button>
+                ) : (
+                  <div className="flex-1 bg-slate-50 border border-slate-100 text-slate-500 text-xs font-medium py-2 px-3 rounded-xl flex items-center justify-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-500"/> Không có đơn từ nào tồn đọng
+                  </div>
+                )}
+              </div>
             </div>
+          </div>
+
+          {/* Tóm tắt tuần: đổi ca + hỗ trợ */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <CalendarIcon size={15} className="text-slate-500" />
+                Tóm tắt tuần: đổi ca & hỗ trợ
+              </h3>
+              <div className="flex items-center gap-2 text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">Hỗ trợ CH</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">Đã đổi ca</span>
+                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">Chờ duyệt</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1.5 mb-2">
+              {weekDaysCardData.map((card) => (
+                <div
+                  key={`strip-${card.dayKey}`}
+                  className={`rounded-xl border px-1 py-1.5 text-center min-w-0 ${
+                    card.isToday
+                      ? 'border-blue-400 bg-blue-50'
+                      : card.swapInfo?.pending
+                        ? 'border-indigo-200 bg-indigo-50/60'
+                        : card.swapInfo
+                          ? 'border-emerald-200 bg-emerald-50/60'
+                          : card.isSupport
+                            ? 'border-amber-200 bg-amber-50/70'
+                            : 'border-slate-100 bg-slate-50'
+                  }`}
+                  title={[
+                    card.dayFullName,
+                    card.isOff ? 'OFF' : card.shift,
+                    card.isSupport ? `Hỗ trợ ${storeLabel(card.covering_store)}` : '',
+                    card.swapInfo?.label || ''
+                  ].filter(Boolean).join(' · ')}
+                >
+                  <div className="text-[10px] font-black text-slate-600">{card.dayKey}</div>
+                  <div className="text-[10px] font-bold text-slate-800 truncate">
+                    {card.isOff ? 'OFF' : (card.shift || '—')}
+                  </div>
+                  {card.isSupport && (
+                    <div className="text-[9px] font-black text-amber-700 truncate">→ {card.covering_store}</div>
+                  )}
+                  {card.swapInfo && (
+                    <div className={`text-[9px] font-black truncate ${card.swapInfo.pending ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                      ⇄ {card.swapInfo.kind === 'swap-out' ? 'đi' : card.swapInfo.kind === 'swap-in' ? 'nhận' : 'đổi'}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {supportDaysThisWeek.length === 0 && swapDaysThisWeek.length === 0 ? (
+              <p className="text-[11px] text-slate-500">Tuần này chưa có ngày đổi ca hoặc đi hỗ trợ cửa hàng khác.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {supportDaysThisWeek.map((card) => (
+                  <div key={`sup-${card.dayKey}`} className="text-[11px] font-semibold text-amber-800">
+                    {card.dayFullName}: hỗ trợ {storeLabel(card.covering_store)}
+                    {card.shift && !card.isOff ? ` · ca ${card.shift}` : ''}
+                  </div>
+                ))}
+                {swapDaysThisWeek.map((card) => (
+                  <div
+                    key={`sw-${card.dayKey}`}
+                    className={`text-[11px] font-semibold ${card.swapInfo.pending ? 'text-indigo-800' : 'text-emerald-800'}`}
+                  >
+                    {card.dayFullName}: {card.swapInfo.label}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 7 Daily Cards Grid */}
@@ -509,7 +667,13 @@ export default function EmployeeSchedule() {
                   className={`rounded-2xl border transition-all flex flex-col justify-between overflow-hidden shadow-2xs ${
                     card.isToday 
                       ? 'bg-blue-50/70 border-blue-400 ring-2 ring-blue-500/20' 
-                      : (card.isOff ? 'bg-white/80 border-slate-200' : 'bg-white border-slate-200 hover:border-blue-300')
+                      : card.swapInfo?.pending
+                        ? 'bg-white border-indigo-300 ring-1 ring-indigo-200'
+                        : card.swapInfo
+                          ? 'bg-white border-emerald-300 ring-1 ring-emerald-200'
+                          : card.isSupport
+                            ? 'bg-amber-50/40 border-amber-300 ring-1 ring-amber-200'
+                            : (card.isOff ? 'bg-white/80 border-slate-200' : 'bg-white border-slate-200 hover:border-blue-300')
                   }`}
                 >
                   {/* Card Header */}
@@ -522,11 +686,29 @@ export default function EmployeeSchedule() {
                         {card.dateFormatted}
                       </div>
                     </div>
-                    {card.isToday && (
-                      <span className="px-2 py-0.5 bg-white text-blue-700 rounded-full font-black text-[9px] uppercase tracking-wider shadow-xs">
-                        Hôm nay
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-0.5">
+                      {card.isToday && (
+                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded-full font-black text-[9px] uppercase tracking-wider shadow-xs">
+                          Hôm nay
+                        </span>
+                      )}
+                      {card.isSupport && (
+                        <span className={`px-1.5 py-0.5 rounded-full font-black text-[8px] uppercase tracking-wide ${
+                          card.isToday ? 'bg-amber-200 text-amber-900' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          Hỗ trợ
+                        </span>
+                      )}
+                      {card.swapInfo && (
+                        <span className={`px-1.5 py-0.5 rounded-full font-black text-[8px] uppercase tracking-wide ${
+                          card.swapInfo.pending
+                            ? (card.isToday ? 'bg-indigo-200 text-indigo-900' : 'bg-indigo-100 text-indigo-800')
+                            : (card.isToday ? 'bg-emerald-200 text-emerald-900' : 'bg-emerald-100 text-emerald-800')
+                        }`}>
+                          {card.swapInfo.pending ? 'Chờ đổi' : 'Đổi ca'}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Card Body: Shift Details */}
@@ -563,19 +745,58 @@ export default function EmployeeSchedule() {
                         </div>
 
                         {/* Store Location */}
-                        <div className="flex items-center gap-1 mt-2 text-[11px] font-semibold text-slate-600">
-                          <MapPin size={12} className={card.covering_store ? 'text-amber-600' : 'text-slate-400'} />
-                          <span>{card.covering_store ? `Chi viện: ${card.covering_store}` : `Tại: ${myDept}`}</span>
+                        <div className={`flex items-start gap-1 mt-2 text-[11px] font-semibold ${card.isSupport ? 'text-amber-800' : 'text-slate-600'}`}>
+                          <MapPin size={12} className={`mt-0.5 shrink-0 ${card.isSupport ? 'text-amber-600' : 'text-slate-400'}`} />
+                          <span>
+                            {card.isSupport
+                              ? `Hỗ trợ: ${storeLabel(card.covering_store)}`
+                              : `Tại: ${storeLabel(myDept) || myDept}`}
+                          </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Interactive Shift Changer on Card (if registration open) */}
+                    {(card.isSupport || card.swapInfo) && (
+                      <div className="space-y-1">
+                        {card.isSupport && card.isOff && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-1">
+                            <MapPin size={11} />
+                            Hỗ trợ {storeLabel(card.covering_store)}
+                          </div>
+                        )}
+                        {card.swapInfo && (
+                          <div className={`flex items-center gap-1 text-[10px] font-bold border rounded-lg px-1.5 py-1 ${swapBadgeClass(card.swapInfo)}`}>
+                            <ArrowRightLeft size={11} className="shrink-0" />
+                            <span className="leading-tight">{card.swapInfo.label}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quick Actions (Khi lịch đã chốt) */}
+                    {!canEdit && !card.isOff && (
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 mt-auto">
+                        <button
+                          onClick={() => setShowSwapModal(true)}
+                          className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                        >
+                          <RotateCcw size={10} /> Đổi ca
+                        </button>
+                        <button
+                          onClick={() => alert("Vui lòng truy cập thẻ 'Yêu cầu C&B' để báo lỗi chấm công cho ca này!")}
+                          className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg border border-red-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                        >
+                          <AlertTriangle size={10} /> Báo lỗi
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Interactive Shift Changer (Khi lịch đang mở) */}
                     {canEdit && (
                       <div className="pt-2 border-t border-slate-100 mt-auto">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Đổi ca ngày này:</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Đăng ký ca ngày này:</label>
                         <select
-                          className="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          className="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs"
                           value={card.shift || 'off'}
                           onChange={e => handleShiftChange(user, card.dayKey, e.target.value)}
                         >
@@ -597,6 +818,20 @@ export default function EmployeeSchedule() {
       {/* VIEW 2: BẢNG TÍNH EXCEL TOÀN CỬA HÀNG (TABLE VIEW) */}
       {displayView === 'table' && (
         <div className="flex-1 overflow-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
+          {(supportDaysThisWeek.length > 0 || swapDaysThisWeek.length > 0) && (
+            <div className="print:hidden mb-2 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] flex flex-wrap gap-x-4 gap-y-1">
+              {supportDaysThisWeek.map((card) => (
+                <span key={`t-sup-${card.dayKey}`} className="font-bold text-amber-800">
+                  {card.dayKey}: hỗ trợ {card.covering_store}
+                </span>
+              ))}
+              {swapDaysThisWeek.map((card) => (
+                <span key={`t-sw-${card.dayKey}`} className={`font-bold ${card.swapInfo.pending ? 'text-indigo-800' : 'text-emerald-800'}`}>
+                  {card.dayKey}: ⇄ {card.swapInfo.label}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="bg-white shadow border border-slate-300 inline-block min-w-full print:shadow-none print:border-none print:w-full print:block">
             <table className="excel-table print:w-full">
               <thead>
@@ -720,11 +955,12 @@ export default function EmployeeSchedule() {
                             {activeDays.map((day, dIdx) => {
                               const val = empSched[day] || '';
                               const canEdit = isMe && isFutureWeek;
+                              const swapInfo = isMe ? swapBadgeForDay(day) : null;
 
                               return (
-                                <td key={day} className={`p-0 border-r border-slate-300 min-w-[64px] w-[64px] max-w-[64px] h-8 text-center align-middle ${
+                                <td key={day} className={`p-0 relative border-r border-slate-300 min-w-[64px] w-[64px] max-w-[64px] h-8 text-center align-middle ${
                                   canEdit ? 'bg-white hover:ring-2 hover:ring-emerald-400 cursor-pointer' : ''
-                                }`}>
+                                }`} title={swapInfo ? swapInfo.label : undefined}>
                                   <ShiftInput
                                     value={val}
                                     rawValue={val}
@@ -733,6 +969,15 @@ export default function EmployeeSchedule() {
                                     colIndex={dIdx}
                                     onChange={(newVal) => handleShiftChange(emp, day, newVal)}
                                   />
+                                  {swapInfo && (
+                                    <span
+                                      className={`pointer-events-none absolute top-0 right-0 text-[8px] font-black leading-none px-0.5 rounded-bl ${
+                                        swapInfo.pending ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
+                                      }`}
+                                    >
+                                      ⇄
+                                    </span>
+                                  )}
                                 </td>
                               );
                             })}

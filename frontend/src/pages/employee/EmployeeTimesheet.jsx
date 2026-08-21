@@ -16,10 +16,12 @@ import { Link } from 'react-router-dom';
 import TimesheetRow from '../../components/TimesheetRow';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
+import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
 
 export default function EmployeeTimesheet() {
-  const { user, schedule, currentWeek, employees } = useStore();
+  const { user, schedule, currentWeek, employees, ensureWeeksLoaded } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
   const myDept = user?.dept || 'VN0497';
 
@@ -27,22 +29,26 @@ export default function EmployeeTimesheet() {
   const [filterOnlyMe, setFilterOnlyMe] = useState(false);
   const [showPersonalSlip, setShowPersonalSlip] = useState(false);
 
-  // Tính toán 31 ngày chu kỳ 26 tháng trước -> 25 tháng này
-  const activeDays = useMemo(() => {
-    const days = [];
-    for (let i = 26; i <= 31; i++) days.push(`${i}`);
-    for (let i = 1; i <= 25; i++) days.push(`${i}`);
-    return days;
-  }, []);
+  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const cycleDates = useMemo(
+    () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
+    [payrollCycle]
+  );
+  const activeDays = useMemo(() => cycleDates.map(d => d.key), [cycleDates]);
+
+  React.useEffect(() => {
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+  }, [cycleDates, ensureWeeksLoaded]);
 
   const groupedEmps = useGroupedEmployees(search, myDept, 'ALL', weekSchedule);
 
-  // Mock getter ca/công cho từng ô ngày
   const getDayValue = (empId, day) => {
-    const s = weekSchedule[empId]?.[day];
-    if (!s || s === 'off' || s === 'OFF') return 'OFF';
-    if (s.includes('_')) return s.split('_')[0];
-    return s;
+    const cell = cycleDates.find(d => d.key === day);
+    if (!cell) return '';
+    const actual = getShiftCode(schedule[cell.weekKey]?.[empId]?.[cell.dayKey]);
+    if (!actual || actual === 'off' || actual === 'OFF') return 'OFF';
+    const hours = getShiftHours(actual);
+    return hours > 0 ? String(hours) : actual;
   };
 
   // Tính tổng giờ công của cá nhân

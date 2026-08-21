@@ -2,54 +2,28 @@ import React, { useMemo } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
+import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { Download, AlertTriangle, Users, FileSpreadsheet } from 'lucide-react';
 
 export default function PTOvertimeModal({ isOpen, onClose }) {
-  const { employees, schedule, currentWeek } = useStore();
+  const { employees, schedule, currentWeek, ensureWeeksLoaded } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
 
-  // Tính toán 31 ngày theo chu kỳ lương 26 tháng trước -> 25 tháng này
-  const cycleDates = useMemo(() => {
-    const parts = currentWeek.split('-');
-    let y = parseInt(parts[0], 10);
-    let m = parseInt(parts[1], 10);
-    let d = parseInt(parts[2], 10);
-    
-    let prevM = m - 1;
-    let prevY = y;
-    let curM = m;
-    let curY = y;
-    
-    if (d >= 26) {
-      prevM = m;
-      prevY = y;
-      curM = m + 1;
-      if (curM > 12) { curM = 1; curY++; }
-    } else {
-      if (prevM < 1) { prevM = 12; prevY--; }
-    }
-    
-    const dates = [];
-    const daysInPrevMonth = new Date(prevY, prevM, 0).getDate();
-    for (let day = 26; day <= daysInPrevMonth; day++) {
-      dates.push({
-        key: `${day}`,
-        display: `${day}/${prevM}/${prevY}`
-      });
-    }
-    for (let day = 1; day <= 25; day++) {
-      dates.push({
-        key: `${day}`,
-        display: `${day}/${curM}/${curY}`
-      });
-    }
-    return dates;
-  }, [currentWeek]);
+  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const cycleDates = useMemo(
+    () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
+    [payrollCycle]
+  );
+
+  React.useEffect(() => {
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+  }, [cycleDates, ensureWeeksLoaded]);
 
   // Format ca: 14-22 -> 14:00-22:00
   const formatShiftForOFC = (s) => {
     if (!s || s === 'off') return '';
-    let actual = s.includes('_') ? s.split('_')[0] : s;
+    const actual = getShiftCode(s);
     if (actual === 'off') return '';
     const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
     if (match) {
@@ -67,23 +41,13 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
       let totalHours = 0;
       const dailyShifts = {};
 
-      cycleDates.forEach(({ key }) => {
-        const s = empSched[key];
-        let actual = s;
-        if (s && s.includes('_')) actual = s.split('_')[0];
+      cycleDates.forEach(({ key, weekKey, dayKey }) => {
+        const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empSched[dayKey];
+        const actual = getShiftCode(s);
         
         if (actual && actual !== 'off') {
           dailyShifts[key] = formatShiftForOFC(actual);
-          if (SHIFTS[actual]) totalHours += SHIFTS[actual].hours;
-          else {
-            const match = actual.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
-            if (match) {
-              let start = parseInt(match[1], 10);
-              let end = parseInt(match[2], 10);
-              if (end < start) end += 24;
-              totalHours += (end - start);
-            }
-          }
+          totalHours += getShiftHours(actual);
         } else {
           dailyShifts[key] = '';
         }
@@ -101,7 +65,7 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
       ptOvertimeList: analyzed.filter(e => e.isOver91),
       allPTList: analyzed
     };
-  }, [employees, weekSchedule, cycleDates]);
+  }, [employees, weekSchedule, cycleDates, schedule]);
 
   // Xuất file CSV định dạng chuẩn OFC
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'Vuot_91h') => {

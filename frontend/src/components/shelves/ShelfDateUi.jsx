@@ -51,31 +51,43 @@ export function ShelfItemTable({ rows, onChange, notifyDays }) {
   return (
     <>
       <p className="text-xs text-slate-500 mb-2">Cùng SP 2 hạn khác nhau → điền cả HSD 1 và HSD 2 trên cùng dòng. Cảnh báo lấy hạn sớm hơn.</p>
-      <div className="overflow-auto">
-        <table className="w-full text-sm min-w-[820px]">
+      <div className="overflow-auto border border-slate-300 rounded-lg">
+        <table className="w-full text-sm min-w-[820px] border-collapse bg-white">
           <thead>
-            <tr className="text-left text-slate-500 border-b">
-              <th className="py-2 pr-2 w-10">STT</th>
-              <th className="py-2 pr-2">Tên SP</th>
-              <th className="py-2 pr-2 w-32">Mã SP</th>
-              <th className="py-2 pr-2 w-20">SL</th>
-              <th className="py-2 pr-2 w-36">Hạn sử dụng 1</th>
-              <th className="py-2 pr-2 w-36">Hạn sử dụng 2</th>
-              <th className="py-2 pr-2 w-36">Cảnh báo</th>
-              <th className="py-2 w-8"></th>
+            <tr className="bg-slate-100 text-left text-slate-700 border-b border-slate-300">
+              <th className="py-2 px-2 w-10 text-center border-r border-slate-300">STT</th>
+              <th className="py-2 px-2 border-r border-slate-300">Tên SP</th>
+              <th className="py-2 px-2 w-32 border-r border-slate-300">Mã SP</th>
+              <th className="py-2 px-2 w-16 border-r border-slate-300 text-center">SL</th>
+              <th className="py-2 px-2 w-36 border-r border-slate-300">Hạn sử dụng 1</th>
+              <th className="py-2 px-2 w-36 border-r border-slate-300">Hạn sử dụng 2</th>
+              <th className="py-2 px-2 w-36 border-r border-slate-300">Cảnh báo</th>
+              <th className="py-2 px-2 w-10 text-center"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={row.key} className="border-b border-slate-100">
-                <td className="py-1.5 pr-2 text-slate-500 font-semibold text-center">{idx + 1}</td>
-                <td className="py-1.5 pr-2"><input className="w-full border rounded-lg px-2 py-2" value={row.productName} onChange={e => patch(idx, 'productName', e.target.value)} placeholder="Tên sản phẩm" /></td>
-                <td className="py-1.5 pr-2"><input className="w-full border rounded-lg px-2 py-2" value={row.sku} onChange={e => patch(idx, 'sku', e.target.value)} placeholder="Mã SP" /></td>
-                <td className="py-1.5 pr-2"><input className="w-full border rounded-lg px-2 py-2" value={row.qty} onChange={e => patch(idx, 'qty', e.target.value)} /></td>
-                <td className="py-1.5 pr-2"><input type="date" className="w-full border rounded-lg px-2 py-2" value={row.expiryDate} onChange={e => patch(idx, 'expiryDate', e.target.value)} /></td>
-                <td className="py-1.5 pr-2"><input type="date" className="w-full border rounded-lg px-2 py-2" value={row.expiryDate2} onChange={e => patch(idx, 'expiryDate2', e.target.value)} /></td>
-                <td className="py-1.5 pr-2"><ExpiryBadge status={itemExpiryStatus(row, notifyDays)} /></td>
-                <td className="py-1.5"><button type="button" className="text-slate-400 hover:text-red-600 text-lg" onClick={() => onChange(rows.filter((_, i) => i !== idx))}>×</button></td>
+              <tr key={row.key} className="border-b border-slate-300 hover:bg-slate-50 focus-within:bg-blue-50/40">
+                <td className="py-1 px-2 text-slate-500 text-center bg-slate-50 border-r border-slate-300">{idx + 1}</td>
+                <td className="p-0 border-r border-slate-300">
+                  <input className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800" value={row.productName} onChange={e => patch(idx, 'productName', e.target.value)} placeholder="Nhập tên..." />
+                </td>
+                <td className="p-0 border-r border-slate-300">
+                  <input className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500 font-mono text-xs text-slate-600 uppercase" value={row.sku} onChange={e => patch(idx, 'sku', e.target.value)} placeholder="Mã..." />
+                </td>
+                <td className="p-0 border-r border-slate-300">
+                  <input type="number" min="0" className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500 text-center font-bold" value={row.qty} onChange={e => patch(idx, 'qty', e.target.value)} />
+                </td>
+                <td className="p-0 border-r border-slate-300">
+                  <input type="date" className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500" value={row.expiryDate} onChange={e => patch(idx, 'expiryDate', e.target.value)} />
+                </td>
+                <td className="p-0 border-r border-slate-300">
+                  <input type="date" className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500" value={row.expiryDate2} onChange={e => patch(idx, 'expiryDate2', e.target.value)} />
+                </td>
+                <td className="p-1 px-2 border-r border-slate-300 bg-white"><ExpiryBadge status={itemExpiryStatus(row, notifyDays)} /></td>
+                <td className="p-0 text-center bg-white">
+                  <button type="button" className="w-full h-full py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center font-black" onClick={() => onChange(rows.filter((_, i) => i !== idx))}>×</button>
+                </td>
               </tr>
             ))}
           </tbody>

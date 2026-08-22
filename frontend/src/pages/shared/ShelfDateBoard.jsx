@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2, Search, CalendarClock, Save } from 'lucide-react';
+import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
 import { getStoreLabel } from '../../utils/scheduleAnnotations';
@@ -19,6 +19,86 @@ import {
   ShelfItemTable
 } from '../../components/shelves/ShelfDateUi';
 
+// ─── Modal Xem Chi Tiết (Read-only) ───────────────────────────────────────────
+function ShelfDetailModal({ shelf, items, empName, onClose }) {
+  if (!shelf) return null;
+  const today = new Date();
+
+  const expiryBadge = (item) => {
+    const d1 = item.expiryDate ? new Date(item.expiryDate) : null;
+    const d2 = item.expiryDate2 ? new Date(item.expiryDate2) : null;
+    const earliest = [d1, d2].filter(Boolean).sort((a, b) => a - b)[0];
+    if (!earliest) return null;
+    const diff = Math.ceil((earliest - today) / 86400000);
+    if (diff < 0) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">⚠️ Hết hạn</span>;
+    if (diff <= 3) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">🟠 Còn {diff} ngày</span>;
+    if (diff <= 7) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">🟡 Còn {diff} ngày</span>;
+    return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">✅ Còn {diff} ngày</span>;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <div className="font-black text-slate-800 text-base">{shelf.name || shelf.code}</div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              👤 NV: <span className="font-semibold text-slate-700">{empName(shelf.assigneeId)}</span>
+              &nbsp;·&nbsp;
+              📅 Hạn nộp: <span className="font-semibold text-slate-700">{shelf.dueDate || '—'}</span>
+              &nbsp;·&nbsp;
+              {items.length} sản phẩm
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 ml-3">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          {items.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <AlertTriangle size={32} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Nhân viên chưa nhập hàng nào vào bảng này.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-600 text-left sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 rounded-tl-xl">STT</th>
+                  <th className="px-3 py-2">Tên sản phẩm</th>
+                  <th className="px-3 py-2">Mã SP</th>
+                  <th className="px-3 py-2 text-center">SL</th>
+                  <th className="px-3 py-2">HSD 1</th>
+                  <th className="px-3 py-2">HSD 2</th>
+                  <th className="px-3 py-2 rounded-tr-xl">Cảnh báo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, idx) => (
+                  <tr key={item.id || idx} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-3 py-2 text-slate-400 text-xs">{idx + 1}</td>
+                    <td className="px-3 py-2 font-semibold text-slate-800">{item.productName || '—'}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-slate-500">{item.sku || '—'}</td>
+                    <td className="px-3 py-2 text-center font-bold">{item.qty ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{item.expiryDate ? String(item.expiryDate).slice(0, 10) : '—'}</td>
+                    <td className="px-3 py-2 text-xs">{item.expiryDate2 ? String(item.expiryDate2).slice(0, 10) : '—'}</td>
+                    <td className="px-3 py-2">{expiryBadge(item)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400 text-right">
+          Dữ liệu do <span className="font-semibold text-slate-600">{empName(shelf.assigneeId)}</span> nhập — chỉ đọc
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ShelfDateBoard() {
   const { user, employees, stores, shelves, shelfItems, saveShelf, deleteShelf, saveShelfItems } = useStore();
   const isManager = isOpsManager(user);
@@ -37,6 +117,9 @@ export default function ShelfDateBoard() {
     dueDate: '',
     notifyDays: DEFAULT_NOTIFY_DAYS
   });
+
+  // State cho modal xem chi tiết
+  const [detailShelf, setDetailShelf] = useState(null);
 
   const activeStore = canPickStore ? filterStore : (user?.dept || '');
 
@@ -103,6 +186,11 @@ export default function ShelfDateBoard() {
     setSelectedId(shelf.id);
     const existing = (shelfItems || []).filter(i => i.shelfId === shelf.id);
     setRows(existing.length ? existing.map(toShelfItemRow) : [emptyShelfItemRow()]);
+  };
+
+  const openDetail = (shelf) => {
+    const items = (shelfItems || []).filter(i => i.shelfId === shelf.id);
+    setDetailShelf({ shelf, items });
   };
 
   const selected = filteredShelves.find(s => s.id === selectedId) || storeShelves.find(s => s.id === selectedId) || null;
@@ -229,7 +317,7 @@ export default function ShelfDateBoard() {
               <th className="px-3 py-2.5">Hạn nộp</th>
               <th className="px-3 py-2.5">Kiểm tra</th>
               <th className="px-3 py-2.5">Hàng HSD</th>
-              <th className="px-3 py-2.5 w-28"></th>
+              <th className="px-3 py-2.5 w-40"></th>
             </tr>
           </thead>
           <tbody>
@@ -238,6 +326,7 @@ export default function ShelfDateBoard() {
             )}
             {filteredShelves.map(shelf => {
               const m = shelfCheckMeta(shelf, shelfItems);
+              const isOwner = shelf.assigneeId === user?.id;
               return (
                 <tr key={shelf.id} className={`border-t border-slate-100 ${selectedId === shelf.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                   <td className="px-3 py-2 font-bold">{shelf.name || shelf.code}</td>
@@ -245,10 +334,29 @@ export default function ShelfDateBoard() {
                   <td className={`px-3 py-2 font-semibold ${dueToneClass(m.due.key)}`}>{shelf.dueDate || '—'}<div className="text-[11px] font-normal">{m.due.label}</div></td>
                   <td className="px-3 py-2">{m.items.length} món{m.lastSaved ? ` · ${String(m.lastSaved).slice(0, 10)}` : ''}</td>
                   <td className="px-3 py-2">{m.warn > 0 ? <span className="font-bold text-amber-700">{m.warn} cảnh báo</span> : 'OK'}</td>
-                  <td className="px-3 py-2">
-                    <button type="button" className="text-blue-700 font-bold mr-2" onClick={() => openShelf(shelf)}>Mở bảng</button>
+                  <td className="px-3 py-2 flex items-center gap-2">
+                    {/* Manager: Xem chi tiết */}
                     {isManager && (
-                      <button type="button" className="text-red-600" onClick={() => { if (confirm('Xóa kệ này?')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)); }}><Trash2 size={14} /></button>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100"
+                        onClick={() => openDetail(shelf)}
+                      >
+                        <Eye size={13} /> Xem chi tiết
+                      </button>
+                    )}
+                    {/* Nhân viên được giao: Mở bảng nhập */}
+                    {(isOwner || isManager) && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100"
+                        onClick={() => openShelf(shelf)}
+                      >
+                        Mở bảng
+                      </button>
+                    )}
+                    {isManager && (
+                      <button type="button" className="text-red-400 hover:text-red-600" onClick={() => { if (confirm('Xóa kệ này?')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)); }}><Trash2 size={14} /></button>
                     )}
                   </td>
                 </tr>
@@ -274,6 +382,16 @@ export default function ShelfDateBoard() {
           </div>
           <ShelfItemTable rows={rows} onChange={setRows} notifyDays={selected.notifyDays} />
         </div>
+      )}
+
+      {/* Modal xem chi tiết read-only */}
+      {detailShelf && (
+        <ShelfDetailModal
+          shelf={detailShelf.shelf}
+          items={detailShelf.items}
+          empName={empName}
+          onClose={() => setDetailShelf(null)}
+        />
       )}
     </div>
   );

@@ -42,7 +42,11 @@ function DemandField({ label, customers, sales, onCustomers, onSales }) {
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, applyAiSchedule, user, stores } = useStore();
   const weekSched = schedule[currentWeek] || {};
-  const activeStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || 'VN0485') : storeId;
+  const defaultStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || 'VN0485') : storeId;
+
+  const [selectedStoreId, setSelectedStoreId] = useState(defaultStoreId);
+
+  const activeStoreId = selectedStoreId;
   const activeStore = stores.find(s => s.id === activeStoreId);
   const fileRef = useRef(null);
 
@@ -71,13 +75,21 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
 
   useEffect(() => {
     if (!isOpen) return;
-    setDemand(normalizeStoreDemand(activeStore?.demand));
+    setSelectedStoreId(defaultStoreId);
+    setDemand(normalizeStoreDemand(stores.find(s => s.id === defaultStoreId)?.demand));
     setPreviews([]);
     setNotes([]);
     setAiResult(null);
     setError('');
     setShowAudit(false);
-  }, [isOpen, activeStoreId]);
+  }, [isOpen]);
+
+  // Khi đổi cửa hàng → reset demand
+  useEffect(() => {
+    setDemand(normalizeStoreDemand(activeStore?.demand));
+    setAiResult(null);
+    setError('');
+  }, [selectedStoreId]);
 
   const patchDemand = (bucket, field, value) => {
     const n = Math.max(0, Number(String(value).replace(/[^\d]/g, '')) || 0);
@@ -154,10 +166,24 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div>
+          <div className="flex-1 min-w-0 mr-2">
             <div className="text-sm font-black text-slate-800">AI xếp lịch</div>
-            <div className="text-[11px] text-slate-500">{activeStoreId} · tuần {currentWeek} · {storeEmps.length} NV</div>
+            <div className="text-[11px] text-slate-500">tuần {currentWeek} · {storeEmps.length} NV</div>
           </div>
+
+          {/* Dropdown chọn cửa hàng */}
+          {(storeId === 'ALL' || stores.length > 1) && (
+            <select
+              value={selectedStoreId}
+              onChange={e => setSelectedStoreId(e.target.value)}
+              className="mr-2 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-indigo-400 outline-none cursor-pointer"
+            >
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.id} — {s.name || s.id}</option>
+              ))}
+            </select>
+          )}
+
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
             <X size={18} />
           </button>

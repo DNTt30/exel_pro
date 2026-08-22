@@ -31,7 +31,7 @@ import { Link } from 'react-router-dom';
 import ShiftInput from '../../components/ShiftInput';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
-import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import {
   getStoreLabel,
@@ -325,44 +325,19 @@ export default function EmployeeSchedule() {
                 className="border-none bg-transparent text-blue-700 font-bold text-xs outline-none px-2 cursor-pointer"
               >
                 {(() => {
-                  const today = new Date();
-                  const currentMonday = new Date(today);
-                  const dayOfWeek = today.getDay();
-                  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-                  currentMonday.setDate(diff);
-                  currentMonday.setHours(0, 0, 0, 0);
-
-                  const list = [];
-                  for (let i = -1; i <= 3; i++) {
-                    const d = new Date(currentMonday);
-                    d.setDate(currentMonday.getDate() + (i * 7));
-                    const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                    list.push({ key: wKey, offset: i, startDate: d });
-                  }
-
+                  const list = listNearbyWeeks();
                   if (!list.some(item => item.key === currentWeek)) {
                     const parts = currentWeek.split('-').map(Number);
                     const d = new Date(parts[0], parts[1] - 1, parts[2]);
-                    d.setHours(0, 0, 0, 0);
-                    const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                    list.push({ key: wKey, offset: null, startDate: d });
+                    list.push({ key: currentWeek, offset: null, startDate: d, endDate: new Date(d.getTime() + 6 * 86400000), tag: 'Tuần đã chọn' });
+                    list.sort((a, b) => a.startDate - b.startDate);
                   }
-
-                  list.sort((a, b) => a.startDate - b.startDate);
-
                   return list.map(item => {
                     const wStart = item.startDate;
-                    const wEnd = new Date(wStart);
-                    wEnd.setDate(wStart.getDate() + 6);
+                    const wEnd = item.endDate || new Date(wStart.getTime() + 6 * 86400000);
                     const startStr = `${String(wStart.getDate()).padStart(2, '0')}/${String(wStart.getMonth() + 1).padStart(2, '0')}`;
                     const endStr = `${String(wEnd.getDate()).padStart(2, '0')}/${String(wEnd.getMonth() + 1).padStart(2, '0')}`;
-                    
-                    let label = `Tuần: ${startStr} → ${endStr}/${wStart.getFullYear()}`;
-                    if (item.offset === 0) label = `📍 Tuần này (${startStr} → ${endStr})`;
-                    else if (item.offset === 1) label = `⚡ Tuần sau (${startStr} → ${endStr})`;
-                    else if (item.offset === -1) label = `Tuần trước (${startStr} → ${endStr})`;
-
-                    return <option key={item.key} value={item.key}>{label}</option>;
+                    return <option key={item.key} value={item.key}>{item.tag} ({startStr} → {endStr})</option>;
                   });
                 })()}
               </select>

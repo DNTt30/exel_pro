@@ -5,6 +5,7 @@ import Toolbar from '../../components/Toolbar';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getRoleBadgeInfo, WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { canPickStore } from '../../lib/authSession';
 
 // Helper phân tích ngày và tự động xác định Thứ + Tuần
 function parseDateDetails(dateStr) {
@@ -215,13 +216,13 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
 
 export default function FeedbackCB() {
   const { feedbacks, resolveFeedback, user, employees, currentWeek } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
 
-  const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : user?.dept);
+  const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  const effectiveFilterDept = isAdmin ? filterDept : user?.dept;
+  const effectiveFilterDept = pickStore ? filterDept : user?.dept;
 
   const filteredFeedbacks = feedbacks.filter(fb => {
     if (effectiveFilterDept !== 'ALL' && fb.dept !== effectiveFilterDept) return false;
@@ -240,7 +241,7 @@ export default function FeedbackCB() {
       <Toolbar 
         search={search} setSearch={setSearch}
         filterDept={filterDept} setFilterDept={setFilterDept}
-        disableDeptFilter={!isAdmin}
+        disableDeptFilter={!pickStore}
         rightActions={
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Trạng thái:</span>

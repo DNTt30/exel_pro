@@ -23,12 +23,15 @@ export const STANDARD_ROLES = [
   { id: 'STFT', label: 'STFT (Nhân viên Full-time)', type: 'STFT', defaultMaxH: 48, badgeCls: 'bg-purple-50 text-purple-700 border-purple-200' },
   { id: 'STPT', label: 'STPT (Nhân viên Part-time)', type: 'STPT', defaultMaxH: 23, badgeCls: 'bg-blue-50 text-blue-700 border-blue-200' },
   { id: 'CSR_NEW', label: 'CSR (Chăm sóc khách hàng)', type: 'CSR_NEW', defaultMaxH: 48, badgeCls: 'bg-rose-50 text-rose-700 border-rose-200' },
-  { id: 'Cửa hàng trưởng', label: '⭐ Cửa hàng trưởng (SM)', type: 'STFT', defaultMaxH: 48, badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { id: 'SM', label: '👑 SM (Quản lý khu vực)', type: 'STFT', defaultMaxH: 48, badgeCls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { id: 'Cửa hàng trưởng', label: 'Cửa hàng trưởng (SM)', type: 'STFT', defaultMaxH: 48, badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'OFC', label: 'OFC (Quản lý khu vực)', type: 'STFT', defaultMaxH: 48, badgeCls: 'bg-amber-50 text-amber-800 border-amber-200' },
 ];
 
 export function getRoleBadgeInfo(roleOrType) {
   const code = roleOrType || 'STPT';
+  if (code === 'SM' || code === 'OFC' || /khu vực/i.test(code)) {
+    return STANDARD_ROLES.find(r => r.id === 'OFC');
+  }
   const found = STANDARD_ROLES.find(r => r.id === code || r.label === code);
   if (found) return found;
   if (code.includes('PT')) return { id: code, label: code, type: 'STPT', badgeCls: 'bg-blue-50 text-blue-700 border-blue-200' };
@@ -164,6 +167,26 @@ export function getCurrentMondayWeek(date = new Date()) {
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return formatISODate(d);
+}
+
+/** Danh sách tuần quanh hôm nay: mặc định 8 tuần lịch sử + tuần này + 4 tuần tới. */
+export function listNearbyWeeks(today = new Date(), past = 8, future = 4) {
+  const currentMonday = new Date(getCurrentMondayWeek(today) + 'T00:00:00');
+  const list = [];
+  for (let i = -past; i <= future; i++) {
+    const d = new Date(currentMonday);
+    d.setDate(currentMonday.getDate() + i * 7);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    const key = formatISODate(d);
+    let tag = `Tuần ${i > 0 ? '+' : ''}${i}`;
+    if (i === 0) tag = 'Tuần này';
+    else if (i === -1) tag = 'Tuần trước';
+    else if (i === 1) tag = 'Tuần sau';
+    else if (i < 0) tag = `Lịch sử ${-i} tuần`;
+    list.push({ key, offset: i, startDate: d, endDate: end, tag });
+  }
+  return list;
 }
 
 /** weekKey = thứ Hai ISO, dayKey = T2…CN */

@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { MA_RE, STANDARD_ROLES } from '../../data/constants';
+import { canPickStore } from '../../lib/authSession';
 
 export default function AddEmployeeModal({ isOpen, onClose }) {
   const { stores, addEmployee, user } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
   const [formData, setFormData] = useState({ 
     id: '', 
     name: '', 
-    dept: isAdmin ? (stores[0]?.id || '') : (user?.dept || ''), 
+    dept: pickStore ? (stores[0]?.id || '') : (user?.dept || ''), 
     role: 'STFT',
     type: 'STFT', 
     maxH: 48 
@@ -20,10 +21,10 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
     if (isOpen) {
       setFormData(prev => ({ 
         ...prev, 
-        dept: isAdmin ? (stores[0]?.id || '') : (user?.dept || '') 
+        dept: pickStore ? (stores[0]?.id || '') : (user?.dept || '') 
       }));
     }
-  }, [isOpen, isAdmin, user?.dept, stores]);
+  }, [isOpen, pickStore, user?.dept, stores]);
 
   const handleRoleChange = (selectedRole) => {
     const roleInfo = STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
@@ -62,7 +63,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
       setFormData({ 
         id: '', 
         name: '', 
-        dept: isAdmin ? (stores[0]?.id || '') : (user?.dept || ''), 
+        dept: pickStore ? (stores[0]?.id || '') : (user?.dept || ''), 
         role: 'STFT',
         type: 'STFT', 
         maxH: 48 
@@ -104,7 +105,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">Cửa hàng làm việc *</label>
           <select 
-            disabled={!isAdmin}
+            disabled={!pickStore}
             className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" 
             value={formData.dept} 
             onChange={e => setFormData({ ...formData, dept: e.target.value })}

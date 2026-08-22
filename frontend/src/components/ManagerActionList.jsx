@@ -4,15 +4,16 @@ import { useStore } from '../store/useStore';
 import { AlertTriangle, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
 import { WEEK_DAYS } from '../data/constants';
 import { normalizeShift, getShiftHours } from '../utils/shiftHelper';
+import { canPickStore } from '../lib/authSession';
 
 export default function ManagerActionList() {
   const { user, feedbacks, shiftSwaps, employees, schedule, currentWeek } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
   const weekSched = schedule[currentWeek] || {};
 
   const items = useMemo(() => {
     const list = [];
-    const pendingFb = (feedbacks || []).filter(f => f.status === 'pending' && (isAdmin || f.dept === user?.dept));
+    const pendingFb = (feedbacks || []).filter(f => f.status === 'pending' && (pickStore || f.dept === user?.dept));
     if (pendingFb.length) {
       list.push({
         key: 'fb',
@@ -23,7 +24,7 @@ export default function ManagerActionList() {
       });
     }
 
-    const pendingSwaps = (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (isAdmin || s.store === user?.dept));
+    const pendingSwaps = (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (pickStore || s.store === user?.dept));
     if (pendingSwaps.length) {
       list.push({
         key: 'swap',
@@ -38,7 +39,7 @@ export default function ManagerActionList() {
     employees.forEach(emp => {
       const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
       if (!isPT) return;
-      if (!isAdmin && emp.dept !== user?.dept) return;
+      if (!pickStore && emp.dept !== user?.dept) return;
       let h = 0;
       WEEK_DAYS.forEach(d => {
         const { shift } = normalizeShift(weekSched[emp.id]?.[d]);
@@ -57,7 +58,7 @@ export default function ManagerActionList() {
     }
 
     return list;
-  }, [feedbacks, shiftSwaps, employees, weekSched, currentWeek, isAdmin, user?.dept]);
+  }, [feedbacks, shiftSwaps, employees, weekSched, currentWeek, pickStore, user?.dept]);
 
   if (items.length === 0) {
     return (

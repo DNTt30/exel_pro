@@ -4,14 +4,15 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { WEEK_DAYS } from '../../data/constants';
 import { isShiftsOverlapping, normalizeShift } from '../../utils/shiftHelper';
+import { canPickStore, isOpsManager } from '../../lib/authSession';
 
 export default function TransferModal({ isOpen, onClose }) {
   const { employees, stores, schedule, updateShift, currentWeek, user } = useStore();
   const weekSched = schedule[currentWeek] || {};
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.isManager;
+  const pickStore = canPickStore(user);
+  const isManager = isOpsManager(user);
   
-  const [sourceStore, setSourceStore] = useState(isAdmin ? '' : user?.dept);
+  const [sourceStore, setSourceStore] = useState(pickStore ? '' : user?.dept);
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [targetStore, setTargetStore] = useState('');
   
@@ -22,10 +23,10 @@ export default function TransferModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && !isAdmin && isManager) {
+    if (isOpen && !pickStore && isManager) {
       setSourceStore(user.dept);
     }
-  }, [isOpen, isAdmin, isManager, user?.dept]);
+  }, [isOpen, pickStore, isManager, user?.dept]);
 
   // Lấy danh sách nhân viên của cửa hàng nguồn
   const sourceEmployees = useMemo(() => {
@@ -70,7 +71,7 @@ export default function TransferModal({ isOpen, onClose }) {
       
       onClose();
       // Reset state
-      if (isAdmin) setSourceStore('');
+      if (pickStore) setSourceStore('');
       setSelectedEmpId('');
       setTargetStore('');
       setTargetShift('6-14');
@@ -94,7 +95,7 @@ export default function TransferModal({ isOpen, onClose }) {
               setSourceStore(e.target.value);
               setSelectedEmpId('');
             }}
-            disabled={!isAdmin}
+            disabled={!pickStore}
           >
             <option value="">-- Chọn cửa hàng nguồn --</option>
             {stores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}

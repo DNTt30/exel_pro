@@ -2,9 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Search, ShieldCheck } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
+import { canPickStore } from '../../lib/authSession';
 
 export default function Employees() {
-  const { employees, stores, addEmployee, updateEmployee, deleteEmployee } = useStore();
+  const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore();
+  const pickStore = canPickStore(user);
+  const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
+  const homeDept = pickStore ? (stores[0]?.id || '') : (user?.dept || '');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
@@ -19,10 +23,12 @@ export default function Employees() {
   });
 
   const filteredEmps = useMemo(() => {
-    if (!search) return employees;
+    let list = employees || [];
+    if (!pickStore && user?.dept) list = list.filter(e => e.dept === user.dept);
+    if (!search) return list;
     const s = search.toLowerCase();
-    return employees.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
-  }, [employees, search]);
+    return list.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
+  }, [employees, search, pickStore, user?.dept]);
 
   const handleRoleChange = (selectedRole) => {
     const roleInfo = STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
@@ -56,7 +62,7 @@ export default function Employees() {
         alert(result.provisionWarning);
       }
       setIsAdding(false);
-      setFormData({ id: '', name: '', dept: stores[0]?.id || '', role: 'STFT', type: 'STFT', maxH: 48 });
+      setFormData({ id: '', name: '', dept: homeDept, role: 'STFT', type: 'STFT', maxH: 48 });
     } catch (e) {
       alert('Lỗi: ' + e.message);
     }
@@ -86,7 +92,9 @@ export default function Employees() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Quản lý Nhân sự</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Danh sách toàn bộ nhân sự các chi nhánh ({filteredEmps.length} nhân sự)</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {pickStore ? `Danh sách nhân sự các chi nhánh (${filteredEmps.length})` : `Nhân sự cửa hàng ${user?.dept || ''} (${filteredEmps.length})`}
+          </p>
         </div>
         <div className="flex items-center gap-2.5">
           <div className="relative">
@@ -110,7 +118,7 @@ export default function Employees() {
           <button 
             onClick={() => { 
               setIsAdding(true); 
-              setFormData({ id: '', name: '', dept: stores[0]?.id || '', role: 'STFT', type: 'STFT', maxH: 48 }); 
+              setFormData({ id: '', name: '', dept: homeDept, role: 'STFT', type: 'STFT', maxH: 48 }); 
             }}
             className="btn btn-primary text-xs py-2 px-3 rounded-lg shadow-2xs font-bold whitespace-nowrap cursor-pointer"
           >
@@ -155,12 +163,13 @@ export default function Employees() {
                 </td>
                 <td className="p-2.5">
                   <select 
-                    className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-medium" 
-                    value={formData.dept} 
+                    className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-medium disabled:bg-slate-100" 
+                    value={formData.dept}
+                    disabled={!pickStore}
                     onChange={e => setFormData({...formData, dept: e.target.value})}
                   >
                     <option value="">-- Chọn Cửa hàng --</option>
-                    {stores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}
+                    {visibleStores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}
                   </select>
                 </td>
                 <td className="p-2.5">
@@ -208,12 +217,13 @@ export default function Employees() {
                   <td className="p-3">
                     {editingId === emp.id ? (
                       <select 
-                        className="w-full p-1.5 border border-blue-400 rounded bg-yellow-50 text-xs font-semibold outline-none" 
-                        value={formData.dept} 
+                        className="w-full p-1.5 border border-blue-400 rounded bg-yellow-50 text-xs font-semibold outline-none disabled:bg-slate-100" 
+                        value={formData.dept}
+                        disabled={!pickStore}
                         onChange={e => setFormData({...formData, dept: e.target.value})}
                       >
-                        {stores.length === 0 && <option value={emp.dept}>{emp.dept}</option>}
-                        {stores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}
+                        {visibleStores.length === 0 && <option value={emp.dept}>{emp.dept}</option>}
+                        {visibleStores.map(st => <option key={st.id} value={st.id}>{st.id} - {st.name}</option>)}
                       </select>
                     ) : <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-bold">{emp.dept}</span>}
                   </td>

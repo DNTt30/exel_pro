@@ -4,10 +4,11 @@ import { WEEK_DAYS, DAY_FULL_NAMES, getStaffingMatrix, normalizeStaffingConfig }
 import { calculateStaffingGap } from '../utils/shiftHelper';
 import { useStore } from '../store/useStore';
 import StaffingMatrixFields from './StaffingMatrixFields';
+import { isOpsManager } from '../lib/authSession';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
   const { stores, user, updateStore } = useStore();
-  const isAdmin = user?.role === 'admin' || user?.isManager;
+  const isAdmin = isOpsManager(user);
 
   const storeOptions = stores.length ? stores : [{ id: filterDept && filterDept !== 'ALL' ? filterDept : 'VN0485', name: filterDept }];
   const defaultStoreId = filterDept && filterDept !== 'ALL'

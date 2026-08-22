@@ -24,12 +24,13 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
+import { canPickStore } from '../../lib/authSession';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 export default function Dashboard() {
   const { employees, schedule, currentWeek, setCurrentWeek, stores, user } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
   const weekSchedule = schedule[currentWeek] || {};
   const availableWeeks = Object.keys(schedule).sort();
 
@@ -104,7 +105,7 @@ export default function Dashboard() {
 
   // Bộ lọc
   const [search, setSearch] = useState('');
-  const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : (user?.dept || 'ALL'));
+  const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : (user?.dept || 'ALL'));
   const [filterOnlyOvertime, setFilterOnlyOvertime] = useState(false);
 
   // Xem chi tiết nhân viên
@@ -204,7 +205,7 @@ export default function Dashboard() {
   const allPTEmployees = useMemo(() => {
     let ptEmps = employees.filter(e => e.type === 'PARTTIME' || e.type === 'STPT' || (e.role && e.role.includes('PT')));
     
-    if (!isAdmin && user?.dept) {
+    if (!pickStore && user?.dept) {
       ptEmps = ptEmps.filter(e => e.dept === user.dept);
     }
 
@@ -279,7 +280,7 @@ export default function Dashboard() {
         isOvertime
       };
     });
-  }, [employees, schedule, weekSchedule, cycleDates, viewMode, isAdmin, user?.dept]);
+  }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, user?.dept]);
 
   // 4. Lọc danh sách theo Search, Cửa hàng và Toggle
   const filteredPTList = useMemo(() => {
@@ -669,7 +670,7 @@ export default function Dashboard() {
             </div>
 
             {/* Store Filter */}
-            {isAdmin && (
+            {pickStore && (
               <select
                 value={filterDept}
                 onChange={e => setFilterDept(e.target.value)}

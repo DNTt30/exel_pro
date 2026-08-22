@@ -7,13 +7,14 @@ import Toolbar from '../../components/Toolbar';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { canPickStore } from '../../lib/authSession';
 
 export default function Timesheet() {
   const { user, currentWeek, schedule, ensureWeeksLoaded } = useStore();
   
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
   const [search, setSearch] = useState('');
-  const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : user?.dept);
+  const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   const [filterRole, setFilterRole] = useState('ALL');
 
   const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
@@ -47,14 +48,14 @@ export default function Timesheet() {
           filterDept={filterDept} setFilterDept={setFilterDept}
           filterRole={filterRole} setFilterRole={setFilterRole}
           showWeekPicker={false}
-          disableDeptFilter={!isAdmin}
+          disableDeptFilter={!pickStore}
           rightActions={
             <>
               <button 
                 className="btn btn-outline text-xs py-1 px-2.5 hover:text-emerald-700 hover:border-emerald-300 font-semibold flex items-center gap-1" 
                 onClick={() => exportTimesheetToExcel({
                   currentWeek,
-                  deptName: (isAdmin ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (isAdmin ? filterDept : user?.dept),
+                  deptName: (pickStore ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (pickStore ? filterDept : user?.dept),
                   groupedEmps,
                   getDayValue,
                   activeDays,
@@ -76,7 +77,7 @@ export default function Timesheet() {
       <div className="hidden print:block text-center mb-4 pb-2 border-b border-slate-300">
         <h1 className="text-xl font-black uppercase text-slate-900 tracking-wide">BẢNG TỔNG HỢP CÔNG & LƯƠNG THÁNG (26 - 25)</h1>
         <div className="flex justify-between items-center text-xs text-slate-600 mt-1 px-2">
-          <span>{(isAdmin ? filterDept : user?.dept) !== 'ALL' ? `Cửa hàng: ${isAdmin ? filterDept : user?.dept}` : 'Toàn bộ chuỗi cửa hàng'}</span>
+          <span>{(pickStore ? filterDept : user?.dept) !== 'ALL' ? `Cửa hàng: ${pickStore ? filterDept : user?.dept}` : 'Toàn bộ chuỗi cửa hàng'}</span>
           <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
           <span>Hệ thống OFC</span>
         </div>

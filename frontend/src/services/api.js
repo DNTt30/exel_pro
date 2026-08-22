@@ -82,20 +82,37 @@ export async function deleteStore(id) {
 }
 
 // --- EMPLOYEES API ---
-export async function getEmployees() {
-  const { data, error } = await db().from('employees').select('*').order('dept', { ascending: true });
-  if (error) {
-    console.error('Lỗi lấy danh sách nhân viên:', error);
-    return [];
-  }
-  return data.map(e => ({
+function mapEmployee(e) {
+  if (!e) return null;
+  return {
     id: e.id,
     name: e.name,
     dept: e.dept,
     type: e.type,
     role: e.role,
     maxH: e.max_h
-  }));
+  };
+}
+
+export async function getEmployeeById(id) {
+  if (!id) return null;
+  const { data, error } = await db().from('employees').select('id,name,dept,type,role,max_h').eq('id', id).maybeSingle();
+  if (error) {
+    console.error('Lỗi lấy nhân viên:', error);
+    return null;
+  }
+  return mapEmployee(data);
+}
+
+export async function getEmployees(opts = {}) {
+  let q = db().from('employees').select('id,name,dept,type,role,max_h').order('dept', { ascending: true });
+  if (opts.dept) q = q.eq('dept', opts.dept);
+  const { data, error } = await q;
+  if (error) {
+    console.error('Lỗi lấy danh sách nhân viên:', error);
+    return [];
+  }
+  return (data || []).map(mapEmployee);
 }
 
 export async function addEmployee(emp) {
@@ -128,15 +145,19 @@ export async function deleteEmployeeData(id) {
 }
 
 // Lấy lịch làm việc của 1 tuần
-export async function getSchedulesByWeek(weekDate) {
-  const { data, error } = await db().from('schedules').select('*').eq('week_date', weekDate);
+export async function getSchedulesByWeek(weekDate, opts = {}) {
+  if (opts.empIds && opts.empIds.length === 0) return {};
+  let q = db().from('schedules').select('emp_id,shifts').eq('week_date', weekDate);
+  if (opts.empId) q = q.eq('emp_id', opts.empId);
+  else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
+  const { data, error } = await q;
   if (error) {
     console.error('Lỗi lấy lịch làm việc:', error);
     return {};
   }
   
   const scheduleMap = {};
-  data.forEach(row => {
+  (data || []).forEach(row => {
     scheduleMap[row.emp_id] = row.shifts || {};
   });
   return scheduleMap;
@@ -175,13 +196,16 @@ export async function saveBulkEmployeeSchedules(weekDate, scheduleMap) {
 }
 
 // Lấy danh sách Feedback
-export async function getFeedbacks() {
-  const { data, error } = await db().from('feedbacks').select('*').order('created_at', { ascending: false });
+export async function getFeedbacks(opts = {}) {
+  let q = db().from('feedbacks').select('*').order('created_at', { ascending: false }).limit(opts.limit || 200);
+  if (opts.empId) q = q.eq('emp_id', opts.empId);
+  else if (opts.dept) q = q.eq('dept', opts.dept);
+  const { data, error } = await q;
   if (error) {
     console.error('Lỗi lấy danh sách feedback:', error);
     return [];
   }
-  return data.map(f => ({
+  return (data || []).map(f => ({
     id: f.id,
     empId: f.emp_id || f.empId,
     empName: f.emp_name || f.empName || f.name || '',
@@ -289,6 +313,175 @@ export async function addAdminLog(entry) {
   };
 }
 
+function mapActivityLog(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    storeId: row.store_id || '',
+    userId: row.user_id || '',
+    action: row.action,
+    category: row.category || 'activity',
+    entityType: row.entity_type || '',
+    entityId: row.entity_id || '',
+    description: row.description || '',
+    ipAddress: row.ip_address || '',
+    userAgent: row.user_agent || '',
+    metadata: row.metadata || null,
+    createdAt: row.created_at
+  };
+}
+
+function mapAuditLog(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    storeId: row.store_id || '',
+    actorId: row.actor_id || '',
+    action: row.action,
+    resourceType: row.resource_type || '',
+    resourceId: row.resource_id || '',
+    oldData: row.old_data || null,
+    newData: row.new_data || null,
+    metadata: row.metadata || null,
+    ipAddress: row.ip_address || '',
+    userAgent: row.user_agent || '',
+    createdAt: row.created_at
+  };
+}
+
+function mapAiConversation(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    storeId: row.store_id || '',
+    userId: row.user_id || '',
+    userMessage: row.user_message || '',
+    assistantResponse: row.assistant_response || '',
+    intent: row.intent || '',
+    model: row.model || '',
+    tokensUsed: row.tokens_used,
+    latencyMs: row.latency_ms,
+    contextUsed: row.context_used || null,
+    error: row.error || '',
+    createdAt: row.created_at
+  };
+}
+
+export async function addActivityLog(entry) {
+  try {
+    const { data, error } = await db().from('activity_logs').insert([{
+      store_id: entry.storeId || null,
+      user_id: entry.userId || null,
+      action: entry.action,
+      category: entry.category || 'activity',
+      entity_type: entry.entityType || null,
+      entity_id: entry.entityId || null,
+      description: entry.description || null,
+      ip_address: entry.ipAddress || null,
+      user_agent: entry.userAgent || null,
+      metadata: entry.metadata || null
+    }]).select().single();
+    if (error) {
+      if (/does not exist|schema cache|relation/i.test(error.message || '')) return null;
+      console.warn('activity_logs:', error.message);
+      return null;
+    }
+    return mapActivityLog(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function addAuditLog(entry) {
+  try {
+    const { data, error } = await db().from('audit_logs').insert([{
+      store_id: entry.storeId || null,
+      actor_id: entry.actorId || null,
+      action: entry.action,
+      resource_type: entry.resourceType,
+      resource_id: entry.resourceId || null,
+      old_data: entry.oldData ?? null,
+      new_data: entry.newData ?? null,
+      metadata: entry.metadata || null,
+      ip_address: entry.ipAddress || null,
+      user_agent: entry.userAgent || null
+    }]).select().single();
+    if (error) {
+      if (/does not exist|schema cache|relation/i.test(error.message || '')) return null;
+      console.warn('audit_logs:', error.message);
+      return null;
+    }
+    return mapAuditLog(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function addAiConversation(entry) {
+  try {
+    const { data, error } = await db().from('ai_conversations').insert([{
+      conversation_id: entry.conversationId,
+      store_id: entry.storeId || null,
+      user_id: entry.userId || null,
+      user_message: entry.userMessage || null,
+      assistant_response: entry.assistantResponse || null,
+      intent: entry.intent || null,
+      model: entry.model || null,
+      tokens_used: entry.tokensUsed ?? null,
+      latency_ms: entry.latencyMs ?? null,
+      context_used: entry.contextUsed || null,
+      error: entry.error || null
+    }]).select().single();
+    if (error) {
+      if (/does not exist|schema cache|relation/i.test(error.message || '')) return null;
+      console.warn('ai_conversations:', error.message);
+      return null;
+    }
+    return mapAiConversation(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function getActivityLogs(opts = {}) {
+  try {
+    let q = db().from('activity_logs').select('*').order('created_at', { ascending: false }).limit(opts.limit || 300);
+    if (opts.storeId) q = q.eq('store_id', opts.storeId);
+    if (opts.category) q = q.eq('category', opts.category);
+    const { data, error } = await q;
+    if (error) return [];
+    return (data || []).map(mapActivityLog);
+  } catch {
+    return [];
+  }
+}
+
+export async function getAuditLogs(opts = {}) {
+  try {
+    let q = db().from('audit_logs').select('*').order('created_at', { ascending: false }).limit(opts.limit || 300);
+    if (opts.storeId) q = q.eq('store_id', opts.storeId);
+    const { data, error } = await q;
+    if (error) return [];
+    return (data || []).map(mapAuditLog);
+  } catch {
+    return [];
+  }
+}
+
+export async function getAiConversations(opts = {}) {
+  try {
+    let q = db().from('ai_conversations').select('*').order('created_at', { ascending: false }).limit(opts.limit || 200);
+    if (opts.storeId) q = q.eq('store_id', opts.storeId);
+    if (opts.userId) q = q.eq('user_id', opts.userId);
+    const { data, error } = await q;
+    if (error) return [];
+    return (data || []).map(mapAiConversation);
+  } catch {
+    return [];
+  }
+}
+
 export async function updateFeedback(id, status, resolutionNote = '') {
   const updatePayload = { status };
   if (resolutionNote) updatePayload.resolution_note = resolutionNote;
@@ -318,9 +511,12 @@ function mapShiftSwap(row) {
   };
 }
 
-export async function getShiftSwaps() {
+export async function getShiftSwaps(opts = {}) {
   try {
-    const { data, error } = await db().from('shift_swaps').select('*').order('created_at', { ascending: false });
+    let q = db().from('shift_swaps').select('*').order('created_at', { ascending: false }).limit(opts.limit || 150);
+    if (opts.empId) q = q.or(`from_emp_id.eq.${opts.empId},to_emp_id.eq.${opts.empId}`);
+    else if (opts.store) q = q.eq('store', opts.store);
+    const { data, error } = await q;
     if (error) {
       console.error('Lỗi lấy danh sách đổi ca:', error);
       return [];
@@ -362,5 +558,200 @@ export async function updateShiftSwap(id, updates) {
   const { data, error } = await db().from('shift_swaps').update(payload).eq('id', id).select().single();
   if (error) throw error;
   return mapShiftSwap(data);
+}
+
+function isMissingTable(message) {
+  return /does not exist|schema cache|relation/i.test(message || '');
+}
+
+function mapShelf(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    storeId: row.store_id,
+    code: row.code,
+    name: row.name || '',
+    assigneeId: row.assignee_id || '',
+    notifyDays: row.notify_days == null ? 3 : Number(row.notify_days),
+    dueDate: row.due_date || '',
+    createdAt: row.created_at
+  };
+}
+
+function mapShelfItem(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    shelfId: row.shelf_id,
+    storeId: row.store_id,
+    productName: row.product_name,
+    sku: row.sku || '',
+    qty: row.qty == null ? '' : row.qty,
+    expiryDate: row.expiry_date || '',
+    expiryDate2: row.expiry_date_2 || '',
+    note: row.note || '',
+    updatedBy: row.updated_by || '',
+    updatedAt: row.updated_at
+  };
+}
+
+export async function getShelves(opts = {}) {
+  try {
+    let q = db().from('store_shelves').select('*').order('code', { ascending: true });
+    if (opts.assigneeId) q = q.eq('assignee_id', opts.assigneeId);
+    else if (opts.storeId) q = q.eq('store_id', opts.storeId);
+    const { data, error } = await q;
+    if (error) {
+      if (isMissingTable(error.message)) return [];
+      console.error('Lỗi lấy kệ:', error);
+      return [];
+    }
+    return (data || []).map(mapShelf);
+  } catch (err) {
+    console.error('Lỗi lấy kệ:', err);
+    return [];
+  }
+}
+
+export async function getShelfItems(opts = {}) {
+  try {
+    if (opts.shelfIds && opts.shelfIds.length === 0) return [];
+    let q = db().from('shelf_items').select('*').order('product_name', { ascending: true });
+    if (opts.storeId) q = q.eq('store_id', opts.storeId);
+    else if (opts.shelfIds?.length) q = q.in('shelf_id', opts.shelfIds);
+    const { data, error } = await q;
+    if (error) {
+      if (isMissingTable(error.message)) return [];
+      console.error('Lỗi lấy hàng kệ:', error);
+      return [];
+    }
+    return (data || []).map(mapShelfItem);
+  } catch (err) {
+    console.error('Lỗi lấy hàng kệ:', err);
+    return [];
+  }
+}
+
+export async function saveShelf(shelf) {
+  const row = {
+    store_id: shelf.storeId,
+    code: shelf.code,
+    name: shelf.name || '',
+    assignee_id: shelf.assigneeId || null,
+    notify_days: shelf.notifyDays == null ? 3 : Number(shelf.notifyDays),
+    due_date: shelf.dueDate || null
+  };
+  if (shelf.id) {
+    const { data, error } = await db().from('store_shelves').update(row).eq('id', shelf.id).select().single();
+    if (error) {
+      if (/due_date|schema cache|column/i.test(error.message || '')) {
+        const { due_date, ...rest } = row;
+        const retry = await db().from('store_shelves').update(rest).eq('id', shelf.id).select().single();
+        if (retry.error) throw retry.error;
+        return mapShelf({ ...retry.data, due_date: shelf.dueDate || '' });
+      }
+      throw error;
+    }
+    return mapShelf(data);
+  }
+  const { data, error } = await db().from('store_shelves').insert([row]).select().single();
+  if (error) {
+    if (/due_date|schema cache|column/i.test(error.message || '')) {
+      const { due_date, ...rest } = row;
+      const retry = await db().from('store_shelves').insert([rest]).select().single();
+      if (retry.error) throw retry.error;
+      return mapShelf({ ...retry.data, due_date: shelf.dueDate || '' });
+    }
+    throw error;
+  }
+  return mapShelf(data);
+}
+
+export async function deleteShelf(id) {
+  const { error } = await db().from('store_shelves').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function replaceShelfItems(shelfId, storeId, rows, empId) {
+  const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
+  if (delErr) throw delErr;
+  const payload = (rows || [])
+    .filter(r => String(r.productName || '').trim())
+    .map(r => ({
+      shelf_id: shelfId,
+      store_id: storeId,
+      product_name: String(r.productName).trim(),
+      sku: String(r.sku || '').trim() || null,
+      qty: r.qty === '' || r.qty == null ? null : Number(r.qty),
+      expiry_date: r.expiryDate || null,
+      expiry_date_2: r.expiryDate2 || null,
+      note: r.note || '',
+      updated_by: empId || null
+    }));
+  if (!payload.length) return [];
+  const { data, error } = await db().from('shelf_items').insert(payload).select();
+  if (error) {
+    if (/sku|expiry_date_2|schema cache|column/i.test(error.message || '')) {
+      const slim = payload.map(({ sku, expiry_date_2, ...rest }) => rest);
+      const retry = await db().from('shelf_items').insert(slim).select();
+      if (retry.error) throw retry.error;
+      return (retry.data || []).map((row, i) => mapShelfItem({
+        ...row,
+        sku: payload[i]?.sku || row.sku,
+        expiry_date_2: payload[i]?.expiry_date_2 || row.expiry_date_2
+      }));
+    }
+    throw error;
+  }
+  return (data || []).map(mapShelfItem);
+}
+
+function mapScheduleWeek(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    storeId: row.store_id,
+    weekDate: row.week_date,
+    status: row.status || 'draft',
+    submittedBy: row.submitted_by || '',
+    submittedAt: row.submitted_at || '',
+    reviewedBy: row.reviewed_by || '',
+    reviewedAt: row.reviewed_at || '',
+    reviewNote: row.review_note || ''
+  };
+}
+
+export async function getScheduleWeeks() {
+  try {
+    const { data, error } = await db().from('schedule_weeks').select('*').order('week_date', { ascending: false }).limit(250);
+    if (error) {
+      if (/does not exist|schema cache|relation/i.test(error.message || '')) return [];
+      console.error('Lỗi lấy trạng thái tuần:', error);
+      return [];
+    }
+    return (data || []).map(mapScheduleWeek);
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertScheduleWeek(row) {
+  const payload = {
+    store_id: row.storeId,
+    week_date: row.weekDate,
+    status: row.status || 'draft',
+    submitted_by: row.submittedBy || null,
+    submitted_at: row.submittedAt || null,
+    reviewed_by: row.reviewedBy || null,
+    reviewed_at: row.reviewedAt || null,
+    review_note: row.reviewNote || null
+  };
+  const { data, error } = await db()
+    .from('schedule_weeks')
+    .upsert(payload, { onConflict: 'store_id,week_date' })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapScheduleWeek(data);
 }
 

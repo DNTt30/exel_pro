@@ -13,6 +13,9 @@ import {
   getCoveringStore, 
   getShiftHours 
 } from '../../utils/shiftHelper';
+import { isOpsManager, canPickStore } from '../../lib/authSession';
+import WeekFlowBar from '../../components/WeekFlowBar';
+import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 
 import AddEmployeeModal from '../../components/modals/AddEmployeeModal';
 import AddStoreModal from '../../components/modals/AddStoreModal';
@@ -27,17 +30,19 @@ import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
 
 export default function Schedule() {
-  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded } = useStore();
+  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore();
   const weekSchedule = schedule[currentWeek] || {};
   
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.isManager;
-  const canEditGrid = isAdmin || isManager;
+  const isManager = isOpsManager(user);
+  const pickStore = canPickStore(user);
   
   const [search, setSearch] = useState('');
-  const [filterDept, setFilterDept] = useState(isAdmin ? 'ALL' : user?.dept);
+  const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
+  const flowStore = pickStore ? filterDept : (user?.dept || '');
+  const weekLocked = isWeekLocked((scheduleWeeks || {})[weekRecordKey(flowStore === 'ALL' ? '' : flowStore, currentWeek)]?.status);
+  const canEditGrid = isManager && !weekLocked;
   const [filterRole, setFilterRole] = useState('ALL');
 
   const [showAddEmp, setShowAddEmp] = useState(false);
@@ -60,8 +65,8 @@ export default function Schedule() {
   }, [searchParams, setSearchParams]);
 
   const pendingManagerSwapsCount = useMemo(() => {
-    return (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (isAdmin || s.store === user?.dept)).length;
-  }, [shiftSwaps, isAdmin, user?.dept]);
+    return (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (pickStore || s.store === user?.dept)).length;
+  }, [shiftSwaps, pickStore, user?.dept]);
 
   // Nhóm nhân viên theo cửa hàng + xử lý mượn nhân sự
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole, weekSchedule);
@@ -104,7 +109,7 @@ export default function Schedule() {
   const handleExportExcel = () => {
     exportScheduleToExcel({
       currentWeek,
-      deptName: (isAdmin ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (isAdmin ? filterDept : user?.dept),
+      deptName: (pickStore ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (pickStore ? filterDept : user?.dept),
       groupedEmps,
       weekSchedule,
       viewMode
@@ -130,6 +135,7 @@ export default function Schedule() {
     curSun.setDate(curSun.getDate() + 6);
     const curRange = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')} → ${String(curSun.getDate()).padStart(2, '0')}/${String(curSun.getMonth() + 1).padStart(2, '0')}`;
 
+    if (weekLocked) return alert('Tuần đang chờ duyệt hoặc đã duyệt — không copy đè.');
     const confirmed = window.confirm(`Sao chép toàn bộ ca làm việc từ tuần trước (${prevRange}) sang tuần này (${curRange})?`);
     if (!confirmed) return;
 
@@ -164,7 +170,12 @@ export default function Schedule() {
       // Lưu hàng loạt lên Supabase thay vì N+1 request
       if (copiedCount > 0) {
         await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
-        useStore.getState().appendAdminLog('Sao chép lịch tuần', currentWeek, `${copiedCount} nhân sự`);
+        useStore.getState().appendAdminLog('COPY_SHIFT_WEEK', currentWeek, `${copiedCount} nhân sự`, {
+          resourceType: 'shift',
+          resourceId: currentWeek,
+          storeId: user?.dept || '',
+          description: `Sao chép lịch tuần ${currentWeek} · ${copiedCount} NV`
+        });
       }
 
       useStore.setState(state => ({
@@ -263,6 +274,7 @@ export default function Schedule() {
           setFilterDept={setFilterDept}
           filterRole={filterRole} 
           setFilterRole={setFilterRole}
+          disableDeptFilter={!pickStore}
           onOpenAddEmp={() => setShowAddEmp(true)}
           onOpenAddStore={() => setShowAddStore(true)}
           onOpenTransfer={() => setShowTransfer(true)}
@@ -270,6 +282,10 @@ export default function Schedule() {
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
+      </div>
+
+      <div className="print:hidden px-2 pt-2">
+        <WeekFlowBar storeId={flowStore} weekDate={currentWeek} />
       </div>
 
       {/* 3. KPI Summary Bar & Actions */}
@@ -299,11 +315,11 @@ export default function Schedule() {
           <button
             type="button"
             onClick={() => setShowAIScheduler(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-black transition-all shadow-sm shadow-indigo-500/25 cursor-pointer"
-            title="AI tự động phân bổ ca tuần hoặc quét lỗi vi phạm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold"
+            title="Xếp lịch từ định biên hoặc ảnh doanh số"
           >
-            <Sparkles size={13} className="text-amber-300 animate-spin" style={{ animationDuration: '4s' }} />
-            <span>✨ AI Xếp Lịch</span>
+            <Sparkles size={13} />
+            AI xếp lịch
           </button>
 
           {/* Nút Trợ lý AI Copilot */}
@@ -336,7 +352,7 @@ export default function Schedule() {
           <button 
             type="button"
             onClick={handleCopyPreviousWeek}
-            disabled={isCopying}
+            disabled={isCopying || weekLocked}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
             title="Sao chép toàn bộ ca làm việc từ tuần trước sang tuần này"
           >
@@ -484,7 +500,7 @@ export default function Schedule() {
                             idx={idx}
                             absoluteRowIdx={currentRow}
                             handleShiftChange={handleShiftChange}
-                            isAdmin={isAdmin}
+                            isAdmin={canEditGrid}
                             canEdit={canEditGrid}
                             days={activeDays}
                           />

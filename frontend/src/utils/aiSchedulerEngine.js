@@ -1,5 +1,134 @@
 import { WEEK_DAYS, DAY_FULL_NAMES, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
 import { getShiftHours, normalizeShift, parseShiftTimeRange, isShiftsOverlapping } from './shiftHelper';
+import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
+
+const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const OLLAMA_TIMEOUT_MS = 800;
+
+function todayDayKey(date = new Date()) {
+  return DAY_CODE_BY_JS[date.getDay()];
+}
+
+function shiftLine(raw) {
+  const { shift, covering_store } = normalizeShift(raw);
+  if (!shift || shift === 'off') return 'OFF';
+  return covering_store ? `${shift} (hỗ trợ ${covering_store})` : shift;
+}
+
+function formatEmpWeek(emp, weekSchedule, currentWeek) {
+  const empSched = weekSchedule[emp.id] || {};
+  let totalH = 0;
+  let totalShifts = 0;
+  const shiftDetails = WEEK_DAYS.map(d => {
+    const { shift, covering_store } = normalizeShift(empSched[d]);
+    const hours = getShiftHours(shift);
+    if (shift && shift !== 'off') {
+      totalH += hours;
+      totalShifts += 1;
+    }
+    const shiftStr = (!shift || shift === 'off')
+      ? 'OFF'
+      : (covering_store ? `${shift} (hỗ trợ ${covering_store})` : shift);
+    return `• **${d}**: ${shiftStr}`;
+  }).join('\n');
+
+  const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME';
+  const statusNote = isPT
+    ? (totalH > 23 ? '⚠️ Vượt 23h/tuần!' : (totalH < 16 && totalH > 0 ? '⚠️ Chưa đủ 16h/tuần' : '✓ Định mức đạt'))
+    : (totalH === 48 ? '✓ Đạt chuẩn 48h (6 ca)' : `Tổng: ${totalH}h / 48h`);
+
+  return { totalH, totalShifts, shiftDetails, statusNote, empSched };
+}
+
+function isSelfAsk(q, qn) {
+  return /(^| )(toi|minh|tui)( |$)/.test(` ${qn} `)
+    || q.includes('của tôi')
+    || q.includes('của mình')
+    || q.includes('tôi làm')
+    || q.includes('mình làm');
+}
+
+function firstNameOf(name) {
+  const parts = String(name || '').toLowerCase().replace(/\([^)]*\)/g, '').trim().split(/\s+/).filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
+
+function refersToLoggedIn(q, user) {
+  if (!user?.id) return false;
+  if (isSelfAsk(q, stripVi(q))) return true;
+  const fn = firstNameOf(user.name);
+  return (fn.length >= 2 && q.includes(fn)) || q.includes(String(user.id).toLowerCase());
+}
+
+function dayShiftAsk(q) {
+  const aboutShift = q.includes('ca') || q.includes('làm') || q.includes('lịch') || q.includes('giờ');
+  if (!aboutShift) return null;
+  if (q.includes('mai') && !q.includes('hôm nay')) {
+    return { key: DAY_CODE_BY_JS[(new Date().getDay() + 1) % 7], label: 'Ngày mai' };
+  }
+  if (q.includes('hôm qua')) {
+    return { key: DAY_CODE_BY_JS[(new Date().getDay() + 6) % 7], label: 'Hôm qua' };
+  }
+  if (q.includes('hôm nay') || q.includes('ca mấy') || q.includes('mấy giờ') || q.includes('ca nào')) {
+    return { key: todayDayKey(), label: 'Hôm nay' };
+  }
+  return null;
+}
+
+function mergeFollowUpQuestion(question, chatHistory) {
+  const raw = String(question || '').trim();
+  const compact = raw.toLowerCase();
+  const isId = /^\d{6,12}$/.test(raw);
+  const isShort = raw.split(/\s+/).length <= 4
+    && !/công thức|pha |đổi ca|bù công|định mức/.test(compact);
+  if (!isId && !isShort) return question;
+  const lastUser = [...(chatHistory || [])].reverse().find(m => m.sender === 'user' && m.text);
+  if (!lastUser) return question;
+  return `${lastUser.text} ${raw}`;
+}
+
+function wantsHoursOnly(q) {
+  return (q.includes('bao nhiêu') && (q.includes('giờ') || q.includes('công') || q.includes(' tiếng')))
+    || q.includes('tổng giờ') || q.includes('tổng h');
+}
+
+function formatDayLead(emp, weekSchedule, currentWeek, dayAsk, q = '') {
+  const packed = formatEmpWeek(emp, weekSchedule, currentWeek);
+  const shift = shiftLine(packed.empSched[dayAsk.key]);
+  let out = `${dayAsk.label} (${dayAsk.key}) ${emp.name}: ${shift}`;
+  if (wantsHoursOnly(q)) {
+    out += `\nTuần: ${packed.totalH}h / ${packed.totalShifts} ca`;
+  }
+  return out;
+}
+
+function compactText(text) {
+  return String(text || '')
+    .replace(/\*\*/g, '')
+    .replace(/`/g, '')
+    .replace(/\n👉[^\n]*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function pendingSwapsOf(shiftSwaps) {
+  const pending = new Set(['pending_partner', 'pending_manager', 'pending', 'approved_by_partner']);
+  return (shiftSwaps || []).filter(s => pending.has(s.status));
+}
+
+function swapPeople(s, employees) {
+  const fromId = s.fromEmpId || s.requester_id;
+  const toId = s.toEmpId || s.target_id;
+  const fromEmp = employees.find(e => e.id === fromId);
+  const toEmp = employees.find(e => e.id === toId);
+  return {
+    fromName: s.fromEmpName || fromEmp?.name || fromId,
+    toName: s.toEmpName || toEmp?.name || toId,
+    fromShift: s.fromShift || s.requester_shift || '',
+    toShift: s.toShift || s.target_shift || '',
+    day: s.fromDay || s.date || ''
+  };
+}
 
 /**
  * GS25 AI SCHEDULER & AUDITING ENGINE (V3.5 - TOÀN DIỆN TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ C&B GS25)
@@ -542,8 +671,18 @@ export function auditSchedule(employees, weekSchedule, storeId) {
 /**
  * AI COPILOT QUERY ENGINE (ĐỌC CHI TIẾT TOÀN BỘ CÁC TRƯỜNG & TẤT CẢ CÁC BẢNG DỮ LIỆU)
  */
-export function askAICopilot(question, context = {}) {
-  const q = question.toLowerCase().trim();
+export function askAICopilot(question, context = {}, chatHistory = []) {
+  return compactText(answerCopilot(question, context, chatHistory));
+}
+
+function answerCopilot(question, context = {}, chatHistory = []) {
+  const history = chatHistory.length ? chatHistory : (context.chatHistory || []);
+  const recipeEarly = lookupFfOnsiteRecipe(question);
+  if (recipeEarly) return recipeEarly;
+
+  const merged = mergeFollowUpQuestion(question, history);
+  const q = String(merged || '').toLowerCase().replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const qn = stripVi(q);
   const { 
     employees = [], 
     weekSchedule = {}, 
@@ -552,7 +691,8 @@ export function askAICopilot(question, context = {}) {
     shiftSwaps = [],
     feedbacks = [],
     storeId = 'VN0485', 
-    currentWeek = '' 
+    currentWeek = '',
+    user = null
   } = context;
 
   const storeEmps = employees.filter(e => e.dept === storeId);
@@ -560,57 +700,62 @@ export function askAICopilot(question, context = {}) {
   const seniorEmps = storeEmps.filter(isSeniorStaff);
   const ftEmps = storeEmps.filter(e => e.type === 'STFT' || e.type === 'SM' || e.role?.includes('SM'));
 
-  // =========================================================================
-  // 1. CÁC QUY ĐỊNH & KIẾN THỨC CHUNG (FAQ / POLICIES - Ưu tiên xử lý trước)
-  // =========================================================================
-  
-  // 1.1 THỜI GIAN NGHỈ TRONG CA
-  const isBreakTimeQuery = 
-    (q.includes('nghỉ') && (q.includes('phút') || q.includes('mấy') || q.includes('bao nhiêu') || q.includes('bao lâu') || q.includes('tiếng') || q.includes('giờ'))) ||
-    q.includes('ăn trưa') || q.includes('ăn tối') || q.includes('ăn cơm') || q.includes('giải lao') || q.includes('break');
+  const recipeReply = lookupFfOnsiteRecipe(q);
+  if (recipeReply) return recipeReply;
+
+  // Lịch của tôi / gọi đúng tên mình (vd. "hôm nay Tú làm ca mấy" khi đang login là Tú)
+  const selfUser = user && (employees.find(e => e.id === user.id) || user);
+  const scheduleish = q.includes('ca') || q.includes('lịch') || q.includes('làm') || q.includes('công') || q.includes('giờ');
+  if (selfUser?.id && refersToLoggedIn(q, selfUser) && scheduleish) {
+    const dayAsk = dayShiftAsk(q) || { key: todayDayKey(), label: 'Hôm nay' };
+    if (wantsHoursOnly(q) && !dayShiftAsk(q)) {
+      const packed = formatEmpWeek(selfUser, weekSchedule, currentWeek);
+      return `Tuần này ${selfUser.name}: ${packed.totalH}h / ${packed.totalShifts} ca`;
+    }
+    return formatDayLead(selfUser, weekSchedule, currentWeek, dayAsk, q);
+  }
+
+  // 1. FAQ — matcher hẹp, tránh "tối đa" / "gs25" / "ot" bắt nhầm
+  const isBreakTimeQuery =
+    q.includes('ăn trưa') || q.includes('ăn tối') || q.includes('ăn cơm') || q.includes('giải lao') || q.includes('break') ||
+    (q.includes('nghỉ') && (q.includes('phút') || q.includes('trong ca') || q.includes('giữa ca')));
 
   if (isBreakTimeQuery && !q.includes('giữa 2 ca') && !q.includes('chuyển ca') && !q.includes('ngày nghỉ')) {
-    return `⏱️ **Thời gian nghỉ trong ca:**\n• **Ca ngày 8h (6-14, 14-22, 10-18)**: Nghỉ **30 phút**.\n• **Ca đêm (22-6)**: Nghỉ **45 phút**.\n• **Tăng ca (> 2h)**: Nghỉ thêm **30 phút**.`;
+    return `Ca ngày 8h: nghỉ 30 phút. Ca đêm: 45 phút. Tăng ca >2h: thêm 30 phút.`;
   }
 
-  // 1.2 NGHỈ GIỮA 2 CA LIÊN TIẾP
-  if (q.includes('giữa 2 ca') || q.includes('chuyển ca') || q.includes('gối đầu') || q.includes('hồi phục') || (q.includes('cách') && q.includes('tiếng'))) {
-    return `🛡️ **Nghỉ giữa 2 ca:** Tối thiểu **12 tiếng** (hoặc 11h theo luật).\n• Hết ca chiều (22h): Không làm ca sáng (6h) hôm sau.\n• Hết ca đêm (6h): Nghỉ nguyên ngày hôm sau hoặc chỉ làm ca tối sau 18h.`;
+  if (q.includes('giữa 2 ca') || q.includes('chuyển ca') || q.includes('gối đầu') || q.includes('hồi phục') || (q.includes('cách') && q.includes('tiếng') && q.includes('nghỉ'))) {
+    return `Nghỉ giữa 2 ca tối thiểu 12 tiếng (luật 11h). Hết 22h không xếp ca 6h hôm sau. Hết ca đêm nghỉ tới sau 18h.`;
   }
 
-  // 1.3 LƯƠNG CA ĐÊM & TĂNG CA (OT)
-  if (q.includes('lương') || q.includes('phụ cấp') || q.includes('tiền') || q.includes('tăng ca') || q.includes('overtime') || q.includes('ot')) {
-    return `💰 **Chế độ lương & phụ cấp:**\n• **Ca đêm (22h - 6h)**: +**30%** lương ca ngày.\n• **Tăng ca ngày thường**: **150%**.\n• **Tăng ca ngày OFF**: **200%**.\n• **Tăng ca ngày Lễ/Tết**: **300%**.\n• **Tăng ca ban đêm**: **200% - 210%**.`;
+  if (q.includes('lương') || q.includes('phụ cấp') || q.includes('tăng ca') || q.includes('overtime') || /(^| )ot( |$)/.test(` ${qn} `) || (q.includes('tiền') && (q.includes('ca') || q.includes('đêm') || q.includes('làm')))) {
+    return `Lương: ca đêm +30%. OT thường 150%, ngày OFF 200%, lễ/tết 300%, OT đêm 200–210%.`;
   }
 
-  // 1.4 CA ĐÊM (22-6)
-  if (q.includes('đêm') || q.includes('22-6') || q.includes('tối')) {
-    return `🌙 **Quy tắc ca đêm (22-6):**\n1. Ưu tiên người đăng ký trước.\n2. Ưu tiên Part-Time trong tuần.\n3. Thiếu người thì Full-Time bù vào.\n4. Ca 1 người bắt buộc là bạn cứng.`;
+  const isNightShiftAsk = /ca đêm|ban đêm|22\s*-\s*6/.test(q)
+    || (q.includes('đêm') && (q.includes('ca') || q.includes('làm') || q.includes('xếp')) && !q.includes('tối đa'));
+  if (isNightShiftAsk && !q.includes('phút') && !q.includes('tiền') && !q.includes('lương')) {
+    return `Ca đêm 22-6: ưu tiên người đăng ký / PT. Ca 1 người phải là bạn cứng.`;
   }
 
-  // 1.5 ĐỊNH MỨC PART-TIME
-  if (q.includes('part') || q.includes('pt') || q.includes('23h') || q.includes('91h') || q.includes('định mức')) {
-    return `⏳ **Định mức Part-Time (STPT):**\n• Tuần: **16h - 23h/tuần**.\n• Tháng: Tối đa **91h/tháng** (quá 91h sẽ báo động đỏ).`;
+  if (q.includes('part') || q.includes('pt') || q.includes('stpt') || q.includes('23h') || q.includes('91h') || q.includes('định mức') || (q.includes('tối đa') && (q.includes('tiếng') || q.includes('giờ') || q.includes('tuần') || q.includes('tháng')))) {
+    return `STPT: 16–23h/tuần, tối đa 91h/tháng.`;
   }
 
-  // 1.6 FULL-TIME BÙ CA & NGHỈ TUẦN
-  if (q.includes('full') || q.includes('ft') || q.includes('bù ca') || q.includes('luật nghỉ') || q.includes('ngày off') || q.includes('ngày nghỉ')) {
-    return `🛡️ **Full-Time (${ftEmps.length} bạn):**\n• Bù toàn bộ các ca thiếu định biên.\n• Tối đa **6 ca (48h/tuần)** + Bắt buộc **1 ngày OFF** trọn vẹn.\n• Đảm bảo nghỉ giữa 2 ca ≥ 11 tiếng.`;
+  if (q.includes('full') || q.includes('stft') || q.includes('bù ca') || q.includes('luật nghỉ') || q.includes('ngày off') || (q.includes('nghỉ') && (q.includes('ngày') || q.includes('tuần')) && !q.includes('phút'))) {
+    return `Full-Time (STFT): 48h/tuần (6 ca) + 1 ngày OFF. Nghỉ giữa 2 ca ≥ 11 tiếng.`;
   }
 
-  // 1.7 NHÂN VIÊN MỚI / KÈM CẶP
   if (q.includes('mới') || q.includes('kèm') || q.includes('csr_new') || q.includes('bạn cứng') || q.includes('học việc') || q.includes('thử việc')) {
-    return `👥 **Quy tắc kèm cặp (${newEmps.length} bạn mới, ${seniorEmps.length} bạn cứng):**\n• Mọi ca có bạn mới **bắt buộc có 1 bạn cứng kèm**.\n• Bạn mới tuyệt đối **không trực solo**. Bạn cứng được phép trực 1 mình.`;
+    return `Bạn mới không trực solo — mỗi ca phải có 1 bạn cứng kèm.`;
   }
 
-  // 1.8 ĐỒNG PHỤC & VĂN HÓA CHÀO KHÁCH GS25
-  if (q.includes('đồng phục') || q.includes('chào') || q.includes('xin chào') || q.includes('tác phong') || q.includes('mũ') || q.includes('bảng tên') || q.includes('thẻ tên') || q.includes('tạp dề') || q.includes('gs25')) {
-    return `🏪 **Quy định Đồng phục & Chào khách GS25:**\n• **Câu chào chuẩn**: Luôn tươi cười và chào to rõ ràng: *"GS25 xin chào!"* khi khách vào cửa hàng và *"GS25 cảm ơn và hẹn gặp lại quý khách!"* khi khách ra về.\n• **Đồng phục**: Mặc áo GS25 phẳng phiu sơ vin, đeo bảng tên bên ngực trái, mang giày tối màu kín mũi; đội mũ và đeo tạp dề sạch khi đứng quầy Fresh Food.\n• **Tác phong**: Tuyệt đối không bấm điện thoại cá nhân trong giờ làm việc.`;
+  if (q.includes('đồng phục') || q.includes('xin chào') || q.includes('tác phong') || q.includes('bảng tên') || q.includes('thẻ tên') || q.includes('tạp dề') || (q.includes('chào') && q.includes('khách'))) {
+    return `Chào: "GS25 xin chào!" / "GS25 cảm ơn và hẹn gặp lại quý khách!". Áo sơ vin, bảng tên trái, tạp dề + mũ khi đứng FF.`;
   }
 
-  // 1.9 KHUNG CA LÀM VIỆC GS25 (Ca 4h & Ca 8h)
   if (q.includes('khung ca') || q.includes('ca 4') || q.includes('ca 8') || (q.includes('ca làm') && (q.includes('mấy') || q.includes('loại')))) {
-    return `🕒 **Khung ca làm việc GS25:**\n• **Ca 8 tiếng (Ca chuẩn)**: 6-14 (Sáng), 14-22 (Chiều), 22-6 (Đêm), 10-18 (Hành chính/Giao nhận).\n• **Ca 4 tiếng (Part-time linh hoạt)**: 6-10, 10-14, 14-18, 18-22.\n• **Ca đêm 24/7**: 22:00 - 6:00 (luôn có ít nhất 1 bạn cứng trực quầy).`;
+    return `Ca 8h: 6-14, 14-22, 22-6, 10-18. Ca 4h: 6-10, 10-14, 14-18, 18-22.`;
   }
 
   // 1.8 HỎI GIỜ / NGÀY HIỆN TẠI VÀ TƯƠNG LAI
@@ -644,7 +789,7 @@ export function askAICopilot(question, context = {}) {
       ...(isTimeQuery ? { hour: '2-digit', minute: '2-digit' } : {})
     }).format(targetDate);
     
-    return `**${prefix}** ${timeStr}`;
+    return `${prefix} ${timeStr}`;
   }
 
   // =========================================================================
@@ -673,90 +818,91 @@ export function askAICopilot(question, context = {}) {
     return false;
   });
 
-  // Nếu tìm thấy nhiều người, ưu tiên người khớp chính xác cả họ tên hoặc ID
   if (matchedEmps.length > 1) {
-    const exactMatch = matchedEmps.find(e => q.includes((e.name || '').toLowerCase()) || paddedQ.includes(' ' + (e.id || '').toString().toLowerCase() + ' '));
-    if (exactMatch) {
-      matchedEmps = [exactMatch];
+    const exactMatch = matchedEmps.find(e =>
+      q.includes((e.name || '').toLowerCase()) || paddedQ.includes(' ' + String(e.id).toLowerCase() + ' ')
+    );
+    if (exactMatch) matchedEmps = [exactMatch];
+    else if (user?.id && matchedEmps.some(e => e.id === user.id)) {
+      matchedEmps = matchedEmps.filter(e => e.id === user.id);
+    } else {
+      const sameStore = matchedEmps.filter(e => e.dept === storeId);
+      if (sameStore.length === 1) matchedEmps = sameStore;
     }
   }
 
-  // Nhận diện ý định hỏi lịch: Nếu nhập nguyên mã NV hoặc tên, tự hiểu là muốn xem lịch
-  let hasScheduleIntent = q.includes('làm') || q.includes('lịch') || q.includes('thông tin') || q.includes('hồ sơ') || paddedQ.includes(' ca ') || paddedQ.includes(' ai ') || paddedQ.includes(' mã ');
+  let hasScheduleIntent = q.includes('làm') || q.includes('lịch') || q.includes('thông tin') || q.includes('hồ sơ')
+    || paddedQ.includes(' ca ') || paddedQ.includes(' ai ') || paddedQ.includes(' mã ')
+    || /^\d{6,12}$/.test(String(question || '').trim())
+    || !!dayShiftAsk(q);
   if (matchedEmps.length > 0) {
-    const isDirectAnswer = matchedEmps.some(e => q.includes(e.id.toString().toLowerCase()) || q === (e.name || '').toLowerCase() || q === e.name.split(' ').pop().toLowerCase());
+    const isDirectAnswer = matchedEmps.some(e =>
+      q.includes(String(e.id).toLowerCase()) ||
+      q === (e.name || '').toLowerCase() ||
+      q === firstNameOf(e.name)
+    );
     if (isDirectAnswer) hasScheduleIntent = true;
   }
 
+  const dayAsk = dayShiftAsk(q);
+
+  if (matchedEmps.length > 1 && hasScheduleIntent && dayAsk) {
+    const lines = matchedEmps.map(e => {
+      const empSched = weekSchedule[e.id] || {};
+      return `${e.name} ${e.id}: ${shiftLine(empSched[dayAsk.key])}`;
+    }).join('\n');
+    return `${dayAsk.label} (${dayAsk.key})\n${lines}`;
+  }
+
   if (matchedEmps.length > 1 && hasScheduleIntent) {
-    const empList = matchedEmps.map(e => `• **${e.name}** (Mã NV: ${e.id})`).join('\n');
-    return `🧐 Dạ sếp, Tú tìm thấy tới **${matchedEmps.length} người** cùng tên này trong hệ thống:\n${empList}\n\nSếp muốn xem lịch của ai ạ? (Gõ kèm **Mã NV** hoặc **Họ tên đầy đủ** để Tú lọc nhé!)`;
+    const empList = matchedEmps.map(e => `${e.name} ${e.id}`).join('\n');
+    return `Trùng tên:\n${empList}\nGõ mã NV.`;
   }
 
   const matchedEmp = matchedEmps.length === 1 ? matchedEmps[0] : null;
 
   if (matchedEmp && hasScheduleIntent) {
-    const empSched = weekSchedule[matchedEmp.id] || {};
-    let totalH = 0;
-    const shiftDetails = WEEK_DAYS.map(d => {
-      const { shift, coveringStore } = normalizeShift(empSched[d]);
-      const hours = getShiftHours(shift);
-      if (shift && shift !== 'off') totalH += hours;
-      const shiftStr = shift && shift !== 'off' 
-        ? (coveringStore ? `${shift} (Chi viện ${coveringStore})` : shift)
-        : 'OFF';
-      return `• **${d}**: ${shiftStr}`;
-    }).join('\n');
-
-    const isPT = matchedEmp.type === 'STPT' || matchedEmp.type === 'PARTTIME';
-    const statusNote = isPT 
-      ? (totalH > 23 ? '⚠️ Vượt 23h/tuần!' : (totalH < 16 && totalH > 0 ? '⚠️ Chưa đủ 16h/tuần' : '✓ Định mức đạt'))
-      : (totalH === 48 ? '✓ Đạt chuẩn 48h (6 ca)' : `Tổng: ${totalH}h / 48h`);
-
-    return `👤 **Hồ Sơ & Lịch Tuần: ${matchedEmp.name}**\n` +
-      `• **Mã NV**: \`${matchedEmp.id}\` | **Cửa hàng**: \`${matchedEmp.dept || storeId}\`\n` +
-      `• **Vị trí**: ${matchedEmp.role || 'Nhân viên'} (${matchedEmp.type || 'STPT'})\n` +
-      `• **Tổng giờ làm tuần**: **${totalH}h** (${statusNote})\n\n` +
-      `📅 **Chi tiết ca trong tuần ${currentWeek}:**\n${shiftDetails}`;
+    if (dayAsk) return formatDayLead(matchedEmp, weekSchedule, currentWeek, dayAsk, q);
+    const packed = formatEmpWeek(matchedEmp, weekSchedule, currentWeek);
+    if (wantsHoursOnly(q)) {
+      return `${matchedEmp.name}: ${packed.totalH}h / ${packed.totalShifts} ca tuần này`;
+    }
+    return `${matchedEmp.name} (${matchedEmp.id})\n${packed.shiftDetails.replace(/• /g, '')}`;
   }
 
-  // 2.2 TRA CỨU ĐƠN ĐỔI CA CHỜ DUYỆT (BẢNG shift_swaps)
   if (q.includes('đổi ca') || q.includes('shift swap') || q.includes('swap')) {
-    const pendingSwaps = shiftSwaps.filter(s => s.status === 'approved_by_partner' || s.status === 'pending');
+    const pendingSwaps = pendingSwapsOf(shiftSwaps);
     if (pendingSwaps.length === 0) {
-      return `🔄 **Đơn Đổi Ca:** Hiện tại **không có đơn đổi ca nào đang chờ duyệt** tại cửa hàng.`;
+      return `Không có đơn đổi ca chờ duyệt.`;
     }
     const swapList = pendingSwaps.slice(0, 4).map((s, idx) => {
-      const reqEmp = employees.find(e => e.id === s.requester_id);
-      const tarEmp = employees.find(e => e.id === s.target_id);
-      const reqName = reqEmp ? reqEmp.name : s.requester_id;
-      const tarName = tarEmp ? tarEmp.name : s.target_id;
-      return `${idx + 1}. **${reqName}** (${s.requester_shift}) ⇄ **${tarName}** (${s.target_shift}) ngày **${s.date}**`;
+      const p = swapPeople(s, employees);
+      return `${idx + 1}. ${p.fromName} ${p.fromShift} ⇄ ${p.toName} ${p.toShift} (${p.day})`;
     }).join('\n');
 
-    return `🔄 **Có ${pendingSwaps.length} đơn đổi ca đang chờ SM duyệt:**\n${swapList}\n\n👉 Bấm nút **"🔄 Đơn đổi ca"** trên thanh công cụ để phê duyệt ngay.`;
+    return `${pendingSwaps.length} đơn đổi ca chờ duyệt:\n${swapList}`;
   }
 
-  // 2.3 TRA CỨU ĐƠN BÁO BÙ CÔNG C&B (BẢNG feedbacks)
   if (q.includes('bù công') || q.includes('feedback') || q.includes('quên chấm công') || q.includes('c&b') || q.includes('giải trình')) {
     const pendingFbs = feedbacks.filter(f => f.status === 'pending');
     if (pendingFbs.length === 0) {
-      return `📋 **Báo Bù Công C&B:** Hiện **không có đơn báo bù công nào đang chờ duyệt**.`;
+      return `Không có đơn bù công chờ duyệt.`;
     }
     const fbList = pendingFbs.slice(0, 4).map((f, idx) => {
-      const emp = employees.find(e => e.id === f.emp_id);
-      const empName = emp ? emp.name : f.emp_id;
-      return `${idx + 1}. **${empName}** xin bù ca **${f.shift_type || '8h'}** ngày **${f.date}** (Lý do: *${f.reason || 'Quên chấm công'}*)`;
+      const empId = f.empId || f.emp_id;
+      const emp = employees.find(e => e.id === empId);
+      const empName = emp ? emp.name : empId;
+      return `${idx + 1}. ${empName} ${f.shift_type || '8h'} ${f.date} (${f.reason || 'Quên chấm công'})`;
     }).join('\n');
 
-    return `📋 **Có ${pendingFbs.length} đơn bù công đang chờ duyệt:**\n${fbList}\n\n👉 Vào mục **"Feedback C&B"** trên menu để xem và duyệt.`;
+    return `${pendingFbs.length} đơn bù công chờ duyệt:\n${fbList}`;
   }
 
   // 2.4 TRA CỨU DANH MỤC CỬA HÀNG (BẢNG stores)
   if (q.includes('cửa hàng') && (q.includes('bao nhiêu') || q.includes('danh sách') || q.includes('toàn bộ') || q.includes('chi nhánh'))) {
     const storeCount = stores.length;
     const storeNames = stores.map(s => `• **${s.id}**: ${s.name} (${s.region || 'Miền Bắc'})`).join('\n');
-    return `🏬 **Hệ Thống Có ${storeCount} Cửa Hàng:**\n${storeNames || `• **${storeId}**: Cửa hàng ${storeId}`}`;
+    return `${storeCount} cửa hàng:\n${storeNames || storeId}`;
   }
 
   // 2.5 TRA CỨU AI LÀM THEO NGÀY CỤ THỂ
@@ -798,15 +944,15 @@ export function askAICopilot(question, context = {}) {
     });
 
     if (workingToday.length === 0) {
-      return `📅 Ngày **${targetDayKey}**: Chưa có nhân viên nào được phân ca.`;
+      return `${targetDayKey}: chưa xếp ca.`;
     }
 
     const listByShift = workingToday.map(e => {
       const { shift } = normalizeShift(weekSchedule[e.id]?.[targetDayKey]);
-      return `• **${e.name}** (${e.type}): Ca **${shift}**`;
+      return `${e.name}: ${shift}`;
     }).join('\n');
 
-    return `📅 **Danh sách làm việc ngày ${targetDayKey} (${workingToday.length} nhân sự):**\n${listByShift}`;
+    return `${targetDayKey}\n${listByShift}`;
   }
 
   // 2.5.1 TRA CỨU AI RẢNH / OFF THEO NGÀY CỤ THỂ (Dùng để tìm người đổi ca)
@@ -817,11 +963,11 @@ export function askAICopilot(question, context = {}) {
     });
 
     if (offToday.length === 0) {
-      return `📅 Ngày **${targetDayKey}**: Không có ai đang nghỉ (OFF). Toàn bộ nhân sự đều có lịch làm việc.`;
+      return `${targetDayKey}: không ai OFF.`;
     }
 
-    const listOff = offToday.map(e => `• **${e.name}** (${e.type})`).join('\n');
-    return `📅 **Danh sách đang rảnh/nghỉ (OFF) ngày ${targetDayKey} (${offToday.length} bạn):**\n${listOff}\n\n👉 Bạn có thể nhắn các bạn này để nhờ đi làm thay hoặc xin đổi ca nhé!`;
+    const listOff = offToday.map(e => e.name).join(', ');
+    return `${targetDayKey} đang OFF: ${listOff}`;
   }
 
   // 2.6 TOP GIỜ LÀM NHIỀU NHẤT
@@ -842,7 +988,7 @@ export function askAICopilot(question, context = {}) {
     });
 
     if (maxEmp) {
-      return `📊 Nhân viên làm nhiều giờ nhất tuần ${currentWeek}: **${maxEmp.name}** (${maxEmp.type}) với **${maxH} giờ**.`;
+      return `Nhiều giờ nhất tuần: ${maxEmp.name} ${maxH}h`;
     }
   }
 
@@ -850,22 +996,28 @@ export function askAICopilot(question, context = {}) {
   if (q.includes('lỗi') || q.includes('vi phạm') || q.includes('quét') || q.includes('kiểm tra') || q.includes('sai') || q.includes('ổn')) {
     const audit = auditSchedule(employees, weekSchedule, storeId);
     if (audit.totalIssues === 0) {
-      return `✅ Lịch tuần ${currentWeek} **đạt chuẩn 100% (0 lỗi)**: Đủ định biên, bạn mới có người kèm, FT và PT đúng giờ.`;
+      return `Tuần ${currentWeek}: 0 lỗi.`;
     } else {
-      const topIssues = audit.issues.slice(0, 3).map(i => `• ${i.title}`).join('\n');
-      return `⚠️ Phát hiện **${audit.totalIssues} vấn đề**:\n${topIssues}\n👉 Bấm nút **"AI Xếp Lịch"** để sửa tự động.`;
+      const topIssues = audit.issues.slice(0, 3).map(i => `- ${i.title}`).join('\n');
+      return `${audit.totalIssues} vấn đề:\n${topIssues}`;
     }
   }
 
-  // 15. TRẢ LỜI MẶC ĐỊNH
-  return `🤖 **Trợ lý AI Cửa hàng ${storeId}:**\n• Tra cứu nhân viên theo tên hoặc mã NV.\n• Tra cứu lịch làm việc theo ngày (T2 -> CN).\n• Tra cứu đơn đổi ca & báo bù công C&B.\n• Xếp lịch & giải đáp luật lao động.\n\n*Hỏi trực tiếp câu hỏi ngắn để nhận câu trả lời ngay!*`;
+  return `Hỏi ca, giờ, lương, công thức món.\nVd: hôm nay tôi làm ca mấy · tuần này bao nhiêu h · trà tắc`;
 }
 
 /**
  * AI COPILOT QUERY ENGINE (SỬ DỤNG LLM OLLAMA)
  * Thay vì dùng Regex cứng, hàm này gửi toàn bộ Context và Chat History cho Ollama Local xử lý.
  */
+export function isGenericCopilotFallback(text) {
+  return /Hỏi ca, giờ, lương, công thức món|TÚ mini — hỏi ngắn là ra ngay|Hỏi trực tiếp câu hỏi ngắn/i.test(String(text || ''));
+}
+
 export async function askOllamaCopilot(question, context = {}, chatHistory = []) {
+  const localReply = askAICopilot(question, context, chatHistory);
+  if (!isGenericCopilotFallback(localReply)) return localReply;
+
   const { 
     employees = [], 
     weekSchedule = {}, 
@@ -957,17 +1109,14 @@ Yêu cầu định dạng:
         model: 'qwen2.5-coder:7b',
         messages: messages,
         stream: false
-      })
+      }),
+      signal: AbortSignal.timeout(OLLAMA_TIMEOUT_MS)
     });
-    
-    if (!response.ok) {
-      throw new Error('Ollama Server Not Running');
-    }
-    
+
+    if (!response.ok) return localReply;
     const data = await response.json();
-    return data.message.content;
-  } catch (error) {
-    console.error('Lỗi kết nối Ollama:', error);
-    throw error;
+    return data.message?.content || localReply;
+  } catch {
+    return localReply;
   }
 }

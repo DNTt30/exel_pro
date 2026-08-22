@@ -14,10 +14,12 @@ import {
   Sparkles
 } from 'lucide-react';
 
+import { canPickStore, isOpsManager } from '../../lib/authSession';
+
 export default function ShiftSwapListModal({ isOpen, onClose, currentWeek }) {
   const { user, shiftSwaps, respondShiftSwap } = useStore();
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.isManager;
+  const pickStore = canPickStore(user);
+  const isManager = isOpsManager(user);
 
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'resolved'
 
@@ -25,11 +27,11 @@ export default function ShiftSwapListModal({ isOpen, onClose, currentWeek }) {
   const mySwaps = useMemo(() => {
     const list = shiftSwaps || [];
     return list.filter(s => {
-      if (isAdmin) return true;
+      if (pickStore) return true;
       if (isManager && s.store === user?.dept) return true;
       return s.fromEmpId === user?.id || s.toEmpId === user?.id;
     });
-  }, [shiftSwaps, user, isAdmin, isManager]);
+  }, [shiftSwaps, user, pickStore, isManager]);
 
   const filteredSwaps = useMemo(() => {
     if (activeTab === 'pending') {
@@ -157,7 +159,7 @@ export default function ShiftSwapListModal({ isOpen, onClose, currentWeek }) {
               const isCreator = swap.fromEmpId === user?.id;
               const isPartner = swap.toEmpId === user?.id;
               const canPartnerAct = isPartner && swap.status === 'pending_partner';
-              const canManagerAct = (isAdmin || isManager) && swap.status === 'pending_manager';
+              const canManagerAct = isManager && swap.status === 'pending_manager';
               const canCancel = isCreator && (swap.status === 'pending_partner' || swap.status === 'pending_manager');
 
               return (

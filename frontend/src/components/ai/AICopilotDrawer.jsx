@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, Bot, User, MessageSquare, ChevronRight, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { askAICopilot, askOllamaCopilot } from '../../utils/aiSchedulerEngine';
+import { askAICopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
+import { isOpsManager, canPickStore } from '../../lib/authSession';
+import { inferAiIntent } from '../../utils/appLogs';
 
 export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore();
@@ -14,7 +16,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   const initialWelcome = {
     id: 'welcome',
     sender: 'ai',
-    text: `🥸 Chào ${firstName}, bạn muốn Tú giúp gì ko?\n\n*(Tú đang trực tại cửa hàng **${activeStoreId}**. Cần check lịch hay đổi ca thì cứ sai vặt thoải mái nhé!)*`
+    text: `Chào ${firstName}. Hỏi ca, giờ, lương hoặc công thức món.`
   };
 
   const [messages, setMessages] = useState(() => {
@@ -47,7 +49,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const isAdmin = user?.role === 'admin' || user?.isManager;
+  const isAdmin = isOpsManager(user);
   const quickPrompts = isAdmin ? [
     '🔍 Quét lỗi & vi phạm lịch tuần',
     '📊 Nhân viên nào làm nhiều giờ nhất?',
@@ -55,9 +57,9 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     '📋 Kiểm tra đơn báo bù công C&B'
   ] : [
     '📅 Hôm nay tôi làm ca mấy giờ?',
-    '⏱️ Tuần này tôi làm được bao nhiêu công?',
-    '👀 Ai hôm nay rảnh để tôi nhờ đổi ca?',
-    '📜 Quy định nghỉ trong ca làm việc'
+    '🍊 Công thức trà tắc',
+    '🍫 Pha milo như nào?',
+    '🍢 Công thức xốt tok'
   ];
 
   const handleSend = async (textToSend = null) => {
@@ -69,8 +71,9 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     if (!textToSend) setInputText('');
     setIsTyping(true);
 
+    const pickStore = canPickStore(user);
     const scopedEmployees = isAdmin
-      ? employees
+      ? (pickStore || !user?.dept ? employees : employees.filter(e => e.dept === user.dept))
       : employees.filter(e => e.dept === activeStoreId || e.id === user?.id);
     const scopedSchedule = {};
     scopedEmployees.forEach(e => {
@@ -91,25 +94,46 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
       shiftSwaps: scopedSwaps,
       feedbacks: scopedFeedbacks,
       storeId: activeStoreId,
-      currentWeek
+      currentWeek,
+      user
     };
 
     // Lọc lịch sử chat (bỏ tin nhắn chào mừng)
     const chatHistory = messages.filter(m => m.id !== 'welcome');
 
+    const t0 = Date.now();
+    let model = 'local-engine';
+    let aiReply = '';
+    let err = '';
     try {
-      // 1. Thử gọi Ollama LLM (AI thực sự)
-      const aiReply = await askOllamaCopilot(query, contextData, chatHistory);
+      const localReply = askAICopilot(query, contextData, chatHistory);
+      if (!isGenericCopilotFallback(localReply)) {
+        aiReply = localReply;
+      } else {
+        aiReply = await askOllamaCopilot(query, contextData, chatHistory);
+        model = isGenericCopilotFallback(aiReply) ? 'local-engine' : 'ollama';
+      }
       const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
-      // 2. Fallback về Rule-based Regex Engine nếu Ollama đang tắt
       console.warn('Ollama is not running, falling back to local engine', error);
-      const fallbackReply = askAICopilot(query, contextData);
-      const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: fallbackReply };
+      err = error.message || 'ollama-error';
+      aiReply = askAICopilot(query, contextData, chatHistory);
+      const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
       setMessages(prev => [...prev, aiMsg]);
     } finally {
       setIsTyping(false);
+      useStore.getState().logAiTurn?.({
+        conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
+        storeId: activeStoreId,
+        userMessage: query,
+        assistantResponse: aiReply,
+        intent: inferAiIntent(query),
+        model,
+        latencyMs: Date.now() - t0,
+        contextUsed: { storeId: activeStoreId, currentWeek, empCount: scopedEmployees.length },
+        error: err || null
+      });
     }
   };
 
@@ -212,7 +236,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
         >
           <input
             type="text"
-            placeholder={isAdmin ? "Hỏi TÚ mini về lịch, định biên, nhân sự..." : "Hỏi TÚ mini về ca làm, quy định, đổi ca..."}
+            placeholder={isAdmin ? "Hỏi lịch, định biên, công thức FF..." : "Hỏi công thức, ca hôm nay, đổi ca..."}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             className="flex-1 px-4 py-3 text-[13px] border border-slate-200 rounded-full bg-slate-50 hover:bg-white focus:bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-inner"

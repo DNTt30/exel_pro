@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Shield, Briefcase, Sparkles, ScrollText, HelpCircle } from 'lucide-react';
+import { appRoleLabel, appRoleOf, isOpsManager } from '../../lib/authSession';
+import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3 } from 'lucide-react';
 
 import NotificationBell from './NotificationBell';
+import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
 
@@ -11,7 +13,7 @@ export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
   const currentWeek = useStore(state => state.currentWeek);
-  const authWarning = useStore(state => state.authWarning);
+  const isInitializing = useStore(state => state.isInitializing);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -22,43 +24,44 @@ export default function AppLayout() {
     navigate('/login');
   };
 
+  const isManager = isOpsManager(user);
+
   const adminLinks = [
-    { to: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard & Cảnh báo' },
-    { to: '/admin/schedule', icon: <CalendarDays size={18} />, label: 'Xếp lịch làm việc' },
-    { to: '/admin/timesheet', icon: <Clock size={18} />, label: 'Bảng công lương' },
-    { to: '/admin/feedback', icon: <FileText size={18} />, label: 'Feedback C&B' },
-    { to: '/admin/employees', icon: <Users size={18} />, label: 'Quản lý Nhân sự' },
-    { to: '/admin/stores', icon: <Store size={18} />, label: 'Quản lý Cửa hàng' },
-    { to: '/admin/logs', icon: <ScrollText size={18} />, label: 'Nhật ký quản lý' },
+    { to: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { to: '/admin/schedule', icon: <CalendarDays size={18} />, label: 'Lịch ca' },
+    { to: '/admin/timesheet', icon: <Clock size={18} />, label: 'Chấm công' },
+    { to: '/admin/feedback', icon: <FileText size={18} />, label: 'Bù công C&B' },
+    { to: '/admin/shelves', icon: <Rows3 size={18} />, label: 'Kệ & date' },
+    { to: '/admin/employees', icon: <Users size={18} />, label: 'Nhân viên' },
+    { to: '/admin/stores', icon: <Store size={18} />, label: 'Cửa hàng' },
+    { to: '/admin/logs', icon: <ScrollText size={18} />, label: 'Nhật ký' },
   ];
 
   const employeeLinks = [
-    { to: '/employee/schedule', icon: <CalendarDays size={18} />, label: 'Lịch làm việc' },
-    { to: '/employee/timesheet', icon: <Clock size={18} />, label: 'Bảng công của tôi' },
-    { to: '/employee/feedback', icon: <FileText size={18} />, label: 'Báo bù công C&B' },
+    { to: '/employee/home', icon: <Home size={18} />, label: 'Trang chủ' },
+    { to: '/employee/schedule', icon: <CalendarDays size={18} />, label: 'Lịch ca' },
+    { to: '/employee/timesheet', icon: <Clock size={18} />, label: 'Chấm công' },
+    { to: '/employee/feedback', icon: <FileText size={18} />, label: 'Bù công C&B' },
+    { to: '/employee/shelves', icon: <Rows3 size={18} />, label: 'Kệ của tôi' },
   ];
 
-  const links = (user?.role === 'admin' || user?.isManager) ? adminLinks : employeeLinks;
+  const links = isManager ? adminLinks : employeeLinks;
 
   const getRoleLabel = () => {
-    if (user?.role === 'admin' || user?.isManager) {
-      return { label: `Admin (SM - ${user?.dept || 'OFC'})`, color: 'bg-purple-100 text-purple-700 border-purple-200' };
-    }
-    return { label: `NV (${user?.dept || 'OFC'})`, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    const role = appRoleOf(user);
+    const label = appRoleLabel(user);
+    if (role === 'admin') return { label, color: 'bg-purple-100 text-purple-800 border-purple-200' };
+    if (role === 'am') return { label, color: 'bg-amber-100 text-amber-800 border-amber-200' };
+    if (role === 'sm') return { label, color: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+    return { label, color: 'bg-slate-100 text-slate-700 border-slate-200' };
   };
 
   const roleInfo = getRoleLabel();
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 print:bg-white print:h-auto print:min-h-0 print:overflow-visible print:block overflow-hidden">
-      {authWarning && (
-        <div className="print:hidden bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-4 py-2">
-          Phiên Supabase chưa tạo được ({authWarning}). App vẫn chạy Hướng B. Trước khi chạy sql_rls_authenticated.sql: Authentication → Email tắt Confirm email, rồi đăng xuất/đăng nhập lại.
-        </div>
-      )}
-
       {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-200 shadow-xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
+      <header className="relative bg-white border-b border-slate-200 shadow-xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           {/* Mobile hamburger button */}
           <button 
@@ -81,6 +84,7 @@ export default function AppLayout() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <CloudSyncBadge />
           <button
             type="button"
             onClick={() => setIsHelpOpen(true)}
@@ -112,6 +116,11 @@ export default function AppLayout() {
             <span className="hidden sm:inline">Đăng xuất</span>
           </button>
         </div>
+        {isInitializing && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden">
+            <div className="h-full w-1/3 bg-blue-600 animate-pulse" />
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
@@ -180,7 +189,7 @@ export default function AppLayout() {
         <HelpDrawer
           isOpen={isHelpOpen}
           onClose={() => setIsHelpOpen(false)}
-          isAdmin={user?.role === 'admin' || user?.isManager}
+          isAdmin={isManager}
         />
 
         <AICopilotDrawer

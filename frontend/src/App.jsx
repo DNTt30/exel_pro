@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
+import { isOpsManager } from './lib/authSession';
 import { lazy, Suspense } from 'react';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -12,9 +13,11 @@ const FeedbackCB = lazy(() => import('./pages/admin/FeedbackCB'));
 const Employees = lazy(() => import('./pages/admin/Employees'));
 const Stores = lazy(() => import('./pages/admin/Stores'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
+const EmployeeHome = lazy(() => import('./pages/employee/EmployeeHome'));
 const EmployeeSchedule = lazy(() => import('./pages/employee/EmployeeSchedule'));
 const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'));
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
+const ShelfDateBoard = lazy(() => import('./pages/shared/ShelfDateBoard'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -55,7 +58,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && allowedRoles.length > 0) {
     const hasRole = allowedRoles.includes(user.role);
-    const managerGetsAdmin = user.isManager && allowedRoles.includes('admin');
+    const managerGetsAdmin = isOpsManager(user) && allowedRoles.includes('admin');
     if (!hasRole && !managerGetsAdmin) {
       return <Navigate to="/" replace />;
     }
@@ -67,24 +70,19 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 const IndexRedirect = () => {
   const user = useStore(state => state.user);
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'admin' || user.isManager) {
+  if (isOpsManager(user)) {
     return <Navigate to="/admin/dashboard" replace />;
   }
-  return <Navigate to="/employee/schedule" replace />;
+  return <Navigate to="/employee/home" replace />;
 };
 
 function App() {
   const user = useStore(state => state.user);
   const initializeData = useStore(state => state.initializeData);
-  const isInitializing = useStore(state => state.isInitializing);
 
   useEffect(() => {
-    if (user) initializeData();
-  }, [user, initializeData]);
-
-  if (isInitializing) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải dữ liệu từ Cloud...</div></div>;
-  }
+    if (user?.id) initializeData();
+  }, [user?.id, initializeData]);
 
   const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
 
@@ -111,11 +109,14 @@ function App() {
               <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
               <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']}><Stores /></PrivateRoute>} />
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']}><AdminLogs /></PrivateRoute>} />
+              <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
 
               {/* Employee Routes */}
+              <Route path="employee/home" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeHome /></PrivateRoute>} />
               <Route path="employee/schedule" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSchedule /></PrivateRoute>} />
               <Route path="employee/timesheet" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeTimesheet /></PrivateRoute>} />
               <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />
+              <Route path="employee/shelves" element={<PrivateRoute allowedRoles={['employee', 'admin']}><ShelfDateBoard /></PrivateRoute>} />
             </Route>
             
             <Route path="*" element={<Navigate to="/login" replace />} />

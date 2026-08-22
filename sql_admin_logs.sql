@@ -1,3 +1,4 @@
+-- Bảng cũ (tóm tắt). Schema đầy đủ: sql_app_logs.sql (activity_logs, audit_logs, ai_conversations).
 -- Nhật ký thao tác quản lý (OFC).
 CREATE TABLE IF NOT EXISTS public.admin_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

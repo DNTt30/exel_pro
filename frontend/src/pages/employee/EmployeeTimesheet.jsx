@@ -26,7 +26,7 @@ export default function EmployeeTimesheet() {
   const myDept = user?.dept || 'VN0497';
 
   const [search, setSearch] = useState('');
-  const [filterOnlyMe, setFilterOnlyMe] = useState(false);
+  const [filterOnlyMe, setFilterOnlyMe] = useState(true);
   const [showPersonalSlip, setShowPersonalSlip] = useState(false);
 
   const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);

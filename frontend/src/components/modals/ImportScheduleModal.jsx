@@ -241,7 +241,11 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
 
       if (Object.keys(bulkUpdates).length > 0) {
         await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
-        useStore.getState().appendAdminLog('Nhập lịch Excel', currentWeek, `${updatedShiftCount} NV, thêm mới ${addedEmpCount}`);
+        useStore.getState().appendAdminLog('IMPORT_SHIFT_EXCEL', currentWeek, `${updatedShiftCount} NV, thêm mới ${addedEmpCount}`, {
+          resourceType: 'shift',
+          resourceId: currentWeek,
+          description: `Nhập Excel tuần ${currentWeek}: cập nhật ${updatedShiftCount} NV, thêm ${addedEmpCount}`
+        });
       }
 
       // 3. Cập nhật Store

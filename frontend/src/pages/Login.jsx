@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { isOpsManager } from '../lib/authSession';
 import { LogIn, UserCircle, Lock, Eye, EyeOff, Building2 } from 'lucide-react';
 
 export default function Login() {
@@ -18,10 +19,10 @@ export default function Login() {
     setSubmitting(true);
     try {
       const user = await login(empId, password);
-      if (user.role === 'admin' || user.isManager) {
-        navigate('/admin/schedule');
+      if (isOpsManager(user)) {
+        navigate('/admin/dashboard');
       } else {
-        navigate('/employee/schedule');
+        navigate('/employee/home');
       }
     } catch (err) {
       setError(err.message);
@@ -43,6 +44,7 @@ export default function Login() {
           </div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">OFC SCHEDULE APP</h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-1">Hệ thống Xếp lịch & Feedback C&B Chuỗi Cửa Hàng</p>
+          <p className="text-[11px] text-slate-400 mt-2">Dữ liệu lưu cloud Supabase, tự đồng bộ khi bạn lưu. 100 NV có thể đăng nhập cùng lúc.</p>
         </div>
 
         {error && (

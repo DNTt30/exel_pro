@@ -165,5 +165,71 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
       expect(replyFb).toContain('bù công');
       expect(replyFb).toContain('Quên vân tay');
     });
+
+    it('answers my shift, PT cap, FT weekly OFF without hijacks', () => {
+      const meCtx = {
+        ...mockContext,
+        user: { id: '201', name: 'Lê Văn C (PT Cứng)', dept: 'VN0485', type: 'STPT' },
+        weekSchedule: {
+          '201': { T2: '6-14', T3: { shift: '14-22', covering_store: 'VN0497' }, T4: 'off', T5: 'off', T6: 'off', T7: 'off', CN: 'off' }
+        }
+      };
+      const mine = askAICopilot('Hôm nay tôi làm ca mấy giờ?', meCtx);
+      expect(mine).toMatch(/Lê Văn C|6-14|14-22|OFF/);
+      expect(mine).not.toContain('Hỏi ca, giờ, lương');
+
+      expect(askAICopilot('Part time một tuần làm tối đa bao nhiêu tiếng?', mockContext)).toContain('23h');
+      expect(askAICopilot('Fulltime một tuần được nghỉ mấy ngày?', mockContext)).toContain('1 ngày OFF');
+
+      const cover = askAICopilot('Lịch của Lê Văn C', meCtx);
+      expect(cover).toContain('VN0497');
+    });
+
+    it('answers hôm nay Tú làm ca without asking which Tú when logged in as Tú', () => {
+      const twoTu = [
+        { id: '260716009', name: 'DƯƠNG NGỌC TÚ', dept: 'VN0485', type: 'STFT' },
+        { id: '260415020', name: 'MÔNG ANH TÚ', dept: 'VN0485', type: 'STFT' }
+      ];
+      const weekSchedule = {
+        '260716009': { T2: '6-14', T3: '6-14', T4: 'off', T5: '6-14', T6: '6-14', T7: '6-14', CN: '6-14' },
+        '260415020': { T2: '14-22', T3: '14-22', T4: '14-22', T5: 'off', T6: 'off', T7: 'off', CN: 'off' }
+      };
+      const asTu = askAICopilot('hôm nay tú làm ca mấy', {
+        employees: twoTu, weekSchedule, storeId: 'VN0485', currentWeek: '2026-08-17',
+        user: twoTu[0]
+      });
+      expect(asTu).toContain('DƯƠNG NGỌC TÚ');
+      expect(asTu).toMatch(/Hôm nay|Ngày mai/);
+      expect(asTu).not.toContain('MÔNG ANH TÚ');
+      expect(asTu).not.toContain('cùng tên');
+
+      const asAdmin = askAICopilot('hôm nay tú làm ca mấy', {
+        employees: twoTu, weekSchedule, storeId: 'VN0485', currentWeek: '2026-08-17',
+        user: { id: 'admin', name: 'Quản trị viên', role: 'admin' }
+      });
+      expect(asAdmin).toContain('DƯƠNG NGỌC TÚ');
+      expect(asAdmin).toContain('MÔNG ANH TÚ');
+      expect(asAdmin).toContain('260716009');
+
+      const follow = askAICopilot('260716009', {
+        employees: twoTu, weekSchedule, storeId: 'VN0485', currentWeek: '2026-08-17',
+        user: { id: 'admin', name: 'Quản trị viên', role: 'admin' }
+      }, [{ sender: 'user', text: 'hôm nay tú làm ca mấy' }]);
+      expect(follow).toContain('DƯƠNG NGỌC TÚ');
+      expect(follow).toMatch(/Hôm nay|Ngày mai/);
+      expect(follow).not.toContain('MÔNG ANH TÚ');
+    });
+
+    it('reads live shift-swap field names', () => {
+      const reply = askAICopilot('Có đơn đổi ca nào cần duyệt không?', {
+        ...mockContext,
+        shiftSwaps: [{
+          fromEmpId: '101', toEmpId: '201', fromEmpName: 'Nguyễn Văn A (SM)', toEmpName: 'Lê Văn C (PT Cứng)',
+          fromDay: 'T3', fromShift: '6-14', toShift: '14-22', status: 'pending_partner'
+        }]
+      });
+      expect(reply).toContain('đơn đổi ca');
+      expect(reply).toContain('Nguyễn Văn A');
+    });
   });
 });

@@ -4,9 +4,12 @@ import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
+import { canPickStore } from '../../lib/authSession';
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore } = useStore();
+  const { stores, addStore, updateStore, deleteStore, user } = useStore();
+  const pickStore = canPickStore(user);
+  const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
@@ -77,14 +80,20 @@ export default function Stores() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Quản lý Cửa hàng</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Danh sách các chi nhánh / cửa hàng trong chuỗi ({stores.length} cửa hàng)</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {pickStore
+              ? `Danh sách các chi nhánh / cửa hàng trong chuỗi (${visibleStores.length} cửa hàng)`
+              : 'Cửa hàng bạn đang quản lý — sửa định biên và Direct.'}
+          </p>
         </div>
-        <button 
-          onClick={() => { setIsAdding(true); setFormData(emptyStoreForm()); }}
-          className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap"
-        >
-          <Plus size={15} /> Thêm cửa hàng
-        </button>
+        {pickStore && (
+          <button 
+            onClick={() => { setIsAdding(true); setFormData(emptyStoreForm()); }}
+            className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap"
+          >
+            <Plus size={15} /> Thêm cửa hàng
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
@@ -137,7 +146,7 @@ export default function Stores() {
               </tr>
             )}
             
-            {stores.map(st => (
+            {visibleStores.map(st => (
               <React.Fragment key={st.id}>
               <tr className="hover:bg-slate-50 transition-colors">
                 <td className="p-3 font-mono font-bold text-slate-800">{st.id}</td>
@@ -164,7 +173,7 @@ export default function Stores() {
                   ) : (
                     <>
                       <button onClick={() => { setEditingId(st.id); setFormData({ ...st, staffing: normalizeStaffingConfig(st.staffing), demand: normalizeStoreDemand(st.demand) }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
-                      <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>
+                      {pickStore && <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>}
                     </>
                   )}
                 </td>

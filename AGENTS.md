@@ -18,6 +18,8 @@ npm run build    # vite build
 
 Cần `frontend/.env` với `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY`. Không commit `.env`.
 
+Prisma (migrate / studio) nằm ở **root repo**, không trong `frontend/`. Không import `@prisma/client` vào Vite — Prisma bypass RLS. Connection: `DATABASE_URL` (6543 + pgbouncer) và `DIRECT_URL` (5432). User DB khuyến nghị: `prisma` (`sql_prisma_user.sql`).
+
 ## Stack & layout
 
 - React 19 + Vite 8 + Tailwind 4 + Zustand (`persist`) + React Router 7

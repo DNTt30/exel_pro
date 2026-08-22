@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toAuthEmail, toAuthPassword, authMetadata, isManagerFromEmp } from '../lib/authSession';
+import { toAuthEmail, toAuthPassword, authMetadata, isManagerFromEmp, isAreaManagerFromEmp, isStoreManagerFromEmp, isOpsManager, canPickStore, appRoleOf, canApproveSchedule } from '../lib/authSession';
 
 describe('toAuthEmail', () => {
   it('maps admin and employee ids to ofc.internal emails', () => {
@@ -17,10 +17,54 @@ describe('toAuthPassword', () => {
 });
 
 describe('isManagerFromEmp', () => {
-  it('detects SM and store manager roles', () => {
-    expect(isManagerFromEmp({ role: 'SM' })).toBe(true);
+  it('detects store SM vs OFC area manager', () => {
+    expect(isStoreManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(true);
+    expect(isAreaManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(false);
+    expect(isAreaManagerFromEmp({ role: 'OFC' })).toBe(true);
+    expect(isAreaManagerFromEmp({ role: 'SM' })).toBe(true);
+    expect(isManagerFromEmp({ role: 'OFC' })).toBe(true);
     expect(isManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(true);
     expect(isManagerFromEmp({ role: 'STPT', type: 'STPT' })).toBe(false);
+    expect(isManagerFromEmp({ role: 'employee', jobTitle: 'Cửa hàng trưởng' })).toBe(true);
+    expect(isAreaManagerFromEmp({ role: 'employee', jobTitle: 'OFC' })).toBe(true);
+  });
+});
+
+describe('isOpsManager / canPickStore', () => {
+  it('treats builtin admin as store SM who can pick a store', () => {
+    const admin = { id: 'admin', role: 'admin', isManager: true, jobTitle: 'Cửa hàng trưởng' };
+    expect(isOpsManager(admin)).toBe(true);
+    expect(canPickStore(admin)).toBe(true);
+  });
+
+  it('gives Cửa hàng trưởng the same manager UI, locked to their store', () => {
+    const sm = { id: '260000001', role: 'employee', isManager: true, jobTitle: 'Cửa hàng trưởng', dept: 'VN0485' };
+    expect(isOpsManager(sm)).toBe(true);
+    expect(isStoreManagerFromEmp(sm)).toBe(true);
+    expect(canPickStore(sm)).toBe(false);
+  });
+
+  it('lets OFC pick stores', () => {
+    const ofc = { id: '260000002', role: 'employee', isManager: true, jobTitle: 'OFC', dept: 'VN0470' };
+    expect(isOpsManager(ofc)).toBe(true);
+    expect(canPickStore(ofc)).toBe(true);
+  });
+
+  it('keeps regular staff off manager UI', () => {
+    const nv = { id: '260000003', role: 'employee', jobTitle: 'STPT', dept: 'VN0485' };
+    expect(isOpsManager(nv)).toBe(false);
+    expect(canPickStore(nv)).toBe(false);
+  });
+});
+
+describe('appRoleOf', () => {
+  it('maps Staff / SM / AM / Admin', () => {
+    expect(appRoleOf({ role: 'employee', jobTitle: 'STPT' })).toBe('staff');
+    expect(appRoleOf({ role: 'employee', isManager: true, jobTitle: 'Cửa hàng trưởng', dept: 'VN0485' })).toBe('sm');
+    expect(appRoleOf({ role: 'employee', isManager: true, jobTitle: 'OFC' })).toBe('am');
+    expect(appRoleOf({ id: 'admin', role: 'admin', isManager: true })).toBe('admin');
+    expect(canApproveSchedule({ id: 'admin', role: 'admin' })).toBe(true);
+    expect(canApproveSchedule({ isManager: true, jobTitle: 'Cửa hàng trưởng' })).toBe(false);
   });
 });
 

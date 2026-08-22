@@ -15,13 +15,70 @@ export function toAuthEmail(userId) {
   return `${id}@ofc.app`;
 }
 
+function jobTitleOf(emp) {
+  const r = String(emp?.role || '').trim();
+  if (r === 'employee' || r === 'admin') return String(emp?.jobTitle || '').trim();
+  return r;
+}
+
+export function isAreaManagerFromEmp(emp) {
+  const r = jobTitleOf(emp);
+  const t = String(emp?.type || '').trim();
+  return r === 'OFC' || r === 'SM' || /khu vực/i.test(r) || t === 'OFC';
+}
+
+export function isStoreManagerFromEmp(emp) {
+  const r = jobTitleOf(emp).toLowerCase();
+  return r.includes('cửa hàng trưởng') && !isAreaManagerFromEmp(emp);
+}
+
 export function isManagerFromEmp(emp) {
-  const roleName = (emp?.role || '').toLowerCase();
+  const title = jobTitleOf(emp).toLowerCase();
   const typeName = emp?.type || '';
-  return roleName.includes('quản lý') ||
-    roleName.includes('cửa hàng trưởng') ||
-    emp?.role === 'SM' ||
+  return isStoreManagerFromEmp(emp) ||
+    isAreaManagerFromEmp(emp) ||
+    title.includes('quản lý') ||
     typeName === 'SM';
+}
+
+/** Tài khoản form `admin` = SM cửa hàng (không còn super-admin tách biệt). */
+export function isBuiltinStoreManager(user) {
+  return user?.id === 'admin' || user?.role === 'admin';
+}
+
+/** SM / OFC / admin — vào menu quản lý cửa hàng. */
+export function isOpsManager(user) {
+  if (!user) return false;
+  return isBuiltinStoreManager(user) || !!(user.isManager || isManagerFromEmp(user));
+}
+
+/** Được chọn nhiều cửa hàng: OFC khu vực, hoặc SM chưa gắn CH (login admin). */
+export function canPickStore(user) {
+  if (!user) return false;
+  if (isAreaManagerFromEmp(user)) return true;
+  return isBuiltinStoreManager(user) && !user.dept;
+}
+
+/** Staff / SM / AM / Admin — map từ tài khoản hiện tại (Hướng B). */
+export function appRoleOf(user) {
+  if (!user) return 'staff';
+  if (isAreaManagerFromEmp(user)) return 'am';
+  if (user.role === 'admin' || user.id === 'admin') return 'admin';
+  if (isOpsManager(user)) return 'sm';
+  return 'staff';
+}
+
+export function appRoleLabel(user) {
+  const r = appRoleOf(user);
+  if (r === 'admin') return user?.dept ? `Admin (${user.dept})` : 'Admin';
+  if (r === 'am') return 'AM';
+  if (r === 'sm') return user?.dept ? `SM (${user.dept})` : 'SM';
+  return user?.dept ? `Staff (${user.dept})` : 'Staff';
+}
+
+export function canApproveSchedule(user) {
+  const r = appRoleOf(user);
+  return r === 'admin' || r === 'am';
 }
 
 export function authMetadata(user) {

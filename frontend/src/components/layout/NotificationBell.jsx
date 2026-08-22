@@ -15,9 +15,11 @@ import {
 } from 'lucide-react';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { WEEK_DAYS } from '../../data/constants';
+import { collectExpiryAlerts } from '../../utils/shelfExpiry';
+import { canPickStore, isOpsManager } from '../../lib/authSession';
 
 export default function NotificationBell() {
-  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps } = useStore();
+  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems } = useStore();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [readIds, setReadIds] = useState(() => {
@@ -44,8 +46,9 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.isManager;
+  const isAdmin = isOpsManager(user);
+  const isManager = isAdmin;
+  const pickStore = canPickStore(user);
 
   // Tính toán danh sách thông báo thông minh
   const notifications = useMemo(() => {
@@ -54,7 +57,7 @@ export default function NotificationBell() {
 
     if (isAdmin || isManager) {
       // 1. Thông báo cho Admin / Manager: Feedbacks chờ duyệt
-      const pendingFbs = feedbacks.filter(f => f.status === 'pending');
+      const pendingFbs = feedbacks.filter(f => f.status === 'pending' && (pickStore || f.dept === user?.dept));
       pendingFbs.forEach(fb => {
         list.push({
           id: `pending_fb_${fb.id}`,
@@ -69,7 +72,7 @@ export default function NotificationBell() {
       });
 
       // 2. Thông báo đơn đổi ca chờ Quản lý phê duyệt
-      const pendingSwaps = (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (isAdmin || s.store === user?.dept));
+      const pendingSwaps = (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (pickStore || s.store === user?.dept));
       pendingSwaps.forEach(swap => {
         list.push({
           id: `pending_swap_${swap.id}`,
@@ -87,6 +90,7 @@ export default function NotificationBell() {
       const weekSched = schedule[currentWeek] || {};
       let ptOverCount = 0;
       employees.forEach(emp => {
+        if (!pickStore && user?.dept && emp.dept !== user.dept) return;
         const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
         if (isPT) {
           const empSched = weekSched[emp.id] || {};
@@ -114,7 +118,27 @@ export default function NotificationBell() {
           time: 'Cảnh báo'
         });
       }
-    } else {
+    }
+
+    const visibleShelves = (shelves || []).filter(s =>
+      (isAdmin || isManager)
+        ? (pickStore || !user.dept || s.storeId === user.dept)
+        : s.assigneeId === user.id
+    );
+    collectExpiryAlerts(visibleShelves, shelfItems).forEach(({ shelf, item, st }) => {
+      list.push({
+        id: `exp_${item.id}`,
+        type: 'expiry',
+        title: `${item.productName} · kệ ${shelf.code}`,
+        desc: `${st.label}. Giao ${isAdmin || isManager ? (shelf.assigneeId || 'chưa giao') : 'bạn'}. Báo trước ${shelf.notifyDays} ngày.`,
+        icon: <AlertTriangle size={16} className="text-amber-600" />,
+        bgColor: st.key === 'ok' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200',
+        link: isAdmin || isManager ? '/admin/shelves' : '/employee/shelves',
+        time: st.label
+      });
+    });
+
+    if (!isAdmin && !isManager) {
       // 4. Thông báo cho Nhân viên: Có đồng nghiệp gửi yêu cầu đổi ca cho bạn
       const pendingPartnerSwaps = (shiftSwaps || []).filter(s => s.toEmpId === user.id && s.status === 'pending_partner');
       pendingPartnerSwaps.forEach(swap => {
@@ -190,7 +214,7 @@ export default function NotificationBell() {
     }
 
     return list;
-  }, [user, isAdmin, isManager, feedbacks, schedule, currentWeek, employees, shiftSwaps]);
+  }, [user, isAdmin, isManager, pickStore, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !readIds.includes(n.id)).length;

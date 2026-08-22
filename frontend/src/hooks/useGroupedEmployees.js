@@ -2,10 +2,11 @@ import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { WEEK_DAYS } from '../data/constants';
 import { getCoveringStore } from '../utils/shiftHelper';
+import { canPickStore } from '../lib/authSession';
 
 export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule = null) {
   const { employees, user } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const pickStore = canPickStore(user);
 
   const groupedEmps = useMemo(() => {
     let filtered = employees;
@@ -19,7 +20,7 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
       filtered = filtered.filter(e => (e.role || e.type) === filterRole);
     }
     
-    const effectiveFilterDept = isAdmin ? filterDept : user?.dept;
+    const effectiveFilterDept = pickStore ? filterDept : user?.dept;
     
     const groups = {};
     filtered.forEach(emp => {
@@ -57,7 +58,7 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
     }
     
     return groups;
-  }, [employees, search, filterDept, filterRole, isAdmin, user?.dept, weekSchedule]);
+  }, [employees, search, filterDept, filterRole, pickStore, user?.dept, weekSchedule]);
 
   return groupedEmps;
 }

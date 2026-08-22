@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, Filter, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { listNearbyWeeks } from '../data/constants';
 
 export default function Toolbar({ 
   search, setSearch, 
@@ -95,66 +96,25 @@ export default function Toolbar({
                 className="border border-blue-200 text-blue-700 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-blue-50/80 hover:bg-blue-100/80 font-bold outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-colors"
               >
                 {(() => {
-                  const today = new Date();
-                  const currentMonday = new Date(today);
-                  const dayOfWeek = today.getDay();
-                  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-                  currentMonday.setDate(diff);
-                  currentMonday.setHours(0, 0, 0, 0);
-
-                  const list = [];
-                  // Chỉ hiển thị gọn gàng 5 tuần: 1 tuần trước, Tuần này, và 3 tuần kế tiếp để đăng ký
-                  for (let i = -1; i <= 3; i++) {
-                    const d = new Date(currentMonday);
-                    d.setDate(currentMonday.getDate() + (i * 7));
-                    const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                    list.push({
-                      key: wKey,
-                      offset: i,
-                      startDate: d
-                    });
-                  }
-
-                  // Nếu đang xem một tuần lịch sử khác (qua datepicker), vẫn hiển thị tuần đó
+                  const list = listNearbyWeeks();
                   if (!list.some(item => item.key === currentWeek)) {
                     const parts = currentWeek.split('-');
                     if (parts.length === 3) {
                       const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
                       d.setHours(0, 0, 0, 0);
-                      const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                      list.push({
-                        key: wKey,
-                        offset: null,
-                        startDate: d
-                      });
+                      list.push({ key: currentWeek, offset: null, startDate: d, endDate: new Date(d.getTime() + 6 * 86400000), tag: 'Tuần đã chọn' });
+                      list.sort((a, b) => a.startDate - b.startDate);
                     }
                   }
-
-                  list.sort((a, b) => a.startDate - b.startDate);
-
                   return list.map(item => {
                     const wStart = item.startDate;
-                    const wEnd = new Date(wStart);
-                    wEnd.setDate(wStart.getDate() + 6);
-
+                    const wEnd = item.endDate || new Date(wStart.getTime() + 6 * 86400000);
                     const startStr = `${wStart.getDate().toString().padStart(2, '0')}/${(wStart.getMonth() + 1).toString().padStart(2, '0')}`;
                     const endStr = `${wEnd.getDate().toString().padStart(2, '0')}/${(wEnd.getMonth() + 1).toString().padStart(2, '0')}`;
                     const yearStr = wStart.getFullYear();
-
-                    let label = `Tuần: ${startStr} → ${endStr}/${yearStr}`;
-                    if (item.offset === 0) {
-                      label = `📍 Tuần Này (${startStr} → ${endStr}/${yearStr})`;
-                    } else if (item.offset === 1) {
-                      label = `⚡ Tuần Sau (${startStr} → ${endStr}/${yearStr})`;
-                    } else if (item.offset === -1) {
-                      label = `Tuần Trước (${startStr} → ${endStr}/${yearStr})`;
-                    } else if (item.offset > 1) {
-                      label = `Tuần (+${item.offset}): ${startStr} → ${endStr}/${yearStr}`;
-                    }
-
                     return (
                       <option key={item.key} value={item.key}>
-                        {label}
+                        {item.tag} ({startStr} → {endStr}/{yearStr})
                       </option>
                     );
                   });

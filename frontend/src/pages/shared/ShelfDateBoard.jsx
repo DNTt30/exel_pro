@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle } from 'lucide-react';
+import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle, Pencil } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
 import { getStoreLabel } from '../../utils/scheduleAnnotations';
@@ -112,7 +112,9 @@ export default function ShelfDateBoard() {
   const [filterEmp, setFilterEmp] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [form, setForm] = useState({
-    assigneeId: '',
+    id: null,
+    code: '',
+    assigneeId: [],
     name: '',
     dueDate: '',
     notifyDays: DEFAULT_NOTIFY_DAYS
@@ -136,7 +138,7 @@ export default function ShelfDateBoard() {
     setFilterStore(id);
     setSelectedId(null);
     setFilterEmp('');
-    setForm(f => ({ ...f, assigneeId: '' }));
+    setForm(f => ({ ...f, assigneeId: [] }));
   };
 
   const storeEmps = useMemo(
@@ -144,12 +146,15 @@ export default function ShelfDateBoard() {
     [employees, activeStore]
   );
 
-  const empName = (id) => (employees || []).find(e => e.id === id)?.name || (id ? id : 'Chưa giao');
+  const empName = (ids) => {
+    if (!ids) return 'Chưa giao';
+    return ids.split(',').map(id => (employees || []).find(e => e.id === id)?.name || id).join(', ');
+  };
   const storeLabel = getStoreLabel(stores, activeStore) || 'Chưa chọn cửa hàng';
 
   const storeShelves = useMemo(() => {
     let list = (shelves || []).filter(s => !activeStore || s.storeId === activeStore);
-    if (!isManager) list = list.filter(s => s.assigneeId === user?.id);
+    if (!isManager) list = list.filter(s => s.assigneeId && s.assigneeId.split(',').includes(user?.id));
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(s => {
@@ -161,7 +166,7 @@ export default function ShelfDateBoard() {
         return s.code.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q) || emp.includes(q) || hitItem;
       });
     }
-    if (filterEmp) list = list.filter(s => s.assigneeId === filterEmp);
+    if (filterEmp) list = list.filter(s => s.assigneeId && s.assigneeId.split(',').includes(filterEmp));
     return list;
   }, [shelves, shelfItems, activeStore, isManager, user?.id, search, filterEmp, employees]);
 
@@ -193,28 +198,42 @@ export default function ShelfDateBoard() {
     setDetailShelf({ shelf, items });
   };
 
+  const editShelf = (shelf) => {
+    setForm({
+      id: shelf.id,
+      code: shelf.code,
+      assigneeId: shelf.assigneeId ? shelf.assigneeId.split(',') : [],
+      name: shelf.name || '',
+      dueDate: shelf.dueDate || '',
+      notifyDays: shelf.notifyDays || DEFAULT_NOTIFY_DAYS
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const selected = filteredShelves.find(s => s.id === selectedId) || storeShelves.find(s => s.id === selectedId) || null;
 
   const handleAssignTask = async () => {
     if (!activeStore) return alert('Chọn cửa hàng');
-    if (!form.assigneeId) return alert('Chọn nhân viên');
+    if (!form.assigneeId || form.assigneeId.length === 0) return alert('Chọn ít nhất 1 nhân viên');
     if (!form.name.trim()) return alert('Nhập tên quầy / kệ');
     if (!form.dueDate) return alert('Chọn hạn nộp trên lịch');
     const slug = form.name.trim().replace(/\s+/g, '-').slice(0, 16) || 'KE';
-    const code = `${slug}-${String(Date.now()).slice(-4)}`;
+    const code = form.id ? form.code : `${slug}-${String(Date.now()).slice(-4)}`.toUpperCase();
     try {
       const saved = await saveShelf({
+        id: form.id,
         storeId: activeStore,
-        code: code.toUpperCase(),
+        code: code,
         name: form.name.trim(),
-        assigneeId: form.assigneeId,
+        assigneeId: form.assigneeId.join(','),
         dueDate: form.dueDate,
         notifyDays: Number(form.notifyDays) || DEFAULT_NOTIFY_DAYS
       });
-      setForm({ assigneeId: '', name: '', dueDate: '', notifyDays: DEFAULT_NOTIFY_DAYS });
-      openShelf(saved);
+      setForm({ id: null, code: '', assigneeId: [], name: '', dueDate: '', notifyDays: DEFAULT_NOTIFY_DAYS });
+      if (!form.id) openShelf(saved);
+      else alert('Đã cập nhật kệ!');
     } catch (e) {
-      alert(e.message || 'Không giao được. Chạy sql_shelves.sql (có cột due_date) trên Supabase.');
+      alert(e.message || 'Không lưu được. Kiểm tra kết nối.');
     }
   };
 
@@ -254,13 +273,20 @@ export default function ShelfDateBoard() {
 
       {isManager && (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-          <div className="text-sm font-black text-slate-800 mb-3">Giao nhiệm vụ tại {storeLabel}</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-            <Field label="1. Nhân viên">
-              <select className={FIELD_CLS} value={form.assigneeId} onChange={e => setForm({ ...form, assigneeId: e.target.value })}>
-                <option value="">-- Chọn NV trong CH --</option>
-                {storeEmps.map(e => <option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
-              </select>
+          <div className="text-sm font-black text-slate-800 mb-3">{form.id ? `Sửa nhiệm vụ kệ: ${form.name}` : `Giao nhiệm vụ tại ${storeLabel}`}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <Field label="1. Nhân viên (chọn nhiều)">
+              <div className="mt-1 border border-slate-200 rounded-xl max-h-32 overflow-y-auto p-1 bg-white">
+                {storeEmps.length === 0 ? <div className="p-2 text-xs text-slate-400">Không có NV</div> : storeEmps.map(e => (
+                  <label key={e.id} className="flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 cursor-pointer rounded-lg transition-colors">
+                    <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" checked={form.assigneeId.includes(e.id)} onChange={(ev) => {
+                      const newIds = ev.target.checked ? [...form.assigneeId, e.id] : form.assigneeId.filter(id => id !== e.id);
+                      setForm({ ...form, assigneeId: newIds });
+                    }} />
+                    <span className="text-sm font-medium text-slate-700">{e.name}</span>
+                  </label>
+                ))}
+              </div>
             </Field>
             <Field label="2. Quầy / kệ (nhập tên)">
               <input className={FIELD_CLS} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Kệ mát trái, quầy A1..." />
@@ -268,13 +294,21 @@ export default function ShelfDateBoard() {
             <Field label="3. Hạn nộp">
               <input type="date" className={FIELD_CLS} value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
             </Field>
-            <button type="button" onClick={handleAssignTask} className="flex items-center justify-center gap-2 h-[42px] px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold">
-              <CalendarClock size={16} /> Giao nhiệm vụ
-            </button>
+            <div className="flex gap-2 w-full">
+              {form.id && (
+                <button type="button" onClick={() => setForm({ id: null, code: '', assigneeId: [], name: '', dueDate: '', notifyDays: DEFAULT_NOTIFY_DAYS })} className="flex items-center justify-center h-[42px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition-colors w-1/3">
+                  Hủy
+                </button>
+              )}
+              <button type="button" onClick={handleAssignTask} className={`flex items-center justify-center gap-2 h-[42px] px-4 text-white rounded-xl text-sm font-bold transition-colors ${form.id ? 'bg-indigo-600 hover:bg-indigo-700 w-2/3' : 'bg-blue-600 hover:bg-blue-700 w-full'}`}>
+                {form.id ? <Save size={16} /> : <CalendarClock size={16} />} 
+                {form.id ? 'Lưu thay đổi' : 'Giao nhiệm vụ'}
+              </button>
+            </div>
           </div>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-500 mt-3">
+          <label className="inline-flex items-center gap-2 text-xs text-slate-500 mt-4">
             Báo NV trước khi HSD còn
-            <input type="number" min={1} max={14} className="w-14 border rounded-lg px-1.5 py-1" value={form.notifyDays} onChange={e => setForm({ ...form, notifyDays: e.target.value })} />
+            <input type="number" min={1} max={14} className="w-14 border rounded-lg px-1.5 py-1 outline-none focus:ring-2 focus:ring-blue-500" value={form.notifyDays} onChange={e => setForm({ ...form, notifyDays: e.target.value })} />
             ngày
           </label>
         </div>
@@ -309,7 +343,7 @@ export default function ShelfDateBoard() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full text-sm min-w-[800px]">
           <thead className="bg-slate-50 text-slate-600 text-left">
             <tr>
               <th className="px-3 py-2.5">Quầy / kệ</th>
@@ -317,7 +351,7 @@ export default function ShelfDateBoard() {
               <th className="px-3 py-2.5">Hạn nộp</th>
               <th className="px-3 py-2.5">Kiểm tra</th>
               <th className="px-3 py-2.5">Hàng HSD</th>
-              <th className="px-3 py-2.5 w-40"></th>
+              <th className="px-3 py-2.5 w-52 text-right"></th>
             </tr>
           </thead>
           <tbody>
@@ -326,37 +360,44 @@ export default function ShelfDateBoard() {
             )}
             {filteredShelves.map(shelf => {
               const m = shelfCheckMeta(shelf, shelfItems);
-              const isOwner = shelf.assigneeId === user?.id;
+              const isOwner = shelf.assigneeId && shelf.assigneeId.split(',').includes(user?.id);
               return (
-                <tr key={shelf.id} className={`border-t border-slate-100 ${selectedId === shelf.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                  <td className="px-3 py-2 font-bold">{shelf.name || shelf.code}</td>
-                  <td className="px-3 py-2">{empName(shelf.assigneeId)}</td>
+                <tr key={shelf.id} className={`border-t border-slate-100 ${selectedId === shelf.id || form.id === shelf.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                  <td className="px-3 py-2 font-bold text-slate-800">{shelf.name || shelf.code}</td>
+                  <td className="px-3 py-2 text-slate-600">{empName(shelf.assigneeId)}</td>
                   <td className={`px-3 py-2 font-semibold ${dueToneClass(m.due.key)}`}>{shelf.dueDate || '—'}<div className="text-[11px] font-normal">{m.due.label}</div></td>
-                  <td className="px-3 py-2">{m.items.length} món{m.lastSaved ? ` · ${String(m.lastSaved).slice(0, 10)}` : ''}</td>
-                  <td className="px-3 py-2">{m.warn > 0 ? <span className="font-bold text-amber-700">{m.warn} cảnh báo</span> : 'OK'}</td>
-                  <td className="px-3 py-2 flex items-center gap-2">
+                  <td className="px-3 py-2 text-slate-600">{m.items.length} món{m.lastSaved ? ` · ${String(m.lastSaved).slice(0, 10)}` : ''}</td>
+                  <td className="px-3 py-2">{m.warn > 0 ? <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full text-xs">{m.warn} cảnh báo</span> : <span className="text-slate-400">OK</span>}</td>
+                  <td className="px-3 py-2 flex items-center justify-end gap-1.5">
                     {/* Manager: Xem chi tiết */}
                     {isManager && (
                       <button
                         type="button"
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100 transition-colors"
                         onClick={() => openDetail(shelf)}
                       >
-                        <Eye size={13} /> Xem chi tiết
+                        <Eye size={13} /> Xem
                       </button>
                     )}
                     {/* Nhân viên được giao: Mở bảng nhập */}
                     {(isOwner || isManager) && (
                       <button
                         type="button"
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 transition-colors"
                         onClick={() => openShelf(shelf)}
                       >
                         Mở bảng
                       </button>
                     )}
                     {isManager && (
-                      <button type="button" className="text-red-400 hover:text-red-600" onClick={() => { if (confirm('Xóa kệ này?')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)); }}><Trash2 size={14} /></button>
+                      <>
+                        <button type="button" className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors ml-1" onClick={() => editShelf(shelf)} title="Sửa thông tin kệ">
+                          <Pencil size={14} />
+                        </button>
+                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)); }} title="Xóa kệ">
+                          <Trash2 size={14} />
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>

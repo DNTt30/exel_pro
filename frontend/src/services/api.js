@@ -673,8 +673,12 @@ export async function deleteShelf(id) {
 }
 
 export async function replaceShelfItems(shelfId, storeId, rows, empId) {
+  // BUG-02 fix: backup dữ liệu cũ trước khi xóa để có thể phục hồi nếu insert thất bại
+  const { data: backup } = await db().from('shelf_items').select('*').eq('shelf_id', shelfId);
+
   const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
   if (delErr) throw delErr;
+
   const payload = (rows || [])
     .filter(r => String(r.productName || '').trim())
     .map(r => ({
@@ -689,8 +693,14 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
       updated_by: empId || null
     }));
   if (!payload.length) return [];
+
   const { data, error } = await db().from('shelf_items').insert(payload).select();
   if (error) {
+    // Cố phục hồi dữ liệu cũ nếu insert thất bại
+    if (backup?.length) {
+      const restorePayload = backup.map(({ id, ...rest }) => rest);
+      await db().from('shelf_items').insert(restorePayload).select();
+    }
     if (/sku|expiry_date_2|schema cache|column/i.test(error.message || '')) {
       const slim = payload.map(({ sku, expiry_date_2, ...rest }) => rest);
       const retry = await db().from('shelf_items').insert(slim).select();

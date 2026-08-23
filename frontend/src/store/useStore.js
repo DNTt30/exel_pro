@@ -585,13 +585,18 @@ export const useStore = create(
         const previousShifts = { ...empSched };
         const updatedShifts = { ...empSched, [day]: shiftCode };
         
-        // 1. Cập nhật UI ngay lập tức
-        set((state) => ({
-          schedule: {
-            ...state.schedule,
-            [weekDate]: { ...weekSched, [empId]: updatedShifts }
-          }
-        }));
+        // 1. Cập nhật UI ngay lập tức (dùng state tươi để tránh lost update khi click nhanh)
+        set((state) => {
+          const latestWeekSched = state.schedule[weekDate] || {};
+          const latestEmpSched = latestWeekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+          const latestUpdated = { ...latestEmpSched, [day]: shiftCode };
+          return {
+            schedule: {
+              ...state.schedule,
+              [weekDate]: { ...latestWeekSched, [empId]: latestUpdated }
+            }
+          };
+        });
 
         // 2. Gửi request lưu lên server
         try {
@@ -669,7 +674,8 @@ export const useStore = create(
         try {
           await api.updateFeedback(feedbackId, status, resolutionNote);
           if (status === 'approved' && newShiftData) {
-            get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
+            // BUG-06 fix: phải await để đảm bảo ca được lưu trước khi tiếp tục
+            await get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
           }
           const prevFb = previousFeedbacks.find(f => f.id === feedbackId) || {};
           get().appendAdminLog('UPDATE_FEEDBACK', feedbackId, status, {
@@ -840,7 +846,9 @@ export const useStore = create(
         const user = get().user;
         const shelf = get().shelves.find(s => s.id === shelfId);
         if (!shelf) throw new Error('Không tìm thấy kệ');
-        if (user?.role !== 'admin' && !userIsManager(user) && shelf.assigneeId !== user?.id) {
+        // BUG-01 fix: assigneeId có thể là comma-separated (nhiều NV cùng kệ)
+        const assigneeIds = (shelf.assigneeId || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (user?.role !== 'admin' && !userIsManager(user) && !assigneeIds.includes(user?.id)) {
           throw new Error('Bạn chỉ ghi date kệ được giao');
         }
         if (user?.role !== 'admin' && user?.dept && shelf.storeId !== user.dept) {

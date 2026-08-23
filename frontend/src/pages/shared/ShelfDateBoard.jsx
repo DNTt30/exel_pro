@@ -242,9 +242,12 @@ export default function ShelfDateBoard() {
     setSaving(true);
     try {
       await saveShelfItems(selected.id, rows);
-      alert('Đã lưu bảng date kệ ' + (selected.name || selected.code));
+      // BUG-15 fix: sync lại rows từ store sau khi lưu để đảm bảo id đúng
+      const freshItems = (shelfItems || []).filter(i => i.shelfId === selected.id);
+      if (freshItems.length) setRows(freshItems.map(toShelfItemRow));
+      alert('✅ Đã lưu bảng date kệ: ' + (selected.name || selected.code));
     } catch (e) {
-      alert(e.message || 'Không lưu được.');
+      alert('❌ Không lưu được: ' + (e.message || 'Kiểm tra kết nối mạng và thử lại.'));
     } finally {
       setSaving(false);
     }
@@ -394,7 +397,7 @@ export default function ShelfDateBoard() {
                         <button type="button" className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors ml-1" onClick={() => editShelf(shelf)} title="Sửa thông tin kệ">
                           <Pencil size={14} />
                         </button>
-                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)); }} title="Xóa kệ">
+                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)).catch(e => alert('Không thể xóa: ' + (e.message || 'Lỗi không xác định'))); }} title="Xóa kệ">
                           <Trash2 size={14} />
                         </button>
                       </>

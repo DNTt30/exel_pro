@@ -44,7 +44,10 @@ export default function EmployeeHome() {
     : `${totalH}h / ${totalShifts} ca (chuẩn 48h)`;
 
   const expiryWarn = useMemo(() => {
-    const mine = (shelves || []).filter(s => s.assigneeId === user?.id);
+    // BUG-04 fix: assigneeId có thể là comma-separated khi kệ giao cho nhiều NV
+    const mine = (shelves || []).filter(s => 
+      s.assigneeId && s.assigneeId.split(',').map(id => id.trim()).includes(user?.id)
+    );
     return collectExpiryAlerts(mine, shelfItems);
   }, [shelves, shelfItems, user?.id]);
 

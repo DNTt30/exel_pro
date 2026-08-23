@@ -385,18 +385,43 @@ export default function DashboardCharts({
     });
   }, [activeChartData, chartWidth, chartHeight, maxHours]);
 
+  // Hàm tính đường cong Bézier mượt mà (Cubic Bézier Spline)
+  const getSmoothSplinePath = (pts) => {
+    if (!pts || pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    if (pts.length === 2) {
+      return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L ${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+    }
+
+    let path = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 >= pts.length ? i + 1 : i + 2];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 5.5;
+      const cp1y = p1.y + (p2.y - p0.y) / 5.5;
+      const cp2x = p2.x - (p3.x - p1.x) / 5.5;
+      const cp2y = p2.y - (p3.y - p1.y) / 5.5;
+
+      path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return path;
+  };
+
   const svgPathD = useMemo(() => {
-    if (points.length === 0) return '';
-    return points.reduce((acc, p, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`, '');
+    return getSmoothSplinePath(points);
   }, [points]);
 
   const svgAreaD = useMemo(() => {
     if (points.length === 0) return '';
+    const curve = getSmoothSplinePath(points);
     const firstX = points[0].x.toFixed(1);
     const lastX = points[points.length - 1].x.toFixed(1);
     const bottomY = (paddingY + chartHeight).toFixed(1);
-    return `${svgPathD} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-  }, [svgPathD, points, chartHeight]);
+    return `${curve} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
+  }, [points, chartHeight]);
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -502,233 +527,309 @@ export default function DashboardCharts({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               
               {/* Main Area / Line Chart */}
-              <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
-                      <TrendingUp size={16} className="text-blue-600" />
-                      <span>
+              <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                          <TrendingUp size={16} />
+                        </div>
+                        <span>
+                          {chartScope === 'avg_week' 
+                            ? 'Đồ Thị Tải Ca Trung Bình Các Thứ Trong Tuần (T2 → CN)' 
+                            : `Đồ Thị Chi Tiết Giờ Công ${viewMode === 'month' ? `Chu Kỳ Tháng ${selectedMonthCycle}` : `Tuần ${currentWeek}`}`}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5 ml-7">
                         {chartScope === 'avg_week' 
-                          ? 'Đồ Thị Tải Ca Trung Bình Các Thứ Trong Tuần (T2 → CN)' 
-                          : `Đồ Thị Chi Tiết Giờ Công ${viewMode === 'month' ? `Chu Kỳ Tháng ${selectedMonthCycle}` : `Tuần ${currentWeek}`}`}
+                          ? 'Dữ liệu trung bình tổng hợp từ toàn bộ lịch sử các tuần đã xếp trong hệ thống' 
+                          : 'Đường cong biểu diễn tổng giờ công thực tế từng ngày'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 font-bold">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span> Giờ công (h)
                       </span>
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {chartScope === 'avg_week' 
-                        ? 'Dữ liệu trung bình tổng hợp từ toàn bộ lịch sử các tuần đã xếp trong hệ thống' 
-                        : 'Đường cong biểu diễn tổng giờ công thực tế từng ngày'}
-                    </p>
+                      <span className="inline-flex items-center gap-1 text-slate-400">
+                        Đỉnh: <strong className="text-slate-700 font-mono">{Math.max(...activeChartData.map(d => d.totalHours), 0)}h</strong>
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Giờ công (h)
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-slate-400">
-                      Cao nhất: <strong className="text-slate-700">{Math.max(...activeChartData.map(d => d.totalHours))}h</strong>
-                    </span>
-                  </div>
-                </div>
 
-                {/* SVG Interactive Chart with Continuous Mouse Tracking */}
-                <div className="relative w-full">
-                  <svg 
-                    viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
-                    className="w-full h-56 select-none overflow-visible cursor-crosshair"
-                    onMouseMove={(e) => {
-                      const svg = e.currentTarget;
-                      const rect = svg.getBoundingClientRect();
-                      const clientX = e.clientX - rect.left;
-                      const scaleX = svgWidth / rect.width;
-                      const svgX = clientX * scaleX;
-                      
-                      if (svgX >= paddingX - 10 && svgX <= svgWidth - paddingX + 10 && points.length > 0) {
-                        const step = chartWidth / (points.length - 1 || 1);
-                        let closestIdx = Math.round((svgX - paddingX) / step);
-                        closestIdx = Math.max(0, Math.min(points.length - 1, closestIdx));
-                        setHoveredPoint(closestIdx);
-                      }
-                    }}
-                    onMouseLeave={() => setHoveredPoint(null)}
-                  >
-                    <defs>
-                      <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
+                  {/* SVG Interactive Chart with Continuous Mouse Tracking */}
+                  <div className="relative w-full bg-gradient-to-b from-slate-50/50 to-white rounded-2xl p-2 border border-slate-100">
+                    <svg 
+                      viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
+                      className="w-full h-56 select-none overflow-visible cursor-crosshair"
+                      onMouseMove={(e) => {
+                        const svg = e.currentTarget;
+                        const rect = svg.getBoundingClientRect();
+                        const clientX = e.clientX - rect.left;
+                        const scaleX = svgWidth / rect.width;
+                        const svgX = clientX * scaleX;
+                        
+                        if (svgX >= paddingX - 10 && svgX <= svgWidth - paddingX + 10 && points.length > 0) {
+                          const step = chartWidth / (points.length - 1 || 1);
+                          let closestIdx = Math.round((svgX - paddingX) / step);
+                          closestIdx = Math.max(0, Math.min(points.length - 1, closestIdx));
+                          setHoveredPoint(closestIdx);
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredPoint(null)}
+                    >
+                      <defs>
+                        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.4" />
+                          <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.12" />
+                          <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.0" />
+                        </linearGradient>
+                        <linearGradient id="hoverColGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+                        </linearGradient>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                          <feDropShadow dx="0" dy="3" stdDeviation="3.5" floodColor="#2563eb" floodOpacity="0.3" />
+                        </filter>
+                      </defs>
 
-                    {/* Y-Axis Grid Lines */}
-                    {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
-                      const y = paddingY + chartHeight * (1 - ratio);
-                      const val = Math.round(maxHours * ratio);
-                      return (
-                        <g key={i}>
+                      {/* Y-Axis Grid Lines */}
+                      {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+                        const y = paddingY + chartHeight * (1 - ratio);
+                        const val = Math.round(maxHours * ratio);
+                        return (
+                          <g key={i}>
+                            <line 
+                              x1={paddingX} 
+                              y1={y} 
+                              x2={svgWidth - paddingX} 
+                              y2={y} 
+                              stroke="#e2e8f0" 
+                              strokeWidth="0.8" 
+                              strokeDasharray={ratio === 0 ? "none" : "4 4"} 
+                            />
+                            <text 
+                              x={paddingX - 8} 
+                              y={y + 3.5} 
+                              textAnchor="end" 
+                              fontSize="9.5" 
+                              fontWeight="600" 
+                              fill="#94a3b8"
+                            >
+                              {val}h
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Hover Column Highlight Pillar */}
+                      {hoveredPoint !== null && points[hoveredPoint] && (
+                        <rect
+                          x={points[hoveredPoint].x - (chartWidth / (points.length - 1 || 1)) / 2}
+                          y={paddingY}
+                          width={chartWidth / (points.length - 1 || 1)}
+                          height={chartHeight}
+                          fill="url(#hoverColGradient)"
+                          rx="6"
+                        />
+                      )}
+
+                      {/* Area Gradient Fill */}
+                      <path d={svgAreaD} fill="url(#areaGradient)" />
+
+                      {/* Smooth Bézier Curve Line with Soft Glow */}
+                      <path 
+                        d={svgPathD} 
+                        fill="none" 
+                        stroke="#2563eb" 
+                        strokeWidth="3.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        filter="url(#glow)"
+                      />
+
+                      {/* Vertical Crosshair Line on Hover */}
+                      {hoveredPoint !== null && points[hoveredPoint] && (
+                        <g>
                           <line 
-                            x1={paddingX} 
-                            y1={y} 
-                            x2={svgWidth - paddingX} 
-                            y2={y} 
-                            stroke="#f1f5f9" 
-                            strokeWidth="1" 
-                            strokeDasharray={ratio === 0 ? "none" : "3 3"} 
+                            x1={points[hoveredPoint].x} 
+                            y1={paddingY} 
+                            x2={points[hoveredPoint].x} 
+                            y2={paddingY + chartHeight} 
+                            stroke="#2563eb" 
+                            strokeWidth="1.5" 
+                            strokeDasharray="3 3" 
                           />
-                          <text 
-                            x={paddingX - 8} 
-                            y={y + 3} 
-                            textAnchor="end" 
-                            fontSize="9" 
-                            fontWeight="600" 
-                            fill="#94a3b8"
-                          >
-                            {val}h
-                          </text>
                         </g>
-                      );
-                    })}
+                      )}
 
-                    {/* Area Gradient Fill */}
-                    <path d={svgAreaD} fill="url(#areaGradient)" />
+                      {/* Interactive Points on the Curve */}
+                      {points.map((p, idx) => {
+                        const isHovered = hoveredPoint === idx;
+                        const isSunday = p.data.isSunday;
 
-                    {/* Curve Stroke Line */}
-                    <path 
-                      d={svgPathD} 
-                      fill="none" 
-                      stroke="#2563eb" 
-                      strokeWidth="2.5" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                    />
+                        return (
+                          <g key={idx} className="cursor-pointer" onClick={() => setHoveredPoint(idx)}>
+                            {isHovered && (
+                              <circle 
+                                cx={p.x} 
+                                cy={p.y} 
+                                r="11" 
+                                fill="#3b82f6" 
+                                opacity="0.35"
+                                className="animate-ping"
+                              />
+                            )}
 
-                    {/* Vertical & Horizontal Crosshair on Hover */}
-                    {hoveredPoint !== null && points[hoveredPoint] && (
-                      <g>
-                        <line 
-                          x1={points[hoveredPoint].x} 
-                          y1={paddingY} 
-                          x2={points[hoveredPoint].x} 
-                          y2={paddingY + chartHeight} 
-                          stroke="#2563eb" 
-                          strokeWidth="1.5" 
-                          strokeDasharray="3 3" 
-                        />
-                        <line 
-                          x1={paddingX} 
-                          y1={points[hoveredPoint].y} 
-                          x2={points[hoveredPoint].x} 
-                          y2={points[hoveredPoint].y} 
-                          stroke="#93c5fd" 
-                          strokeWidth="1" 
-                          strokeDasharray="2 2" 
-                        />
-                      </g>
-                    )}
-
-                    {/* Interactive Points on the Curve */}
-                    {points.map((p, idx) => {
-                      const isHovered = hoveredPoint === idx;
-                      const isSunday = p.data.isSunday;
-
-                      return (
-                        <g key={idx}>
-                          {isHovered && (
+                            {/* Circle on curve */}
                             <circle 
                               cx={p.x} 
                               cy={p.y} 
-                              r="9" 
-                              fill="#3b82f6" 
-                              opacity="0.25"
-                              className="animate-ping"
+                              r={isHovered ? 6.5 : (isSunday ? 5 : 4)} 
+                              fill={isSunday ? "#ea580c" : (isHovered ? "#1d4ed8" : "#2563eb")} 
+                              stroke="#ffffff" 
+                              strokeWidth={isHovered ? "3" : "2"} 
                             />
-                          )}
 
-                          {/* Circle on curve */}
-                          <circle 
-                            cx={p.x} 
-                            cy={p.y} 
-                            r={isHovered ? 6 : (isSunday ? 4.5 : 3.5)} 
-                            fill={isSunday ? "#ea580c" : (isHovered ? "#1d4ed8" : "#3b82f6")} 
-                            stroke="#ffffff" 
-                            strokeWidth={isHovered ? "2.5" : "1.5"} 
-                          />
+                            {/* X-Axis Label */}
+                            {(chartScope === 'avg_week' || viewMode === 'week' || idx % 3 === 0 || idx === points.length - 1) && (
+                              <g>
+                                {isHovered && (
+                                  <rect
+                                    x={p.x - 14}
+                                    y={paddingY + chartHeight + 6}
+                                    width="28"
+                                    height="18"
+                                    rx="6"
+                                    fill="#2563eb"
+                                  />
+                                )}
+                                <text 
+                                  x={p.x} 
+                                  y={paddingY + chartHeight + (isHovered ? 19 : 17)} 
+                                  textAnchor="middle" 
+                                  fontSize={chartScope === 'avg_week' ? "11" : "10"} 
+                                  fontWeight={isSunday || isHovered ? "800" : "600"} 
+                                  fill={isHovered ? "#ffffff" : (isSunday ? "#ea580c" : "#64748b")}
+                                >
+                                  {p.data.label}
+                                </text>
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
 
-                          {/* X-Axis Label */}
-                          {(chartScope === 'avg_week' || viewMode === 'week' || idx % 3 === 0 || idx === points.length - 1) && (
-                            <text 
-                              x={p.x} 
-                              y={paddingY + chartHeight + 16} 
-                              textAnchor="middle" 
-                              fontSize={chartScope === 'avg_week' ? "11" : "9"} 
-                              fontWeight={isSunday || isHovered ? "800" : "600"} 
-                              fill={isSunday ? "#ea580c" : (isHovered ? "#1d4ed8" : "#64748b")}
-                            >
-                              {p.data.label}
-                            </text>
+                    {/* Rich Floating Tooltip */}
+                    {hoveredPoint !== null && points[hoveredPoint] && (
+                      <div 
+                        className="absolute bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl text-xs pointer-events-none z-30 transition-all border border-white/10 animate-in fade-in duration-100 min-w-[240px]"
+                        style={{
+                          left: `${Math.min(Math.max((points[hoveredPoint].x / svgWidth) * 100, 18), 82)}%`,
+                          top: points[hoveredPoint].y > 90 ? '10px' : '95px',
+                          transform: 'translateX(-50%)'
+                        }}
+                      >
+                        <div className="font-extrabold text-blue-300 border-b border-slate-700/80 pb-1.5 mb-2 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                            <span className="text-white text-xs">
+                              {chartScope === 'avg_week' 
+                                ? `${points[hoveredPoint].data.subLabel} (${points[hoveredPoint].data.label})` 
+                                : `${points[hoveredPoint].data.label} (${points[hoveredPoint].data.subLabel})`}
+                            </span>
+                          </div>
+                          <span className="text-white font-mono bg-blue-600 px-2 py-0.5 rounded-md text-[11px] font-bold shadow-xs">
+                            {points[hoveredPoint].data.totalHours}h {chartScope === 'avg_week' ? 'TB' : ''}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 text-[11px] text-slate-300">
+                          <div className="flex justify-between items-center bg-slate-800/80 px-2.5 py-1 rounded-lg">
+                            <span className="text-slate-400">
+                              {chartScope === 'avg_week' ? 'Trung bình ca trực:' : 'Tổng số ca trực:'}
+                            </span>
+                            <strong className="text-white font-mono">{points[hoveredPoint].data.shiftCount} ca</strong>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                            <div className="flex items-center justify-between bg-slate-800/60 px-2 py-1 rounded-lg">
+                              <span className="text-emerald-400 font-semibold">Sáng (6-14):</span>
+                              <strong className="text-white font-mono">{points[hoveredPoint].data.morningCount}</strong>
+                            </div>
+                            <div className="flex items-center justify-between bg-slate-800/60 px-2 py-1 rounded-lg">
+                              <span className="text-sky-400 font-semibold">Chiều (14-22):</span>
+                              <strong className="text-white font-mono">{points[hoveredPoint].data.afternoonCount}</strong>
+                            </div>
+                            <div className="flex items-center justify-between bg-slate-800/60 px-2 py-1 rounded-lg">
+                              <span className="text-amber-400 font-semibold">Gãy (10-18):</span>
+                              <strong className="text-white font-mono">{points[hoveredPoint].data.splitCount}</strong>
+                            </div>
+                            <div className="flex items-center justify-between bg-slate-800/60 px-2 py-1 rounded-lg">
+                              <span className="text-rose-400 font-semibold">Đêm (22-6):</span>
+                              <strong className="text-white font-mono">{points[hoveredPoint].data.nightCount}</strong>
+                            </div>
+                          </div>
+
+                          {points[hoveredPoint].data.transferCount > 0 && (
+                            <div className="flex justify-between items-center bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2.5 py-1 rounded-lg mt-1 font-bold">
+                              <span>Chi viện liên cửa hàng:</span>
+                              <span>{points[hoveredPoint].data.transferCount} ca</span>
+                            </div>
                           )}
-                        </g>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Day-by-Day Interactive Mini Bar Cards Strip (for 7 days) */}
+                {activeChartData.length <= 7 && (
+                  <div className="grid grid-cols-7 gap-2 mt-3 pt-3 border-t border-slate-100">
+                    {activeChartData.map((d, i) => {
+                      const isHovered = hoveredPoint === i;
+                      const maxVal = Math.max(...activeChartData.map(item => item.totalHours), 1);
+                      const barPct = Math.round((d.totalHours / maxVal) * 100);
+
+                      return (
+                        <div
+                          key={i}
+                          onMouseEnter={() => setHoveredPoint(i)}
+                          onMouseLeave={() => setHoveredPoint(null)}
+                          className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                            isHovered 
+                              ? 'bg-blue-50 border-blue-400 shadow-xs ring-2 ring-blue-400/20 -translate-y-0.5' 
+                              : 'bg-slate-50/70 border-slate-200/80 hover:bg-white'
+                          }`}
+                        >
+                          <span className={`text-[11px] font-black block ${d.isSunday ? 'text-orange-600' : (isHovered ? 'text-blue-700' : 'text-slate-700')}`}>
+                            {d.label}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium block truncate">
+                            {d.subLabel}
+                          </span>
+                          
+                          {/* Mini Progress Bar */}
+                          <div className="w-full bg-slate-200 h-1.5 rounded-full my-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all ${
+                                d.isSunday ? 'bg-orange-500' : (isHovered ? 'bg-blue-600' : 'bg-blue-500')
+                              }`}
+                              style={{ width: `${barPct}%` }}
+                            ></div>
+                          </div>
+
+                          <span className="text-xs font-black font-mono text-slate-900 block">
+                            {d.totalHours}h
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-semibold block">
+                            {d.shiftCount} ca
+                          </span>
+                        </div>
                       );
                     })}
-                  </svg>
-
-                  {/* Rich Floating Tooltip */}
-                  {hoveredPoint !== null && points[hoveredPoint] && (
-                    <div 
-                      className="absolute bg-slate-900/95 backdrop-blur-xs text-white p-3 rounded-2xl shadow-2xl text-xs pointer-events-none z-30 transition-all border border-slate-700/80 animate-in fade-in duration-100 min-w-[230px]"
-                      style={{
-                        left: `${Math.min(Math.max((points[hoveredPoint].x / svgWidth) * 100, 16), 84)}%`,
-                        top: points[hoveredPoint].y > 100 ? '10px' : '90px',
-                        transform: 'translateX(-50%)'
-                      }}
-                    >
-                      <div className="font-extrabold text-blue-300 border-b border-slate-700/80 pb-1.5 mb-2 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-                          <span>
-                            {chartScope === 'avg_week' 
-                              ? `${points[hoveredPoint].data.subLabel} (${points[hoveredPoint].data.label})` 
-                              : `${points[hoveredPoint].data.label} (${points[hoveredPoint].data.subLabel})`}
-                          </span>
-                        </div>
-                        <span className="text-white font-mono bg-blue-600 px-2 py-0.5 rounded-md text-[11px] font-bold shadow-xs">
-                          {points[hoveredPoint].data.totalHours}h {chartScope === 'avg_week' ? 'TB' : ''}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1.5 text-[11px] text-slate-300">
-                        <div className="flex justify-between items-center bg-slate-800/80 px-2 py-1 rounded-lg">
-                          <span className="text-slate-400">
-                            {chartScope === 'avg_week' ? 'Trung bình ca trực:' : 'Tổng số ca trực:'}
-                          </span>
-                          <strong className="text-white font-mono">{points[hoveredPoint].data.shiftCount} ca</strong>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1.5 pt-1">
-                          <div className="flex items-center justify-between bg-slate-800/50 px-2 py-0.5 rounded">
-                            <span className="text-emerald-400">Sáng (6-14):</span>
-                            <strong className="text-white">{points[hoveredPoint].data.morningCount}</strong>
-                          </div>
-                          <div className="flex items-center justify-between bg-slate-800/50 px-2 py-0.5 rounded">
-                            <span className="text-blue-400">Chiều (14-22):</span>
-                            <strong className="text-white">{points[hoveredPoint].data.afternoonCount}</strong>
-                          </div>
-                          <div className="flex items-center justify-between bg-slate-800/50 px-2 py-0.5 rounded">
-                            <span className="text-orange-400">Gãy (10-18):</span>
-                            <strong className="text-white">{points[hoveredPoint].data.splitCount}</strong>
-                          </div>
-                          <div className="flex items-center justify-between bg-slate-800/50 px-2 py-0.5 rounded">
-                            <span className="text-rose-400">Đêm (22-6):</span>
-                            <strong className="text-white">{points[hoveredPoint].data.nightCount}</strong>
-                          </div>
-                        </div>
-
-                        {points[hoveredPoint].data.transferCount > 0 && (
-                          <div className="flex justify-between items-center bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2 py-1 rounded-lg mt-1 font-bold">
-                            <span>Chi viện liên cửa hàng:</span>
-                            <span>{points[hoveredPoint].data.transferCount} ca</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Quick Insights Sidebar */}

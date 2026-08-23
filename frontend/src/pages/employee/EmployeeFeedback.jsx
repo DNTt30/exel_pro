@@ -18,6 +18,7 @@ import {
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
+import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 
 export default function EmployeeFeedback() {
   const { user, addFeedback, feedbacks, currentWeek, schedule } = useStore();
@@ -28,37 +29,16 @@ export default function EmployeeFeedback() {
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && user?.role.includes('PT'));
 
   // 1. Tính tổng giờ tháng chu kỳ 26-25 của nhân viên
-  const cycleDates = useMemo(() => {
-    const parts = currentWeek.split('-');
-    let y = parseInt(parts[0], 10);
-    let m = parseInt(parts[1], 10);
-    let d = parseInt(parts[2], 10);
-    
-    let prevM = m - 1;
-    let prevY = y;
-    let curM = m;
-    let curY = y;
-    
-    if (d >= 26) {
-      prevM = m;
-      prevY = y;
-      curM = m + 1;
-      if (curM > 12) { curM = 1; curY++; }
-    } else {
-      if (prevM < 1) { prevM = 12; prevY--; }
-    }
-    
-    const dates = [];
-    const daysInPrevMonth = new Date(prevY, prevM, 0).getDate();
-    for (let day = 26; day <= daysInPrevMonth; day++) dates.push(`${day}`);
-    for (let day = 1; day <= 25; day++) dates.push(`${day}`);
-    return dates;
-  }, [currentWeek]);
+  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const cycleDates = useMemo(
+    () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
+    [payrollCycle]
+  );
 
   const monthTotalHours = useMemo(() => {
     let total = 0;
-    cycleDates.forEach(dayKey => {
-      const s = mySched[dayKey];
+    cycleDates.forEach(d => {
+      const s = schedule[d.weekKey]?.[user?.id]?.[d.dayKey] || mySched[d.dayKey];
       const actual = getShiftCode(s);
       if (actual && actual !== 'off') {
         if (SHIFTS[actual]) total += SHIFTS[actual].hours;
@@ -74,7 +54,7 @@ export default function EmployeeFeedback() {
       }
     });
     return total;
-  }, [mySched, cycleDates]);
+  }, [schedule, mySched, cycleDates, user?.id]);
 
   const isOver91 = isPT && monthTotalHours > 91;
 

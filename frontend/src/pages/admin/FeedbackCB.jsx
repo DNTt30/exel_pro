@@ -6,55 +6,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getRoleBadgeInfo, WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
-
-// Helper phân tích ngày và tự động xác định Thứ + Tuần
-function parseDateDetails(dateStr) {
-  if (!dateStr) return { dayKey: 'T2', dayLabel: 'Thứ Hai', weekMonday: null, formattedDate: '-' };
-  
-  let d = null;
-  let cleanStr = dateStr.trim();
-
-  if (cleanStr.includes('/')) {
-    const parts = cleanStr.split('/').map(Number);
-    if (parts.length === 3) {
-      // DD/MM/YYYY hoặc D/M/YYYY
-      const day = parts[0];
-      const month = parts[1];
-      const year = parts[2] < 100 ? 2000 + parts[2] : parts[2];
-      d = new Date(year, month - 1, day);
-    }
-  } else if (cleanStr.includes('-')) {
-    const parts = cleanStr.split('-').map(Number);
-    if (parts.length === 3) {
-      if (parts[0] > 1000) {
-        // YYYY-MM-DD
-        d = new Date(parts[0], parts[1] - 1, parts[2]);
-      } else {
-        // DD-MM-YYYY
-        d = new Date(parts[2], parts[1] - 1, parts[0]);
-      }
-    }
-  }
-
-  if (!d || isNaN(d.getTime())) {
-    return { dayKey: 'T2', dayLabel: 'Thứ Hai', weekMonday: null, formattedDate: cleanStr };
-  }
-
-  const dayOfWeek = d.getDay(); // 0 = CN, 1 = T2, ..., 6 = T7
-  const dayKeyMapping = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-  const dayKey = dayKeyMapping[dayOfWeek];
-  const dayLabel = DAY_FULL_NAMES[dayKey] || dayKey;
-
-  // Tính ngày Thứ Hai của tuần đó
-  const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-  const monday = new Date(d);
-  monday.setDate(diff);
-  const weekMonday = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-
-  const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-
-  return { dayKey, dayLabel, weekMonday, formattedDate };
-}
+import { parseDateDetails } from '../../utils/dateHelper';
 
 const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
   // Tìm thông tin nhân viên theo ID nếu trong feedback bị thiếu tên

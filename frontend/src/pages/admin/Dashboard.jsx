@@ -205,13 +205,21 @@ export default function Dashboard() {
     return actual;
   };
 
-  // 3. Tính toán toàn bộ nhân viên Part-time
-  const allPTEmployees = useMemo(() => {
-    let ptEmps = employees.filter(e => e.type === 'PARTTIME' || e.type === 'STPT' || (e.role && e.role.includes('PT')));
-    
+  // 1. Danh sách nhân viên theo cửa hàng đang chọn (hoặc toàn chuỗi nếu ALL)
+  const currentDeptEmployees = useMemo(() => {
+    let list = employees;
     if (!pickStore && user?.dept) {
-      ptEmps = ptEmps.filter(e => e.dept === user.dept);
+      list = list.filter(e => e.dept === user.dept);
     }
+    if (filterDept !== 'ALL') {
+      list = list.filter(e => e.dept === filterDept);
+    }
+    return list;
+  }, [employees, filterDept, pickStore, user?.dept]);
+
+  // 3. Tính toán toàn bộ nhân viên Part-time (đã lọc theo cửa hàng đang chọn)
+  const allPTEmployees = useMemo(() => {
+    let ptEmps = currentDeptEmployees.filter(e => e.type === 'PARTTIME' || e.type === 'STPT' || (e.role && e.role.includes('PT')));
 
     return ptEmps.map(emp => {
       const empWeekSched = weekSchedule[emp.id] || {};
@@ -284,7 +292,7 @@ export default function Dashboard() {
         isOvertime
       };
     });
-  }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, user?.dept]);
+  }, [currentDeptEmployees, schedule, weekSchedule, cycleDates, viewMode]);
 
   // 4. Lọc danh sách theo Search, Cửa hàng và Toggle
   const filteredPTList = useMemo(() => {
@@ -295,18 +303,14 @@ export default function Dashboard() {
       list = list.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
     }
 
-    if (filterDept !== 'ALL') {
-      list = list.filter(e => e.dept === filterDept);
-    }
-
     if (filterOnlyOvertime) {
       list = list.filter(e => e.isOvertime);
     }
 
     return list;
-  }, [allPTEmployees, search, filterDept, filterOnlyOvertime]);
+  }, [allPTEmployees, search, filterOnlyOvertime]);
 
-  // Danh sách vượt hạn mức
+  // Danh sách vượt hạn mức (đã lọc theo cửa hàng đang chọn)
   const ptOvertimeList = useMemo(() => {
     return allPTEmployees.filter(e => e.isOvertime);
   }, [allPTEmployees]);
@@ -315,8 +319,9 @@ export default function Dashboard() {
   const storeStats = useMemo(() => {
     const map = {};
     employees.forEach(emp => {
+      if (!pickStore && user?.dept && emp.dept !== user.dept) return;
       if (!map[emp.dept]) {
-        map[emp.dept] = { totalEmps: 0, ptEmps: 0, ptOver91: 0, totalHours: 0 };
+        map[emp.dept] = { dept: emp.dept, totalEmps: 0, ptEmps: 0, ptOver91: 0, totalHours: 0 };
       }
       map[emp.dept].totalEmps++;
       const isPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
@@ -367,13 +372,17 @@ export default function Dashboard() {
       }
     });
 
-    return Object.entries(map).map(([dept, data]) => ({ dept, ...data }));
-  }, [employees, schedule, weekSchedule, cycleDates, viewMode]);
+    return Object.values(map);
+  }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, user?.dept]);
 
-  // Tổng giờ toàn chuỗi
-  const totalSystemHours = useMemo(() => {
-    return storeStats.reduce((sum, s) => sum + s.totalHours, 0);
-  }, [storeStats]);
+  // Tổng giờ theo cửa hàng đang chọn (hoặc toàn chuỗi nếu ALL)
+  const currentDeptTotalHours = useMemo(() => {
+    if (filterDept === 'ALL') {
+      return storeStats.reduce((sum, s) => sum + s.totalHours, 0);
+    }
+    const found = storeStats.find(s => s.dept === filterDept);
+    return found ? found.totalHours : 0;
+  }, [storeStats, filterDept]);
 
   // 6. Tính toán Kệ & Date và Nhân sự hôm nay
   const quickStats = useMemo(() => {
@@ -489,7 +498,7 @@ export default function Dashboard() {
 
   return (
     <div className="w-full min-h-full bg-slate-100/90 p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in duration-200">
-      <ManagerActionList />
+      <ManagerActionList storeId={filterDept} />
       
       {/* Modern Full-width Header & Command Bar */}
       <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -666,12 +675,12 @@ export default function Dashboard() {
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
               <span className="text-2xl sm:text-3xl font-black font-mono text-blue-700">{quickStats.empsWorkingToday}</span>
-              <span className="text-[11px] text-slate-500 font-semibold">/ {employees.length} NV</span>
+              <span className="text-[11px] text-slate-500 font-semibold">/ {currentDeptEmployees.length} NV</span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
-              {employees.length - allPTEmployees.length} FT • {allPTEmployees.length} PT
+              {currentDeptEmployees.length - allPTEmployees.length} FT • {allPTEmployees.length} PT
             </span>
             <button 
               onClick={() => scrollToChart('shifts')}
@@ -694,7 +703,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-indigo-700">{totalSystemHours.toLocaleString()}</span>
+              <span className="text-2xl sm:text-3xl font-black font-mono text-indigo-700">{currentDeptTotalHours.toLocaleString()}</span>
               <span className="text-[11px] text-slate-500 font-semibold">giờ</span>
             </div>
           </div>
@@ -721,8 +730,12 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-slate-800">{stores.length || 3}</span>
-              <span className="text-[11px] text-slate-500 font-semibold">chi nhánh</span>
+              <span className="text-2xl sm:text-3xl font-black font-mono text-slate-800">
+                {filterDept === 'ALL' ? (stores.length || 3) : 1}
+              </span>
+              <span className="text-[11px] text-slate-500 font-semibold">
+                {filterDept === 'ALL' ? 'chi nhánh' : 'chi nhánh'}
+              </span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -768,7 +781,7 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time (Thay thế thẻ AI thừa) */}
+        {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time */}
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
@@ -811,12 +824,12 @@ export default function Dashboard() {
           currentWeek={currentWeek}
           cycleDates={cycleDates}
           weekDaysInfo={weekDaysInfo}
-          employees={employees}
+          employees={currentDeptEmployees}
           allPTEmployees={allPTEmployees}
           ptOvertimeList={ptOvertimeList}
-          storeStats={storeStats}
+          storeStats={filterDept === 'ALL' ? storeStats : storeStats.filter(s => s.dept === filterDept)}
           schedule={schedule}
-          totalSystemHours={totalSystemHours}
+          totalSystemHours={currentDeptTotalHours}
           activeTab={activeChartTab}
           setActiveTab={setActiveChartTab}
         />

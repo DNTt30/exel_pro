@@ -6,14 +6,17 @@ import { WEEK_DAYS } from '../data/constants';
 import { normalizeShift, getShiftHours } from '../utils/shiftHelper';
 import { canPickStore } from '../lib/authSession';
 
-export default function ManagerActionList() {
+export default function ManagerActionList({ storeId = 'ALL' }) {
   const { user, feedbacks, shiftSwaps, employees, schedule, currentWeek } = useStore();
   const pickStore = canPickStore(user);
+  const effectiveStore = (!pickStore && user?.dept) ? user.dept : storeId;
   const weekSched = schedule[currentWeek] || {};
 
   const items = useMemo(() => {
     const list = [];
-    const pendingFb = (feedbacks || []).filter(f => f.status === 'pending' && (pickStore || f.dept === user?.dept));
+    const pendingFb = (feedbacks || []).filter(f => 
+      f.status === 'pending' && (effectiveStore === 'ALL' || f.dept === effectiveStore)
+    );
     if (pendingFb.length) {
       list.push({
         key: 'fb',
@@ -24,7 +27,9 @@ export default function ManagerActionList() {
       });
     }
 
-    const pendingSwaps = (shiftSwaps || []).filter(s => s.status === 'pending_manager' && (pickStore || s.store === user?.dept));
+    const pendingSwaps = (shiftSwaps || []).filter(s => 
+      s.status === 'pending_manager' && (effectiveStore === 'ALL' || s.store === effectiveStore)
+    );
     if (pendingSwaps.length) {
       list.push({
         key: 'swap',
@@ -39,7 +44,7 @@ export default function ManagerActionList() {
     employees.forEach(emp => {
       const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
       if (!isPT) return;
-      if (!pickStore && emp.dept !== user?.dept) return;
+      if (effectiveStore !== 'ALL' && emp.dept !== effectiveStore) return;
       let h = 0;
       WEEK_DAYS.forEach(d => {
         const { shift } = normalizeShift(weekSched[emp.id]?.[d]);

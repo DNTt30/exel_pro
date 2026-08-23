@@ -41,15 +41,28 @@ export default function Dashboard() {
   // Chế độ xem: 'month' (Chu kỳ 26-25 / 31 ngày) hoặc 'week' (7 ngày)
   const [viewMode, setViewMode] = useState('month'); 
 
-  // Chọn chu kỳ tháng (YYYY-M)
+  // Chọn chu kỳ tháng (YYYY-MM)
   const [selectedMonthCycle, setSelectedMonthCycle] = useState(() => {
-    const parts = currentWeek.split('-');
-    return `${parts[0]}-${parts[1]}`;
+    const parts = (currentWeek || '').split('-').map(Number);
+    const y = parts[0] || new Date().getFullYear();
+    const m = parts[1] || (new Date().getMonth() + 1);
+    const d = parts[2] || 1;
+    if (d >= 26) {
+      let nextM = m + 1;
+      let nextY = y;
+      if (nextM > 12) { nextM = 1; nextY++; }
+      return `${nextY}-${String(nextM).padStart(2, '0')}`;
+    }
+    return `${y}-${String(m).padStart(2, '0')}`;
   });
 
   const availableMonths = useMemo(() => {
     const [y, m] = selectedMonthCycle.split('-').map(Number);
     const list = [];
+    const now = new Date();
+    const currentRealYear = now.getFullYear();
+    const currentRealMonth = now.getMonth() + 1;
+
     // Hiển thị danh sách 13 tháng xoay quanh tháng đang chọn
     for (let i = -6; i <= 6; i++) {
       const d = new Date(y, (m - 1) + i, 1);
@@ -60,11 +73,11 @@ export default function Dashboard() {
       let prevY = curY;
       if (prevM < 1) { prevM = 12; prevY--; }
       
-      const key = `${curY}-${curM}`;
       const prevMStr = prevM.toString().padStart(2, '0');
       const curMStr = curM.toString().padStart(2, '0');
+      const key = `${curY}-${curMStr}`; // Đồng bộ YYYY-MM
       
-      const isCurrent = curY === 2026 && curM === 8;
+      const isCurrent = curY === currentRealYear && curM === currentRealMonth;
       let label = `Tháng ${curMStr}/${curY} (26/${prevMStr} → 25/${curMStr})`;
       if (isCurrent) {
         label = `📍 Tháng ${curMStr}/${curY} (26/${prevMStr} → 25/${curMStr}) [Hiện tại]`;
@@ -80,7 +93,7 @@ export default function Dashboard() {
     let newM = m - 1;
     let newY = y;
     if (newM < 1) { newM = 12; newY--; }
-    setSelectedMonthCycle(`${newY}-${newM}`);
+    setSelectedMonthCycle(`${newY}-${String(newM).padStart(2, '0')}`);
   };
 
   const handleNextMonth = () => {
@@ -88,7 +101,7 @@ export default function Dashboard() {
     let newM = m + 1;
     let newY = y;
     if (newM > 12) { newM = 1; newY++; }
-    setSelectedMonthCycle(`${newY}-${newM}`);
+    setSelectedMonthCycle(`${newY}-${String(newM).padStart(2, '0')}`);
   };
 
   const handlePrevWeek = () => {

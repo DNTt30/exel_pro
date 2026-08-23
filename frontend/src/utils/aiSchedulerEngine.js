@@ -1,5 +1,5 @@
-import { WEEK_DAYS, DAY_FULL_NAMES, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
-import { getShiftHours, normalizeShift, parseShiftTimeRange, isShiftsOverlapping } from './shiftHelper';
+import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
+import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -15,7 +15,7 @@ function shiftLine(raw) {
   return covering_store ? `${shift} (hỗ trợ ${covering_store})` : shift;
 }
 
-function formatEmpWeek(emp, weekSchedule, currentWeek) {
+function formatEmpWeek(emp, weekSchedule) {
   const empSched = weekSchedule[emp.id] || {};
   let totalH = 0;
   let totalShifts = 0;
@@ -686,7 +686,6 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   const { 
     employees = [], 
     weekSchedule = {}, 
-    schedule = {},
     stores = [],
     shiftSwaps = [],
     feedbacks = [],
@@ -696,9 +695,6 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   } = context;
 
   const storeEmps = employees.filter(e => e.dept === storeId);
-  const newEmps = storeEmps.filter(isNewStaff);
-  const seniorEmps = storeEmps.filter(isSeniorStaff);
-  const ftEmps = storeEmps.filter(e => e.type === 'STFT' || e.type === 'SM' || e.role?.includes('SM'));
 
   const recipeReply = lookupFfOnsiteRecipe(q);
   if (recipeReply) return recipeReply;

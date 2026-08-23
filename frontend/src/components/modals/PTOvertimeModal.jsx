@@ -1,14 +1,18 @@
 import React, { useMemo } from 'react';
-import Modal from './Modal';
+
 import { useStore } from '../../store/useStore';
-import { SHIFTS } from '../../data/initialData';
+
 import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { Download, AlertTriangle, Users, FileSpreadsheet } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function PTOvertimeModal({ isOpen, onClose }) {
-  const { employees, schedule, currentWeek, ensureWeeksLoaded } = useStore();
-  const weekSchedule = schedule[currentWeek] || {};
+  const { employees, schedule, currentWeek, ensureWeeksLoaded } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded })));
+  const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
   const cycleDates = useMemo(

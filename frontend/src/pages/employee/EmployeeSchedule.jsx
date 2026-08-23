@@ -1,53 +1,28 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
-import { 
-  Download, 
-  Printer, 
-  Search, 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Users, 
-  Building2,
-  FileText,
-  X,
-  Sparkles,
-  Zap,
-  RotateCcw,
-  Save,
-  LayoutGrid,
-  Table,
-  MapPin,
-  Sun,
-  Moon,
-  Coffee,
-  ArrowRightLeft
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Download, Printer, Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, Sparkles, Zap, RotateCcw, LayoutGrid, Table, MapPin, Sun, Moon, Coffee, ArrowRightLeft } from 'lucide-react';
+
 import ShiftInput from '../../components/ShiftInput';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
-import {
-  getStoreLabel,
-  isSupportAssignment,
-  getSwapsForWeek,
-  getSwapBadgeForDay
-} from '../../utils/scheduleAnnotations';
+import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
-  const { user, schedule, updateShift, currentWeek, setCurrentWeek, employees, shiftSwaps, stores } = useStore();
-  const weekSchedule = schedule[currentWeek] || {};
+  // 'employees' không dùng ở đây — bỏ để tránh đăng ký thừa
+  const { user, schedule, updateShift, currentWeek, setCurrentWeek, shiftSwaps, stores } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores })));
+  const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
-  const [search, setSearch] = useState('');
-  const [filterOnlyMe, setFilterOnlyMe] = useState(false);
+  const [search] = useState('');
+  const [filterOnlyMe] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving'
   const [displayView, setDisplayView] = useState('card'); // 'card' (Lịch thẻ cá nhân) hoặc 'table' (Bảng tính toàn CH)
   const [showSwapModal, setShowSwapModal] = useState(false);
@@ -65,7 +40,7 @@ export default function EmployeeSchedule() {
   const groupedEmps = useGroupedEmployees(search, myDept, 'ALL', weekSchedule);
 
   // 4. Lịch của nhân viên đăng nhập
-  const mySched = weekSchedule[user?.id] || {};
+  const mySched = weekSchedule[user?.id] || EMPTY_SCHED;
 
   // 5. Kiểm tra xem tuần đang chọn có phải là TUẦN SAU / TƯƠNG LAI hay không
   const isFutureWeek = useMemo(() => {

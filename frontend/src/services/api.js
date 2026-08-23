@@ -44,7 +44,8 @@ function isOptionalStoreColumnError(message) {
 }
 
 function stripOptionalStoreCols(payload) {
-  const { staffing, demand, ...rest } = payload;
+  // Bỏ chủ đích 2 cột tùy chọn — tiền tố _ để lint hiểu là cố ý
+  const { staffing: _staffing, demand: _demand, ...rest } = payload;
   return rest;
 }
 
@@ -645,7 +646,7 @@ export async function saveShelf(shelf) {
     const { data, error } = await db().from('store_shelves').update(row).eq('id', shelf.id).select().single();
     if (error) {
       if (/due_date|schema cache|column/i.test(error.message || '')) {
-        const { due_date, ...rest } = row;
+        const { due_date: _due_date, ...rest } = row;
         const retry = await db().from('store_shelves').update(rest).eq('id', shelf.id).select().single();
         if (retry.error) throw retry.error;
         return mapShelf({ ...retry.data, due_date: shelf.dueDate || '' });
@@ -657,7 +658,7 @@ export async function saveShelf(shelf) {
   const { data, error } = await db().from('store_shelves').insert([row]).select().single();
   if (error) {
     if (/due_date|schema cache|column/i.test(error.message || '')) {
-      const { due_date, ...rest } = row;
+      const { due_date: _due_date, ...rest } = row;
       const retry = await db().from('store_shelves').insert([rest]).select().single();
       if (retry.error) throw retry.error;
       return mapShelf({ ...retry.data, due_date: shelf.dueDate || '' });
@@ -698,11 +699,11 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
   if (error) {
     // Cố phục hồi dữ liệu cũ nếu insert thất bại
     if (backup?.length) {
-      const restorePayload = backup.map(({ id, ...rest }) => rest);
+      const restorePayload = backup.map(({ id: _id, ...rest }) => rest);
       await db().from('shelf_items').insert(restorePayload).select();
     }
     if (/sku|expiry_date_2|schema cache|column/i.test(error.message || '')) {
-      const slim = payload.map(({ sku, expiry_date_2, ...rest }) => rest);
+      const slim = payload.map(({ sku: _sku, expiry_date_2: _expiry_date2, ...rest }) => rest);
       const retry = await db().from('shelf_items').insert(slim).select();
       if (retry.error) throw retry.error;
       return (retry.data || []).map((row, i) => mapShelfItem({

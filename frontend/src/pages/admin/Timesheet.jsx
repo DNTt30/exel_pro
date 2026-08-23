@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
@@ -8,9 +8,10 @@ import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { canPickStore } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function Timesheet() {
-  const { user, currentWeek, schedule, ensureWeeksLoaded } = useStore();
+  const { user, currentWeek, schedule, ensureWeeksLoaded } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   
   const pickStore = canPickStore(user);
   const [search, setSearch] = useState('');
@@ -30,7 +31,8 @@ export default function Timesheet() {
 
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole);
 
-  const getDayValue = (empId, day) => {
+  // useCallback giữ tham chiếu ổn định để TimesheetRow (memo) bỏ qua render thừa
+  const getDayValue = useCallback((empId, day) => {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell) return '';
     const raw = schedule[cell.weekKey]?.[empId]?.[cell.dayKey];
@@ -38,7 +40,7 @@ export default function Timesheet() {
     if (!code || code === 'off') return 'OFF';
     const hours = getShiftHours(code);
     return hours > 0 ? String(hours) : code;
-  };
+  }, [cycleDates, schedule]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">

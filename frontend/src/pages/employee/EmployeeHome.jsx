@@ -6,10 +6,14 @@ import { WEEK_DAYS, SCHEDULE_RULES } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import { collectExpiryAlerts } from '../../utils/shelfExpiry';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function EmployeeHome() {
-  const { user, schedule, currentWeek, shiftSwaps, stores, shelves, shelfItems } = useStore();
-  const mySched = schedule[currentWeek]?.[user?.id] || {};
+  const { user, schedule, currentWeek, shiftSwaps, stores, shelves, shelfItems } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, shelves: s.shelves, shelfItems: s.shelfItems })));
+  const mySched = schedule[currentWeek]?.[user?.id] || EMPTY_SCHED;
   const myDept = user?.dept || '';
 
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && String(user.role).includes('PT'));

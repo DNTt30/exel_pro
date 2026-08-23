@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { WEEK_DAYS, buildStaffingByDay, suggestStaffingFromDemand, normalizeStoreDemand } from '../../data/constants';
 import { generateAISchedule, auditSchedule } from '../../utils/aiSchedulerEngine';
 import { analyzeSalesImages } from '../../utils/salesImageAnalyzer';
+import { useShallow } from 'zustand/react/shallow';
 
 function fmtVnd(n) {
   const v = Number(n) || 0;
@@ -39,9 +40,12 @@ function DemandField({ label, customers, sales, onCustomers, onSales }) {
   );
 }
 
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
+
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
-  const { employees, schedule, applyAiSchedule, user, stores } = useStore();
-  const weekSched = schedule[currentWeek] || {};
+  const { employees, schedule, applyAiSchedule, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
+  const weekSched = schedule[currentWeek] || EMPTY_SCHED;
   const defaultStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || 'VN0485') : storeId;
 
   const [selectedStoreId, setSelectedStoreId] = useState(defaultStoreId);
@@ -82,14 +86,14 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
     setAiResult(null);
     setError('');
     setShowAudit(false);
-  }, [isOpen]);
+  }, [isOpen, defaultStoreId, stores]);
 
   // Khi đổi cửa hàng → reset demand
   useEffect(() => {
     setDemand(normalizeStoreDemand(activeStore?.demand));
     setAiResult(null);
     setError('');
-  }, [selectedStoreId]);
+  }, [selectedStoreId, activeStore?.demand]);
 
   const patchDemand = (bucket, field, value) => {
     const n = Math.max(0, Number(String(value).replace(/[^\d]/g, '')) || 0);

@@ -4,9 +4,10 @@ import { useStore } from '../../store/useStore';
 import StaffingMatrixFields from '../StaffingMatrixFields';
 import StoreDemandFields from '../StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function AddStoreModal({ isOpen, onClose }) {
-  const { addStore } = useStore();
+  const { addStore } = useStore(useShallow((s) => ({ addStore: s.addStore })));
   const [formData, setFormData] = useState({
     id: '',
     name: '',

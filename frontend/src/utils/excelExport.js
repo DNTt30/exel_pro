@@ -5,7 +5,7 @@ import { normalizeShift } from './shiftHelper';
  * Xuất lịch làm việc ra file Excel (.xls) có đầy đủ định dạng bảng biểu, màu sắc ca làm việc,
  * header ngày tháng chi tiết và KHÔNG bị lỗi Excel tự động chuyển 6-14 thành ngày tháng (14-Jun).
  */
-export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, weekSchedule, viewMode = 'week' }) {
+export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, weekSchedule }) {
   const parts = currentWeek.split('-');
   const y = parseInt(parts[0], 10);
   const m = parseInt(parts[1], 10);
@@ -182,7 +182,6 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
       let total = 0;
       let ftTotal = 0;
       let ptTotal = 0;
-      let klCount = 0;
 
       const isPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
 
@@ -204,7 +203,6 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
           else if (val === '22-6') cellStyle = 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
           else cellStyle = 'background-color: #e2e8f0; color: #1e293b; font-weight: bold;';
         } else if (val === 'KL') {
-          klCount++;
           cellStyle = 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;';
         }
 

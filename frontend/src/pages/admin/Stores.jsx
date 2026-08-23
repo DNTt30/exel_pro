@@ -5,9 +5,10 @@ import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore, user } = useStore();
+  const { stores, addStore, updateStore, deleteStore, user } = useStore(useShallow((s) => ({ stores: s.stores, addStore: s.addStore, updateStore: s.updateStore, deleteStore: s.deleteStore, user: s.user })));
   const pickStore = canPickStore(user);
   const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
   const [isAdding, setIsAdding] = useState(false);

@@ -2,15 +2,15 @@ import React, { useState, useRef } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import * as api from '../../services/api';
-import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, X, RefreshCw, Layers } from 'lucide-react';
-import { WEEK_DAYS, MA_RE } from '../../data/constants';
+import { Upload, FileSpreadsheet, Download, AlertTriangle, X } from 'lucide-react';
+import { WEEK_DAYS } from '../../data/constants';
 import { provisionAuthUser } from '../../lib/authSession';
-import { SHIFTS } from '../../data/initialData';
-import { normalizeShift } from '../../utils/shiftHelper';
+
+
+import { useShallow } from 'zustand/react/shallow';
 
 export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
-  const { employees, stores, schedule } = useStore();
+  const { employees, stores, schedule } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule })));
   const [file, setFile] = useState(null);
   const [parsedData, setParsedData] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
@@ -19,8 +19,9 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Tải file mẫu Excel
-  const handleDownloadTemplate = () => {
+  // Tải file mẫu Excel (xlsx nạp động để không nhét vào bundle chính)
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx');
     const header = ['Mã NV', 'Họ và Tên', 'Cửa hàng', 'Vị trí', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     const sampleRows = [
       ['260716009', 'DƯƠNG NGỌC TÚ', 'VN0485', 'STFT', '6-14', '6-14', '6-14', '6-14', '6-14', '6-14', 'off'],
@@ -50,8 +51,9 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
     setFile(fileObj);
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];

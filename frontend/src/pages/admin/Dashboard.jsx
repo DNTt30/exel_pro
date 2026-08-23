@@ -3,39 +3,21 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { 
-  AlertTriangle, 
-  Users, 
-  Clock, 
-  Building2, 
-  Download, 
-  Search, 
-  CheckCircle2, 
-  FileSpreadsheet,
-  ArrowRight,
-  TrendingUp,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  X,
-  Info,
-  Layers,
-  MessageSquare,
-  Package,
-  PieChart,
-  BarChart3
-} from 'lucide-react';
+import { AlertTriangle, Users, Clock, Building2, Download, Search, CheckCircle2, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, Package, PieChart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import { canPickStore } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
+
 export default function Dashboard() {
-  const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems, ensureWeeksLoaded } = useStore();
+  const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems, ensureWeeksLoaded } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, stores: s.stores, user: s.user, shelves: s.shelves, shelfItems: s.shelfItems, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   const pickStore = canPickStore(user);
-  const weekSchedule = schedule[currentWeek] || {};
+  const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
   const availableWeeks = Object.keys(schedule).sort();
 
   // Chế độ xem: 'month' (Chu kỳ 26-25 / 31 ngày) hoặc 'week' (7 ngày)

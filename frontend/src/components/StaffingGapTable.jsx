@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Users, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
-import { WEEK_DAYS, DAY_FULL_NAMES, getStaffingMatrix, normalizeStaffingConfig } from '../data/constants';
+import { WEEK_DAYS, getStaffingMatrix, normalizeStaffingConfig } from '../data/constants';
 import { calculateStaffingGap } from '../utils/shiftHelper';
 import { useStore } from '../store/useStore';
 import StaffingMatrixFields from './StaffingMatrixFields';
 import { isOpsManager } from '../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
-  const { stores, user, updateStore } = useStore();
+  const { stores, user, updateStore } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore })));
   const isAdmin = isOpsManager(user);
 
   const storeOptions = stores.length ? stores : [{ id: filterDept && filterDept !== 'ALL' ? filterDept : 'VN0485', name: filterDept }];
@@ -25,7 +26,11 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
     if (filterDept && filterDept !== 'ALL') setStoreId(filterDept);
   }, [filterDept]);
 
-  const store = stores.find(s => s.id === storeId) || { id: storeId, staffing: null };
+  // Memo để tham chiếu `store` ổn định giữa các render
+  const store = useMemo(
+    () => stores.find(s => s.id === storeId) || { id: storeId, staffing: null },
+    [stores, storeId]
+  );
   const requiredMatrix = useMemo(
     () => getStaffingMatrix({ staffing: draftStaffing || store.staffing }, selectedDay),
     [store, selectedDay, draftStaffing]

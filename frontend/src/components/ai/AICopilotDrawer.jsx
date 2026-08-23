@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, X, Bot, User, MessageSquare, ChevronRight, Trash2 } from 'lucide-react';
+import { Send, X, User, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { askAICopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { inferAiIntent } from '../../utils/appLogs';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId }) {
-  const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore();
+  const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, stores: s.stores, shiftSwaps: s.shiftSwaps, feedbacks: s.feedbacks, user: s.user })));
   const weekSched = schedule[currentWeek] || {};
   const activeStoreId = storeId === 'ALL' ? (user?.dept || 'VN0485') : storeId;
 

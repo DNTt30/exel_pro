@@ -3,9 +3,10 @@ import { useStore } from '../store/useStore';
 import { WEEK_DAYS } from '../data/constants';
 import { getCoveringStore } from '../utils/shiftHelper';
 import { canPickStore } from '../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule = null) {
-  const { employees, user } = useStore();
+  const { employees, user } = useStore(useShallow((s) => ({ employees: s.employees, user: s.user })));
   const pickStore = canPickStore(user);
 
   const groupedEmps = useMemo(() => {

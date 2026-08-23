@@ -1,14 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
-import { RefreshCw, ArrowRightLeft, User, Calendar, AlertCircle, AlertTriangle } from 'lucide-react';
+import { RefreshCw, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
-  const { user, employees, schedule, addShiftSwap } = useStore();
-  const weekSched = schedule[currentWeek] || {};
-  const mySched = weekSched[user?.id] || {};
+  const { user, employees, schedule, addShiftSwap } = useStore(useShallow((s) => ({ user: s.user, employees: s.employees, schedule: s.schedule, addShiftSwap: s.addShiftSwap })));
+  const weekSched = schedule[currentWeek] || EMPTY_SCHED;
+  const mySched = weekSched[user?.id] || EMPTY_SCHED;
 
   // 1. Chỉ lấy những ngày BẢN THÂN CÓ CA LÀM VIỆC (khác OFF)
   const myShiftsList = useMemo(() => {

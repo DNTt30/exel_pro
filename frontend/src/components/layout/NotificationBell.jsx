@@ -17,9 +17,10 @@ import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { WEEK_DAYS } from '../../data/constants';
 import { collectExpiryAlerts } from '../../utils/shelfExpiry';
 import { canPickStore, isOpsManager } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function NotificationBell() {
-  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems } = useStore();
+  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, schedule: s.schedule, currentWeek: s.currentWeek, employees: s.employees, shiftSwaps: s.shiftSwaps, shelves: s.shelves, shelfItems: s.shelfItems })));
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [readIds, setReadIds] = useState(() => {

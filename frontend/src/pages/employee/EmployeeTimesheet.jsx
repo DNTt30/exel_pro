@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { 
   Download, 
@@ -15,9 +15,10 @@ import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function EmployeeTimesheet() {
-  const { user, schedule, currentWeek, ensureWeeksLoaded } = useStore();
+  const { user, schedule, currentWeek, ensureWeeksLoaded } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   const weekSchedule = schedule[currentWeek] || {};
   const myDept = user?.dept || 'VN0497';
 
@@ -49,14 +50,14 @@ export default function EmployeeTimesheet() {
     return result;
   }, [rawGroupedEmps, filterOnlyMe, user?.id]);
 
-  const getDayValue = (empId, day) => {
+  const getDayValue = useCallback((empId, day) => {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell) return '';
     const actual = getShiftCode(schedule[cell.weekKey]?.[empId]?.[cell.dayKey]);
     if (!actual || actual === 'off' || actual === 'OFF') return 'OFF';
     const hours = getShiftHours(actual);
     return hours > 0 ? String(hours) : actual;
-  };
+  }, [cycleDates, schedule]);
 
   // Tính tổng giờ công của cá nhân
   const myTotalHours = useMemo(() => {
@@ -70,7 +71,7 @@ export default function EmployeeTimesheet() {
       }
     });
     return total;
-  }, [user, activeDays, weekSchedule, cycleDates]);
+  }, [getDayValue, activeDays, user?.id]);
 
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && user?.role.includes('PT'));
   const isOver91 = isPT && myTotalHours > 91;

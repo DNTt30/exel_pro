@@ -5,9 +5,10 @@ import { SHIFTS } from '../../data/initialData';
 import { WEEK_DAYS } from '../../data/constants';
 import { isShiftsOverlapping, normalizeShift } from '../../utils/shiftHelper';
 import { canPickStore, isOpsManager } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function TransferModal({ isOpen, onClose }) {
-  const { employees, stores, schedule, updateShift, currentWeek, user } = useStore();
+  const { employees, stores, schedule, updateShift, currentWeek, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user })));
   const weekSched = schedule[currentWeek] || {};
   const pickStore = canPickStore(user);
   const isManager = isOpsManager(user);

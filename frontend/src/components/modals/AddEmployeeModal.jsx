@@ -3,9 +3,10 @@ import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { MA_RE, STANDARD_ROLES } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function AddEmployeeModal({ isOpen, onClose }) {
-  const { stores, addEmployee, user } = useStore();
+  const { stores, addEmployee, user } = useStore(useShallow((s) => ({ stores: s.stores, addEmployee: s.addEmployee, user: s.user })));
   const pickStore = canPickStore(user);
   const [formData, setFormData] = useState({ 
     id: '', 

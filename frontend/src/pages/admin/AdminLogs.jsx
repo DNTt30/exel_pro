@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { Search, ScrollText, Shield, Bot, Activity } from 'lucide-react';
 import { canPickStore } from '../../lib/authSession';
@@ -22,14 +22,17 @@ const TABS = [
   { id: 'ai', label: 'AI chat', icon: Bot }
 ];
 
+// Mảng / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_ARR = [];
+
 export default function AdminLogs() {
   const user = useStore(s => s.user);
-  const activityLogs = useStore(s => s.activityLogs) || [];
-  const auditLogs = useStore(s => s.auditLogs) || [];
-  const aiConversations = useStore(s => s.aiConversations) || [];
-  const adminLogs = useStore(s => s.adminLogs) || [];
+  const activityLogs = useStore(s => s.activityLogs) || EMPTY_ARR;
+  const auditLogs = useStore(s => s.auditLogs) || EMPTY_ARR;
+  const aiConversations = useStore(s => s.aiConversations) || EMPTY_ARR;
+  const adminLogs = useStore(s => s.adminLogs) || EMPTY_ARR;
   const loadAdminLogs = useStore(s => s.loadAdminLogs);
-  const stores = useStore(s => s.stores) || [];
+  const stores = useStore(s => s.stores) || EMPTY_ARR;
   const pickStore = canPickStore(user);
 
   const [tab, setTab] = useState('audit');
@@ -43,7 +46,7 @@ export default function AdminLogs() {
   }, [loadAdminLogs]);
 
   const q = search.trim().toLowerCase();
-  const matchStore = (storeId) => storeFilter === 'ALL' || storeId === storeFilter;
+  const matchStore = useCallback((storeId) => storeFilter === 'ALL' || storeId === storeFilter, [storeFilter]);
 
   const activityRows = useMemo(() => {
     const src = activityLogs.length
@@ -68,7 +71,7 @@ export default function AdminLogs() {
       return [l.userId, l.metadata?.actorName, l.action, l.entityId, l.description, l.ipAddress]
         .some(v => String(v || '').toLowerCase().includes(q));
     });
-  }, [activityLogs, adminLogs, tab, storeFilter, actionFilter, q]);
+  }, [activityLogs, adminLogs, tab, matchStore, actionFilter, q]);
 
   const auditRows = useMemo(() => {
     return auditLogs.filter(l => {
@@ -78,7 +81,7 @@ export default function AdminLogs() {
       return [l.actorId, l.action, l.resourceType, l.resourceId, l.metadata?.description, JSON.stringify(l.oldData), JSON.stringify(l.newData)]
         .some(v => String(v || '').toLowerCase().includes(q));
     });
-  }, [auditLogs, storeFilter, actionFilter, q]);
+  }, [auditLogs, matchStore, actionFilter, q]);
 
   const aiRows = useMemo(() => {
     return aiConversations.filter(l => {
@@ -87,7 +90,7 @@ export default function AdminLogs() {
       return [l.userId, l.userMessage, l.assistantResponse, l.intent, l.model]
         .some(v => String(v || '').toLowerCase().includes(q));
     });
-  }, [aiConversations, storeFilter, q]);
+  }, [aiConversations, matchStore, q]);
 
   const actionOptions = useMemo(() => {
     const set = new Set();

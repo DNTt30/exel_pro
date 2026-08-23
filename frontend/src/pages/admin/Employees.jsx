@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X, Search, ShieldCheck } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Search } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function Employees() {
-  const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore();
+  const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
   const pickStore = canPickStore(user);
   const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
   const homeDept = pickStore ? (stores[0]?.id || '') : (user?.dept || '');

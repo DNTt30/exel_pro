@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle, Pencil } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
 import { getStoreLabel } from '../../utils/scheduleAnnotations';
+import { useShallow } from 'zustand/react/shallow';
 import {
   DEFAULT_NOTIFY_DAYS,
   collectExpiryAlerts,
@@ -100,7 +101,7 @@ function ShelfDetailModal({ shelf, items, empName, onClose }) {
 }
 
 export default function ShelfDateBoard() {
-  const { user, employees, stores, shelves, shelfItems, saveShelf, deleteShelf, saveShelfItems } = useStore();
+  const { user, employees, stores, shelves, shelfItems, saveShelf, deleteShelf, saveShelfItems } = useStore(useShallow((s) => ({ user: s.user, employees: s.employees, stores: s.stores, shelves: s.shelves, shelfItems: s.shelfItems, saveShelf: s.saveShelf, deleteShelf: s.deleteShelf, saveShelfItems: s.saveShelfItems })));
   const isManager = isOpsManager(user);
   const canPickStore = canPickAnyStore(user);
 
@@ -146,10 +147,10 @@ export default function ShelfDateBoard() {
     [employees, activeStore]
   );
 
-  const empName = (ids) => {
+  const empName = useCallback((ids) => {
     if (!ids) return 'Chưa giao';
     return ids.split(',').map(id => (employees || []).find(e => e.id === id)?.name || id).join(', ');
-  };
+  }, [employees]);
   const storeLabel = getStoreLabel(stores, activeStore) || 'Chưa chọn cửa hàng';
 
   const storeShelves = useMemo(() => {
@@ -168,7 +169,7 @@ export default function ShelfDateBoard() {
     }
     if (filterEmp) list = list.filter(s => s.assigneeId && s.assigneeId.split(',').includes(filterEmp));
     return list;
-  }, [shelves, shelfItems, activeStore, isManager, user?.id, search, filterEmp, employees]);
+  }, [shelves, shelfItems, activeStore, isManager, user?.id, search, filterEmp, empName]);
 
   const filteredShelves = useMemo(() => {
     if (filterStatus === 'all') return storeShelves;

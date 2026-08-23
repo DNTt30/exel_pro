@@ -1,23 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
-import { 
-  ArrowRightLeft, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Check, 
-  X, 
-  AlertCircle, 
-  Building2,
-  Trash2,
-  Sparkles
-} from 'lucide-react';
+import { ArrowRightLeft, CheckCircle2, XCircle, Clock, Check, Sparkles } from 'lucide-react';
 
 import { canPickStore, isOpsManager } from '../../lib/authSession';
+import { useShallow } from 'zustand/react/shallow';
 
-export default function ShiftSwapListModal({ isOpen, onClose, currentWeek }) {
-  const { user, shiftSwaps, respondShiftSwap } = useStore();
+export default function ShiftSwapListModal({ isOpen, onClose }) {
+  const { user, shiftSwaps, respondShiftSwap } = useStore(useShallow((s) => ({ user: s.user, shiftSwaps: s.shiftSwaps, respondShiftSwap: s.respondShiftSwap })));
   const pickStore = canPickStore(user);
   const isManager = isOpsManager(user);
 

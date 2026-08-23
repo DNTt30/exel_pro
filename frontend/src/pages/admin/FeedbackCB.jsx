@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { CheckCircle2, XCircle, Search, Filter, Image as ImageIcon, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Image as ImageIcon } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
-import { getRoleBadgeInfo, WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { getRoleBadgeInfo, WEEK_DAYS } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
 import { parseDateDetails } from '../../utils/dateHelper';
+import { useShallow } from 'zustand/react/shallow';
 
 const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
   // Tìm thông tin nhân viên theo ID nếu trong feedback bị thiếu tên
@@ -167,7 +168,7 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
 };
 
 export default function FeedbackCB() {
-  const { feedbacks, resolveFeedback, user, employees, currentWeek } = useStore();
+  const { feedbacks, resolveFeedback, user, employees, currentWeek } = useStore(useShallow((s) => ({ feedbacks: s.feedbacks, resolveFeedback: s.resolveFeedback, user: s.user, employees: s.employees, currentWeek: s.currentWeek })));
   const pickStore = canPickStore(user);
 
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);

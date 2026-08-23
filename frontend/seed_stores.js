@@ -14,7 +14,7 @@ async function addStores() {
   ];
 
   for (const st of stores) {
-    const { data, error } = await supabase.from('stores').upsert([st], { onConflict: 'id' });
+    const { error } = await supabase.from('stores').upsert([st], { onConflict: 'id' });
     if (error) {
       console.error('Error inserting', st.id, error);
     } else {

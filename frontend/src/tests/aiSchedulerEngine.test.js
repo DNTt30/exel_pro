@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { 
-  generateAISchedule, 
-  auditSchedule, 
-  checkRestPeriodViolation, 
-  isSeniorStaff,
-  isNewStaff,
-  askAICopilot 
-} from '../utils/aiSchedulerEngine';
+import { generateAISchedule, auditSchedule, checkRestPeriodViolation, askAICopilot } from '../utils/aiSchedulerEngine';
 
 describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () => {
   const mockEmployees = [

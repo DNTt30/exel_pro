@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from './Modal';
-import { Printer, Download, User, Building2, Calendar, Clock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Printer, ShieldCheck } from 'lucide-react';
 import { getRoleBadgeInfo } from '../../data/constants';
 import { getShiftHours, normalizeShift } from '../../utils/shiftHelper';
 

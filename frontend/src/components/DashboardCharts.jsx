@@ -1,19 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  PieChart, 
-  BarChart3, 
-  Users, 
-  Clock, 
-  Building2, 
-  AlertTriangle, 
-  CheckCircle2, 
-  ChevronRight,
-  Sparkles,
-  Calendar,
-  Layers,
-  BarChart2
-} from 'lucide-react';
+import { TrendingUp, PieChart, BarChart3, Clock, Building2, CheckCircle2, Sparkles, Calendar, Layers } from 'lucide-react';
 import { SHIFTS } from '../data/initialData';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
@@ -36,7 +22,6 @@ export default function DashboardCharts({
   weekDaysInfo, 
   employees, 
   allPTEmployees, 
-  ptOvertimeList, 
   storeStats, 
   schedule, 
   totalSystemHours,
@@ -280,7 +265,7 @@ export default function DashboardCharts({
     }
 
     return months;
-  }, [selectedMonthCycle, allPTEmployees, employees, schedule, totalSystemHours, ptOvertimeList]);
+  }, [selectedMonthCycle, allPTEmployees, employees, schedule]);
 
   // Selected Active Data based on chartScope
   const activeChartData = useMemo(() => {

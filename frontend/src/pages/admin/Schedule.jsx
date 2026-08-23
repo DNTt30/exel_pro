@@ -2,17 +2,12 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
-import { SHIFTS } from '../../data/initialData';
+
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
-import { Save, Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
+import { Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
-import { 
-  normalizeShift, 
-  getShiftCode, 
-  getCoveringStore, 
-  getShiftHours 
-} from '../../utils/shiftHelper';
+import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import WeekFlowBar from '../../components/WeekFlowBar';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
@@ -28,10 +23,14 @@ import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function Schedule() {
-  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore();
-  const weekSchedule = schedule[currentWeek] || {};
+  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks })));
+  const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
   
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -103,7 +102,11 @@ export default function Schedule() {
     updateShift(currentWeek, emp.id, day, saveVal);
   }, [currentWeek, updateShift, viewMode, cycleDates]);
 
-  const activeDays = viewMode === 'week' ? WEEK_DAYS : cycleDates.map(d => d.key);
+  // Memo giữ tham chiếu ổn định để EmployeeRow (memo) không re-render hàng loạt
+  const activeDays = useMemo(
+    () => (viewMode === 'week' ? WEEK_DAYS : cycleDates.map(d => d.key)),
+    [viewMode, cycleDates]
+  );
 
   // Xuất file Excel (.xls) có đầy đủ định dạng
   const handleExportExcel = () => {

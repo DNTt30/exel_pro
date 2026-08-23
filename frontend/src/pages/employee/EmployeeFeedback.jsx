@@ -1,30 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { 
-  Send, 
-  Image as ImageIcon, 
-  AlertCircle, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle, 
-  FileText, 
-  History, 
-  Building2, 
-  Sparkles,
-  Search,
-  Filter
-} from 'lucide-react';
+import { Send, Image as ImageIcon, Clock, XCircle, AlertTriangle, FileText, History, Sparkles, Search } from 'lucide-react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
+import { useShallow } from 'zustand/react/shallow';
+
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
+const EMPTY_SCHED = {};
 
 export default function EmployeeFeedback() {
-  const { user, addFeedback, feedbacks, currentWeek, schedule } = useStore();
+  const { user, addFeedback, feedbacks, currentWeek, schedule } = useStore(useShallow((s) => ({ user: s.user, addFeedback: s.addFeedback, feedbacks: s.feedbacks, currentWeek: s.currentWeek, schedule: s.schedule })));
   const myFeedbacks = feedbacks.filter(fb => fb.empId === user?.id);
-  const weekSchedule = schedule[currentWeek] || {};
-  const mySched = weekSchedule[user?.id] || {};
+  const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
+  const mySched = weekSchedule[user?.id] || EMPTY_SCHED;
 
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && user?.role.includes('PT'));
 

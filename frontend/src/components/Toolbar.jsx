@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Filter, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { listNearbyWeeks } from '../data/constants';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function Toolbar({ 
   search, setSearch, 
@@ -11,11 +12,10 @@ export default function Toolbar({
   disableDeptFilter = false,
   rightActions 
 }) {
-  const { employees, currentWeek, setCurrentWeek, schedule } = useStore();
+  const { employees, currentWeek, setCurrentWeek } = useStore(useShallow((s) => ({ employees: s.employees, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek })));
   
   const depts = [...new Set(employees.map(e => e.dept))].sort();
   const roles = [...new Set(employees.map(e => e.role || e.type))].sort();
-  const availableWeeks = Object.keys(schedule).sort();
 
   return (
     <div className="bg-white px-3 md:px-4 py-2 border-b border-slate-200 flex flex-wrap gap-2 md:gap-3 items-center justify-between shadow-2xs">

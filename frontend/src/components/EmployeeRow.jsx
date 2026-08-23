@@ -2,12 +2,18 @@ import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
 import { useStore } from '../store/useStore';
 import { Edit2 } from 'lucide-react';
-import { EMPLOYEE_TYPES, STANDARD_ROLES, getRoleBadgeInfo } from '../data/constants';
-import { 
-  parseShiftForCell, 
-  calculateEmployeeWeeklyHours, 
-  validateEmployeeSchedule 
-} from '../utils/shiftHelper';
+import { STANDARD_ROLES, getRoleBadgeInfo } from '../data/constants';
+import { parseShiftForCell, calculateEmployeeWeeklyHours, validateEmployeeSchedule } from '../utils/shiftHelper';
+
+// So sánh lịch theo GIÁ TRỊ: view tháng ở cha tạo object mới mỗi render,
+// so sánh tham chiếu sẽ vô hiệu hóa memo.
+const schedShallowEqual = (a, b) => {
+  if (a === b) return true;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  return ka.every(k => a[k] === b[k]);
+};
 
 const EmployeeRow = memo(({ 
   emp, 
@@ -209,7 +215,7 @@ const EmployeeRow = memo(({
   );
 }, (prevProps, nextProps) => {
   return (
-    prevProps.empSched === nextProps.empSched && 
+    schedShallowEqual(prevProps.empSched, nextProps.empSched) && 
     prevProps.emp === nextProps.emp && 
     prevProps.idx === nextProps.idx && 
     prevProps.isAdmin === nextProps.isAdmin && 

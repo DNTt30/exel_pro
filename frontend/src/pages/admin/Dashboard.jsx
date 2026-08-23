@@ -375,14 +375,17 @@ export default function Dashboard() {
     return Object.values(map);
   }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, user?.dept]);
 
+  // Tổng giờ toàn chuỗi (Tất cả cửa hàng)
+  const totalSystemHours = useMemo(() => {
+    return storeStats.reduce((sum, s) => sum + s.totalHours, 0);
+  }, [storeStats]);
+
   // Tổng giờ theo cửa hàng đang chọn (hoặc toàn chuỗi nếu ALL)
   const currentDeptTotalHours = useMemo(() => {
-    if (filterDept === 'ALL') {
-      return storeStats.reduce((sum, s) => sum + s.totalHours, 0);
-    }
+    if (filterDept === 'ALL') return totalSystemHours;
     const found = storeStats.find(s => s.dept === filterDept);
     return found ? found.totalHours : 0;
-  }, [storeStats, filterDept]);
+  }, [storeStats, filterDept, totalSystemHours]);
 
   // 6. Tính toán Kệ & Date và Nhân sự hôm nay
   const quickStats = useMemo(() => {

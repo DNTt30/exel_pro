@@ -6,7 +6,8 @@ import { buildSwappedSchedules, mergeAiSchedule } from '../utils/shiftHelper';
 import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, canPickStore, canApproveSchedule } from '../lib/authSession';
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { redact, describeDiff, clientMeta, rememberClientIp, capJson } from '../utils/appLogs';
-import { weekRecordKey, isWeekLocked } from '../utils/scheduleWeek';
+import { weekRecordKey } from '../utils/scheduleWeek';
+import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, userIsManager } from './guards';
 import { notifyTelegram } from '../utils/telegram';
 
 function sessionUserFromEmp(emp) {
@@ -18,44 +19,6 @@ function sessionUserFromEmp(emp) {
     isManager: isManagerFromEmp(emp),
     isAreaManager: isAreaManagerFromEmp(emp)
   };
-}
-
-function userIsManager(user) {
-  return isOpsManager(user);
-}
-
-function assertWeekEditable(state, storeId, weekDate) {
-  if (!storeId || !weekDate) return;
-  const rec = state.scheduleWeeks?.[weekRecordKey(storeId, weekDate)];
-  if (isWeekLocked(rec?.status)) {
-    throw new Error(rec.status === 'approved'
-      ? 'Tuần đã duyệt. AM/Admin bấm Từ chối nếu cần sửa.'
-      : 'Tuần đang chờ duyệt, không sửa ô ca.');
-  }
-}
-
-function assertCanEditShift(state, empId, weekDate) {
-  const user = state.user;
-  if (!user) throw new Error('Chưa đăng nhập');
-  const emp = (state.employees || []).find(e => e.id === empId);
-  assertWeekEditable(state, emp?.dept || user.dept, weekDate);
-  if (user.role === 'admin') return;
-  if (userIsManager(user)) {
-    if (emp && emp.dept && user.dept && emp.dept !== user.dept && empId !== user.id) {
-      throw new Error('Không có quyền sửa lịch cửa hàng khác');
-    }
-    return;
-  }
-  if (empId !== user.id) {
-    throw new Error('Bạn chỉ được đăng ký ca của mình');
-  }
-}
-
-function assertCanManageStaff(state) {
-  const user = state.user;
-  if (!user) throw new Error('Chưa đăng nhập');
-  if (user.role === 'admin' || userIsManager(user)) return;
-  throw new Error('Không có quyền quản lý nhân sự');
 }
 
 async function bindAuthSession(user) {

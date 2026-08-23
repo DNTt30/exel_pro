@@ -39,9 +39,13 @@ export default function DashboardCharts({
   ptOvertimeList, 
   storeStats, 
   schedule, 
-  totalSystemHours 
+  totalSystemHours,
+  activeTab: externalActiveTab,
+  setActiveTab: externalSetActiveTab
 }) {
-  const [activeTab, setActiveTab] = useState('workload'); // 'workload' | 'stores' | 'shifts'
+  const [internalActiveTab, setInternalActiveTab] = useState('workload'); // 'workload' | 'stores' | 'shifts'
+  const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
+  const setActiveTab = externalSetActiveTab || setInternalActiveTab;
   // Chế độ phân tích: 'avg_week' (Mặc định: Trung bình các tuần) | 'detailed' (Chi tiết kỳ đang chọn) | 'monthly' (So sánh các tháng)
   const [chartScope, setChartScope] = useState('avg_week');
   const [hoveredPoint, setHoveredPoint] = useState(null);

@@ -22,7 +22,9 @@ import {
   Info,
   Layers,
   MessageSquare,
-  Package
+  Package,
+  PieChart,
+  BarChart3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
@@ -418,6 +420,48 @@ export default function Dashboard() {
     return { empsWorkingToday, pendingShelves, warningShelves, totalShelves: storeShelves.length };
   }, [employees, shelves, shelfItems, weekSchedule, pickStore, user?.dept, filterDept]);
 
+  // 7. Thống kê tỷ lệ tuân thủ định mức Part-time
+  const complianceStats = useMemo(() => {
+    let optimal = 0;
+    let under = 0;
+    let overtime = 0;
+
+    allPTEmployees.forEach(emp => {
+      const hrs = emp.activeTotalHours;
+      if (viewMode === 'month') {
+        if (hrs > 91) overtime++;
+        else if (hrs >= 50) optimal++;
+        else under++;
+      } else {
+        if (hrs > 23) overtime++;
+        else if (hrs >= 16) optimal++;
+        else under++;
+      }
+    });
+
+    const total = allPTEmployees.length || 1;
+    const complianceRate = Math.round(((total - overtime) / total) * 100);
+
+    return {
+      optimal,
+      under,
+      overtime,
+      total: allPTEmployees.length,
+      complianceRate
+    };
+  }, [allPTEmployees, viewMode]);
+
+  // Tab điều khiển biểu đồ liên thông từ KPI cards
+  const [activeChartTab, setActiveChartTab] = useState('workload');
+
+  const scrollToChart = (tabName) => {
+    if (tabName) setActiveChartTab(tabName);
+    const el = document.getElementById('analytics-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // 6. Xuất file CSV định dạng chuẩn OFC
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'BaoCao') => {
     const isMonth = viewMode === 'month';
@@ -570,7 +614,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards Grid - Responsive 6 Columns */}
+      {/* KPI Cards Grid - Responsive 6 Columns with Chart Drill-downs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         
         {/* Card 1: Cảnh báo PT vượt định mức */}
@@ -598,16 +642,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <div className="w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all ${ptOvertimeList.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                style={{ width: `${allPTEmployees.length > 0 ? (ptOvertimeList.length / allPTEmployees.length) * 100 : 0}%` }}
-              ></div>
-            </div>
-            <p className="text-[10px] font-bold mt-1.5 text-slate-500 truncate">
-              {ptOvertimeList.length > 0 ? '⚠️ Cần điều chỉnh giảm ca' : '✅ Đạt định mức chuẩn'}
-            </p>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400">
+              {ptOvertimeList.length > 0 ? '⚠️ Vượt định mức' : '✅ Đạt chuẩn'}
+            </span>
+            <button 
+              onClick={() => scrollToChart('shifts')}
+              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 hover:underline cursor-pointer"
+            >
+              Xem biểu đồ ↗
+            </button>
           </div>
         </div>
 
@@ -625,13 +669,16 @@ export default function Dashboard() {
               <span className="text-[11px] text-slate-500 font-semibold">/ {employees.length} NV</span>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold">
-            <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/60 rounded">
-              {employees.length - allPTEmployees.length} FT
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+              {employees.length - allPTEmployees.length} FT • {allPTEmployees.length} PT
             </span>
-            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded">
-              {allPTEmployees.length} PT
-            </span>
+            <button 
+              onClick={() => scrollToChart('shifts')}
+              className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 hover:underline cursor-pointer"
+            >
+              Cơ cấu ca ↗
+            </button>
           </div>
         </div>
 
@@ -651,9 +698,17 @@ export default function Dashboard() {
               <span className="text-[11px] text-slate-500 font-semibold">giờ</span>
             </div>
           </div>
-          <p className="text-[10px] font-bold text-slate-400 mt-3 truncate">
-            {viewMode === 'month' ? `Kỳ Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}` : `Tuần ${currentWeek}`}
-          </p>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
+              {viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}` : `Tuần ${currentWeek.slice(5)}`}
+            </span>
+            <button 
+              onClick={() => scrollToChart('workload')}
+              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5 hover:underline cursor-pointer"
+            >
+              Xu hướng ↗
+            </button>
+          </div>
         </div>
 
         {/* Card 4: Chuỗi Cửa hàng */}
@@ -670,12 +725,16 @@ export default function Dashboard() {
               <span className="text-[11px] text-slate-500 font-semibold">chi nhánh</span>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1 flex-wrap">
-            {depts.slice(0, 3).map(dept => (
-              <span key={dept} className="px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[9px] font-bold">
-                {dept}
-              </span>
-            ))}
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[70px]">
+              {filterDept === 'ALL' ? 'Toàn chuỗi' : filterDept}
+            </span>
+            <button 
+              onClick={() => scrollToChart('stores')}
+              className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 hover:underline cursor-pointer"
+            >
+              So sánh ↗
+            </button>
           </div>
         </div>
 
@@ -703,49 +762,65 @@ export default function Dashboard() {
               <span className="text-[11px] text-slate-500 font-semibold">kệ cảnh báo</span>
             </div>
           </div>
-          <div className="mt-3 text-[10px] font-bold text-slate-500 flex items-center justify-between">
-            <span>{quickStats.pendingShelves} kệ chờ kiểm</span>
-            <span className="text-blue-600 group-hover:underline">Chi tiết →</span>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
+            <span className="text-slate-400">{quickStats.pendingShelves} kệ chờ kiểm</span>
+            <span className="text-amber-600 group-hover:underline flex items-center gap-0.5">Kiểm date ↗</span>
           </div>
         </Link>
 
-        {/* Card 6: AI Trợ Lý TÚ Mini */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-blue-50/80 via-indigo-50/60 to-white border border-blue-200/80 shadow-2xs flex flex-col justify-between">
+        {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time (Thay thế thẻ AI thừa) */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-800">Trợ Lý AI TÚ</span>
-              <div className="w-7 h-7 rounded-xl bg-blue-600 text-white shadow-xs flex items-center justify-center">
-                <MessageSquare size={14} />
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
+                Tuân Thủ Định Mức
+              </span>
+              <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white shadow-xs flex items-center justify-center">
+                <PieChart size={14} />
               </div>
             </div>
-            <p className="text-[11px] text-slate-600 font-medium mt-2 line-clamp-2">
-              Xếp lịch tự động & giải đáp quy định GS25
-            </p>
+            <div className="mt-2.5 flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-700">
+                {complianceStats.complianceRate}%
+              </span>
+              <span className="text-[11px] text-slate-500 font-semibold">
+                ({complianceStats.optimal}/{complianceStats.total} NV)
+              </span>
+            </div>
           </div>
-          <button 
-            onClick={() => alert('Hãy nhấn vào nút Trợ lý AI ở góc dưới bên phải màn hình để bắt đầu!')}
-            className="mt-3 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
-          >
-            Hỏi TÚ AI
-          </button>
+          <div className="mt-3 pt-2 border-t border-emerald-100/60 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-emerald-700">
+              {viewMode === 'month' ? 'Chuẩn 50-91h' : 'Chuẩn 16-23h'}
+            </span>
+            <button 
+              onClick={() => scrollToChart('shifts')}
+              className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5 hover:underline cursor-pointer"
+            >
+              Phân tầng ↗
+            </button>
+          </div>
         </div>
 
       </div>
 
-      {/* Visual Analytics & Forecast Charts */}
-      <DashboardCharts
-        viewMode={viewMode}
-        selectedMonthCycle={selectedMonthCycle}
-        currentWeek={currentWeek}
-        cycleDates={cycleDates}
-        weekDaysInfo={weekDaysInfo}
-        employees={employees}
-        allPTEmployees={allPTEmployees}
-        ptOvertimeList={ptOvertimeList}
-        storeStats={storeStats}
-        schedule={schedule}
-        totalSystemHours={totalSystemHours}
-      />
+      {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
+      <div id="analytics-section">
+        <DashboardCharts
+          viewMode={viewMode}
+          selectedMonthCycle={selectedMonthCycle}
+          currentWeek={currentWeek}
+          cycleDates={cycleDates}
+          weekDaysInfo={weekDaysInfo}
+          employees={employees}
+          allPTEmployees={allPTEmployees}
+          ptOvertimeList={ptOvertimeList}
+          storeStats={storeStats}
+          schedule={schedule}
+          totalSystemHours={totalSystemHours}
+          activeTab={activeChartTab}
+          setActiveTab={setActiveChartTab}
+        />
+      </div>
 
       {/* Main Table Container */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">

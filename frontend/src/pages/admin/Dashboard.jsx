@@ -20,7 +20,9 @@ import {
   Eye,
   X,
   Info,
-  Layers
+  Layers,
+  MessageSquare,
+  Package
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
@@ -29,7 +31,7 @@ import { canPickStore } from '../../lib/authSession';
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 export default function Dashboard() {
-  const { employees, schedule, currentWeek, setCurrentWeek, stores, user } = useStore();
+  const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems } = useStore();
   const pickStore = canPickStore(user);
   const weekSchedule = schedule[currentWeek] || {};
   const availableWeeks = Object.keys(schedule).sort();
@@ -371,6 +373,51 @@ export default function Dashboard() {
     return storeStats.reduce((sum, s) => sum + s.totalHours, 0);
   }, [storeStats]);
 
+  // 6. Tính toán Kệ & Date và Nhân sự hôm nay
+  const quickStats = useMemo(() => {
+    const today = new Date();
+    const dOfWeek = today.getDay();
+    const dayKey = WEEK_DAYS[dOfWeek === 0 ? 6 : dOfWeek - 1];
+    
+    let empsWorkingToday = 0;
+    employees.forEach(emp => {
+      if (!pickStore && user?.dept && emp.dept !== user.dept) return;
+      if (filterDept !== 'ALL' && emp.dept !== filterDept) return;
+      
+      const s = weekSchedule[emp.id]?.[dayKey];
+      const actual = getShiftCode(s);
+      if (actual && actual !== 'off') empsWorkingToday++;
+    });
+
+    let storeShelves = (shelves || []);
+    if (!pickStore && user?.dept) storeShelves = storeShelves.filter(s => s.storeId === user.dept);
+    if (filterDept !== 'ALL') storeShelves = storeShelves.filter(s => s.storeId === filterDept);
+    
+    let pendingShelves = 0;
+    let warningShelves = 0;
+    
+    storeShelves.forEach(s => {
+      const items = (shelfItems || []).filter(i => i.shelfId === s.id);
+      if (items.length === 0) {
+        pendingShelves++;
+      } else {
+        let hasWarn = false;
+        items.forEach(item => {
+          const d1 = item.expiryDate ? new Date(item.expiryDate) : null;
+          const d2 = item.expiryDate2 ? new Date(item.expiryDate2) : null;
+          const earliest = [d1, d2].filter(Boolean).sort((a, b) => a - b)[0];
+          if (earliest) {
+            const diff = Math.ceil((earliest - today) / 86400000);
+            if (diff <= (s.notifyDays || 3)) hasWarn = true;
+          }
+        });
+        if (hasWarn) warningShelves++;
+      }
+    });
+
+    return { empsWorkingToday, pendingShelves, warningShelves, totalShelves: storeShelves.length };
+  }, [employees, shelves, shelfItems, weekSchedule, pickStore, user?.dept, filterDept]);
+
   // 6. Xuất file CSV định dạng chuẩn OFC
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'BaoCao') => {
     const isMonth = viewMode === 'month';
@@ -513,7 +560,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         
         {/* Card 1: Cảnh báo PT vượt định mức */}
         <div className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
@@ -553,17 +600,17 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Card 2: Tổng nhân sự */}
+        {/* Card 2: Tổng nhân sự & Đi làm hôm nay */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tổng Nhân Sự</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nhân Sự & Hôm Nay</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Users size={16} />
             </div>
           </div>
           <div className="mt-2.5 flex items-baseline gap-2">
-            <span className="text-3xl font-black font-mono text-slate-800">{employees.length}</span>
-            <span className="text-xs text-slate-500 font-semibold">nhân viên</span>
+            <span className="text-3xl font-black font-mono text-slate-800">{quickStats.empsWorkingToday}</span>
+            <span className="text-xs text-slate-500 font-semibold">/ {employees.length} NV đang đi làm</span>
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px]">
             <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/60 rounded-md font-bold">
@@ -613,6 +660,54 @@ export default function Dashboard() {
               </span>
             ))}
           </div>
+        </div>
+
+        {/* Card 5: Kệ & Date */}
+        <Link to="/admin/shelves" className={`p-5 rounded-2xl border transition-all relative overflow-hidden block ${
+          quickStats.warningShelves > 0 
+            ? 'bg-gradient-to-br from-orange-50 via-amber-50/70 to-orange-100/50 border-orange-200/90 hover:border-orange-300' 
+            : 'bg-white border-slate-200/90 hover:border-blue-300'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${quickStats.warningShelves > 0 ? 'text-orange-800' : 'text-slate-500'}`}>
+              Hàng Sắp Hết Hạn
+            </span>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              quickStats.warningShelves > 0 ? 'bg-orange-500 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <Package size={16} />
+            </div>
+          </div>
+          <div className="mt-2.5 flex items-baseline gap-2">
+            <span className={`text-3xl font-black font-mono tracking-tight ${quickStats.warningShelves > 0 ? 'text-orange-600' : 'text-slate-800'}`}>
+              {quickStats.warningShelves}
+            </span>
+            <span className="text-xs text-slate-500 font-semibold">kệ có cảnh báo</span>
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-[11px]">
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200/60 rounded-md font-bold">
+              {quickStats.pendingShelves} kệ chưa kiểm tra
+            </span>
+          </div>
+        </Link>
+
+        {/* Card 6: AI Trợ Lý */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-violet-50 via-fuchsia-50/70 to-violet-100/50 border border-violet-200/90 shadow-xs relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-violet-800">Trợ Lý AI TÚ Mini</span>
+              <div className="w-8 h-8 rounded-xl bg-violet-600 text-white shadow-2xs flex items-center justify-center">
+                <MessageSquare size={16} />
+              </div>
+            </div>
+            <p className="text-xs text-violet-900/70 font-medium mt-2">
+              Hỗ trợ tự động xếp lịch, giải đáp quy định GS25, công thức món ăn...
+            </p>
+          </div>
+          {/* Nút giả lập mở AI (Bọt AI thường nổi ở góc, nên ở đây chỉ báo hiệu) */}
+          <button onClick={() => alert('Hãy nhấn vào biểu tượng Trợ lý TÚ Mini ở góc dưới bên phải màn hình nhé!')} className="mt-3 w-full py-2 bg-white/60 hover:bg-white text-violet-700 font-bold text-xs rounded-xl transition-colors border border-violet-200/50">
+            Trò chuyện với AI
+          </button>
         </div>
 
       </div>

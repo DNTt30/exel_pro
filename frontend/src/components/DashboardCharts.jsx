@@ -273,8 +273,8 @@ export default function DashboardCharts({
         label: `T${curM}/${curY}`,
         fullLabel: `Tháng ${curM.toString().padStart(2, '0')}/${curY}`,
         cycleLabel: `26/${prevM} → 25/${curM}`,
-        totalHours: monthHours || Math.round(totalSystemHours * (0.9 + Math.sin(curM) * 0.1)),
-        ptOvertimeCount: ptOvertimeCount || (curM === 8 ? ptOvertimeList.length : Math.max(0, ptOvertimeList.length - 2)),
+        totalHours: monthHours,
+        ptOvertimeCount: ptOvertimeCount,
         isCurrent: curY === selY && curM === selM
       });
     }

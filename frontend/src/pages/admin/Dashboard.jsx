@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
@@ -33,7 +33,7 @@ import { canPickStore } from '../../lib/authSession';
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 export default function Dashboard() {
-  const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems } = useStore();
+  const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems, ensureWeeksLoaded } = useStore();
   const pickStore = canPickStore(user);
   const weekSchedule = schedule[currentWeek] || {};
   const availableWeeks = Object.keys(schedule).sort();
@@ -173,6 +173,14 @@ export default function Dashboard() {
     return dates;
   }, [selectedMonthCycle]);
 
+  // Tự động tải dữ liệu các tuần thuộc chu kỳ tháng được chọn từ CSDL Supabase
+  useEffect(() => {
+    if (viewMode === 'month' && cycleDates.length > 0 && ensureWeeksLoaded) {
+      const neededWeeks = Array.from(new Set(cycleDates.map(d => d.weekKey)));
+      ensureWeeksLoaded(neededWeeks);
+    }
+  }, [viewMode, cycleDates, ensureWeeksLoaded]);
+
   // 2. Tính toán 7 ngày trong tuần
   const weekDaysInfo = useMemo(() => {
     const parts = currentWeek.split('-');
@@ -229,8 +237,8 @@ export default function Dashboard() {
       const monthShifts = {};
 
       cycleDates.forEach(({ key, weekKey, dayKey }) => {
-        // Tìm ca trong schedule[weekKey] hoặc fallback từ empWeekSched[dayKey]
-        const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empWeekSched[dayKey];
+        // Tìm ca thực tế trong schedule[weekKey] đã lưu
+        const s = schedule[weekKey]?.[emp.id]?.[dayKey];
         const actual = getShiftCode(s);
         if (actual && actual !== 'off') {
           monthShifts[key] = formatShiftForOFC(actual);
@@ -332,7 +340,7 @@ export default function Dashboard() {
       
       if (viewMode === 'month') {
         cycleDates.forEach(({ weekKey, dayKey }) => {
-          const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empSched[dayKey];
+          const s = schedule[weekKey]?.[emp.id]?.[dayKey];
           const actual = getShiftCode(s);
           if (actual && actual !== 'off') {
             if (SHIFTS[actual]) empHours += SHIFTS[actual].hours;

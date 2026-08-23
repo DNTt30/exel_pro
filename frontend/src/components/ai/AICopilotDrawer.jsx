@@ -140,7 +140,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[400px] bg-white shadow-[0_0_50px_rgba(0,0,0,0.2)] sm:rounded-l-3xl overflow-hidden z-50 flex flex-col border-l border-slate-200/50 animate-slide-left print:hidden">
+    <div className="fixed bottom-24 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[380px] h-[520px] sm:h-[540px] bg-white shadow-2xl shadow-slate-900/20 rounded-2xl overflow-hidden z-50 flex flex-col border border-slate-200 print:hidden">
       {/* Header */}
       <div className="p-5 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 text-white flex items-center justify-between shadow-md relative overflow-hidden">
         {/* Lớp phủ trang trí (Glass effect) */}

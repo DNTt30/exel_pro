@@ -444,7 +444,7 @@ export default function Dashboard() {
   const depts = [...new Set(employees.map(e => e.dept))].sort();
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full animate-in fade-in duration-200">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full animate-in fade-in duration-200 min-h-full bg-slate-100">
       <ManagerActionList />
       
       {/* Page Header & View Mode Switcher */}
@@ -457,7 +457,7 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  Dashboard Quản Trị & Cảnh Báo OFC
+                  Dashboard GS25 — Quản lý & Cảnh Báo
                 </h1>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md text-[11px] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span> Live System

@@ -24,6 +24,7 @@ import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -138,7 +139,7 @@ export default function Schedule() {
     curSun.setDate(curSun.getDate() + 6);
     const curRange = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')} → ${String(curSun.getDate()).padStart(2, '0')}/${String(curSun.getMonth() + 1).padStart(2, '0')}`;
 
-    if (weekLocked) return alert('Tuần đang chờ duyệt hoặc đã duyệt — không copy đè.');
+    if (weekLocked) return toast.error('Tuần đang chờ duyệt hoặc đã duyệt — không copy đè.');
     const confirmed = window.confirm(`Sao chép toàn bộ ca làm việc từ tuần trước (${prevRange}) sang tuần này (${curRange})?`);
     if (!confirmed) return;
 
@@ -150,7 +151,7 @@ export default function Schedule() {
       }
 
       if (!sourceSched || Object.keys(sourceSched).length === 0) {
-        return alert(`Tuần trước (${prevRange}) chưa có lịch làm việc nào để sao chép!`);
+        return toast.error(`Tuần trước (${prevRange}) chưa có lịch làm việc nào để sao chép!`);
       }
 
       let targetEmps = employees;
@@ -188,10 +189,10 @@ export default function Schedule() {
         }
       }));
 
-      alert(`✅ Đã sao chép lịch làm việc của ${copiedCount} nhân sự sang tuần này (${curRange})!`);
+      toast.success(`✅ Đã sao chép lịch làm việc của ${copiedCount} nhân sự sang tuần này (${curRange})!`);
     } catch (err) {
       console.error('Lỗi sao chép lịch:', err);
-      alert('Không thể sao chép lịch: ' + (err.message || 'Lỗi kết nối'));
+      toast.error('Không thể sao chép lịch: ' + (err.message || 'Lỗi kết nối'));
     } finally {
       setIsCopying(false);
     }

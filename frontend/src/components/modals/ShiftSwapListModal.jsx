@@ -5,6 +5,7 @@ import { ArrowRightLeft, CheckCircle2, XCircle, Clock, Check, Sparkles } from 'l
 
 import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function ShiftSwapListModal({ isOpen, onClose }) {
   const { user, shiftSwaps, respondShiftSwap } = useStore(useShallow((s) => ({ user: s.user, shiftSwaps: s.shiftSwaps, respondShiftSwap: s.respondShiftSwap })));
@@ -36,20 +37,20 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
   const handlePartnerResponse = (swapId, agree) => {
     if (agree) {
       respondShiftSwap(swapId, 'pending_manager', 'Đồng nghiệp đã đồng ý, chuyển Quản lý phê duyệt.');
-      alert('✅ Bạn đã đồng ý đổi ca! Yêu cầu đã được chuyển tới Quản lý để phê duyệt.');
+      toast.success('✅ Bạn đã đồng ý đổi ca! Yêu cầu đã được chuyển tới Quản lý để phê duyệt.');
     } else {
       respondShiftSwap(swapId, 'rejected', 'Đồng nghiệp đã từ chối đổi ca.');
-      alert('Đã từ chối yêu cầu đổi ca.');
+      toast.info('Đã từ chối yêu cầu đổi ca.');
     }
   };
 
   const handleManagerResponse = (swapId, approve) => {
     if (approve) {
       respondShiftSwap(swapId, 'approved', 'Quản lý đã phê duyệt và tự động hoán đổi ca.');
-      alert('✅ Phê duyệt thành công! Lịch làm việc của 2 nhân viên đã được tự động cập nhật trên hệ thống.');
+      toast.success('✅ Phê duyệt thành công! Lịch làm việc của 2 nhân viên đã được tự động cập nhật trên hệ thống.');
     } else {
       respondShiftSwap(swapId, 'rejected', 'Quản lý đã từ chối đơn đổi ca.');
-      alert('Đã từ chối đơn đổi ca.');
+      toast.info('Đã từ chối đơn đổi ca.');
     }
   };
 

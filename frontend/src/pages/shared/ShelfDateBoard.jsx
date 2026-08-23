@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
 import { getStoreLabel } from '../../utils/scheduleAnnotations';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 import {
   DEFAULT_NOTIFY_DAYS,
   collectExpiryAlerts,
@@ -214,10 +215,10 @@ export default function ShelfDateBoard() {
   const selected = filteredShelves.find(s => s.id === selectedId) || storeShelves.find(s => s.id === selectedId) || null;
 
   const handleAssignTask = async () => {
-    if (!activeStore) return alert('Chọn cửa hàng');
-    if (!form.assigneeId || form.assigneeId.length === 0) return alert('Chọn ít nhất 1 nhân viên');
-    if (!form.name.trim()) return alert('Nhập tên quầy / kệ');
-    if (!form.dueDate) return alert('Chọn hạn nộp trên lịch');
+    if (!activeStore) return toast.error('Chọn cửa hàng');
+    if (!form.assigneeId || form.assigneeId.length === 0) return toast.error('Chọn ít nhất 1 nhân viên');
+    if (!form.name.trim()) return toast.error('Nhập tên quầy / kệ');
+    if (!form.dueDate) return toast.error('Chọn hạn nộp trên lịch');
     const slug = form.name.trim().replace(/\s+/g, '-').slice(0, 16) || 'KE';
     const code = form.id ? form.code : `${slug}-${String(Date.now()).slice(-4)}`.toUpperCase();
     try {
@@ -232,9 +233,9 @@ export default function ShelfDateBoard() {
       });
       setForm({ id: null, code: '', assigneeId: [], name: '', dueDate: '', notifyDays: DEFAULT_NOTIFY_DAYS });
       if (!form.id) openShelf(saved);
-      else alert('Đã cập nhật kệ!');
+      else toast.success('Đã cập nhật kệ!');
     } catch (e) {
-      alert(e.message || 'Không lưu được. Kiểm tra kết nối.');
+      toast.error(e.message || 'Không lưu được. Kiểm tra kết nối.');
     }
   };
 
@@ -246,9 +247,9 @@ export default function ShelfDateBoard() {
       // BUG-15 fix: sync lại rows từ store sau khi lưu để đảm bảo id đúng
       const freshItems = (shelfItems || []).filter(i => i.shelfId === selected.id);
       if (freshItems.length) setRows(freshItems.map(toShelfItemRow));
-      alert('✅ Đã lưu bảng date kệ: ' + (selected.name || selected.code));
+      toast.success('✅ Đã lưu bảng date kệ: ' + (selected.name || selected.code));
     } catch (e) {
-      alert('❌ Không lưu được: ' + (e.message || 'Kiểm tra kết nối mạng và thử lại.'));
+      toast.error('❌ Không lưu được: ' + (e.message || 'Kiểm tra kết nối mạng và thử lại.'));
     } finally {
       setSaving(false);
     }
@@ -398,7 +399,7 @@ export default function ShelfDateBoard() {
                         <button type="button" className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors ml-1" onClick={() => editShelf(shelf)} title="Sửa thông tin kệ">
                           <Pencil size={14} />
                         </button>
-                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)).catch(e => alert('Không thể xóa: ' + (e.message || 'Lỗi không xác định'))); }} title="Xóa kệ">
+                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)).catch(e => toast.error('Không thể xóa: ' + (e.message || 'Lỗi không xác định'))); }} title="Xóa kệ">
                           <Trash2 size={14} />
                         </button>
                       </>

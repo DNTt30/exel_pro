@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, Save, X, Search } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
@@ -46,11 +47,11 @@ export default function Employees() {
     const trimmedName = formData.name.trim();
 
     if (!trimmedId || !trimmedName || !formData.dept) {
-      return alert('Vui lòng nhập đủ Mã NV, Họ tên và Chọn Cửa hàng');
+      return toast.error('Vui lòng nhập đủ Mã NV, Họ tên và Chọn Cửa hàng');
     }
 
     if (!MA_RE.test(trimmedId)) {
-      return alert('Mã nhân viên phải gồm đúng 9 chữ số liên tiếp (Ví dụ: 260512008)!');
+      return toast.error('Mã nhân viên phải gồm đúng 9 chữ số liên tiếp (Ví dụ: 260512008)!');
     }
 
     try {
@@ -60,12 +61,12 @@ export default function Employees() {
         name: trimmedName
       });
       if (result?.provisionWarning) {
-        alert(result.provisionWarning);
+        toast.info(result.provisionWarning);
       }
       setIsAdding(false);
       setFormData({ id: '', name: '', dept: homeDept, role: 'STFT', type: 'STFT', maxH: 48 });
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      toast.error('Lỗi: ' + e.message);
     }
   };
 
@@ -74,7 +75,7 @@ export default function Employees() {
       await updateEmployee(editingId, formData);
       setEditingId(null);
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      toast.error('Lỗi: ' + e.message);
     }
   };
 
@@ -83,7 +84,7 @@ export default function Employees() {
       try {
         await deleteEmployee(id);
       } catch (e) {
-        alert('Lỗi: ' + e.message);
+        toast.error('Lỗi: ' + e.message);
       }
     }
   };

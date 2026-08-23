@@ -6,6 +6,7 @@ import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -83,7 +84,7 @@ export default function EmployeeFeedback() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!date && reportType === 'STANDARD') return alert('Vui lòng chọn ngày phát sinh lỗi');
+    if (!date && reportType === 'STANDARD') return toast.error('Vui lòng chọn ngày phát sinh lỗi');
     
     // Kiểm tra Deadline chốt công mùng 10 hàng tháng
     if (date) {
@@ -94,7 +95,7 @@ export default function EmployeeFeedback() {
         selectedDate.getFullYear() < today.getFullYear();
         
       if (isPreviousMonth && today.getDate() > 10) {
-        return alert('Đã quá hạn chốt dữ liệu (17h30 ngày 10 hàng tháng). Bạn không thể gửi báo cáo cho tháng trước nữa.');
+        return toast.error('Đã quá hạn chốt dữ liệu (17h30 ngày 10 hàng tháng). Bạn không thể gửi báo cáo cho tháng trước nữa.');
       }
     }
 
@@ -125,7 +126,7 @@ export default function EmployeeFeedback() {
     setDate('');
     setNote('');
     setImageUrl('');
-    alert('Đã gửi báo cáo thành công! Vui lòng chờ Quản lý và phòng C&B duyệt.');
+    toast.success('Đã gửi báo cáo thành công! Vui lòng chờ Quản lý và phòng C&B duyệt.');
   };
 
   return (

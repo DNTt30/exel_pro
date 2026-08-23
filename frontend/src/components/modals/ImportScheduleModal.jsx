@@ -8,6 +8,7 @@ import { provisionAuthUser } from '../../lib/authSession';
 
 
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
   const { employees, stores, schedule } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule })));
@@ -259,11 +260,11 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         }
       });
 
-      alert(`✅ Nhập lịch thành công!\n- Đã cập nhật lịch cho ${updatedShiftCount} nhân sự vào Tuần ${currentWeek}.\n${addedEmpCount > 0 ? `- Tự động thêm ${addedEmpCount} nhân sự mới vào danh sách.` : ''}`);
+      toast.success(`✅ Nhập lịch thành công!\n- Đã cập nhật lịch cho ${updatedShiftCount} nhân sự vào Tuần ${currentWeek}.\n${addedEmpCount > 0 ? `- Tự động thêm ${addedEmpCount} nhân sự mới vào danh sách.` : ''}`);
       onClose();
     } catch (err) {
       console.error('Lỗi khi áp dụng lịch:', err);
-      alert('Đã xảy ra lỗi khi lưu lịch: ' + (err.message || 'Lỗi kết nối'));
+      toast.error('Đã xảy ra lỗi khi lưu lịch: ' + (err.message || 'Lỗi kết nối'));
     } finally {
       setLoading(false);
     }

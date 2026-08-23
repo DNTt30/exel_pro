@@ -6,6 +6,7 @@ import { WEEK_DAYS } from '../../data/constants';
 import { isShiftsOverlapping, normalizeShift } from '../../utils/shiftHelper';
 import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function TransferModal({ isOpen, onClose }) {
   const { employees, stores, schedule, updateShift, currentWeek, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user })));
@@ -41,10 +42,10 @@ export default function TransferModal({ isOpen, onClose }) {
 
   const handleTransfer = async () => {
     if (!selectedEmpId || !targetStore) {
-      return alert('Vui lòng chọn nhân viên và cửa hàng đích');
+      return toast.error('Vui lòng chọn nhân viên và cửa hàng đích');
     }
     if (targetStore === sourceStore) {
-      return alert('Cửa hàng đích phải khác cửa hàng gốc của nhân viên');
+      return toast.error('Cửa hàng đích phải khác cửa hàng gốc của nhân viên');
     }
 
     // 1. Kiểm tra chống trùng ca chéo cửa hàng (LOGIC-01)
@@ -53,9 +54,7 @@ export default function TransferModal({ isOpen, onClose }) {
       const { shift: existingShift } = normalizeShift(existingRaw);
       if (existingShift && existingShift !== 'off') {
         if (isShiftsOverlapping(existingShift, targetShift)) {
-          return alert(
-            `❌ Xung đột giờ làm: Nhân viên "${selectedEmp?.name || selectedEmpId}" đã được xếp ca "${existingShift}" vào ngày ${targetDay}. Ca chi viện "${targetShift}" bị trùng khung thời gian!`
-          );
+          return toast.error(`❌ Xung đột giờ làm: Nhân viên "${selectedEmp?.name || selectedEmpId}" đã được xếp ca "${existingShift}" vào ngày ${targetDay}. Ca chi viện "${targetShift}" bị trùng khung thời gian!`);
         }
       }
     }
@@ -77,7 +76,7 @@ export default function TransferModal({ isOpen, onClose }) {
       setTargetStore('');
       setTargetShift('6-14');
     } catch (e) {
-      alert('Lỗi khi điều chuyển nhân sự: ' + e.message);
+      toast.error('Lỗi khi điều chuyển nhân sự: ' + e.message);
     } finally {
       setLoading(false);
     }

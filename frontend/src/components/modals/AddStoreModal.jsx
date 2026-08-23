@@ -5,6 +5,7 @@ import StaffingMatrixFields from '../StaffingMatrixFields';
 import StoreDemandFields from '../StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function AddStoreModal({ isOpen, onClose }) {
   const { addStore } = useStore(useShallow((s) => ({ addStore: s.addStore })));
@@ -18,7 +19,7 @@ export default function AddStoreModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
-    if (!formData.id || !formData.name) return alert('Vui lòng nhập đủ Mã và Tên cửa hàng');
+    if (!formData.id || !formData.name) return toast.error('Vui lòng nhập đủ Mã và Tên cửa hàng');
     setLoading(true);
     try {
       await addStore(formData);
@@ -31,7 +32,7 @@ export default function AddStoreModal({ isOpen, onClose }) {
         demand: normalizeStoreDemand()
       });
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      toast.error('Lỗi: ' + e.message);
     } finally {
       setLoading(false);
     }

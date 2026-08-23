@@ -1,9 +1,10 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import Toaster from '../ui/toast';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
@@ -139,6 +140,7 @@ export default function AppLayout() {
           <Sparkles size={22} className="group-hover:animate-pulse" />
         </button>
 
+        <Toaster />
         <HelpDrawer isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} isAdmin={isManager} />
         <AICopilotDrawer isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} currentWeek={currentWeek} storeId={user?.dept || 'ALL'} />
       </div>

@@ -6,6 +6,7 @@ import { useStore } from '../store/useStore';
 import StaffingMatrixFields from './StaffingMatrixFields';
 import { isOpsManager } from '../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../components/ui/toastStore';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
   const { stores, user, updateStore } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore })));
@@ -46,7 +47,7 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
       await updateStore(storeId, { staffing: normalizeStaffingConfig(draftStaffing) });
       setDraftStaffing(null);
     } catch (err) {
-      alert('Không lưu được định biên: ' + (err.message || 'Lỗi kết nối. Chạy sql_stores_staffing.sql nếu chưa có cột staffing.'));
+      toast.error('Không lưu được định biên: ' + (err.message || 'Lỗi kết nối. Chạy sql_stores_staffing.sql nếu chưa có cột staffing.'));
     } finally {
       setSaving(false);
     }

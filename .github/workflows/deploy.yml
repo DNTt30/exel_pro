@@ -22,12 +22,24 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      # Cổng chất lượng: chặn deploy nếu lint lỗi hoặc test đỏ
+      - name: Lint & Test (gate)
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run test
       - name: Build
         working-directory: frontend
         env:
           VITE_BASE_PATH: /exel_pro/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        # NOTE: giá trị fallback dưới đây là Supabase URL + anon key PHÁT HÀNH CÔNG KHAI
+        # (luôn nhúng trong bundle client nên không phải secret). Khi rotate key,
+        # nhớ sửa cả fallback này hoặc cấu hình secrets trong GH Settings.
         run: |
           if [ -z "$VITE_SUPABASE_URL" ]; then
             export VITE_SUPABASE_URL="https://plitfdjzuealjxbylwxy.supabase.co"
@@ -35,7 +47,6 @@ jobs:
           if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
             export VITE_SUPABASE_ANON_KEY="sb_publishable_NSojsCWhOgiUvZIrMpoXEg_So_tE3O_"
           fi
-          npm ci
           npm run build
       - name: Publish gh-pages
         uses: peaceiris/actions-gh-pages@v4

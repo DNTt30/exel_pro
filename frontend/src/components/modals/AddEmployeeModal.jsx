@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { MA_RE, STANDARD_ROLES } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function AddEmployeeModal({ isOpen, onClose }) {
   const { stores, addEmployee, user } = useStore(useShallow((s) => ({ stores: s.stores, addEmployee: s.addEmployee, user: s.user })));
@@ -42,12 +43,12 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
     const trimmedName = formData.name.trim();
 
     if (!trimmedId || !trimmedName || !formData.dept) {
-      return alert('Vui lòng nhập đủ thông tin bắt buộc (*)');
+      return toast.error('Vui lòng nhập đủ thông tin bắt buộc (*)');
     }
 
     // Validate mã nhân viên đúng 9 chữ số theo regex MA_RE
     if (!MA_RE.test(trimmedId)) {
-      return alert('Mã nhân viên không hợp lệ! Mã phải bao gồm đúng 9 chữ số (Ví dụ: 260512008).');
+      return toast.error('Mã nhân viên không hợp lệ! Mã phải bao gồm đúng 9 chữ số (Ví dụ: 260512008).');
     }
 
     setLoading(true);
@@ -58,7 +59,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
         name: trimmedName
       });
       if (result?.provisionWarning) {
-        alert(result.provisionWarning);
+        toast.info(result.provisionWarning);
       }
       onClose();
       setFormData({ 
@@ -70,7 +71,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
         maxH: 48 
       });
     } catch (e) {
-      alert('Lỗi khi thêm nhân sự: ' + e.message);
+      toast.error('Lỗi khi thêm nhân sự: ' + e.message);
     } finally {
       setLoading(false);
     }

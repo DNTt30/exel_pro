@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { canApproveSchedule, isOpsManager } from '../lib/authSession';
 import { weekRecordKey, weekStatusMeta, isWeekLocked } from '../utils/scheduleWeek';
 import { telegramConfigured } from '../utils/telegram';
+import { toast } from '../components/ui/toastStore';
 
 export default function WeekFlowBar({ storeId, weekDate }) {
   const user = useStore(s => s.user);
@@ -30,7 +31,7 @@ export default function WeekFlowBar({ storeId, weekDate }) {
       await saveWeekStatus({ storeId, weekDate, status: next, reviewNote: extraNote || note });
       setNote('');
     } catch (e) {
-      alert(e.message || 'Không cập nhật được trạng thái tuần. Chạy sql_schedule_weeks.sql trên Supabase.');
+      toast.error(e.message || 'Không cập nhật được trạng thái tuần. Chạy sql_schedule_weeks.sql trên Supabase.');
     } finally {
       setBusy(false);
     }

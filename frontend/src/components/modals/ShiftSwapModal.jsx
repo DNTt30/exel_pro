@@ -5,6 +5,7 @@ import { RefreshCw, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -114,9 +115,9 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedMyShift) return alert('Bạn không có ca làm việc nào để thực hiện đổi ca.');
-    if (!toEmpId) return alert('Vui lòng chọn đồng nghiệp muốn đổi ca.');
-    if (!selectedPartnerShift) return alert('Đồng nghiệp được chọn không có ca làm việc nào để đổi sang.');
+    if (!selectedMyShift) return toast.error('Bạn không có ca làm việc nào để thực hiện đổi ca.');
+    if (!toEmpId) return toast.error('Vui lòng chọn đồng nghiệp muốn đổi ca.');
+    if (!selectedPartnerShift) return toast.error('Đồng nghiệp được chọn không có ca làm việc nào để đổi sang.');
 
     try {
       await addShiftSwap({
@@ -134,10 +135,10 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
         toShift: selectedPartnerShift.shift,
         reason: reason.trim()
       });
-      alert('Đã gửi yêu cầu đổi ca. Đang chờ đồng nghiệp xác nhận.');
+      toast.success('Đã gửi yêu cầu đổi ca. Đang chờ đồng nghiệp xác nhận.');
       onClose();
     } catch (err) {
-      alert('Không thể gửi đơn đổi ca: ' + (err.message || 'Lỗi kết nối'));
+      toast.error('Không thể gửi đơn đổi ca: ' + (err.message || 'Lỗi kết nối'));
     }
   };
 

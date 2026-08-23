@@ -12,6 +12,7 @@ import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -74,7 +75,7 @@ export default function EmployeeSchedule() {
   const handleShiftChange = useCallback(async (emp, day, value) => {
     if (emp.id !== user?.id) return;
     if (!isFutureWeek) {
-      alert('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     setSaveStatus('saving');
@@ -85,7 +86,7 @@ export default function EmployeeSchedule() {
   // 8. Đăng ký nhanh cả tuần mẫu (Chỉ tuần tương lai mới được sửa)
   const handleQuickRegister = async (shiftCode) => {
     if (!isFutureWeek) {
-      alert('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     setSaveStatus('saving');
@@ -733,7 +734,7 @@ export default function EmployeeSchedule() {
                           <RotateCcw size={10} /> Đổi ca
                         </button>
                         <button
-                          onClick={() => alert("Vui lòng truy cập thẻ 'Yêu cầu C&B' để báo lỗi chấm công cho ca này!")}
+                          onClick={() => toast.info("Vui lòng truy cập thẻ 'Yêu cầu C&B' để báo lỗi chấm công cho ca này!")}
                           className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg border border-red-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
                         >
                           <AlertTriangle size={10} /> Báo lỗi
@@ -758,8 +759,7 @@ export default function EmployeeSchedule() {
                       </div>
                     )}
                   </div>
-                </div>
-              );
+                </div>);
             })}
           </div>
         </div>

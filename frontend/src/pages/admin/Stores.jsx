@@ -6,6 +6,7 @@ import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { toast } from '../../components/ui/toastStore';
 
 export default function Stores() {
   const { stores, addStore, updateStore, deleteStore, user } = useStore(useShallow((s) => ({ stores: s.stores, addStore: s.addStore, updateStore: s.updateStore, deleteStore: s.deleteStore, user: s.user })));
@@ -25,7 +26,7 @@ export default function Stores() {
   const [formData, setFormData] = useState(emptyStoreForm());
 
   const handleSaveAdd = async () => {
-    if (!formData.id || !formData.name) return alert('Vui lòng nhập đủ Mã và Tên');
+    if (!formData.id || !formData.name) return toast.error('Vui lòng nhập đủ Mã và Tên');
     try {
       await addStore({
         ...formData,
@@ -35,7 +36,7 @@ export default function Stores() {
       setIsAdding(false);
       setFormData(emptyStoreForm());
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      toast.error('Lỗi: ' + e.message);
     }
   };
 
@@ -49,7 +50,7 @@ export default function Stores() {
       });
       setEditingId(null);
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      toast.error('Lỗi: ' + e.message);
     }
   };
 
@@ -58,7 +59,7 @@ export default function Stores() {
       try {
         await deleteStore(id);
       } catch (e) {
-        alert('Lỗi: ' + e.message);
+        toast.error('Lỗi: ' + e.message);
       }
     }
   };

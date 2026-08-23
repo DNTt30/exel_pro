@@ -9,6 +9,7 @@ import { redact, describeDiff, clientMeta, rememberClientIp, capJson } from '../
 import { weekRecordKey } from '../utils/scheduleWeek';
 import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, userIsManager } from './guards';
 import { notifyTelegram } from '../utils/telegram';
+import { toast } from '../components/ui/toastStore';
 
 function sessionUserFromEmp(emp) {
   return {
@@ -582,7 +583,7 @@ export const useStore = create(
               [weekDate]: { ...weekSched, [empId]: previousShifts }
             }
           }));
-          alert(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
+          toast.error(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
         }
       },
 
@@ -616,7 +617,7 @@ export const useStore = create(
           set(state => ({
             feedbacks: state.feedbacks.filter(f => f.id !== tempId)
           }));
-          alert(`Không thể gửi phản hồi: ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
+          toast.error(`Không thể gửi phản hồi: ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
           throw err;
         }
       },
@@ -652,7 +653,7 @@ export const useStore = create(
         } catch (err) {
           console.error("Lỗi khi duyệt feedback:", err);
           set({ feedbacks: previousFeedbacks });
-          alert(`Lỗi khi cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
+          toast.error(`Lỗi khi cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
         }
       },
 
@@ -753,7 +754,7 @@ export const useStore = create(
         } catch (err) {
           console.error('Lỗi khi cập nhật đơn đổi ca:', err);
           set({ shiftSwaps: previousSwaps, schedule: previousSchedule });
-          alert(`Không thể cập nhật đơn đổi ca: ${err.message || 'Lỗi kết nối'}`);
+          toast.error(`Không thể cập nhật đơn đổi ca: ${err.message || 'Lỗi kết nối'}`);
         }
       },
 
@@ -853,7 +854,7 @@ export const useStore = create(
           console.error("Lỗi khi cập nhật trạng thái phản hồi:", err);
           // Rollback
           set({ feedbacks: previousFeedbacks });
-          alert(`Không thể cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
+          toast.error(`Không thể cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
         }
       }
     }),

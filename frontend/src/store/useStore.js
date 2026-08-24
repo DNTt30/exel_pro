@@ -5,6 +5,8 @@ import { getCurrentMondayWeek, normalizeStaffingConfig, normalizeStoreDemand } f
 import { buildSwappedSchedules, mergeAiSchedule } from '../utils/shiftHelper';
 import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, canPickStore, canApproveSchedule } from '../lib/authSession';
 import { bootstrapQueryPlan } from '../utils/dataScope';
+import { hasCustomAdminPassword, verifyAdminPassword } from '../lib/adminCredential';
+import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../lib/loginThrottle';
 import { redact, describeDiff, clientMeta, rememberClientIp, capJson } from '../utils/appLogs';
 import { weekRecordKey } from '../utils/scheduleWeek';
 import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, userIsManager } from './guards';
@@ -40,13 +42,27 @@ export const useStore = create(
           let nextUser = null;
 
           if (userId === 'admin') {
-            if (password !== '1') throw new Error('Mật khẩu không chính xác');
+            // Bảo mật: khóa tạm khi thử sai quá nhiều lần
+            const lock = checkLocked('admin');
+            if (!lock.allowed) {
+              const mins = Math.max(1, Math.ceil(lock.retryAfterSec / 60));
+              throw new Error('Đã thử sai quá ' + THROTTLE_MAX_FAILS + ' lần. Thử lại sau khoảng ' + mins + ' phút.');
+            }
+            // Ưu tiên mật khẩu thật (SHA-256+salt); '1' chỉ chấp nhận khi chưa thiết lập
+            const customOk = await verifyAdminPassword(password);
+            const usingDefault = password === '1' && !hasCustomAdminPassword();
+            if (!customOk && !usingDefault) {
+              const fail = recordFailure('admin');
+              throw new Error(fail.locked ? 'Sai mật khẩu. Tài khoản tạm khóa 5 phút.' : 'Mật khẩu không chính xác');
+            }
             nextUser = {
               id: 'admin',
               role: 'admin',
               name: 'Cửa hàng trưởng',
               jobTitle: 'Cửa hàng trưởng',
-              isManager: true
+              isManager: true,
+              mustSetupPassword: usingDefault,
+              loginAt: Date.now()
             };
           } else {
             let emp = await api.getEmployeeById(userId);
@@ -56,9 +72,19 @@ export const useStore = create(
               emp = (emps.length ? emps : get().employees).find(e => e.id === userId);
             }
             if (!emp) throw new Error('Không tìm thấy mã nhân viên');
-            if (password !== '1') throw new Error('Mật khẩu không chính xác');
-            nextUser = sessionUserFromEmp(emp);
+            const empLock = checkLocked(userId);
+            if (!empLock.allowed) {
+              const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
+              throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
+            }
+            if (password !== '1') {
+              recordFailure(userId);
+              throw new Error('Mật khẩu không chính xác');
+            }
+            nextUser = { ...sessionUserFromEmp(emp), loginAt: Date.now() };
           }
+
+          resetFailures(userId);
 
           set({ user: nextUser, syncStatus: 'loading' });
           get().appendAdminLog('LOGIN_SUCCESS', nextUser.id, isOpsManager(nextUser) ? (nextUser.isAreaManager ? 'OFC' : 'SM') : 'Nhân viên', {

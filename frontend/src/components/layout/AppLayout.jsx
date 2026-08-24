@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import Toaster from '../ui/toast';
+import { toast } from '../ui/toastStore';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
@@ -21,6 +22,50 @@ export default function AppLayout() {
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
   const isManager = isOpsManager(user);
+  const location = useLocation();
+
+  // ── Bảo mật 1: admin chưa đặt mật khẩu riêng → ép vào trang đổi mật khẩu
+  useEffect(() => {
+    if (user?.id === 'admin' && user?.mustSetupPassword && location.pathname !== '/admin/security/change-password') {
+      navigate('/admin/security/change-password', { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
+  // ── Bảo mật 2: tự đăng xuất khi không tương tác (20 phút) hoặc hết phiên tuyệt đối (12h)
+  const logoutRef = useRef(handleLogout);
+  logoutRef.current = handleLogout;
+  useEffect(() => {
+    if (!user) return undefined;
+    const IDLE_LIMIT_MS = 20 * 60 * 1000;
+    const ABSOLUTE_LIMIT_MS = 12 * 60 * 60 * 1000;
+    let idleTimer = null;
+    let expiredTimer = null;
+    const forceLogout = (reason) => () => {
+      Promise.resolve(logoutRef.current()).finally(() => {
+        toast.info(reason);
+      });
+    };
+    const resetIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(forceLogout('Phiên hết hạn do không hoạt động — vui lòng đăng nhập lại.'), IDLE_LIMIT_MS);
+    };
+    const events = ['pointerdown', 'keydown', 'visibilitychange'];
+    events.forEach((ev) => window.addEventListener(ev, resetIdle, { passive: true }));
+    resetIdle();
+    if (user.loginAt) {
+      const remainMs = user.loginAt + ABSOLUTE_LIMIT_MS - Date.now();
+      if (remainMs <= 0) {
+        forceLogout('Phiên đăng nhập đã quá 12 giờ — vui lòng đăng nhập lại.')();
+        return undefined;
+      }
+      expiredTimer = setTimeout(forceLogout('Phiên đăng nhập đã quá 12 giờ — vui lòng đăng nhập lại.'), remainMs);
+    }
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (expiredTimer) clearTimeout(expiredTimer);
+      events.forEach((ev) => window.removeEventListener(ev, resetIdle));
+    };
+  }, [user]);
 
   const adminLinks = [
     { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },

@@ -13,6 +13,7 @@ const FeedbackCB = lazy(() => import('./pages/admin/FeedbackCB'));
 const Employees = lazy(() => import('./pages/admin/Employees'));
 const Stores = lazy(() => import('./pages/admin/Stores'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
+const SecurityChangePassword = lazy(() => import('./pages/admin/SecurityChangePassword'));
 const EmployeeHome = lazy(() => import('./pages/employee/EmployeeHome'));
 const EmployeeSchedule = lazy(() => import('./pages/employee/EmployeeSchedule'));
 const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'));
@@ -109,6 +110,7 @@ function App() {
               <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
               <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']}><Stores /></PrivateRoute>} />
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']}><AdminLogs /></PrivateRoute>} />
+              <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
 
               {/* Employee Routes */}

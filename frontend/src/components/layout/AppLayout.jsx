@@ -24,20 +24,20 @@ export default function AppLayout() {
 
   const adminLinks = [
     { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
-    { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lich ca' },
-    { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Cham cong' },
-    { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bu cong C&B' },
-    { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Ke & date' },
-    { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhan vien' },
-    { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cua hang' },
-    { to: '/admin/logs',       icon: <ScrollText size={17} />,      label: 'Nhat ky' },
+    { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca' },
+    { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
+    { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B' },
+    { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
+    { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
+    { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
+    { to: '/admin/logs',       icon: <ScrollText size={17} />,      label: 'Nhật ký' },
   ];
   const employeeLinks = [
-    { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chu' },
-    { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lich ca' },
-    { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Cham cong' },
-    { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bu cong C&B' },
-    { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Ke cua toi' },
+    { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
+    { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
+    { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
+    { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
+    { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Kệ của tôi' },
   ];
   const links = isManager ? adminLinks : employeeLinks;
 
@@ -51,27 +51,27 @@ export default function AppLayout() {
   const ri = getRoleInfo();
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 print:bg-white print:h-auto print:block overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 print:bg-white print:h-auto print:block overflow-hidden">
 
       {/* ── Header ── */}
-      <header className="relative bg-white border-b border-blue-100 shadow-sm z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
+      <header className="relative bg-white/90 backdrop-blur-md border-b border-slate-200/70 shadow-2xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2.5">
             {/* GS25 logo */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/20 font-black text-sm tracking-tight select-none">GS25</div>
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">GS25</div>
             <div className="hidden sm:block">
               <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">OFC Schedule</h1>
-              <p className="text-[10px] text-slate-400 font-medium">Quan ly Lich & C&B</p>
+              <p className="text-[10px] text-slate-400 font-medium">Quản lý Lịch & C&B</p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
           <CloudSyncBadge />
-          <button onClick={() => setIsHelpOpen(true)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Huong dan"><HelpCircle size={18} /></button>
+          <button onClick={() => setIsHelpOpen(true)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell />
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 pl-2 pr-3 py-1 rounded-full ml-1">
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
@@ -80,7 +80,7 @@ export default function AppLayout() {
             <span className="text-xs font-bold text-slate-700 max-w-[90px] sm:max-w-[150px] truncate">{user?.name}</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border hidden sm:inline ${ri.top}`}>{ri.label}</span>
           </div>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors ml-0.5" title="Dang xuat"><LogOut size={16} /></button>
+          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors ml-0.5" title="Đăng xuất"><LogOut size={16} /></button>
         </div>
         {isInitializing && (<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden"><div className="h-full w-1/3 bg-blue-500 animate-pulse" /></div>)}
       </header>
@@ -90,7 +90,7 @@ export default function AppLayout() {
         {mobileMenuOpen && (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} />)}
 
         {/* ── Sidebar (blue gradient) ── */}
-        <aside className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto w-60 flex flex-col print:hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-900 border-r border-blue-900/30 transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}>
+        <aside className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto w-60 flex flex-col print:hidden bg-gradient-to-b from-blue-600 via-blue-700 to-indigo-900 border-r border-blue-950/30 transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}>
 
           <div className="px-4 py-3 md:hidden flex items-center justify-between border-b border-white/10">
             <span className="font-bold text-sm text-white/80">Menu</span>
@@ -103,7 +103,7 @@ export default function AppLayout() {
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-white font-bold text-sm truncate leading-tight">{user?.name || 'Nguoi dung'}</p>
+              <p className="text-white font-bold text-sm truncate leading-tight">{user?.name || 'Người dùng'}</p>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 inline-block ${ri.side}`}>{ri.label}</span>
             </div>
           </div>
@@ -126,17 +126,17 @@ export default function AppLayout() {
           {/* Footer */}
           <div className="px-3 py-3 border-t border-white/10">
             <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/40 hover:text-red-300 hover:bg-white/10 transition-all text-xs font-semibold">
-              <LogOut size={14} /> Dang xuat
+              <LogOut size={14} /> Đăng xuất
             </button>
             <p className="text-white/20 text-[10px] text-center mt-2">© 2026 GS25 OFC System</p>
           </div>
         </aside>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-auto bg-slate-100 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col"><Outlet /></main>
+        <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col"><Outlet /></main>
 
         {/* Floating AI Button - blue */}
-        <button onClick={() => setIsAIOpen(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-500 to-blue-700 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group" title="GS25 AI Copilot">
+        <button onClick={() => setIsAIOpen(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group" title="GS25 AI Copilot">
           <Sparkles size={22} className="group-hover:animate-pulse" />
         </button>
 

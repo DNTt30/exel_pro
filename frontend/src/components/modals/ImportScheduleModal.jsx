@@ -2,9 +2,11 @@ import React, { useState, useRef } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import * as api from '../../services/api';
-import { Upload, FileSpreadsheet, Download, AlertTriangle, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, AlertTriangle, X, FileDown } from 'lucide-react';
 import { WEEK_DAYS } from '../../data/constants';
+import { normalizeShiftCell } from '../../utils/scheduleTextNormalize';
 import { provisionAuthUser } from '../../lib/authSession';
+import { getShiftCode, getCoveringStore } from '../../utils/shiftHelper';
 
 
 import { useShallow } from 'zustand/react/shallow';
@@ -43,6 +45,48 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
     XLSX.writeFile(wb, `Mau_Phan_Ca_OFC_${currentWeek}.xlsx`);
   };
 
+  // Xuất lịch tuần hiện tại ra đúng bố cục mẫu ezHR (nhiều khối cửa hàng)
+  const handleExportWeekLayout = async () => {
+    const XLSX = await import('xlsx');
+    const wk = schedule[currentWeek] || {};
+    const parts = currentWeek.split('-').map(Number);
+    const monday = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    const dateLabels = [];
+    const dayNames = ['THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY', 'CHỦ NHẬT'];
+    WEEK_DAYS.forEach((_, i) => {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      dateLabels.push(String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'));
+    });
+    const rowsOut = [];
+    (stores.length ? stores : [{ id: '' }]).forEach(st => {
+      const emps = employees.filter(e => e.dept === st.id);
+      if (!emps.length) return;
+      rowsOut.push(['Mã nhân viên', 'Họ và Tên', 'Phòng ban', 'Loại NV', ...dateLabels, '']);
+      rowsOut.push(['', '', '', '', ...dayNames, '']);
+      emps.forEach(e => {
+        const days = wk[e.id] || {};
+        const cells = WEEK_DAYS.map(dk => {
+          const raw = days[dk];
+          if (raw === undefined || raw === null || raw === '') return '';
+          const code = getShiftCode(raw);
+          if (code === 'off') return 'off';
+          if (!code) return '';
+          const cs = getCoveringStore(raw);
+          return cs ? code + ' ' + cs : code;
+        });
+        rowsOut.push([e.id, e.name, e.dept, e.type, ...cells, '']);
+      });
+      rowsOut.push([]);
+      rowsOut.push([]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rowsOut);
+    ws['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 8 }, ...WEEK_DAYS.map(() => ({ wch: 13 })), { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'LichTuan');
+    XLSX.writeFile(wb, 'Lich_Tuan_' + currentWeek + '.xlsx');
+  };
+
   // Đọc và phân tích file Excel/CSV
   const processFile = (fileObj) => {
     setErrorMsg('');
@@ -74,15 +118,23 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         let deptCol = -1;
         let roleCol = -1;
         const dayCols = { T2: -1, T3: -1, T4: -1, T5: -1, T6: -1, T7: -1, CN: -1 };
+        let dateColCount = 0;
 
         for (let r = 0; r < Math.min(rows.length, 10); r++) {
           const row = rows[r].map(c => String(c).trim().toLowerCase());
           
           row.forEach((cell, cIdx) => {
-            if (cell.includes('mã nv') || cell === 'mã' || cell === 'id' || cell.includes('manv')) idCol = cIdx;
+            if (cell.includes('mã nv') || cell.includes('mã nhân viên') || cell === 'mã' || cell === 'id' || cell.includes('manv')) idCol = cIdx;
             if (cell.includes('họ và tên') || cell.includes('họ tên') || cell === 'tên' || cell === 'name') nameCol = cIdx;
             if (cell.includes('cửa hàng') || cell.includes('phòng ban') || cell === 'dept' || cell === 'store') deptCol = cIdx;
             if (cell.includes('vị trí') || cell.includes('chức vụ') || cell === 'role' || cell.includes('loại nv')) roleCol = cIdx;
+
+            // Cột ngày dạng dd/mm hoặc dd/mm/yyyy (mẫu ezHR): map tuần tự theo vị trí
+            if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(cell) && dateColCount < 7 && idCol !== -1) {
+              const seq = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+              dayCols[seq[dateColCount]] = cIdx;
+              dateColCount += 1;
+            }
 
             // Thứ trong tuần
             if (cell === 't2' || cell.includes('thứ hai') || cell.includes('thứ 2') || cell === 'mon') dayCols.T2 = cIdx;
@@ -125,7 +177,12 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
           if (!row || row.length === 0) continue;
 
           let rawId = String(row[idCol] || '').trim();
-          if (!rawId || rawId.toLowerCase().includes('cửa hàng:') || rawId.toLowerCase().includes('tổng cộng')) continue;
+          const rawIdLow = rawId.toLowerCase();
+          if (!rawId || rawIdLow.includes('cửa hàng:') || rawIdLow.includes('tổng cộng')) continue;
+          // Bỏ qua dòng header lặp (file mẫu ezHR lặp header theo từng khối CH)
+          if (rawIdLow.includes('mã nhân') || rawIdLow.includes('mã nv')) continue;
+          const rawNameLow = String(row[nameCol] || '').trim().toLowerCase();
+          if (rawNameLow.includes('họ và tên') || rawNameLow.includes('họ tên')) continue;
 
           // Làm sạch mã NV
           const empId = rawId.replace(/\D/g, '') || rawId;
@@ -137,9 +194,9 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
           WEEK_DAYS.forEach(dayKey => {
             const colIdx = dayCols[dayKey];
             if (colIdx !== -1 && row[colIdx] !== undefined) {
-              const rawShift = String(row[colIdx]).trim();
-              if (rawShift) {
-                shifts[dayKey] = rawShift;
+              const normalized = normalizeShiftCell(row[colIdx]);
+              if (normalized) {
+                shifts[dayKey] = normalized;
               }
             }
           });
@@ -276,16 +333,27 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         {/* Top Actions: Template Download */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
           <div className="text-xs text-slate-600">
-            Hỗ trợ định dạng file <strong>.xlsx, .xls, .csv</strong> (7 cột Thứ từ T2 đến CN).
+            Nhận cả mẫu ezHR (header lặp theo cửa hàng, cột ngày 24/8, ca kiểu <code>6h-18h</code>, <code>22-6 VN0497</code>).
           </div>
-          <button
-            type="button"
-            onClick={handleDownloadTemplate}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-          >
-            <Download size={13} />
-            <span>Tải file Excel mẫu (.xlsx)</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportWeekLayout}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Xuất lịch tuần hiện tại ra đúng bố cục mẫu ezHR (nhiều khối cửa hàng)"
+            >
+              <FileDown size={13} />
+              <span>Xuất lịch tuần (mẫu ezHR)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            >
+              <Download size={13} />
+              <span>Tải file Excel mẫu (.xlsx)</span>
+            </button>
+          </div>
         </div>
 
         {/* Drag & Drop Zone */}

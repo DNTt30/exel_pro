@@ -5,13 +5,10 @@ import heroImg from '../assets/gs25_hero.jpg';
 import { isOpsManager } from '../lib/authSession';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
 import { 
-  LogIn, 
-  Eye, 
-  EyeOff, 
-  Building2, 
-  Sparkles, 
-  ShieldCheck, 
-  Clock, 
+  LogIn,
+  Eye,
+  EyeOff,
+  ShieldCheck,
   UserCheck, 
   KeyRound, 
   ArrowRight,
@@ -100,13 +97,6 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Quick fill tài khoản mẫu
-  const quickFill = (id, pass = '1') => {
-    setEmpId(id);
-    setPassword(pass);
-    setError('');
   };
 
   return (
@@ -431,41 +421,6 @@ export default function Login() {
               </form>
             )}
 
-            {/* Quick Demo Fill Accounts */}
-            {!otpStep && (
-              <div className="mt-6 pt-5 border-t border-slate-200/80">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
-                  ⚡ Chọn Nhanh Tài Khoản Mẫu:
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => quickFill('260716009', '1')}
-                    className="p-2 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100 text-left transition-all cursor-pointer group"
-                  >
-                    <span className="text-xs font-bold text-blue-900 block group-hover:text-blue-700">
-                      👔 Quản Lý / OFC
-                    </span>
-                    <span className="text-[10px] text-blue-600 font-mono block">
-                      ID: 260716009
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => quickFill('260512008', '1')}
-                    className="p-2 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-left transition-all cursor-pointer group"
-                  >
-                    <span className="text-xs font-bold text-purple-900 block group-hover:text-purple-700">
-                      🎒 Nhân Viên Part-time
-                    </span>
-                    <span className="text-[10px] text-purple-600 font-mono block">
-                      ID: 260512008
-                    </span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Footer Security Footnote */}

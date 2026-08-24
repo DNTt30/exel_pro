@@ -1,6 +1,7 @@
 import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
+import { tryAnswerWithData } from './copilotIntents';
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OLLAMA_TIMEOUT_MS = 800;
@@ -677,7 +678,11 @@ export function askAICopilot(question, context = {}, chatHistory = []) {
 
 function answerCopilot(question, context = {}, chatHistory = []) {
   const history = chatHistory.length ? chatHistory : (context.chatHistory || []);
-  const recipeEarly = lookupFfOnsiteRecipe(question);
+  // Câu thuộc miền lịch/ca không cho recipe matcher đón sớm (fix: 'muon doi ca' → công thức món)
+  const SCHEDULE_DOMAIN = ['doi ca', 'xep ca', 'lich ca', 'ca lam', 'cham cong', 'bu cong'];
+  const strippedQuestion = stripVi(String(question || '').toLowerCase());
+  const domainLocked = SCHEDULE_DOMAIN.some((w) => strippedQuestion.includes(w));
+  const recipeEarly = domainLocked ? null : lookupFfOnsiteRecipe(question);
   if (recipeEarly) return recipeEarly;
 
   const merged = mergeFollowUpQuestion(question, history);
@@ -695,6 +700,12 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   } = context;
 
   const storeEmps = employees.filter(e => e.dept === storeId);
+
+  // INTENT MỚI (copilotIntents): lương cá nhân, so sánh, FT thiếu chuẩn,
+  // PT gần giới hạn, hướng dẫn đổi ca, ít giờ nhất... Trả về null thì
+  // rơi xuống chuỗi xử lý cũ bên dưới.
+  const routedAnswer = tryAnswerWithData({ q, qn, employees, weekSchedule, stores, shiftSwaps, feedbacks, storeId, currentWeek, user });
+  if (routedAnswer) return compactText(routedAnswer);
 
   const recipeReply = lookupFfOnsiteRecipe(q);
   if (recipeReply) return recipeReply;

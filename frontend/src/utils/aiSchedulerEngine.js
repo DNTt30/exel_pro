@@ -310,7 +310,8 @@ export function generateAISchedule(employees, storeId, options = {}) {
     employeeShiftsCount[e.id] = 0;
   });
 
-  const ftEmployees = storeEmployees.filter(e => e.type === 'STFT' || e.type === 'SM' || e.role?.includes('SM') || e.role?.includes('Full'));
+  // CSR_NEW tính như full-time theo quy chuẩn (≥48h & ≥6 ca/tuần)
+  const ftEmployees = storeEmployees.filter(e => e.type === 'STFT' || e.type === 'CSR_NEW' || e.type === 'SM' || e.role?.includes('SM') || e.role?.includes('Full'));
   const ptEmployees = storeEmployees.filter(e => !ftEmployees.some(ft => ft.id === e.id));
 
   const seniorEmployees = storeEmployees.filter(isSeniorStaff);
@@ -335,7 +336,10 @@ export function generateAISchedule(employees, storeId, options = {}) {
     const isFT = ftEmployees.some(ft => ft.id === emp.id);
 
     if (isFT) {
-      if (!isFTBackfill && ftMandatoryOffDays[emp.id] === dayKey) return false;
+      const offDaysLeft = WEEK_DAYS.filter(d => resultSchedule[emp.id][d] === 'off').length;
+      // Luật nghỉ tuần TUYỆT ĐỐI: >=1 ngày off trọn vẹn và tối đa 6 ca (48h).
+      // Backfill chỉ được mượn ngày off định mức nếu NV còn ngày off khác & chưa đủ 6 ca.
+      if (ftMandatoryOffDays[emp.id] === dayKey && (!isFTBackfill || offDaysLeft <= 1)) return false;
       if (employeeShiftsCount[emp.id] >= 6) return false;
     }
 
@@ -346,9 +350,17 @@ export function generateAISchedule(employees, storeId, options = {}) {
 
     const addedHours = getShiftHours(shiftCode);
     if (!isFT) {
-      if (employeeHours[emp.id] + addedHours > SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK) return false;
+      // Tôn trọng định mức riêng của từng NV nếu có (maxH), mặc định 23h
+      const ptCap = Number(emp.maxH) > 0 ? Number(emp.maxH) : SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK;
+      if (employeeHours[emp.id] + addedHours > ptCap) return false;
     } else {
       if (employeeHours[emp.id] + addedHours > 48 && !isFTBackfill) return false;
+    }
+
+    // Nghỉ giữa ca: kiểm cả ngày KẾ TIẾP đã bị xếp trước (phase 3/4 gán lệch thứ tự)
+    if (dayIdx < WEEK_DAYS.length - 1) {
+      const nextDayKey = WEEK_DAYS[dayIdx + 1];
+      if (checkRestPeriodViolation(shiftCode, resultSchedule[emp.id][nextDayKey])) return false;
     }
 
     return true;
@@ -514,6 +526,19 @@ export function generateAISchedule(employees, storeId, options = {}) {
     });
   });
 
+  // CẢNH BÁO: các ca vẫn thiếu người so với định biên sau khi đã tối ưu
+  const warnings = [];
+  WEEK_DAYS.forEach(dayKey => {
+    const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+    shiftPriorities.forEach(shiftCode => {
+      const neededCount = dayMatrix[shiftCode] || 0;
+      const actualCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
+      if (actualCount < neededCount) {
+        warnings.push(`Thiếu ${neededCount - actualCount} người ca ${shiftCode} ngày ${dayKey} (cần ${neededCount}, có ${actualCount}).`);
+      }
+    });
+  });
+
   return {
     schedule: resultSchedule,
     employeeHours,
@@ -530,13 +555,13 @@ export function generateAISchedule(employees, storeId, options = {}) {
       compliantFTPercent: ftEmployees.length > 0 ? Math.round((compliantFTCount / ftEmployees.length) * 100) : 100,
       compliantPTPercent: ptEmployees.length > 0 ? Math.round((compliantPTCount / ptEmployees.length) * 100) : 100
     },
+    warnings,
     insights: [
       `🤖 Đã phân bổ tối ưu ${totalAssignedShifts} ca làm việc (${totalAssignedHours} giờ) cho ${storeEmployees.length} nhân sự cửa hàng ${storeId}.`,
-      `🛡️ Full-Time bù toàn bộ ca thiếu: Lực lượng Full-Time đã tự động lấp đầy 100% các ca thiếu định biên, đồng thời tuân thủ tuyệt đối Luật Nghỉ Tuần (mỗi bạn có 1 ngày nghỉ OFF trọn vẹn).`,
-      `⏱️ Luật nghỉ giữa ca (≥ 11 tiếng): 100% nhân sự không bị xếp ca gối đầu quá sức (hết ca chiều 22h không bị xếp ca sáng 6h; sau ca đêm 22-6 được nghỉ ngơi hồi phục).`,
-      `👥 Kèm cặp nhân viên mới: 100% các ca có nhân sự mới đều có Bạn Cứng kèm cặp (${mentorPairsCount} lượt kèm).`,
-      `✓ Full-Time: 100% đạt chuẩn 48h/tuần (6 ca 8h).`,
-      `✓ Part-Time: 100% trong khung định mức an toàn (${SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK}h - ${SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK}h/tuần).`
+      `🛡️ Full-Time bù ca thiếu, tuân thủ Luật Nghỉ Tuần (mỗi bạn >=1 ngày OFF trọn vẹn, tối đa 6 ca = 48h).`,
+      `⏱️ Luật nghỉ giữa ca (>= 11 tiếng): không xếp ca gối đầu quá sức (hết ca 22h không dính ca sáng 6h hôm sau).`,
+      `👥 Kèm cặp nhân viên mới: ${mentorPairsCount} lượt kèm cặp Bạn Cứng trên các ca.`,
+      `✓ Full-Time đạt chuẩn: ${ftEmployees.length > 0 ? Math.round((compliantFTCount / ftEmployees.length) * 100) : 100}% (48h/tuần - 6 ca) | Part-Time đạt định mức: ${ptEmployees.length > 0 ? Math.round((compliantPTCount / ptEmployees.length) * 100) : 100}% (16-23h).`
     ]
   };
 }

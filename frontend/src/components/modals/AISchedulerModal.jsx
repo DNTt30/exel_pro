@@ -279,6 +279,14 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
                 <span>PT {aiResult.stats.compliantPTPercent}%</span>
               </div>
               <p className="text-[11px] text-slate-500">{aiResult.insights[0]}</p>
+              {Array.isArray(aiResult.warnings) && aiResult.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 space-y-0.5">
+                  <p className="text-[11px] font-bold text-amber-800">⚠️ Cần SM bổ sung tay ({aiResult.warnings.length}):</p>
+                  {aiResult.warnings.map((w, i) => (
+                    <p key={i} className="text-[11px] text-amber-700">• {w}</p>
+                  ))}
+                </div>
+              )}
               <div className="overflow-auto max-h-48 border border-slate-200 rounded-xl">
                 <table className="w-full text-[11px]">
                   <thead className="bg-slate-50 sticky top-0">

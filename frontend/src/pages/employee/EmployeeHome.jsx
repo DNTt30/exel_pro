@@ -162,7 +162,7 @@ export default function EmployeeHome() {
             const isToday = d === todayKey;
             return (
               <div key={d}
-                className={`rounded-xl px-1 py-2 text-center border ${working ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}>
+                className={`rounded-xl px-1 py-2.5 text-center border ${working ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}>
                 <div className={`text-[10px] font-bold ${isToday ? 'text-blue-700' : 'text-slate-400'}`}>{d}</div>
                 <div className={`text-[11px] font-black mt-0.5 ${working ? 'text-blue-700' : 'text-slate-300'}`}>{working ? shift : '–'}</div>
               </div>

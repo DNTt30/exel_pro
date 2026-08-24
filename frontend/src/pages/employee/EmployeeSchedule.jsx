@@ -12,6 +12,7 @@ import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import { useShallow } from 'zustand/react/shallow';
+import { visibleDeptIds } from '../../utils/dataScope';
 import { toast } from '../../components/ui/toastStore';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
@@ -26,6 +27,9 @@ export default function EmployeeSchedule() {
   const [filterOnlyMe] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving'
   const [displayView, setDisplayView] = useState('card'); // 'card' (Lịch thẻ cá nhân) hoặc 'table' (Bảng tính toàn CH)
+  const visibleDepts = useMemo(() => visibleDeptIds(user, stores), [user, stores]);
+  const [viewDept, setViewDept] = useState(''); // '' = mặc định CH của mình
+  const activeDept = viewDept || user?.dept || '';
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSwapListModal, setShowSwapListModal] = useState(false);
 
@@ -36,9 +40,9 @@ export default function EmployeeSchedule() {
   // 1. Ngày hiển thị cố định theo Tuần (T2 -> CN)
   const activeDays = WEEK_DAYS;
 
-  // 3. Nhóm nhân viên theo cửa hàng của nhân viên đang đăng nhập
+  // 3. Nhóm nhân viên theo CH đang xem (mặc định CH của mình; SM quản lý nhiều CH thì NV chọn được)
   const myDept = user?.dept || 'VN0497';
-  const groupedEmps = useGroupedEmployees(search, myDept, 'ALL', weekSchedule);
+  const groupedEmps = useGroupedEmployees(search, activeDept || myDept, 'ALL', weekSchedule);
 
   // 4. Lịch của nhân viên đăng nhập
   const mySched = weekSchedule[user?.id] || EMPTY_SCHED;
@@ -766,6 +770,25 @@ export default function EmployeeSchedule() {
       )}
 
       {/* VIEW 2: BẢNG TÍNH EXCEL TOÀN CỬA HÀNG (TABLE VIEW) */}
+      {displayView === 'table' && visibleDepts.length > 1 && (
+        <div className="print:hidden px-3 pt-2 pb-1 flex flex-wrap items-center gap-1.5 bg-slate-100">
+          <span className="text-[11px] font-bold text-slate-500 mr-1">🏬 Cửa hàng:</span>
+          {visibleDepts.map(id => (
+            <button key={id}
+              onClick={() => setViewDept(id)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                activeDept === id
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+              }`}
+              title={`Xem lịch ${getStoreLabel(stores, id)}`}
+            >
+              {getStoreLabel(stores, id)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {displayView === 'table' && (
         <div className="flex-1 overflow-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
           {(supportDaysThisWeek.length > 0 || swapDaysThisWeek.length > 0) && (
@@ -786,13 +809,13 @@ export default function EmployeeSchedule() {
             <table className="excel-table print:w-full">
               <thead>
                 <tr className="bg-slate-200 border-b border-slate-300">
-                  <th className="min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-700 text-xs md:sticky left-0 z-20 bg-slate-200 border-r border-slate-300">STT</th>
+                  <th className="hidden md:table-cell min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-700 text-xs md:sticky left-0 z-20 bg-slate-200 border-r border-slate-300">STT</th>
                   <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-700 text-xs md:sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '48px' }}>Mã NV</th>
                   <th className="min-w-[150px] md:min-w-[200px] w-[150px] md:w-[200px] max-w-[150px] md:max-w-[200px] text-left font-bold text-slate-700 text-xs sticky z-30 bg-slate-200 border-r border-slate-300 px-3 left-0 md:left-[144px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                     Họ và Tên
                   </th>
-                  <th className="min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Vị trí</th>
-                  <th className="min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Cửa hàng</th>
+                  <th className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Vị trí</th>
+                  <th className="hidden lg:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Cửa hàng</th>
                   
                   {/* 7 Cột Ngày Trong Tuần */}
                   {activeDays.map((day, idx) => {
@@ -812,7 +835,7 @@ export default function EmployeeSchedule() {
                     return (
                       <th 
                         key={day} 
-                        className={`min-w-[60px] w-[60px] max-w-[60px] border-r border-slate-300 py-1 transition-colors ${
+                        className={`min-w-[52px] w-[52px] sm:min-w-[60px] sm:w-[60px] sm:max-w-[60px] border-r border-slate-300 py-1 transition-colors ${
                           isToday 
                             ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500' 
                             : (day === 'CN' ? 'bg-orange-50/80 text-orange-900' : 'bg-slate-200 text-slate-700')

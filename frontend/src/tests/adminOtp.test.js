@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   isOtpEnabled, hasTrustedDeviceLocal, saveDeviceToken, getDeviceToken,
   checkDeviceTrusted, requestAdminOtp,
@@ -13,6 +13,8 @@ globalThis.localStorage = {
 };
 
 describe('adminOtp (client lib)', () => {
+  beforeEach(() => { vi.stubEnv('VITE_ADMIN_OTP_URL', ''); });
+  afterEach(() => { vi.unstubAllEnvs(); });
   beforeEach(() => store.clear());
 
   it('2FA tắt khi chưa cấu hình VITE_ADMIN_OTP_URL', () => {

@@ -150,6 +150,8 @@ export const useStore = create(
 
       // Data State
       authWarning: null,
+      // Công thực tế (ezHR): key 'empId|YYYY-MM-DD' -> { actualHours, note } | null (null = xóa override)
+      attendance: {},
       adminLogs: [],
       activityLogs: [],
       auditLogs: [],
@@ -283,6 +285,34 @@ export const useStore = create(
           });
           return { schedule };
         });
+      },
+
+      /** Tải công thực tế cho khoảng ngày ISO [from,to] */
+      loadAttendanceRange: async (fromDate, toDate) => {
+        try {
+          const rows = await api.getAttendanceRange(fromDate, toDate);
+          const map = {};
+          rows.forEach(r => { map[r.empId + '|' + r.workDate] = { actualHours: r.actualHours, note: r.note }; });
+          set({ attendance: map });
+        } catch (e) { console.error(e); }
+      },
+
+      /** Ghi/ Xóa override công 1 ô — optimistic, lỗi thì rollback */
+      saveAttendanceCell: async (empId, workDate, hours, updatedBy) => {
+        const key = empId + '|' + workDate;
+        const prev = get().attendance[key] || null;
+        const next = (hours === null || isNaN(hours)) ? null : { actualHours: hours, note: prev?.note || '' };
+        set(s => ({
+          attendance: (() => { const m2 = { ...s.attendance }; if (next) m2[key] = next; else delete m2[key]; return m2; })()
+        }));
+        try {
+          await api.upsertAttendanceRows(next ? [{ ...next, empId, workDate, updatedBy }] : []);
+          // Xóa override thật sự: cần upsert dòng 0 giờ thay vì bỏ qua (PK tồn tại)
+          if (!next) await api.upsertAttendanceRows([{ empId, workDate, actualHours: 0, updatedBy }]);
+        } catch (e) {
+          set(s => ({ attendance: (() => { const m2 = { ...s.attendance }; if (prev) m2[key] = prev; else delete m2[key]; return m2; })() }));
+          throw e;
+        }
       },
 
       appendAdminLog: async (action, target = '', detail = '', extra = {}) => {

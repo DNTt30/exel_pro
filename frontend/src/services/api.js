@@ -8,3 +8,4 @@ export * from './api/logs';
 export * from './api/shiftSwaps';
 export * from './api/shelves';
 export * from './api/weeks';
+export * from './api/attendance';

@@ -4,20 +4,26 @@
 // Neu chua cau hinh VITE_ADMIN_OTP_URL => 2FA tat (graceful off).
 // =====================================================================
 
-const FN_URL = import.meta.env?.VITE_ADMIN_OTP_URL || '';
-const SECRET = import.meta.env?.VITE_TELEGRAM_PROXY_SECRET || '';
 const DEVICE_KEY = 'ofc-admin-device-token';
 
+// Đọc env ĐỘNG (không giữ hằng lúc import) để vi.stubEnv điều khiển được trong test
+export function otpUrl() {
+  return String(import.meta.env?.VITE_ADMIN_OTP_URL || '').trim();
+}
+function proxySecret() {
+  return String(import.meta.env?.VITE_TELEGRAM_PROXY_SECRET || '').trim();
+}
+
 export function isOtpEnabled() {
-  return Boolean(FN_URL);
+  return Boolean(otpUrl());
 }
 
 async function callFn(action, extra = {}) {
-  if (!FN_URL) return { ok: false, reason: 'not-configured' };
+  if (!otpUrl()) return { ok: false, reason: 'not-configured' };
   try {
-    const res = await fetch(FN_URL, {
+    const res = await fetch(otpUrl(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(SECRET ? { 'x-ofc-secret': SECRET } : {}) },
+      headers: { 'Content-Type': 'application/json', ...(proxySecret() ? { 'x-ofc-secret': proxySecret() } : {}) },
       body: JSON.stringify({ action, ...extra }),
       signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
     });

@@ -3,15 +3,19 @@ import { SHIFTS } from '../data/initialData';
 import { getRoleBadgeInfo } from '../data/constants';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
-const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
-  // Tính toán Auto-sum
+const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
+  // Tính toán Auto-sum — ưu tiên CÔNG THỰC TẾ (ezHR) khi có override
   let totalPT = 0;
   let totalFT = 0;
   
   const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
   
   activeDays.forEach(day => {
-    const val = getDayValue(emp.id, day);
+    let val = getDayValue(emp.id, day);
+    if (getActualValue) {
+      const act = getActualValue(emp.id, day);
+      if (act !== null && act !== undefined && act !== '') val = String(act);
+    }
     if (val && val !== 'OFF') {
       const num = parseFloat(val);
       if (!isNaN(num)) {
@@ -60,6 +64,23 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue }) => {
           } else {
             badgeStyle = { backgroundColor: '#3b82f6', color: '#ffffff' };
           }
+        }
+
+        if (editMode && onActualChange) {
+          const raw = getActualValue ? getActualValue(emp.id, day) : '';
+          const has = raw !== null && raw !== undefined && raw !== '';
+          return (
+            <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center">
+              <input
+                type="number" step="0.5" min="0" max="16"
+                value={raw}
+                placeholder={isOff ? '' : String(val)}
+                onChange={(e) => onActualChange(emp.id, day, e.target.value)}
+                className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none focus:ring-1 focus:ring-blue-500 ${has ? 'bg-amber-50 border-amber-400 text-amber-800' : 'bg-white border-slate-200 text-slate-700'}`}
+                title={has ? 'Công thực tế (ezHR) — nền vàng = đang ghi đè lịch' : 'Nhập giờ thực tế để ghi đè lịch xếp'}
+              />
+            </td>
+          );
         }
 
         return (

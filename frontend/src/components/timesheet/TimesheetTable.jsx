@@ -1,7 +1,7 @@
-﻿import React, { memo } from 'react';
+import React, { memo } from 'react';
 import TimesheetRow from '../TimesheetRow';
 
-const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue }) => {
+const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
   const deptKeys = Object.keys(groupedEmps);
   const totalEmployees = deptKeys.reduce((sum, dept) => sum + (groupedEmps[dept]?.length || 0), 0);
 
@@ -77,6 +77,9 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue 
                       idx={idx}
                       activeDays={activeDays}
                       getDayValue={getDayValue}
+                      editMode={editMode}
+                      getActualValue={getActualValue}
+                      onActualChange={onActualChange}
                     />
                   ))}
                 </React.Fragment>

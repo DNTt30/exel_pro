@@ -6,6 +6,7 @@ import ManagerActionList from '../../components/ManagerActionList';
 import { AlertTriangle, Users, Clock, Building2, Download, Search, CheckCircle2, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, Package, PieChart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
+import StaffingGapChart from '../../components/charts/StaffingGapChart';
 import { buildOFCReportCSV, downloadCSV } from '../../utils/exportOFC';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
@@ -831,6 +832,16 @@ export default function Dashboard() {
           activeTab={activeChartTab}
           setActiveTab={setActiveChartTab}
         />
+        {/* Định biên vs Thực tế theo Ngày × Ca (tuần hiện tại) */}
+        <div className="mt-4">
+          <StaffingGapChart
+            employees={currentDeptEmployees}
+            weekSchedule={weekSchedule}
+            stores={stores}
+            scopeStoreId={filterDept}
+            currentWeek={currentWeek}
+          />
+        </div>
       </div>
 
       {/* Main Table Container */}

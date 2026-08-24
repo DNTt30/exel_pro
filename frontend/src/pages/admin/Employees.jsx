@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
@@ -86,6 +86,18 @@ export default function Employees() {
       } catch (e) {
         toast.error('Lỗi: ' + e.message);
       }
+    }
+  };
+
+  // Khóa/mở tài khoản: mã bị khóa không thể đăng nhập (dùng khi nghỉ việc)
+  const handleToggleActive = async (emp) => {
+    const next = emp.isActive === false; // đang khóa -> mở
+    if (!next && !confirm('Vô hiệu hóa mã ' + emp.id + '? Người này sẽ không đăng nhập được nữa.')) return;
+    try {
+      await updateEmployee(emp.id, { isActive: next });
+      toast.success(next ? 'Đã mở lại tài khoản ' + emp.id : 'Đã vô hiệu hóa mã ' + emp.id);
+    } catch (e) {
+      toast.error('Lỗi: ' + e.message + ' (Chạy sql_employee_status.sql nếu chưa có cột is_active)');
     }
   };
 
@@ -264,6 +276,9 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
+                        <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
+                          {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
+                        </button>
                         <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
                         <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Xóa"><Trash2 size={15} /></button>
                       </>

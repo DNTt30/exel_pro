@@ -35,3 +35,9 @@ Bật 2FA:
 
 - Chưa cấu hình biến trên → 2FA tự tắt, app chạy như bình thường.
 - Quên mất thiết bị tin tưởng: xóa key `ofc-admin-device-token` trong localStorage để buộc OTP lại; hoặc xóa các dòng `purpose='device'` trong bảng `admin_otps` để thu hồi TẤT CẢ thiết bị.
+
+## Bảo mật nhân viên: khóa mã nghỉ việc + cảnh báo đăng nhập (đã thêm)
+
+- **Khóa mã NV**: cột `is_active` trên bảng `employees` (chạy `sql_employee_status.sql`). Mã bị khóa → đăng nhập bị từ chối. Bấm icon 🔒 trong trang Quản lý Nhân sự để khóa/mở; hoặc SQL trực tiếp.
+- **Cảnh báo Telegram**: mỗi lượt đăng nhập thành công (mọi vai trò) gửi tin về chat quản lý qua proxy `telegram-notify` — fire-and-forget, không làm chậm đăng nhập. Điều kiện: đã cấu hình `VITE_TELEGRAM_PROXY_URL`.
+- Lưu ý: nhân viên đang đăng nhập sẵn sẽ không bị đá ra ngay khi bị khóa — phiên mới bị chặn ở lần đăng nhập kế tiếp.

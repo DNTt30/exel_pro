@@ -80,6 +80,7 @@ export const useStore = create(
               emp = (emps.length ? emps : get().employees).find(e => e.id === userId);
             }
             if (!emp) throw new Error('Không tìm thấy mã nhân viên');
+            if (emp.isActive === false) throw new Error('Mã này đã bị vô hiệu hóa (nghỉ việc). Liên hệ quản lý để mở lại.');
             const empLock = checkLocked(userId);
             if (!empLock.allowed) {
               const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
@@ -95,13 +96,22 @@ export const useStore = create(
           resetFailures(userId);
 
           set({ user: nextUser, syncStatus: 'loading' });
-          get().appendAdminLog('LOGIN_SUCCESS', nextUser.id, isOpsManager(nextUser) ? (nextUser.isAreaManager ? 'OFC' : 'SM') : 'Nhân viên', {
+          const roleLabel = isOpsManager(nextUser) ? (nextUser.isAreaManager ? 'OFC' : 'SM') : 'Nhân viên';
+          get().appendAdminLog('LOGIN_SUCCESS', nextUser.id, roleLabel, {
             category: 'security',
             entityType: 'session',
             entityId: nextUser.id,
             storeId: nextUser.dept || '',
             description: `Đăng nhập thành công · ${nextUser.name || nextUser.id}`
           });
+          // Bảo mật: báo Telegram mỗi lượt đăng nhập — răn đe mượn tài khoản,
+          // fire-and-forget nên không bao giờ chậm/trễ việc đăng nhập.
+          try {
+            if (telegramConfigured()) {
+              const when = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+              notifyTelegram('🔑 ' + (nextUser.name || nextUser.id) + ' (' + nextUser.id + ') đăng nhập · ' + roleLabel + ' · ' + when).catch(() => {});
+            }
+          } catch { /* ignore */ }
           bindAuthSession(nextUser).then((authWarning) => {
             if (get().user?.id === nextUser.id && authWarning !== get().authWarning) {
               set({ authWarning });

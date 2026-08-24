@@ -9,13 +9,14 @@ function mapEmployee(e) {
     dept: e.dept,
     type: e.type,
     role: e.role,
-    maxH: e.max_h
+    maxH: e.max_h,
+    isActive: e.is_active !== false
   };
 }
 
 export async function getEmployeeById(id) {
   if (!id) return null;
-  const { data, error } = await db().from('employees').select('id,name,dept,type,role,max_h').eq('id', id).maybeSingle();
+  const { data, error } = await db().from('employees').select('id,name,dept,type,role,max_h,is_active').eq('id', id).maybeSingle();
   if (error) {
     console.error('Lỗi lấy nhân viên:', error);
     return null;
@@ -24,7 +25,7 @@ export async function getEmployeeById(id) {
 }
 
 export async function getEmployees(opts = {}) {
-  let q = db().from('employees').select('id,name,dept,type,role,max_h').order('dept', { ascending: true });
+  let q = db().from('employees').select('id,name,dept,type,role,max_h,is_active').order('dept', { ascending: true });
   if (opts.dept) q = q.eq('dept', opts.dept);
   const { data, error } = await q;
   if (error) {
@@ -53,6 +54,7 @@ export async function updateEmployeeInfo(id, updates) {
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.role !== undefined) payload.role = updates.role;
   if (updates.maxH !== undefined) payload.max_h = updates.maxH;
+  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   
   const { error } = await db().from('employees').update(payload).eq('id', id);
   if (error) throw error;

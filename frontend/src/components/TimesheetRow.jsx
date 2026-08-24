@@ -1,7 +1,39 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { SHIFTS } from '../data/initialData';
 import { getRoleBadgeInfo } from '../data/constants';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
+
+/**
+ * Ô nhap cong thuc te: tu giu gia tri khi dang go (khong bi reset boi re-render),
+ * chi commit len DB khi roi khoi o hoac nhan Enter. Neu trong = tra ve theo lich.
+ */
+function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
+  const [val, setVal] = useState(initial ?? '');
+  const [focused, setFocused] = useState(false);
+
+  // Dong bo khi du lieu thay doi tu ngoai (tai lai / xoa override) neu khong focus
+  useEffect(() => {
+    if (!focused) setVal(initial ?? '');
+  }, [initial, focused]);
+
+  const has = String(val).trim() !== '';
+  return (
+    <input
+      type="number" step="0.5" min="0" max="16"
+      value={val}
+      placeholder={has ? '' : placeholderText}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setVal(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+      onBlur={() => {
+        setFocused(false);
+        if (String(val).trim() !== String(initial ?? '')) onCommit(empId, day, val);
+      }}
+      className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none focus:ring-1 focus:ring-blue-500 ${has ? 'bg-amber-50 border-amber-400 text-amber-800' : 'bg-white border-slate-200 text-slate-700'}`}
+      title={has ? 'Cong thuc te (ezHR) - nen vang = ghi de lich xep' : 'Nhap gio thuc te de ghi de lich xep'}
+    />
+  );
+}
 
 const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
   // Tính toán Auto-sum — ưu tiên CÔNG THỰC TẾ (ezHR) khi có override
@@ -68,16 +100,15 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
 
         if (editMode && onActualChange) {
           const raw = getActualValue ? getActualValue(emp.id, day) : '';
-          const has = raw !== null && raw !== undefined && raw !== '';
+          const initial = (raw === null || raw === undefined) ? '' : String(raw);
           return (
             <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center">
-              <input
-                type="number" step="0.5" min="0" max="16"
-                value={raw}
-                placeholder={isOff ? '' : String(val)}
-                onChange={(e) => onActualChange(emp.id, day, e.target.value)}
-                className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none focus:ring-1 focus:ring-blue-500 ${has ? 'bg-amber-50 border-amber-400 text-amber-800' : 'bg-white border-slate-200 text-slate-700'}`}
-                title={has ? 'Công thực tế (ezHR) — nền vàng = đang ghi đè lịch' : 'Nhập giờ thực tế để ghi đè lịch xếp'}
+              <AttendanceCell
+                empId={emp.id}
+                day={day}
+                initial={initial}
+                placeholderText={isOff ? '' : String(val)}
+                onCommit={onActualChange}
               />
             </td>
           );

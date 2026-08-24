@@ -297,11 +297,13 @@ export const useStore = create(
         } catch (e) { console.error(e); }
       },
 
-      /** Ghi/ Xóa override công 1 ô — optimistic, lỗi thì rollback */
-      saveAttendanceCell: async (empId, workDate, hours, updatedBy) => {
+      /** Ghi/ Xóa override công 1 ô — hours là số giờ; note nhận mã (AL/PL/UL/NS) */
+      saveAttendanceCell: async (empId, workDate, hours, updatedBy, note) => {
         const key = empId + '|' + workDate;
         const prev = get().attendance[key] || null;
-        const next = (hours === null || isNaN(hours)) ? null : { actualHours: hours, note: prev?.note || '' };
+        const code = String(note || '').trim();
+        const hasHours = !(hours === null || isNaN(hours));
+        const next = (!hasHours && !code) ? null : { actualHours: hasHours ? hours : 0, note: code || prev?.note || '' };
         set(s => ({
           attendance: (() => { const m2 = { ...s.attendance }; if (next) m2[key] = next; else delete m2[key]; return m2; })()
         }));

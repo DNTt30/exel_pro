@@ -2,10 +2,11 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
-import { Download, Printer, Pencil, Check } from 'lucide-react';
+import { Download, Printer, Pencil, Check, FileSpreadsheet } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { toast } from '../../components/ui/toastStore';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
+import { downloadPayrollXlsx } from '../../utils/exportPayroll';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { canPickStore } from '../../lib/authSession';
@@ -56,21 +57,29 @@ export default function Timesheet() {
     return hours > 0 ? String(hours) : code;
   }, [cycleDates, schedule]);
 
-  // Đọc công thực tế: key 'empId|YYYY-MM-DD'; trả '' khi không có override
+  // Đọc công thực tế: ưu tiên MÃ (AL/PL/UL), không thì số giờ; '' khi trống
   const getActualValue = useCallback((empId, day) => {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell) return '';
     const rec = attendance[cell.fullDateStr ? empId + '|' + cell.fullDateStr : ''];
-    if (!rec || !rec.actualHours) return '';
-    return String(rec.actualHours);
+    if (!rec) return '';
+    if (rec.note && rec.note.trim() !== '') return rec.note.trim().toUpperCase();
+    return rec.actualHours > 0 ? String(rec.actualHours) : '';
   }, [cycleDates, attendance]);
 
   const handleActualChange = useCallback(async (empId, day, raw) => {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell || !cell.fullDateStr) return;
     try {
-      const trimmed = String(raw).trim();
-      await saveAttendanceCell(empId, cell.fullDateStr, trimmed === '' ? null : parseFloat(trimmed), user?.id);
+      const trimmed = String(raw).trim().toUpperCase();
+      if (trimmed === '') {
+        await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id);
+      } else if (/^[0-9.]+$/.test(trimmed)) {
+        await saveAttendanceCell(empId, cell.fullDateStr, parseFloat(trimmed), user?.id);
+      } else {
+        // Mã chữ: AL (phép năm), PL (phép/trả lương), UL (không lương), NS...
+        await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id, trimmed);
+      }
     } catch (e) {
       toast.error('Không lưu được công: ' + e.message);
     }
@@ -115,6 +124,18 @@ export default function Timesheet() {
               >
                 {editMode ? <Check size={14} /> : <Pencil size={14} />}
                 {editMode ? `Đang sửa công (${overrideCount} ô)` : 'Sửa công thực tế'}
+              </button>
+              <button
+                onClick={() => downloadPayrollXlsx({
+                  cycleDates,
+                  groupedEmps,
+                  getDayValue,
+                  getActualValue
+                }, `OFC_CongLuong_Thang_${payrollCycle.month}_${payrollCycle.year}.xlsx`)}
+                className="text-xs py-1.5 px-3 rounded-lg font-bold border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Xuất bảng công lương đúng mẫu C&B (31 ngày 26→25 + cột tổng hợp)"
+              >
+                <FileSpreadsheet size={14} /> Xuất Công Lương C&B
               </button>
               <button className="btn btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 cursor-pointer" onClick={() => window.print()}>
                 <Printer size={14} /> In Bảng Công

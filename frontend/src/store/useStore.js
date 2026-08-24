@@ -26,7 +26,9 @@ function sessionUserFromEmp(emp) {
 }
 
 async function bindAuthSession(user) {
-  const result = await ensureAuthSession(user, { allowSignUp: user?.id === 'admin' });
+  // Bảo mật: ai đăng nhập app cũng tự cấp phiên Supabase Auth —
+  // để RLS phía DB phân quyền được theo vai trò 'authenticated'.
+  const result = await ensureAuthSession(user, { allowSignUp: true });
   if (result.ok) return null;
   if (result.reason === 'no-client' || result.reason === 'no-user') return null;
   console.warn('Supabase Auth chưa sẵn sàng:', result.reason);

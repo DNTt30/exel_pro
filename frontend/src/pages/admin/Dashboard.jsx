@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
@@ -11,6 +11,7 @@ import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
 import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
 import { buildOFCReportCSV, downloadCSV } from '../../utils/exportOFC';
+import { downloadBackupXlsx } from '../../utils/exportBackup';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -482,6 +483,21 @@ export default function Dashboard() {
     }
   };
 
+  // 6a. Sao lưu toàn bộ dữ liệu ra .xlsx (SM/OFC)
+  const handleBackupXlsx = () => {
+    try {
+      const fileName = downloadBackupXlsx(useStore.getState());
+      useStore.getState().appendAdminLog('DATA_BACKUP', fileName, 'admin', {
+        category: 'security',
+        entityType: 'backup',
+        entityId: fileName,
+        description: 'Sao lưu dữ liệu ra Excel: ' + fileName
+      });
+    } catch (e) {
+      console.error('Lỗi sao lưu:', e);
+    }
+  };
+
   // 6. Xuất file CSV định dạng chuẩn OFC
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'BaoCao') => {
     const isMonth = viewMode === 'month';
@@ -612,6 +628,15 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+
+          {/* Full-data Backup (.xlsx) — SM/OFC sao lưu toàn bộ dữ liệu đã tải */}
+          <button
+            onClick={handleBackupXlsx}
+            className="btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs py-2 px-3.5 rounded-xl font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
+            title="Tải toàn bộ dữ liệu (nhân viên, lịch mọi tuần đã tải, feedback, đổi ca, kệ) ra file Excel"
+          >
+            <DatabaseBackup size={14} /> Sao lưu .xlsx
+          </button>
 
           {/* Export Button */}
           <button

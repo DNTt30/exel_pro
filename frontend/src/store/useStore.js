@@ -7,6 +7,7 @@ import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp, is
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { hasCustomAdminPassword, verifyAdminPassword } from '../lib/adminCredential';
 import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../lib/loginThrottle';
+import { checkDeviceTrusted } from '../lib/adminOtp';
 import { redact, describeDiff, clientMeta, rememberClientIp, capJson } from '../utils/appLogs';
 import { weekRecordKey } from '../utils/scheduleWeek';
 import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, userIsManager } from './guards';
@@ -54,6 +55,13 @@ export const useStore = create(
             if (!customOk && !usingDefault) {
               const fail = recordFailure('admin');
               throw new Error(fail.locked ? 'Sai mật khẩu. Tài khoản tạm khóa 5 phút.' : 'Mật khẩu không chính xác');
+            }
+            // Bảo mật 2FA: thiết bị chưa tin tưởng → yêu cầu mã OTP Telegram.
+            // Ném lỗi có code để Login.jsx chuyển sang bước nhập OTP rồi đăng nhập lại.
+            if (!(await checkDeviceTrusted())) {
+              const otpErr = new Error('Cần xác thực 2 bước qua Telegram');
+              otpErr.code = 'OTP_REQUIRED';
+              throw otpErr;
             }
             nextUser = {
               id: 'admin',

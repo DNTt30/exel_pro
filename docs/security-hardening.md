@@ -23,3 +23,15 @@
 2. **Đổi cách cấp mật khẩu Supabase Auth** (`lib/authSession.js` đang sinh mật khẩu từ ID): nếu tách hẳn sang Supabase Auth, mật khẩu ứng dụng sẽ do người dùng giữ thay vì derive từ mã NV.
 3. **HTTPS bắt buộc** khi deploy (GitHub Pages mặc định HTTPS ✓). Không chạy production qua HTTP LAN.
 4. **2FA cho admin**: có thể thêm bước OTP qua Telegram Edge Function sẵn có (`supabase/functions/telegram-notify`) khi đăng nhập admin từ thiết bị lạ.
+
+## 2FA Telegram cho admin (đã thêm)
+
+Luồng: mật khẩu đúng → Edge Function `admin-otp` tạo mã 6 số, lưu **hash** vào bảng `admin_otps`, gửi qua Telegram → admin nhập mã → server xác minh (tối đa 5 lần) → phát hành **deviceToken** (ghi nhớ 30 ngày, chỉ lưu hash).
+
+Bật 2FA:
+1. Chạy `sql_admin_otp.sql` trong Supabase SQL Editor (tạo bảng `admin_otps`, RLS khóa hoàn toàn).
+2. `supabase functions deploy admin-otp --project-ref <ref>` (dùng chung secrets TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / NOTIFY_SECRET với telegram-notify).
+3. Thêm vào `frontend/.env`: `VITE_ADMIN_OTP_URL=https://<ref>.functions.supabase.co/admin-otp` rồi build/deploy lại.
+
+- Chưa cấu hình biến trên → 2FA tự tắt, app chạy như bình thường.
+- Quên mất thiết bị tin tưởng: xóa key `ofc-admin-device-token` trong localStorage để buộc OTP lại; hoặc xóa các dòng `purpose='device'` trong bảng `admin_otps` để thu hồi TẤT CẢ thiết bị.

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { isOpsManager } from '../lib/authSession';
-import { LogIn, UserCircle, Lock, Eye, EyeOff, Building2 } from 'lucide-react';
+import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
+import { LogIn, UserCircle, Lock, Eye, EyeOff, Building2, Send } from 'lucide-react';
 
 export default function Login() {
   const [empId, setEmpId] = useState('');
@@ -10,8 +11,53 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Bước 2FA: nhập mã OTP gửi qua Telegram của admin ──
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpNote, setOtpNote] = useState('');
+  const [cooldown, setCooldown] = useState(0);
   const login = useStore(state => state.login);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const sendOtp = async (isResend) => {
+    setOtpBusy(true);
+    setOtpNote('');
+    const r = await requestAdminOtp();
+    setOtpBusy(false);
+    if (!r.ok) {
+      setOtpNote(r.reason === 'cooldown'
+        ? 'Mã trước vẫn còn hiệu lực — hãy kiểm tra Telegram.'
+        : 'Không gửi được mã. Kiểm tra cấu hình 2FA rồi thử "Gửi lại mã".');
+      return;
+    }
+    setCooldown(60);
+    if (isResend) setOtpNote('Đã gửi lại mã — kiểm tra Telegram của admin.');
+  };
+
+  const submitOtp = async (e) => {
+    e.preventDefault();
+    if (otpBusy) return;
+    setOtpBusy(true);
+    setError('');
+    const r = await verifyAdminOtp(otpCode);
+    if (!r.ok) {
+      setOtpBusy(false);
+      setError(r.reason === 'wrong' ? 'Mã không đúng — thử lại.'
+        : r.reason === 'expired' ? 'Mã hết hạn hoặc sai quá 5 lần — gửi lại mã mới.'
+        : 'Xác minh lỗi, thử lại.');
+      return;
+    }
+    setOtpBusy(false);
+    await handleLogin(); // thiết bị đã tin tưởng → vào thẳng
+  };
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
@@ -25,7 +71,13 @@ export default function Login() {
         navigate('/employee/home');
       }
     } catch (err) {
-      setError(err.message);
+      if (err.code === 'OTP_REQUIRED') {
+        setOtpStep(true);
+        setError('');
+        sendOtp(false);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -54,6 +106,56 @@ export default function Login() {
           </div>
         )}
 
+        {otpStep ? (
+          <form onSubmit={submitOtp} className="space-y-4">
+            <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-semibold flex items-start gap-2">
+              <Send size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Mã 6 số đã gửi tới Telegram của admin. Mã có hiệu lực 5 phút, thiết bị này sẽ được ghi nhớ 30 ngày.</span>
+            </div>
+            {otpNote && (
+              <div className="text-xs font-semibold text-slate-500">{otpNote}</div>
+            )}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Mã xác thực (OTP)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="block w-full px-3 py-3 text-center text-2xl font-black tracking-[0.45em] border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 outline-none"
+                placeholder="······"
+                autoFocus
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={otpBusy || otpCode.length !== 6}
+              className="w-full flex justify-center items-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60"
+            >
+              <LogIn size={18} />
+              {otpBusy ? 'Đang xác minh...' : 'Xác nhận & đăng nhập'}
+            </button>
+            <button
+              type="button"
+              onClick={() => sendOtp(true)}
+              disabled={otpBusy || cooldown > 0}
+              className="w-full text-xs font-bold text-blue-600 hover:text-blue-700 disabled:text-slate-400 transition-colors"
+            >
+              {cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : otpBusy ? 'Đang gửi...' : 'Gửi lại mã'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOtpStep(false); setOtpCode(''); setError(''); }}
+              className="w-full text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              ← Quay lại đăng nhập
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
@@ -109,6 +211,7 @@ export default function Login() {
             {submitting ? 'Đang đăng nhập...' : 'Đăng Nhập'}
           </button>
         </form>
+        )}
 
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-400">

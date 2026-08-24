@@ -86,7 +86,7 @@ export default function EmployeeHome() {
   const pct = Math.max(0, Math.min(100, Math.round((totalH / (target || 1)) * 100)));
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4 pb-10">
+    <div className="p-4 sm:p-6 max-w-3xl lg:max-w-6xl mx-auto space-y-4 lg:space-y-0 pb-10">
 
       {/* ── Header chào hỏi ── */}
       <div>
@@ -107,8 +107,11 @@ export default function EmployeeHome() {
         </Link>
       )}
 
+      {/* ── Khối nội dung: 1 cột mobile, 3 cột desktop ── */}
+      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4 items-start">
+
       {/* ── Hero: ca hôm nay ── */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20">
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20 lg:col-span-2">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">Ca hôm nay · {todayKey}</span>
           <CalendarClock size={15} className="text-white/50" />
@@ -150,7 +153,7 @@ export default function EmployeeHome() {
       </div>
 
       {/* ── Dải xem nhanh tuần T2→CN ── */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm lg:col-span-2">
         <div className="grid grid-cols-7 gap-1.5">
           {WEEK_DAYS.map((d) => {
             const raw = mySched[d] || '';
@@ -186,7 +189,7 @@ export default function EmployeeHome() {
       )}
 
       {/* ── Nút tắt nhanh ── */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 lg:col-span-3 lg:grid-cols-4">
         <Link to="/employee/schedule" className="flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 transition-colors">
           <CalendarDays size={16} /> Lịch ca
         </Link>
@@ -200,6 +203,8 @@ export default function EmployeeHome() {
           <ShoppingBasket size={16} /> Kệ của tôi
         </Link>
       </div>
+
+      </div>{/* /khối nội dung */}
     </div>
   );
 }

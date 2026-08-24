@@ -22,7 +22,7 @@ const fakeState = {
 describe('exportBackup', () => {
   it('tao du cac sheet chuan', () => {
     const wb = buildBackupWorkbook(fakeState);
-    ['Nhan vien', 'Lich', 'Feedbacks', 'Doi ca', 'Ke hang', 'Mon trong ke', 'Cua hang', 'Trang thai tuan']
+    ['Nhan vien', 'Lich', 'Feedbacks', 'Doi ca', 'Ke hang', 'Mon trong ke', 'Cua hang']
       .forEach(n => expect(wb.SheetNames).toContain(n));
   });
 

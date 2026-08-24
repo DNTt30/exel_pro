@@ -10,7 +10,8 @@ import StaffingGapChart from '../../components/charts/StaffingGapChart';
 import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
 import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
-import { buildOFCReportCSV, downloadCSV } from '../../utils/exportOFC';
+import { downloadOFCReportXlsx } from '../../utils/exportOFC';
+import { toast } from '../../components/ui/toastStore';
 import { downloadBackupXlsx } from '../../utils/exportBackup';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
@@ -484,32 +485,31 @@ export default function Dashboard() {
   };
 
   // 6a. Sao lưu toàn bộ dữ liệu ra .xlsx (SM/OFC)
-  const handleBackupXlsx = () => {
+  const handleBackupXlsx = async () => {
     try {
-      const fileName = downloadBackupXlsx(useStore.getState());
+      toast.info('Đang tổng hợp dữ liệu sao lưu...');
+      const fileName = await downloadBackupXlsx(useStore.getState());
       useStore.getState().appendAdminLog('DATA_BACKUP', fileName, 'admin', {
         category: 'security',
         entityType: 'backup',
         entityId: fileName,
         description: 'Sao lưu dữ liệu ra Excel: ' + fileName
       });
+      toast.success('Đã tải ' + fileName);
     } catch (e) {
       console.error('Lỗi sao lưu:', e);
+      toast.error('Lỗi sao lưu: ' + e.message);
     }
   };
 
-  // 6. Xuất file CSV định dạng chuẩn OFC
+  // 6. Xuất báo cáo PT — file Excel chuẩn (.xlsx), mở trực tiếp không lỗi font/cột
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'BaoCao') => {
     const isMonth = viewMode === 'month';
-    const dateHeaders = isMonth
-      ? cycleDates.map(d => d.display).join(',')
-      : weekDaysInfo.map(d => d.fullDisplay).join(',');
-    const csv = buildOFCReportCSV({
+    downloadOFCReportXlsx({
       list: listToExport.map(emp => ({ ...emp, shiftsMap: isMonth ? emp.monthShifts : emp.weekShifts })),
       dayKeys: isMonth ? cycleDates.map(d => d.key) : WEEK_DAYS,
-      dateHeaders
-    });
-    downloadCSV(csv, `OFC_BaoCao_PartTime_${isMonth ? `Thang_${selectedMonthCycle}` : `Tuan_${currentWeek}`}_${fileNameSuffix}.csv`);
+      dateLabels: isMonth ? cycleDates.map(d => d.display) : weekDaysInfo.map(d => d.fullDisplay)
+    }, `OFC_BaoCao_PartTime_${isMonth ? `Thang_${selectedMonthCycle}` : `Tuan_${currentWeek}`}_${fileNameSuffix}.xlsx`);
   };
 
   const depts = [...new Set(employees.map(e => e.dept))].sort();

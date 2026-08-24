@@ -56,8 +56,13 @@ export async function updateEmployeeInfo(id, updates) {
   if (updates.maxH !== undefined) payload.max_h = updates.maxH;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   
-  const { error } = await db().from('employees').update(payload).eq('id', id);
+  // .select('id') để phát hiện RLS chặn ngầm: PostgREST trả 200 + 0 dòng
+  // khi phiên chưa xác thực — không có lỗi, chỉ âm thầm bỏ qua.
+  const { data, error } = await db().from('employees').update(payload).eq('id', id).select('id');
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Không ghi được vào DB (bị RLS chặn). Đăng xuất → đăng nhập lại để nhận phiên xác thực.');
+  }
 }
 
 export async function deleteEmployeeData(id) {

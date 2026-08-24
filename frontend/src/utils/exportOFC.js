@@ -35,3 +35,45 @@ export function downloadCSV(csv, filename) {
   link.download = filename;
   link.click();
 }
+
+// =====================================================================
+// Ban xuat .xlsx thay CSV — khong lo delimiter, mo truc tiep bang Excel.
+// =====================================================================
+import * as XLSX from 'xlsx';
+
+/** Chuyen mot o ca (string hoac object {shift, covering_store}) thanh chuoi hien thi. */
+export function shiftCellText(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  if (typeof v === 'object') {
+    return String(v.shift || '') + (v.covering_store ? ' (' + v.covering_store + ')' : '');
+  }
+  return String(v);
+}
+
+export function buildOFCReportAOA({ list, dayKeys, dateLabels }) {
+  const rows = [['STT', 'Cửa Hàng', 'Mã nhân Viên', 'Mã Điểm Danh', 'Vị Trí', 'Họ và Tên', ...dateLabels, 'Tổng giờ làm']];
+  list.forEach((emp, idx) => {
+    const m = emp.shiftsMap || {};
+    rows.push([
+      idx + 1, emp.dept || '', emp.id || '', emp.attendanceCode || '',
+      emp.role || emp.type || '', emp.name || '',
+      ...dayKeys.map(k => shiftCellText(m[k])),
+      emp.activeTotalHours ?? ''
+    ]);
+  });
+  return rows;
+}
+
+export function downloadOFCReportXlsx(params, filename) {
+  const ws = XLSX.utils.aoa_to_sheet(buildOFCReportAOA(params));
+  ws['!cols'] = [
+    { wch: 5 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 26 },
+    ...(params.dateLabels || []).map(() => ({ wch: 13 })),
+    { wch: 11 }
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Bao cao');
+  const out = String(filename || 'BaoCao.xlsx').replace(/\.csv$/i, '') + (String(filename).toLowerCase().endsWith('.xlsx') ? '' : '.xlsx');
+  XLSX.writeFile(wb, out);
+  return out;
+}

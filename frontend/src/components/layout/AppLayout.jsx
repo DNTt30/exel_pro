@@ -16,6 +16,7 @@ export default function AppLayout() {
   const logout = useStore(state => state.logout);
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
+const authWarning = useStore(state => state.authWarning);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -130,6 +131,13 @@ export default function AppLayout() {
         </div>
         {isInitializing && (<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden"><div className="h-full w-1/3 bg-blue-500 animate-pulse" /></div>)}
       </header>
+
+      {/* Cảnh báo phiên dữ liệu chưa xác thực — RLS sẽ chặn ngầm ghi/đọc */}
+      {authWarning && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-300 text-amber-900 text-[11px] sm:text-xs font-semibold print:hidden">
+          ⚠️ Phiên dữ liệu chưa xác thực ({authWarning}). Hãy <strong>Đăng xuất → đăng nhập lại</strong>. Nếu vẫn lỗi: Supabase Dashboard → Authentication → Sign In / Providers → Email → tắt "Confirm email".
+        </div>
+      )}
 
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden print:overflow-visible print:h-auto print:block relative">

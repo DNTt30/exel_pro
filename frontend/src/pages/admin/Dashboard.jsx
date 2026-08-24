@@ -6,6 +6,7 @@ import ManagerActionList from '../../components/ManagerActionList';
 import { AlertTriangle, Users, Clock, Building2, Download, Search, CheckCircle2, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, Package, PieChart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
+import { buildOFCReportCSV, downloadCSV } from '../../utils/exportOFC';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -480,24 +481,15 @@ export default function Dashboard() {
   // 6. Xuất file CSV định dạng chuẩn OFC
   const handleExportOFC_CSV = (listToExport, fileNameSuffix = 'BaoCao') => {
     const isMonth = viewMode === 'month';
-    const dateHeaders = isMonth 
-      ? cycleDates.map(d => d.display).join(',') 
+    const dateHeaders = isMonth
+      ? cycleDates.map(d => d.display).join(',')
       : weekDaysInfo.map(d => d.fullDisplay).join(',');
-
-    let csv = `STT,Cửa Hàng,Mã nhân Viên,Mã Điểm Danh,Vị Trí,Họ và Tên,${dateHeaders},Tổng giờ làm\n`;
-
-    listToExport.forEach((emp, idx) => {
-      const shiftsMap = isMonth ? emp.monthShifts : emp.weekShifts;
-      const keys = isMonth ? cycleDates.map(d => d.key) : WEEK_DAYS;
-      const shiftsStr = keys.map(k => shiftsMap[k] || '').join(',');
-      csv += `${idx + 1},${emp.dept || ''},${emp.id || ''},${emp.attendanceCode || ''},${emp.role || emp.type || ''},"${emp.name || ''}",${shiftsStr},${emp.activeTotalHours}\n`;
+    const csv = buildOFCReportCSV({
+      list: listToExport.map(emp => ({ ...emp, shiftsMap: isMonth ? emp.monthShifts : emp.weekShifts })),
+      dayKeys: isMonth ? cycleDates.map(d => d.key) : WEEK_DAYS,
+      dateHeaders
     });
-
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `OFC_BaoCao_PartTime_${isMonth ? `Thang_${selectedMonthCycle}` : `Tuan_${currentWeek}`}_${fileNameSuffix}.csv`;
-    link.click();
+    downloadCSV(csv, `OFC_BaoCao_PartTime_${isMonth ? `Thang_${selectedMonthCycle}` : `Tuan_${currentWeek}`}_${fileNameSuffix}.csv`);
   };
 
   const depts = [...new Set(employees.map(e => e.dept))].sort();

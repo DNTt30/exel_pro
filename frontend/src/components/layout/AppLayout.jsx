@@ -6,6 +6,7 @@ import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, St
 import NotificationBell from './NotificationBell';
 import Toaster from '../ui/toast';
 import { toast } from '../ui/toastStore';
+import { AdminPageSkeleton, EmployeePageSkeleton } from '../ui/Skeleton';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
@@ -178,7 +179,10 @@ export default function AppLayout() {
         </aside>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col"><Outlet /></main>
+        <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
+          {/* Skeleton khi đang khởi tạo dữ liệu — tránh trang trắng */}
+          {isInitializing ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
+        </main>
 
         {/* Floating AI Button - blue */}
         <button onClick={() => setIsAIOpen(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group" title="GS25 AI Copilot">

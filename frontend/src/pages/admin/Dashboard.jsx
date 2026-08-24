@@ -3,10 +3,13 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { AlertTriangle, Users, Clock, Building2, Download, Search, CheckCircle2, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, Package, PieChart } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
+import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
+import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
+import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
 import { buildOFCReportCSV, downloadCSV } from '../../utils/exportOFC';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
@@ -623,197 +626,20 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards Grid - Responsive 6 Columns with Chart Drill-downs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        
-        {/* Card 1: Cảnh báo PT vượt định mức */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden ${
-          ptOvertimeList.length > 0 
-            ? 'bg-gradient-to-br from-rose-50/90 via-red-50/50 to-white border-rose-200 shadow-sm' 
-            : 'bg-white border-slate-200/80 shadow-2xs'
-        }`}>
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-700">
-                {viewMode === 'month' ? 'PT > 91h/Tháng' : 'PT > 23h/Tuần'}
-              </span>
-              <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${
-                ptOvertimeList.length > 0 ? 'bg-rose-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-700'
-              }`}>
-                {ptOvertimeList.length > 0 ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${ptOvertimeList.length > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                {ptOvertimeList.length}
-              </span>
-              <span className="text-[11px] text-slate-500 font-semibold">/ {allPTEmployees.length} PT</span>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400">
-              {ptOvertimeList.length > 0 ? '⚠️ Vượt định mức' : '✅ Đạt chuẩn'}
-            </span>
-            <button 
-              onClick={() => scrollToChart('shifts')}
-              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 hover:underline cursor-pointer"
-            >
-              Xem biểu đồ ↗
-            </button>
-          </div>
-        </div>
-
-        {/* Card 2: Nhân sự & Hôm nay */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Trực Ca Hôm Nay</span>
-              <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Users size={14} />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-blue-700">{quickStats.empsWorkingToday}</span>
-              <span className="text-[11px] text-slate-500 font-semibold">/ {currentDeptEmployees.length} NV</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
-              {currentDeptEmployees.length - allPTEmployees.length} FT • {allPTEmployees.length} PT
-            </span>
-            <button 
-              onClick={() => scrollToChart('shifts')}
-              className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 hover:underline cursor-pointer"
-            >
-              Cơ cấu ca ↗
-            </button>
-          </div>
-        </div>
-
-        {/* Card 3: Tổng giờ công đã xếp */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                Tổng Giờ Công
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Clock size={14} />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-indigo-700">{currentDeptTotalHours.toLocaleString()}</span>
-              <span className="text-[11px] text-slate-500 font-semibold">giờ</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
-              {viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}` : `Tuần ${currentWeek.slice(5)}`}
-            </span>
-            <button 
-              onClick={() => scrollToChart('workload')}
-              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5 hover:underline cursor-pointer"
-            >
-              Xu hướng ↗
-            </button>
-          </div>
-        </div>
-
-        {/* Card 4: Chuỗi Cửa hàng */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Cửa Hàng</span>
-              <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Building2 size={14} />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-slate-800">
-                {filterDept === 'ALL' ? (stores.length || 3) : 1}
-              </span>
-              <span className="text-[11px] text-slate-500 font-semibold">
-                {filterDept === 'ALL' ? 'chi nhánh' : 'chi nhánh'}
-              </span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[70px]">
-              {filterDept === 'ALL' ? 'Toàn chuỗi' : filterDept}
-            </span>
-            <button 
-              onClick={() => scrollToChart('stores')}
-              className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 hover:underline cursor-pointer"
-            >
-              So sánh ↗
-            </button>
-          </div>
-        </div>
-
-        {/* Card 5: Kệ & Date */}
-        <Link to="/admin/shelves" className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden group block ${
-          quickStats.warningShelves > 0 
-            ? 'bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-white border-amber-200 shadow-sm hover:border-amber-400' 
-            : 'bg-white border-slate-200/80 shadow-2xs hover:border-blue-300'
-        }`}>
-          <div>
-            <div className="flex items-center justify-between">
-              <span className={`text-[11px] font-extrabold uppercase tracking-wider ${quickStats.warningShelves > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
-                Kệ Cận Date
-              </span>
-              <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${
-                quickStats.warningShelves > 0 ? 'bg-amber-500 text-white shadow-xs' : 'bg-slate-100 text-slate-600'
-              }`}>
-                <Package size={14} />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${quickStats.warningShelves > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
-                {quickStats.warningShelves}
-              </span>
-              <span className="text-[11px] text-slate-500 font-semibold">kệ cảnh báo</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
-            <span className="text-slate-400">{quickStats.pendingShelves} kệ chờ kiểm</span>
-            <span className="text-amber-600 group-hover:underline flex items-center gap-0.5">Kiểm date ↗</span>
-          </div>
-        </Link>
-
-        {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
-                Tuân Thủ Định Mức
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white shadow-xs flex items-center justify-center">
-                <PieChart size={14} />
-              </div>
-            </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-700">
-                {complianceStats.complianceRate}%
-              </span>
-              <span className="text-[11px] text-slate-500 font-semibold">
-                ({complianceStats.optimal}/{complianceStats.total} NV)
-              </span>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-emerald-100/60 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-emerald-700">
-              {viewMode === 'month' ? 'Chuẩn 50-91h' : 'Chuẩn 16-23h'}
-            </span>
-            <button 
-              onClick={() => scrollToChart('shifts')}
-              className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5 hover:underline cursor-pointer"
-            >
-              Phân tầng ↗
-            </button>
-          </div>
-        </div>
-
-      </div>
+      <KpiCardsGrid
+        ptOvertimeList={ptOvertimeList}
+        allPTEmployees={allPTEmployees}
+        viewMode={viewMode}
+        quickStats={quickStats}
+        complianceStats={complianceStats}
+        currentDeptEmployees={currentDeptEmployees}
+        currentDeptTotalHours={currentDeptTotalHours}
+        selectedMonthCycle={selectedMonthCycle}
+        currentWeek={currentWeek}
+        filterDept={filterDept}
+        stores={stores}
+        scrollToChart={scrollToChart}
+      />
 
       {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
       <div id="analytics-section">
@@ -1051,214 +877,24 @@ export default function Dashboard() {
       </div>
 
       {/* Store Breakdown Cards */}
-      <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-extrabold text-base text-slate-900">
-              Tình Hình Nhân Sự & Giờ Làm Theo Cửa Hàng ({viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}` : 'Theo Tuần'})
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Click vào cửa hàng để lọc nhanh danh sách nhân sự</p>
-          </div>
-          <span className="text-xs text-slate-500 font-semibold px-2.5 py-1 bg-slate-100 rounded-lg">Toàn hệ thống ({storeStats.length} chi nhánh)</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {storeStats.map(s => {
-            const isCurrentFilter = filterDept === s.dept;
-            const pctOfTotal = totalSystemHours > 0 ? Math.round((s.totalHours / totalSystemHours) * 100) : 0;
-
-            return (
-              <div 
-                key={s.dept} 
-                onClick={() => setFilterDept(isCurrentFilter ? 'ALL' : s.dept)}
-                className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                  isCurrentFilter 
-                    ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 shadow-xs' 
-                    : 'border-slate-200/90 hover:border-blue-300 bg-slate-50/40 hover:bg-white shadow-2xs'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-blue-700 text-sm">🏬 {s.dept}</span>
-                  {s.ptOver91 > 0 ? (
-                    <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-[10px] font-extrabold">
-                      ⚠️ {s.ptOver91} PT vượt {viewMode === 'month' ? '91h' : '23h'}
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-bold">
-                      ✓ Đạt chuẩn
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[10px] font-semibold">Nhân sự</span>
-                    <span className="font-extrabold text-slate-800">{s.totalEmps} <span className="font-normal text-slate-500">(PT: {s.ptEmps})</span></span>
-                  </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[10px] font-semibold">Tổng giờ ({pctOfTotal}%)</span>
-                    <span className="font-extrabold text-blue-700">{s.totalHours.toLocaleString()}h</span>
-                  </div>
-                </div>
-
-                {/* Mini Store Share Bar */}
-                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-600 rounded-full transition-all"
-                    style={{ width: `${pctOfTotal}%` }}
-                  ></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <StoreBreakdownCards
+        storeStats={storeStats}
+        totalSystemHours={totalSystemHours}
+        filterDept={filterDept}
+        setFilterDept={setFilterDept}
+        viewMode={viewMode}
+        selectedMonthCycle={selectedMonthCycle}
+      />
 
       {/* Employee Detail Drill-down Modal */}
       {selectedEmp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150">
-            
-            {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center font-bold text-lg shadow-inner">
-                  👤
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-black text-lg leading-tight">{selectedEmp.name}</h3>
-                    <span className="px-2 py-0.5 bg-white/20 rounded text-[11px] font-bold">
-                      {selectedEmp.role || selectedEmp.type || 'STPT'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-blue-100 font-mono mt-0.5">
-                    Mã NV: <strong>{selectedEmp.id}</strong> | Cửa hàng: <strong>{selectedEmp.dept}</strong>
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedEmp(null)}
-                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/20 transition-colors cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
-              
-              {/* Status Alert Banner */}
-              <div className={`p-4 rounded-xl border flex items-center gap-3.5 ${
-                selectedEmp.isOvertime 
-                  ? 'bg-rose-50 border-rose-200 text-rose-900' 
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              }`}>
-                <div className={`p-2.5 rounded-xl text-white ${selectedEmp.isOvertime ? 'bg-rose-600 shadow-2xs' : 'bg-emerald-600'}`}>
-                  {selectedEmp.isOvertime ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-xs">
-                    {selectedEmp.isOvertime 
-                      ? (viewMode === 'month' 
-                          ? `CẢNH BÁO: Nhân viên đã làm ${selectedEmp.monthTotalHours}h / 91h trong tháng!`
-                          : `CẢNH BÁO: Nhân viên đã đăng ký ${selectedEmp.weekTotalHours}h / 23h trong tuần!`)
-                      : `AN TOÀN: Tổng giờ tháng là ${selectedEmp.monthTotalHours}h (Định mức chuẩn ≤ 91h)`}
-                  </h4>
-                  <p className="text-[11px] opacity-90 mt-0.5">
-                    Định mức tuần an toàn: 16h - 23h. Tổng giờ chu kỳ tháng: {selectedEmp.monthTotalHours}h / 91h.
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Stat Cards */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Tổng Giờ Tháng</span>
-                  <span className={`text-2xl font-black font-mono mt-0.5 block ${selectedEmp.monthTotalHours > 91 ? 'text-rose-600' : 'text-slate-800'}`}>
-                    {selectedEmp.monthTotalHours}h
-                  </span>
-                </div>
-                <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Giờ Tuần Này</span>
-                  <span className="text-2xl font-black font-mono text-blue-700 mt-0.5 block">
-                    {selectedEmp.weekTotalHours}h
-                  </span>
-                </div>
-                <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Hạn Mức Chuẩn</span>
-                  <span className="text-2xl font-black font-mono text-slate-700 mt-0.5 block">
-                    91h
-                  </span>
-                </div>
-              </div>
-
-              {/* Detail Shifts Matrix */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
-                    <Clock size={14} className="text-blue-600" />
-                    <span>
-                      {viewMode === 'month' 
-                        ? `Phân bổ 31 ngày chu kỳ Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}:` 
-                        : `Chi tiết ca làm việc tuần ${currentWeek}:`}
-                    </span>
-                  </h4>
-                  <span className="text-[11px] font-bold text-blue-700">Tổng cộng: {selectedEmp.activeTotalHours}h</span>
-                </div>
-
-                {viewMode === 'month' ? (
-                  <div className="grid grid-cols-7 gap-1.5 text-center bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    {cycleDates.map(d => {
-                      const val = selectedEmp.monthShifts[d.key];
-                      return (
-                        <div key={d.key} className={`p-1.5 rounded-lg border text-center ${val ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'}`}>
-                          <span className="text-[9px] font-bold text-slate-500 block">{d.shortDisplay} ({d.dayKey})</span>
-                          <span className={`text-[10px] font-extrabold font-mono mt-0.5 block ${val ? 'text-blue-700' : 'text-slate-300'}`}>
-                            {val || '-'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-7 gap-2 text-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    {WEEK_DAYS.map(day => {
-                      const shiftVal = selectedEmp.weekShifts[day];
-                      return (
-                        <div key={day} className={`p-2.5 rounded-xl border ${shiftVal ? 'bg-blue-50 border-blue-200 shadow-2xs' : 'bg-white border-slate-200'}`}>
-                          <span className="font-black text-xs text-blue-800 block">{day}</span>
-                          <span className={`text-xs font-extrabold font-mono mt-1 block ${shiftVal ? 'text-blue-700' : 'text-slate-300'}`}>
-                            {shiftVal || '-'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-              <Link 
-                to="/admin/schedule"
-                className="btn btn-primary text-xs py-1.5 px-3.5 rounded-xl font-bold flex items-center gap-1"
-              >
-                <span>Chỉnh sửa ca tại Bảng Xếp Lịch</span>
-                <ArrowRight size={14} />
-              </Link>
-              <button 
-                onClick={() => setSelectedEmp(null)}
-                className="btn btn-outline text-xs py-1.5 px-4 rounded-xl font-bold hover:bg-slate-100 cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
-
-          </div>
-        </div>
+        <EmployeeDetailModal
+          emp={selectedEmp}
+          onClose={() => setSelectedEmp(null)}
+          viewMode={viewMode}
+          selectedMonthCycle={selectedMonthCycle}
+          cycleDates={cycleDates}
+        />
       )}
 
     </div>

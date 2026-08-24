@@ -41,7 +41,7 @@ export default function EmployeeSchedule() {
   const activeDays = WEEK_DAYS;
 
   // 3. Nhóm nhân viên theo CH đang xem (mặc định CH của mình; SM quản lý nhiều CH thì NV chọn được)
-  const myDept = user?.dept || 'VN0497';
+  const myDept = user?.dept || '';
   const groupedEmps = useGroupedEmployees(search, activeDept || myDept, 'ALL', weekSchedule);
 
   // 4. Lịch của nhân viên đăng nhập

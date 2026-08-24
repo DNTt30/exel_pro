@@ -173,7 +173,7 @@ export function tryAnswerWithData(ctx) {
     qn = '',
     employees = [],
     weekSchedule = {},
-    storeId = 'VN0485',
+    storeId = '',
     user = null,
   } = ctx || {};
   const storeEmps = employees.filter((e) => e.dept === storeId);

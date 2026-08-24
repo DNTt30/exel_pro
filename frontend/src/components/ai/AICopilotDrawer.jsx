@@ -9,7 +9,7 @@ import { useShallow } from 'zustand/react/shallow';
 export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, stores: s.stores, shiftSwaps: s.shiftSwaps, feedbacks: s.feedbacks, user: s.user })));
   const weekSched = schedule[currentWeek] || {};
-  const activeStoreId = storeId === 'ALL' ? (user?.dept || 'VN0485') : storeId;
+  const activeStoreId = storeId === 'ALL' ? (user?.dept || '') : storeId;
 
   const userName = user?.name || user?.username || 'bạn';
   const firstName = userName.split(' ').pop();

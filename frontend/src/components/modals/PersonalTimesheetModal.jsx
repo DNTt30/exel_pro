@@ -8,7 +8,7 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
   if (!user) return null;
 
   const roleInfo = getRoleBadgeInfo(user.role || user.type);
-  const myDept = user.dept || 'VN0485';
+  const myDept = user.dept || '';
 
   // Thống kê chi tiết công
   let totalHours = 0;

@@ -130,7 +130,7 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
           // Làm sạch mã NV
           const empId = rawId.replace(/\D/g, '') || rawId;
           const empName = String(row[nameCol] || '').trim() || `Nhân viên ${empId}`;
-          const empDept = String(row[deptCol] || '').trim() || stores[0]?.id || 'VN0485';
+          const empDept = String(row[deptCol] || '').trim() || stores[0]?.id || '';
           const empRole = String(row[roleCol] || '').trim() || 'STPT';
 
           const shifts = {};

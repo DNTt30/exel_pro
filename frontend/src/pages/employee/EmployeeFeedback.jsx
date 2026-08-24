@@ -59,7 +59,7 @@ export default function EmployeeFeedback() {
   // Fields dành riêng cho Part-time vượt 91h
   const [overtimeHours, setOvertimeHours] = useState(monthTotalHours > 91 ? `${monthTotalHours}` : '92');
   const [overtimeReason, setOvertimeReason] = useState('Hỗ trợ cửa hàng khác đi chi viện');
-  const [overtimeStore, setOvertimeStore] = useState(user?.dept || 'VN0497');
+  const [overtimeStore, setOvertimeStore] = useState(user?.dept || '');
 
   // Search in History
   const [historySearch, setHistorySearch] = useState('');

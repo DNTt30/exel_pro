@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
 export default function EmployeeTimesheet() {
   const { user, schedule, currentWeek, ensureWeeksLoaded } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   const weekSchedule = schedule[currentWeek] || {};
-  const myDept = user?.dept || 'VN0497';
+  const myDept = user?.dept || '';
 
   const [search, setSearch] = useState('');
   const [filterOnlyMe, setFilterOnlyMe] = useState(true);

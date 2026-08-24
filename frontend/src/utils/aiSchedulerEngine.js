@@ -694,7 +694,7 @@ function answerCopilot(question, context = {}, chatHistory = []) {
     stores = [],
     shiftSwaps = [],
     feedbacks = [],
-    storeId = 'VN0485', 
+    storeId = '', 
     currentWeek = '',
     user = null
   } = context;
@@ -1028,7 +1028,7 @@ export async function askOllamaCopilot(question, context = {}, chatHistory = [])
   const { 
     employees = [], 
     weekSchedule = {}, 
-    storeId = 'VN0485'
+    storeId = ''
   } = context;
 
   // Lược bớt dữ liệu để gửi cho LLM (tránh bị tràn token)

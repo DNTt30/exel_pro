@@ -46,7 +46,7 @@ const EMPTY_SCHED = {};
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, applyAiSchedule, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
-  const defaultStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || 'VN0485') : storeId;
+  const defaultStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || '') : storeId;
 
   const [selectedStoreId, setSelectedStoreId] = useState(defaultStoreId);
 

@@ -133,43 +133,16 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
         );
       })}
       
-      {/* Tổng Hợp */}
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className={`min-w-[64px] w-[64px] text-center font-bold border-r border-slate-200 ${
+      {/* Tổng Hợp — khớp đúng 3 cột header: Giờ FT | Giờ PT | Tổng */}
+      <td className="min-w-[64px] w-[64px] text-center font-bold text-blue-700 border-l border-slate-300 bg-slate-50">{totalFT > 0 ? totalFT.toFixed(2) : '0.00'}</td>
+      <td className={`min-w-[64px] w-[64px] text-center font-bold ${
         isPTOvertimed 
           ? 'bg-red-100 text-red-700 font-extrabold cursor-help' 
-          : 'text-blue-700 bg-slate-50'
-      }`} title={isPTOvertimed ? `⚠️ Cảnh báo: Nhân viên Part-time vượt quá 91h/tháng (${totalPT.toFixed(2)}h / 91h)` : ''}>
+          : 'bg-slate-100 text-blue-700'
+      }`} title={isPTOvertimed ? `⚠️ Cảnh báo: Part-time vượt định mức tháng (${totalPT.toFixed(2)}h / 91h)` : ''}>
         {isPTOvertimed ? `⚠️ ${totalPT.toFixed(2)}` : (totalPT > 0 ? totalPT.toFixed(2) : '0.00')}
       </td>
-      <td className="min-w-[64px] w-[64px] text-center font-bold text-blue-700 border-r border-slate-200 bg-slate-50">{totalFT > 0 ? totalFT.toFixed(2) : '0.00'}</td>
-      <td className="min-w-[48px] w-[48px] text-center text-red-600 border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200 bg-slate-50">0.00</td>
-      <td className="min-w-[80px] w-[80px] text-center font-bold text-emerald-700 bg-emerald-50 border-r border-slate-400">{tongCong > 0 ? tongCong.toFixed(2) : '0.00'}</td>
-
-      {/* OT Ngày */}
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-400">0.00</td>
-
-      {/* OT Đêm */}
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-400">0.00</td>
-
-      {/* Nghỉ bù */}
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-400">0.00</td>
-
-      {/* Training */}
-      <td className="min-w-[64px] w-[64px] text-center border-r border-slate-200">0.00</td>
-      <td className="min-w-[64px] w-[64px] text-center">0.00</td>
+      <td className="min-w-[64px] w-[64px] text-center font-black text-emerald-700 bg-emerald-50">{tongCong > 0 ? tongCong.toFixed(2) : '0.00'}</td>
     </tr>
   );
 });

@@ -94,7 +94,7 @@ export default function KpiCardsGrid({
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
-              {viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}` : `Tuần ${currentWeek.slice(5)}`}
+              {viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}` : (() => { const p = currentWeek.split('-'); return p.length === 3 ? `Tuần ${p[2]}/${p[1]}` : `Tuần ${currentWeek}`; })()}
             </span>
             <button 
               onClick={() => scrollToChart('workload')}

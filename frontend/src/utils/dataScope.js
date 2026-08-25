@@ -52,3 +52,8 @@ export function visibleDeptIds(user, stores) {
   });
   return [...ids];
 }
+/** Danh sach CUA HANG (object) duoc phep quan ly trong khu vuc admin */
+export function visibleStoresForAdmin(user, stores) {
+  const ids = new Set(visibleDeptIds(user, stores));
+  return (Array.isArray(stores) ? stores : []).filter(s => ids.has(s.id));
+}

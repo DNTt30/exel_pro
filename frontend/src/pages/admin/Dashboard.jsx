@@ -9,6 +9,7 @@ import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
 import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
 import MonthConfirmWidget from '../../components/dashboard/MonthConfirmWidget';
+import { visibleStoresForAdmin } from '../../utils/dataScope';
 import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
 import { downloadOFCReportXlsx } from '../../utils/exportOFC';
@@ -112,6 +113,7 @@ export default function Dashboard() {
 
   // Bộ lọc
   const [search, setSearch] = useState('');
+  const visibleStores = useMemo(() => visibleStoresForAdmin(user, stores), [user, stores]);
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : (user?.dept || 'ALL'));
   const [filterOnlyOvertime, setFilterOnlyOvertime] = useState(false);
 
@@ -663,7 +665,7 @@ export default function Dashboard() {
         selectedMonthCycle={selectedMonthCycle}
         currentWeek={currentWeek}
         filterDept={filterDept}
-        stores={stores}
+        stores={visibleStores}
         scrollToChart={scrollToChart}
       />
 
@@ -691,7 +693,7 @@ export default function Dashboard() {
           <StaffingGapChart
             employees={currentDeptEmployees}
             weekSchedule={weekSchedule}
-            stores={stores}
+            stores={visibleStores}
             scopeStoreId={filterDept}
             currentWeek={currentWeek}
           />

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
-import { isOpsManager } from './lib/authSession';
+import { isOpsManager, isBuiltinStoreManager } from './lib/authSession';
 import { lazy, Suspense } from 'react';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -53,10 +53,11 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const PrivateRoute = ({ children, allowedRoles }) => {
+const PrivateRoute = ({ children, allowedRoles, fullAdminOnly }) => {
   const user = useStore(state => state.user);
   
   if (!user) return <Navigate to="/login" replace />;
+  if (fullAdminOnly && !isBuiltinStoreManager(user)) return <Navigate to="/admin/dashboard" replace />;
   if (allowedRoles && allowedRoles.length > 0) {
     const hasRole = allowedRoles.includes(user.role);
     const managerGetsAdmin = isOpsManager(user) && allowedRoles.includes('admin');
@@ -107,9 +108,9 @@ function App() {
               <Route path="admin/schedule" element={<PrivateRoute allowedRoles={['admin']}><Schedule /></PrivateRoute>} />
               <Route path="admin/timesheet" element={<PrivateRoute allowedRoles={['admin']}><Timesheet /></PrivateRoute>} />
               <Route path="admin/feedback" element={<PrivateRoute allowedRoles={['admin']}><FeedbackCB /></PrivateRoute>} />
-              <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
-              <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']}><Stores /></PrivateRoute>} />
-              <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']}><AdminLogs /></PrivateRoute>} />
+              <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><Employees /></PrivateRoute>} />
+              <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><Stores /></PrivateRoute>} />
+              <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><AdminLogs /></PrivateRoute>} />
               <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
 

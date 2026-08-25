@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { appRoleLabel, appRoleOf, isOpsManager } from '../../lib/authSession';
+import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import Toaster from '../ui/toast';
@@ -69,7 +69,13 @@ const authWarning = useStore(state => state.authWarning);
     };
   }, [user]);
 
-  const adminLinks = [
+  const isFullAdmin = isBuiltinStoreManager(user);
+  const adminLinksFullOnly = [
+    { to: '/admin/employees',  icon: <Users size={17} />,      label: 'Nhân viên' },
+    { to: '/admin/stores',     icon: <Store size={17} />,     label: 'Cửa hàng' },
+    { to: '/admin/logs',       icon: <ScrollText size={17} />, label: 'Nhật ký' },
+  ];
+  const adminLinksBase = [
     { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
     { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca' },
     { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
@@ -79,6 +85,7 @@ const authWarning = useStore(state => state.authWarning);
     { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
     { to: '/admin/logs',       icon: <ScrollText size={17} />,      label: 'Nhật ký' },
   ];
+  const adminLinks = [...adminLinksBase, ...(isFullAdmin ? adminLinksFullOnly : [])];
   const employeeLinks = [
     { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
     { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },

@@ -2,6 +2,8 @@ import React from 'react';
 import { Search, Filter, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { listNearbyWeeks } from '../data/constants';
+import { visibleDeptIds } from '../utils/dataScope';
+import { isBuiltinStoreManager } from '../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function Toolbar({ 
@@ -12,10 +14,11 @@ export default function Toolbar({
   disableDeptFilter = false,
   rightActions 
 }) {
-  const { employees, currentWeek, setCurrentWeek } = useStore(useShallow((s) => ({ employees: s.employees, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek })));
-  
-  const depts = [...new Set(employees.map(e => e.dept))].sort();
-  const roles = [...new Set(employees.map(e => e.role || e.type))].sort();
+  const { employees, stores, user, currentWeek, setCurrentWeek } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, user: s.user, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek })));
+  const fullAdmin = isBuiltinStoreManager(user);
+  const allowedDepts = new Set(visibleDeptIds(user, stores));
+  const depts = [...new Set(employees.map(e => e.dept))].filter(d => d && (fullAdmin || allowedDepts.has(d))).sort();
+  const roles = [...new Set(employees.filter(e => fullAdmin || !e.dept || allowedDepts.has(e.dept)).map(e => e.role || e.type))].sort();
 
   return (
     <div className="bg-white px-3 md:px-4 py-2 border-b border-slate-200 flex flex-wrap gap-2 md:gap-3 items-center justify-between shadow-2xs">
@@ -52,7 +55,7 @@ export default function Toolbar({
               onChange={e => setFilterDept(e.target.value)}
               className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 transition-colors outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="ALL">Tất cả cửa hàng</option>
+              {fullAdmin && <option value="ALL">Tất cả cửa hàng</option>}
               {depts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>

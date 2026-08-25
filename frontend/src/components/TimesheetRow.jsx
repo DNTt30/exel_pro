@@ -114,9 +114,18 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
           );
         }
 
+        // UU TIEN HIEN THI: cong thuc te override > lich xep
+        const actDisp = getActualValue ? getActualValue(emp.id, day) : '';
+        const actStr = String(actDisp ?? '').trim();
+        const actNum = parseFloat(actStr);
+        const hasActNum = actStr !== '' && !isNaN(actNum);
         return (
           <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center font-semibold">
-            {isOff ? (
+            {hasActNum ? (
+              <span className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 leading-tight">{actNum}</span>
+            ) : actStr !== '' ? (
+              <span className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 leading-tight">{actStr.toUpperCase()}</span>
+            ) : isOff ? (
               <span className="text-slate-300 text-[11px] block py-1">-</span>
             ) : (
               <span 

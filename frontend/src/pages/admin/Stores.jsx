@@ -172,7 +172,7 @@ export default function Stores() {
                 <td className="p-3">
                   {editingId === st.id ? (
                     <input type="text" placeholder="Mã SM" className="w-full p-1.5 border border-blue-400 rounded bg-white font-mono text-xs outline-none" value={formData.sm_id || ''} onChange={e => setFormData({ ...formData, sm_id: e.target.value })} />
-                  ) : (
+                  ) : pickStore ? (
                     <select
                       className="w-full p-1.5 border border-slate-200 rounded bg-slate-50 text-xs cursor-pointer"
                       value={st.sm_id || st.smId || ''}
@@ -191,6 +191,11 @@ export default function Stores() {
                         <option key={m.id} value={m.id}>{m.id} · {m.name}</option>
                       ))}
                     </select>
+                  ) : (
+                    (() => {
+                      const m = (employees || []).find(x => x.id === (st.sm_id || st.smId));
+                      return <span className="text-xs font-mono font-bold text-slate-600">{m ? `${m.id} · ${m.name}` : '—'}</span>;
+                    })()
                   )}
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">

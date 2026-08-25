@@ -108,8 +108,8 @@ function App() {
               <Route path="admin/schedule" element={<PrivateRoute allowedRoles={['admin']}><Schedule /></PrivateRoute>} />
               <Route path="admin/timesheet" element={<PrivateRoute allowedRoles={['admin']}><Timesheet /></PrivateRoute>} />
               <Route path="admin/feedback" element={<PrivateRoute allowedRoles={['admin']}><FeedbackCB /></PrivateRoute>} />
-              <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><Employees /></PrivateRoute>} />
-              <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><Stores /></PrivateRoute>} />
+              <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
+              <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']}><Stores /></PrivateRoute>} />
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><AdminLogs /></PrivateRoute>} />
               <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />

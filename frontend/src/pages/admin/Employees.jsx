@@ -147,6 +147,7 @@ export default function Employees() {
               </button>
             )}
           </div>
+          {pickStore && (
           <button 
             onClick={() => { 
               setIsAdding(true); 
@@ -156,6 +157,7 @@ export default function Employees() {
           >
             <Plus size={15} /> Thêm nhân sự
           </button>
+          )}
         </div>
       </div>
 
@@ -172,7 +174,7 @@ export default function Employees() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {isAdding && (
+            {pickStore && isAdding && (
               <tr className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
                 <td className="p-2.5">
                   <input 
@@ -294,6 +296,7 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
+                        {pickStore && emp.id !== user?.id && (
                         <button
                           onClick={async () => {
                             const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';
@@ -310,11 +313,18 @@ export default function Employees() {
                         >
                           <Crown size={15} />
                         </button>
+                        )}
+                        {pickStore && (
                         <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
                           {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
                         </button>
+                        )}
+                        {pickStore && (
                         <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
+                        )}
+                        {pickStore && (
                         <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Xóa"><Trash2 size={15} /></button>
+                        )}
                       </>
                     )}
                   </td>

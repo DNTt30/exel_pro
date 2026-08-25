@@ -71,8 +71,6 @@ const authWarning = useStore(state => state.authWarning);
 
   const isFullAdmin = isBuiltinStoreManager(user);
   const adminLinksFullOnly = [
-    { to: '/admin/employees',  icon: <Users size={17} />,      label: 'Nhân viên' },
-    { to: '/admin/stores',     icon: <Store size={17} />,     label: 'Cửa hàng' },
     { to: '/admin/logs',       icon: <ScrollText size={17} />, label: 'Nhật ký' },
   ];
   const adminLinksBase = [
@@ -81,6 +79,8 @@ const authWarning = useStore(state => state.authWarning);
     { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
     { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B' },
     { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
+    { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
+    { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
     { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
     { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
     { to: '/admin/logs',       icon: <ScrollText size={17} />,      label: 'Nhật ký' },

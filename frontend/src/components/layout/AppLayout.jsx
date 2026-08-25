@@ -81,9 +81,6 @@ const authWarning = useStore(state => state.authWarning);
     { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
     { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
     { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
-    { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
-    { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
-    { to: '/admin/logs',       icon: <ScrollText size={17} />,      label: 'Nhật ký' },
   ];
   const adminLinks = [...adminLinksBase, ...(isFullAdmin ? adminLinksFullOnly : [])];
   const employeeLinks = [

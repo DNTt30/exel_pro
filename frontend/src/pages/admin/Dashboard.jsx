@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
 import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
+import MonthConfirmWidget from '../../components/dashboard/MonthConfirmWidget';
 import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
 import { downloadOFCReportXlsx } from '../../utils/exportOFC';
@@ -665,6 +666,8 @@ export default function Dashboard() {
         stores={stores}
         scrollToChart={scrollToChart}
       />
+
+      <MonthConfirmWidget />
 
       {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
       <div id="analytics-section">

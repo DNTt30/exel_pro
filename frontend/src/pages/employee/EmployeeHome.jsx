@@ -7,6 +7,7 @@ import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import { collectExpiryAlerts } from '../../utils/shelfExpiry';
 import { useShallow } from 'zustand/react/shallow';
+import MonthConfirmCard from '../../components/employee/MonthConfirmCard';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -102,6 +103,8 @@ export default function EmployeeHome() {
           <CalendarDays size={12} /> Tuần {currentWeek}
         </span>
       </div>
+
+      <MonthConfirmCard />
 
       {/* ── Hero: ca hôm nay ── */}
       <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-4 text-white shadow-lg shadow-blue-500/20">

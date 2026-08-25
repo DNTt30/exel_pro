@@ -68,7 +68,7 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
       return scoped;
     }
     return groups;
-  }, [employees, search, filterDept, filterRole, pickStore, user?.dept, weekSchedule, stores]);
+  }, [employees, search, filterDept, filterRole, pickStore, user?.dept, user, weekSchedule, stores]);
 
   return groupedEmps;
 }

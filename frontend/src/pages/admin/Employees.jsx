@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore, isManagerFromEmp } from '../../lib/authSession';
+import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 import { updateEmployeeInfo } from '../../services/api';
@@ -10,7 +11,8 @@ import { updateEmployeeInfo } from '../../services/api';
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
   const pickStore = canPickStore(user);
-  const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
+  const allowedDepts = new Set(visibleDeptIds(user, stores));
+  const visibleStores = pickStore ? stores : stores.filter(s => allowedDepts.has(s.id));
   const homeDept = pickStore ? (stores[0]?.id || '') : (user?.dept || '');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);

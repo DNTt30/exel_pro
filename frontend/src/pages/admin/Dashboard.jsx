@@ -221,14 +221,16 @@ export default function Dashboard() {
   // 1. Danh sách nhân viên theo cửa hàng đang chọn (hoặc toàn chuỗi nếu ALL)
   const currentDeptEmployees = useMemo(() => {
     let list = employees;
-    if (!pickStore && user?.dept) {
-      list = list.filter(e => e.dept === user.dept);
+    // Nếu user không thể pick store toàn quyền (OFC/Admin), họ bị giới hạn bởi visibleStores
+    if (!pickStore && visibleStores.length > 0) {
+      const allowedDepts = new Set(visibleStores.map(s => s.id));
+      list = list.filter(e => allowedDepts.has(e.dept));
     }
     if (filterDept !== 'ALL') {
       list = list.filter(e => e.dept === filterDept);
     }
     return list;
-  }, [employees, filterDept, pickStore, user?.dept]);
+  }, [employees, filterDept, pickStore, visibleStores]);
 
   // 3. Tính toán toàn bộ nhân viên Part-time (đã lọc theo cửa hàng đang chọn)
   const allPTEmployees = useMemo(() => {
@@ -328,11 +330,13 @@ export default function Dashboard() {
     return allPTEmployees.filter(e => e.isOvertime);
   }, [allPTEmployees]);
 
+  const allowedDepts = useMemo(() => new Set(visibleStores.map(s => s.id)), [visibleStores]);
+
   // 5. Thống kê theo từng cửa hàng
   const storeStats = useMemo(() => {
     const map = {};
     employees.forEach(emp => {
-      if (!pickStore && user?.dept && emp.dept !== user.dept) return;
+      if (!pickStore && allowedDepts.size > 0 && !allowedDepts.has(emp.dept)) return;
       if (!map[emp.dept]) {
         map[emp.dept] = { dept: emp.dept, totalEmps: 0, ptEmps: 0, ptOver91: 0, totalHours: 0 };
       }
@@ -386,7 +390,7 @@ export default function Dashboard() {
     });
 
     return Object.values(map);
-  }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, user?.dept]);
+  }, [employees, schedule, weekSchedule, cycleDates, viewMode, pickStore, allowedDepts]);
 
   // Tổng giờ toàn chuỗi (Tất cả cửa hàng)
   const totalSystemHours = useMemo(() => {
@@ -408,7 +412,7 @@ export default function Dashboard() {
     
     let empsWorkingToday = 0;
     employees.forEach(emp => {
-      if (!pickStore && user?.dept && emp.dept !== user.dept) return;
+      if (!pickStore && allowedDepts.size > 0 && !allowedDepts.has(emp.dept)) return;
       if (filterDept !== 'ALL' && emp.dept !== filterDept) return;
       
       const s = weekSchedule[emp.id]?.[dayKey];
@@ -417,7 +421,9 @@ export default function Dashboard() {
     });
 
     let storeShelves = (shelves || []);
-    if (!pickStore && user?.dept) storeShelves = storeShelves.filter(s => s.storeId === user.dept);
+    if (!pickStore && allowedDepts.size > 0) {
+      storeShelves = storeShelves.filter(s => allowedDepts.has(s.storeId));
+    }
     if (filterDept !== 'ALL') storeShelves = storeShelves.filter(s => s.storeId === filterDept);
     
     let pendingShelves = 0;
@@ -443,7 +449,7 @@ export default function Dashboard() {
     });
 
     return { empsWorkingToday, pendingShelves, warningShelves, totalShelves: storeShelves.length };
-  }, [employees, shelves, shelfItems, weekSchedule, pickStore, user?.dept, filterDept]);
+  }, [employees, shelves, shelfItems, weekSchedule, pickStore, allowedDepts, filterDept]);
 
   // 7. Thống kê tỷ lệ tuân thủ định mức Part-time
   const complianceStats = useMemo(() => {
@@ -515,7 +521,7 @@ export default function Dashboard() {
     }, `OFC_BaoCao_PartTime_${isMonth ? `Thang_${selectedMonthCycle}` : `Tuan_${currentWeek}`}_${fileNameSuffix}.xlsx`);
   };
 
-  const depts = [...new Set(employees.map(e => e.dept))].sort();
+  const depts = visibleStores.map(s => s.id).sort();
 
   return (
     <div className="w-full min-h-full bg-slate-100/90 p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in duration-200">

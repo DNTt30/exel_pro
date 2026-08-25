@@ -48,18 +48,28 @@ export function isBuiltinStoreManager(user) {
   return user?.id === 'admin' || user?.role === 'admin';
 }
 
+export function getUserDepts(user) {
+  if (!user || !user.dept) return [];
+  return user.dept.split(',').map(d => d.trim()).filter(Boolean);
+}
+
+export function isMultiStoreManager(user) {
+  return getUserDepts(user).length > 1;
+}
+
 /** SM / OFC / admin — vào menu quản lý cửa hàng. */
 export function isOpsManager(user) {
   if (!user) return false;
   return isBuiltinStoreManager(user) || !!(user.isManager || isManagerFromEmp(user));
 }
 
-/** Được chọn nhiều cửa hàng: OFC khu vực, hoặc SM chưa gắn CH (login admin). */
+/** Được chọn nhiều cửa hàng: OFC khu vực, hoặc SM chưa gắn CH (login admin), hoặc SM được gán nhiều cửa hàng. */
 export function canPickStore(user) {
   if (!user) return false;
   if (isAreaManagerFromEmp(user)) return true;
   // ADMIN builtin: luon toan quyen, bo qua dept stale trong phien luu
   if (user.id === 'admin' || user.role === 'admin') return true;
+  if (isMultiStoreManager(user)) return true;
   return isBuiltinStoreManager(user) && !user.dept;
 }
 

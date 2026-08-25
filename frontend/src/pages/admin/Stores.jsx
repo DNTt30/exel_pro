@@ -5,6 +5,7 @@ import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
+import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 import { isManagerFromEmp } from '../../lib/authSession';
@@ -13,7 +14,8 @@ import { updateStore as apiUpdateStore } from '../../services/api';
 export default function Stores() {
   const { stores, employees, addStore, updateStore, deleteStore, user } = useStore(useShallow((s) => ({ stores: s.stores, employees: s.employees, addStore: s.addStore, updateStore: s.updateStore, deleteStore: s.deleteStore, user: s.user })));
   const pickStore = canPickStore(user);
-  const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
+  const allowedDepts = new Set(visibleDeptIds(user, stores));
+  const visibleStores = pickStore ? stores : stores.filter(s => allowedDepts.has(s.id));
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   

@@ -3,6 +3,7 @@ import { Send, X, User, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { askAICopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
+import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -91,7 +92,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
       employees: scopedEmployees,
       weekSchedule: scopedSchedule,
       schedule: { [currentWeek]: scopedSchedule },
-      stores: isAdmin ? stores : stores.filter(s => s.id === user?.dept || s.id === activeStoreId),
+      stores: isAdmin ? stores : (() => { const ok = new Set(visibleDeptIds(user, stores)); if (activeStoreId) ok.add(activeStoreId); return stores.filter(s => ok.has(s.id)); })(),
       shiftSwaps: scopedSwaps,
       feedbacks: scopedFeedbacks,
       storeId: activeStoreId,

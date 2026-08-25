@@ -6,6 +6,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getRoleBadgeInfo, WEEK_DAYS } from '../../data/constants';
 import { canPickStore } from '../../lib/authSession';
+import { visibleDeptIds } from '../../utils/dataScope';
 import { parseDateDetails } from '../../utils/dateHelper';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -173,14 +174,18 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
 };
 
 export default function FeedbackCB() {
-  const { feedbacks, resolveFeedback, user, employees, currentWeek } = useStore(useShallow((s) => ({ feedbacks: s.feedbacks, resolveFeedback: s.resolveFeedback, user: s.user, employees: s.employees, currentWeek: s.currentWeek })));
+  const { feedbacks, resolveFeedback, user, stores, employees, currentWeek } = useStore(useShallow((s) => ({ feedbacks: s.feedbacks, resolveFeedback: s.resolveFeedback, user: s.user, stores: s.stores, employees: s.employees, currentWeek: s.currentWeek })));
   const pickStore = canPickStore(user);
 
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  const effectiveFilterDept = pickStore ? filterDept : user?.dept;
+  // SM nhieu cua hang: cho phep chuyen trong pham vi sm_id thay vi ep CH goc
+  const allowedDepts = useMemo(() => new Set(visibleDeptIds(user, stores)), [user, stores]);
+  const effectiveFilterDept = pickStore
+    ? filterDept
+    : (filterDept && allowedDepts.has(filterDept) ? filterDept : user?.dept);
 
   const filteredFeedbacks = feedbacks.filter(fb => {
     if (effectiveFilterDept !== 'ALL' && fb.dept !== effectiveFilterDept) return false;
@@ -199,7 +204,7 @@ export default function FeedbackCB() {
       <Toolbar 
         search={search} setSearch={setSearch}
         filterDept={filterDept} setFilterDept={setFilterDept}
-        disableDeptFilter={!pickStore}
+        disableDeptFilter={false}
         rightActions={
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Trạng thái:</span>

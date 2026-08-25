@@ -25,6 +25,8 @@ export default function Timesheet() {
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   const [filterRole, setFilterRole] = useState('ALL');
+  // Nhan/xuat theo CH dang chon (Toolbar da gioi han pham vi sm_id)
+  const effDept = pickStore ? filterDept : (filterDept || user?.dept);
 
   const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
   const cycleDates = useMemo(
@@ -95,14 +97,14 @@ export default function Timesheet() {
           filterDept={filterDept} setFilterDept={setFilterDept}
           filterRole={filterRole} setFilterRole={setFilterRole}
           showWeekPicker={false}
-          disableDeptFilter={!pickStore}
+          disableDeptFilter={false}
           rightActions={
             <>
               <button 
                 className="btn btn-outline text-xs py-1.5 px-3 hover:text-emerald-700 hover:border-emerald-300 font-semibold flex items-center gap-1.5 cursor-pointer" 
                 onClick={() => exportTimesheetToExcel({
                   currentWeek,
-                  deptName: (pickStore ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (pickStore ? filterDept : user?.dept),
+                  deptName: effDept === 'ALL' ? 'Toan_Bo_Cua_Hang' : effDept,
                   groupedEmps,
                   getDayValue,
                   activeDays,
@@ -148,7 +150,7 @@ export default function Timesheet() {
       <div className="hidden print:block text-center mb-4 pb-2 border-b border-slate-300">
         <h1 className="text-xl font-black uppercase text-slate-900 tracking-wide">BẢNG TỔNG HỢP CÔNG & LƯƠNG THÁNG (26 - 25)</h1>
         <div className="flex justify-between items-center text-xs text-slate-600 mt-1 px-2">
-          <span>{(pickStore ? filterDept : user?.dept) !== 'ALL' ? `Cửa hàng: ${pickStore ? filterDept : user?.dept}` : 'Toàn bộ chuỗi cửa hàng'}</span>
+          <span>{effDept !== 'ALL' ? `Cửa hàng: ${effDept}` : 'Toàn bộ chuỗi cửa hàng'}</span>
           <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
           <span>Hệ thống GS25 OFC</span>
         </div>

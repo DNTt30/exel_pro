@@ -9,6 +9,7 @@ import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
+import { visibleDeptIds } from '../../utils/dataScope';
 import WeekFlowBar from '../../components/WeekFlowBar';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 
@@ -30,7 +31,7 @@ import { toast } from '../../components/ui/toastStore';
 const EMPTY_SCHED = {};
 
 export default function Schedule() {
-  const { employees, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks })));
+  const { employees, stores, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
   
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,7 +41,9 @@ export default function Schedule() {
   
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
-  const flowStore = pickStore ? filterDept : (user?.dept || '');
+  // SM da-CH: nhan CH dang chon neu no nam trong pham vi sm_id
+  const allowedFlow = new Set(visibleDeptIds(user, stores));
+  const flowStore = pickStore ? filterDept : ((filterDept && allowedFlow.has(filterDept)) ? filterDept : (user?.dept || ''));
   const weekLocked = isWeekLocked((scheduleWeeks || {})[weekRecordKey(flowStore === 'ALL' ? '' : flowStore, currentWeek)]?.status);
   const canEditGrid = isManager && !weekLocked;
   const [filterRole, setFilterRole] = useState('ALL');
@@ -278,7 +281,7 @@ export default function Schedule() {
           setFilterDept={setFilterDept}
           filterRole={filterRole} 
           setFilterRole={setFilterRole}
-          disableDeptFilter={!pickStore}
+          disableDeptFilter={false}
           onOpenAddEmp={() => setShowAddEmp(true)}
           onOpenAddStore={() => setShowAddStore(true)}
           onOpenTransfer={() => setShowTransfer(true)}

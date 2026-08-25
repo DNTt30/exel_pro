@@ -36,3 +36,6 @@ UPDATE employees SET is_active = false WHERE id = '260512008';
 ## 6. Khi gặp lỗi
 - F5 trang trước, nếu vẫn lỗi: chụp màn hình + mô tả gửi Zalo nhóm dự án.
 - Dữ liệu lưu Supabase cloud — máy hỏng cũng không mất lịch.
+
+---
+> Chi tiết ranh giới quyền: xem `MA_TRAN_QUYEN.md`. SM chỉ thao tác trong các cửa hàng được gán `sm_id`.

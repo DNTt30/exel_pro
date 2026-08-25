@@ -3,10 +3,11 @@ import { useStore } from '../store/useStore';
 import { WEEK_DAYS } from '../data/constants';
 import { getCoveringStore } from '../utils/shiftHelper';
 import { canPickStore } from '../lib/authSession';
+import { visibleDeptIds } from '../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 
 export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule = null) {
-  const { employees, user } = useStore(useShallow((s) => ({ employees: s.employees, user: s.user })));
+  const { employees, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, user: s.user, stores: s.stores })));
   const pickStore = canPickStore(user);
 
   const groupedEmps = useMemo(() => {
@@ -21,7 +22,10 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
       filtered = filtered.filter(e => (e.role || e.type) === filterRole);
     }
     
-    const effectiveFilterDept = pickStore ? filterDept : user?.dept;
+    // SM nhieu cua hang: cho phep chuyen trong pham vi sm_id; mac dinh ve CH cua minh
+    const allowed = new Set(visibleDeptIds(user, stores));
+    const requested = filterDept && allowed.has(filterDept) ? filterDept : user?.dept;
+    const effectiveFilterDept = pickStore ? filterDept : (requested || 'ALL');
     
     const groups = {};
     filtered.forEach(emp => {
@@ -58,8 +62,13 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
       return filteredGroups;
     }
     
+    if (!pickStore) {
+      const scoped = {};
+      Object.keys(groups).forEach(k => { if (allowed.has(k)) scoped[k] = groups[k]; });
+      return scoped;
+    }
     return groups;
-  }, [employees, search, filterDept, filterRole, pickStore, user?.dept, weekSchedule]);
+  }, [employees, search, filterDept, filterRole, pickStore, user?.dept, weekSchedule, stores]);
 
   return groupedEmps;
 }

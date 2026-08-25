@@ -37,6 +37,8 @@ jobs:
           VITE_BASE_PATH: /exel_pro/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ADMIN_OTP_URL: ${{ secrets.VITE_ADMIN_OTP_URL }}
+          VITE_TELEGRAM_PROXY_SECRET: ${{ secrets.VITE_TELEGRAM_PROXY_SECRET }}
         # NOTE: giá trị fallback dưới đây là Supabase URL + anon key PHÁT HÀNH CÔNG KHAI
         # (luôn nhúng trong bundle client nên không phải secret). Khi rotate key,
         # nhớ sửa cả fallback này hoặc cấu hình secrets trong GH Settings.

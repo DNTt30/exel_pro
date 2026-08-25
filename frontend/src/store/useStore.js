@@ -311,11 +311,11 @@ export const useStore = create(
           await api.upsertAttendanceRows(next ? [{ ...next, empId, workDate, updatedBy }] : []);
           // Xóa override thật sự: cần upsert dòng 0 giờ thay vì bỏ qua (PK tồn tại)
           if (!next) await api.upsertAttendanceRows([{ empId, workDate, actualHours: 0, updatedBy }]);
-          // AUDIT TRAIL: ai sửa công thực tế, từ gì -> gì (ảnh hưởng lương trực tiếp)
+          // AUDIT TRAIL: ai sửa công thực tế — fire-and-forget, log lỗi không ảnh hưởng việc lưu
           const fmt = r => r ? ((r.actualHours || 0) + 'h' + (r.note ? '/' + r.note : '')) : 'trống';
-          get().appendAdminLog('SUA_CONG_THUC_TE', empId + ' · ' + workDate,
+          void get().appendAdminLog('SUA_CONG_THUC_TE', empId + ' · ' + workDate,
             fmt(prev) + ' → ' + fmt(next) + (updatedBy ? ' (bởi ' + updatedBy + ')' : ''),
-            { entityType: 'attendance', entityId: empId });
+            { entityType: 'attendance', entityId: empId }).catch(() => {});
         } catch (e) {
           set(s => ({ attendance: (() => { const m2 = { ...s.attendance }; if (prev) m2[key] = prev; else delete m2[key]; return m2; })() }));
           throw e;
@@ -323,6 +323,7 @@ export const useStore = create(
       },
 
       appendAdminLog: async (action, target = '', detail = '', extra = {}) => {
+        try {
         const user = get().user;
         const meta = clientMeta();
         const storeId = extra.storeId || user?.dept || '';
@@ -377,6 +378,7 @@ export const useStore = create(
             createdAt: savedActivity?.createdAt || new Date().toISOString()
           }, ...(state.adminLogs || [])].slice(0, 300)
         }));
+        } catch (e) { console.warn('appendAdminLog:', e?.message || e); }
       },
 
       logAiTurn: async (payload) => {

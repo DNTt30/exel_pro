@@ -187,7 +187,10 @@ export default function FeedbackCB() {
     ? filterDept
     : (filterDept && allowedDepts.has(filterDept) ? filterDept : user?.dept);
 
+  // Khong tu duyet: an yeu cau do chinh minh gui khoi hang doi
+  const ownPendingCount = feedbacks.filter(fb => fb.empId === user?.id && fb.status === 'pending').length;
   const filteredFeedbacks = feedbacks.filter(fb => {
+    if (fb.empId === user?.id && fb.status === 'pending') return false;
     if (effectiveFilterDept !== 'ALL' && fb.dept !== effectiveFilterDept) return false;
     if (filterStatus !== 'ALL' && fb.status !== filterStatus) return false;
     if (search) {
@@ -201,6 +204,11 @@ export default function FeedbackCB() {
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
+      {ownPendingCount > 0 && (
+        <div className="mx-3 mt-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-semibold">
+          Bạn đang có {ownPendingCount} yêu cầu của chính mình — hệ thống ẩn khỏi hàng đợi này, chờ ADMIN/quản lý cấp trên xử lý.
+        </div>
+      )}
       <Toolbar 
         search={search} setSearch={setSearch}
         filterDept={filterDept} setFilterDept={setFilterDept}

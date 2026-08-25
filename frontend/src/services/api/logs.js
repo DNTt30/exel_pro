@@ -23,6 +23,8 @@ export async function getAdminLogs() {
 }
 
 export async function addAdminLog(entry) {
+  // Log phai KHONG BAO GIO lam hong thao tac chinh — loi thi chi canh bao
+  try {
   const { data, error } = await db().from('admin_logs').insert([{
     actor_id: entry.actorId,
     actor_name: entry.actorName,
@@ -30,7 +32,7 @@ export async function addAdminLog(entry) {
     target: entry.target || '',
     detail: entry.detail || ''
   }]).select().single();
-  if (error) throw error;
+  if (error) { console.warn('admin_logs:', error.message); return null; }
   return {
     id: data.id,
     actorId: data.actor_id,
@@ -40,6 +42,7 @@ export async function addAdminLog(entry) {
     detail: data.detail || '',
     createdAt: data.created_at
   };
+  } catch (e) { console.warn('admin_logs:', e?.message || e); return null; }
 }
 
 function mapActivityLog(row) {

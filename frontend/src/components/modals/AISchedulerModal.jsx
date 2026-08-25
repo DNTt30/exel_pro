@@ -3,6 +3,7 @@ import { ImagePlus, Sparkles, X, Loader2, Check, AlertTriangle, Trash2 } from 'l
 import { useStore } from '../../store/useStore';
 import { WEEK_DAYS, buildStaffingByDay, suggestStaffingFromDemand, normalizeStoreDemand } from '../../data/constants';
 import { generateAISchedule, auditSchedule } from '../../utils/aiSchedulerEngine';
+import { demandToMatrices } from '../../utils/revenueDemand';
 import { analyzeSalesImages } from '../../utils/salesImageAnalyzer';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -129,14 +130,24 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
     setGenerating(true);
     setError('');
     try {
-      const storeForMatrix = hasDemand ? { staffing } : activeStore;
-      const result = generateAISchedule(employees, activeStoreId, {
-        requiredMatrix: hasDemand ? staffing.weekday : undefined,
-        requiredMatrixByDay: buildStaffingByDay(storeForMatrix)
-      });
+      let opts;
       if (hasDemand) {
+        // Doanh thu -> nhu cau theo gio -> ma tran ca (co ca ngan cho PT gio vang)
+        const { weekday, weekend } = demandToMatrices(demand);
+        const byDay = {};
+        WEEK_DAYS.forEach(d => { byDay[d] = (d === 'T7' || d === 'CN') ? weekend : weekday; });
+        opts = { requiredMatrixByDay: byDay };
+      } else {
+        opts = { requiredMatrixByDay: buildStaffingByDay(activeStore) };
+      }
+      const result = generateAISchedule(employees, activeStoreId, opts);
+      if (hasDemand) {
+        const wdM = demandToMatrices(demand).weekday;
+        const weM = demandToMatrices(demand).weekend;
+        const fmtM = m => Object.keys(m).map(c => `${c}x${m[c]}`).join(' + ');
         result.insights = [
-          `Theo doanh số ${fmtVnd(demand.weekday.sales) || '—'} (T2–T6) / ${fmtVnd(demand.weekend.sales) || '—'} (T7–CN). Định biên ${staffing.weekday['6-14']}-${staffing.weekday['14-22']}-${staffing.weekday['22-6']} (thường) · ${staffing.weekend['6-14']}-${staffing.weekend['14-22']}-${staffing.weekend['22-6']} (cuối tuần).`,
+          `Theo doanh số ${fmtVnd(demand.weekday.sales) || '—'} (T2–T6) / ${fmtVnd(demand.weekend.sales) || '—'} (T7–CN). FT gánh khung xương ca dài; PT lấp giờ vàng bằng ca ngắn.`,
+          `🧮 Định biên sinh tự động — thường: ${fmtM(wdM)} · cuối tuần: ${fmtM(weM)}.`,
           ...result.insights.slice(1, 3)
         ];
       }

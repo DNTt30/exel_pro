@@ -322,7 +322,12 @@ export function generateAISchedule(employees, storeId, options = {}) {
     ftMandatoryOffDays[emp.id] = WEEK_DAYS[index % WEEK_DAYS.length];
   });
 
-  const shiftPriorities = ['22-6', '6-14', '14-22'];
+  // Thu tu XU LY trong ngay: dem -> ca ngan gio vang (PT) -> khung xuong ca dai
+  const CANON_ORDER = ['22-6', '10-14', '14-18', '18-22', '6-10', '6-14', '14-22', '10-18', '6-12'];
+  const matrixCodes = new Set();
+  if (requiredMatrix) Object.keys(requiredMatrix).forEach(c => { if ((requiredMatrix[c] || 0) > 0) matrixCodes.add(c); });
+  Object.values(requiredMatrixByDay).forEach(m => Object.keys(m || {}).forEach(c => { if ((m[c] || 0) > 0) matrixCodes.add(c); }));
+  const shiftPriorities = CANON_ORDER.filter(c => c === '22-6' || matrixCodes.has(c));
 
   const assignShiftTo = (emp, dayKey, shiftCode) => {
     resultSchedule[emp.id][dayKey] = shiftCode;
@@ -399,10 +404,12 @@ export function generateAISchedule(employees, storeId, options = {}) {
           }
         }
       } else {
+        const codeHours = getShiftHours(shiftCode);
+        const isShortPeak = codeHours > 0 && codeHours < 8;
         const currentAssigned = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode);
         const hasSenior = currentAssigned.some(isSeniorStaff);
 
-        if (!hasSenior) {
+        if (!hasSenior && !isShortPeak) {
           const availableSeniors = seniorEmployees.sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
           for (const senior of availableSeniors) {
             if (canTakeShift(senior, dayKey, dayIdx, shiftCode)) {
@@ -425,7 +432,13 @@ export function generateAISchedule(employees, storeId, options = {}) {
         }
 
         if (assignedCount < neededCount) {
-          const sortedPT = [...ptEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
+          const shortPeak = getShiftHours(shiftCode) > 0 && getShiftHours(shiftCode) < 8;
+          const sortedPT = shortPeak
+            ? [...ptEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id])
+            : [
+                ...newEmployees.sort((a, b) => employeeHours[a.id] - employeeHours[b.id]),
+                ...ptEmployees.filter(e => !newEmployees.some(n => n.id === e.id)).sort((a, b) => employeeHours[a.id] - employeeHours[b.id])
+              ];
           for (const emp of sortedPT) {
             if (assignedCount >= neededCount) break;
             if (canTakeShift(emp, dayKey, dayIdx, shiftCode)) {

@@ -56,6 +56,8 @@ export function isOpsManager(user) {
 export function canPickStore(user) {
   if (!user) return false;
   if (isAreaManagerFromEmp(user)) return true;
+  // ADMIN builtin: luon toan quyen, bo qua dept stale trong phien luu
+  if (user.id === 'admin' || user.role === 'admin') return true;
   return isBuiltinStoreManager(user) && !user.dept;
 }
 

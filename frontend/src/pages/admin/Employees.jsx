@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown } from 'lucide-react';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
-import { canPickStore } from '../../lib/authSession';
+import { canPickStore, isManagerFromEmp } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
+import { updateEmployeeInfo } from '../../services/api';
 
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
@@ -14,6 +15,7 @@ export default function Employees() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL'); // ALL | sm | nv
   
   const [formData, setFormData] = useState({ 
     id: '', 
@@ -27,10 +29,12 @@ export default function Employees() {
   const filteredEmps = useMemo(() => {
     let list = employees || [];
     if (!pickStore && user?.dept) list = list.filter(e => e.dept === user.dept);
+    if (roleFilter === 'sm') list = list.filter(e => isManagerFromEmp(e));
+    else if (roleFilter === 'nv') list = list.filter(e => !isManagerFromEmp(e));
     if (!search) return list;
     const s = search.toLowerCase();
     return list.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
-  }, [employees, search, pickStore, user?.dept]);
+  }, [employees, search, roleFilter, pickStore, user?.dept]);
 
   const handleRoleChange = (selectedRole) => {
     const roleInfo = STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
@@ -111,6 +115,14 @@ export default function Employees() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+            {[['ALL', 'Tất cả'], ['sm', 'Quản lý (SM)'], ['nv', 'Nhân viên']].map(([v, lb]) => (
+              <button key={v} onClick={() => setRoleFilter(v)}
+                className={`px-2.5 py-1.5 text-[11px] font-bold rounded-md transition-colors cursor-pointer ${roleFilter === v ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}>
+                {lb}
+              </button>
+            ))}
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
             <input 
@@ -276,6 +288,22 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
+                        <button
+                          onClick={async () => {
+                            const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';
+                            try {
+                              await updateEmployeeInfo(emp.id, { jobTitle: next });
+                              updateEmployee(emp.id, { jobTitle: next });
+                              toast.success(next ? `${emp.name} đã là Quản lý (SM)` : `${emp.name} về vai trò Nhân viên`);
+                            } catch (e) {
+                              toast.error('Lỗi: ' + e.message);
+                            }
+                          }}
+                          className={`p-1.5 rounded transition-colors mr-1 cursor-pointer ${isManagerFromEmp(emp) ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-slate-400 hover:bg-slate-100'}`}
+                          title={isManagerFromEmp(emp) ? 'Hạ thành Nhân viên' : 'Đặt làm Quản lý (SM)'}
+                        >
+                          <Crown size={15} />
+                        </button>
                         <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
                           {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
                         </button>

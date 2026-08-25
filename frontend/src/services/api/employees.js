@@ -55,6 +55,7 @@ export async function updateEmployeeInfo(id, updates) {
   if (updates.role !== undefined) payload.role = updates.role;
   if (updates.maxH !== undefined) payload.max_h = updates.maxH;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+  if (updates.jobTitle !== undefined) payload.job_title = updates.jobTitle;
   
   // .select('id') để phát hiện RLS chặn ngầm: PostgREST trả 200 + 0 dòng
   // khi phiên chưa xác thực — không có lỗi, chỉ âm thầm bỏ qua.

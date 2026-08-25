@@ -7,9 +7,11 @@ import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/consta
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
+import { isManagerFromEmp } from '../../lib/authSession';
+import { updateStore as apiUpdateStore } from '../../services/api';
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore, user } = useStore(useShallow((s) => ({ stores: s.stores, addStore: s.addStore, updateStore: s.updateStore, deleteStore: s.deleteStore, user: s.user })));
+  const { stores, employees, addStore, updateStore, deleteStore, user } = useStore(useShallow((s) => ({ stores: s.stores, employees: s.employees, addStore: s.addStore, updateStore: s.updateStore, deleteStore: s.deleteStore, user: s.user })));
   const pickStore = canPickStore(user);
   const visibleStores = pickStore ? stores : stores.filter(s => s.id === user?.dept);
   const [isAdding, setIsAdding] = useState(false);
@@ -105,6 +107,7 @@ export default function Stores() {
               <th className="p-3">Mã Cửa hàng</th>
               <th className="p-3">Tên Cửa hàng</th>
               <th className="p-3">Khu vực</th>
+              <th className="p-3">SM quản lý</th>
               <th className="p-3 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -165,6 +168,30 @@ export default function Stores() {
                       <option>Miền Nam</option>
                     </select>
                   ) : getRegionBadge(st.region)}
+                </td>
+                <td className="p-3">
+                  {editingId === st.id ? (
+                    <input type="text" placeholder="Mã SM" className="w-full p-1.5 border border-blue-400 rounded bg-white font-mono text-xs outline-none" value={formData.sm_id || ''} onChange={e => setFormData({ ...formData, sm_id: e.target.value })} />
+                  ) : (
+                    <select
+                      className="w-full p-1.5 border border-slate-200 rounded bg-slate-50 text-xs cursor-pointer"
+                      value={st.sm_id || st.smId || ''}
+                      onChange={async (e) => {
+                        const v = e.target.value;
+                        try {
+                          await apiUpdateStore(st.id, { sm_id: v });
+                          updateStore(st.id, { sm_id: v });
+                        } catch (err) {
+                          toast.error('Lỗi lưu SM: ' + err.message);
+                        }
+                      }}
+                    >
+                      <option value="">— Chưa gán —</option>
+                      {(employees || []).filter(isManagerFromEmp).map(m => (
+                        <option key={m.id} value={m.id}>{m.id} · {m.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
                   {editingId === st.id ? (

@@ -96,7 +96,13 @@ export default function Employees() {
   // Khóa/mở tài khoản: mã bị khóa không thể đăng nhập (dùng khi nghỉ việc)
   const handleToggleActive = async (emp) => {
     const next = emp.isActive === false; // đang khóa -> mở
-    if (!next && !confirm('Vô hiệu hóa mã ' + emp.id + '? Người này sẽ không đăng nhập được nữa.')) return;
+    if (!next) {
+      // Cảnh báo vòng đời: khóa SM vẫn còn đứng tên quản lý cửa hàng
+      const ownedStores = stores.filter(s => (s.sm_id || s.smId) === emp.id);
+      if (isManagerFromEmp(emp) && ownedStores.length > 0) {
+        if (!confirm('⚠️ ' + emp.name + ' (' + emp.id + ') đang là SM phụ trách: ' + ownedStores.map(s => s.id).join(', ') + '.\nKhóa mã này sẽ khiến các cửa hàng trên KHÔNG CÒN NGƯỜI PHỤ TRÁCH.\nHãy gán SM khác trước nếu cần. Vẫn tiếp tục khóa?')) return;
+      } else if (!confirm('Vô hiệu hóa mã ' + emp.id + '? Người này sẽ không đăng nhập được nữa.')) return;
+    }
     try {
       await updateEmployee(emp.id, { isActive: next });
       toast.success(next ? 'Đã mở lại tài khoản ' + emp.id : 'Đã vô hiệu hóa mã ' + emp.id);

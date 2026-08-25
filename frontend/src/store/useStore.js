@@ -311,6 +311,11 @@ export const useStore = create(
           await api.upsertAttendanceRows(next ? [{ ...next, empId, workDate, updatedBy }] : []);
           // Xóa override thật sự: cần upsert dòng 0 giờ thay vì bỏ qua (PK tồn tại)
           if (!next) await api.upsertAttendanceRows([{ empId, workDate, actualHours: 0, updatedBy }]);
+          // AUDIT TRAIL: ai sửa công thực tế, từ gì -> gì (ảnh hưởng lương trực tiếp)
+          const fmt = r => r ? ((r.actualHours || 0) + 'h' + (r.note ? '/' + r.note : '')) : 'trống';
+          get().appendAdminLog('SUA_CONG_THUC_TE', empId + ' · ' + workDate,
+            fmt(prev) + ' → ' + fmt(next) + (updatedBy ? ' (bởi ' + updatedBy + ')' : ''),
+            { entityType: 'attendance', entityId: empId });
         } catch (e) {
           set(s => ({ attendance: (() => { const m2 = { ...s.attendance }; if (prev) m2[key] = prev; else delete m2[key]; return m2; })() }));
           throw e;

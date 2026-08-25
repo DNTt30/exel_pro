@@ -31,6 +31,11 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
   }, [dateDetails.dayKey]);
 
   const handleResolve = (action) => {
+    // Chống tự duyệt: SM/Admin không xét yêu cầu do chính mình gửi
+    if (fb.empId && user?.id && fb.empId === user.id) {
+      alert('Bạn không thể tự duyệt yêu cầu của chính mình. Hãy nhờ quản lý cấp trên xử lý.');
+      return;
+    }
     let shiftData = null;
     if (action === 'approved' && newShift) {
       shiftData = {

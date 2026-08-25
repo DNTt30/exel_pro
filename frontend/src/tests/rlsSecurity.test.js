@@ -13,11 +13,14 @@ const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const hasEnv = Boolean(URL_ && KEY);
 
-async function anonGet(table) {
-  const res = await fetch(URL_ + '/rest/v1/' + table + '?select=*&limit=1', {
+async function anonProbe(table) {
+  // PostgREST trả 200 + mảng RỖNG khi RLS chặn SELECT → phải đếm dòng, không nhìn status
+  const res = await fetch(URL_ + '/rest/v1/' + table + '?select=*&limit=5', {
     headers: { apikey: KEY, Authorization: 'Bearer ' + KEY },
   });
-  return res.status;
+  if (!res.ok) return { status: res.status, rows: -1 };
+  const j = await res.json().catch(() => []);
+  return { status: 200, rows: Array.isArray(j) ? j.length : 0 };
 }
 
 async function anonInsert(table, body) {
@@ -31,8 +34,8 @@ async function anonInsert(table, body) {
 
 const mode = hasEnv ? await (async () => {
   try {
-    const st = await anonGet('feedbacks');
-    return st === 200 ? 'OPEN' : 'STRICT';
+    const p = await anonProbe('feedbacks');
+    return p.status !== 200 || p.rows === 0 ? 'STRICT' : 'OPEN';
   } catch { return 'UNKNOWN'; }
 })() : 'NO-ENV';
 
@@ -41,8 +44,9 @@ describe.skipIf(!hasEnv)('RLS security — chế độ: ' , () => {
     expect(['OPEN', 'STRICT']).toContain(mode);
   });
 
-  it.runIf(mode === 'STRICT')('STRICT: anon KHÔNG đọc được feedbacks', async () => {
-    expect(await anonGet('feedbacks')).not.toBe(200);
+  it.runIf(mode === 'STRICT')('STRICT: anon đọc feedbacks thấy 0 dòng', async () => {
+    const p = await anonProbe('feedbacks');
+    expect(p.status !== 200 || p.rows === 0).toBe(true);
   });
 
   it.runIf(mode === 'STRICT')('T2 · STRICT: anon KHÔNG ghi được schedules', async () => {

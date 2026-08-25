@@ -21,9 +21,12 @@ export function isOtpEnabled() {
 async function callFn(action, extra = {}) {
   if (!otpUrl()) return { ok: false, reason: 'not-configured' };
   try {
+    // Supabase gateway kiem tra JWT: phai kem apikey/Authorization anon key
+    const ANON = String(import.meta.env?.VITE_SUPABASE_ANON_KEY || '').trim();
+    const authHeaders = ANON ? { apikey: ANON, Authorization: 'Bearer ' + ANON } : {};
     const res = await fetch(otpUrl(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(proxySecret() ? { 'x-ofc-secret': proxySecret() } : {}) },
+      headers: { 'Content-Type': 'application/json', ...authHeaders, ...(proxySecret() ? { 'x-ofc-secret': proxySecret() } : {}) },
       body: JSON.stringify({ action, ...extra }),
       signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
     });

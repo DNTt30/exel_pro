@@ -19,7 +19,7 @@ function sessionUserFromEmp(emp) {
     ...emp,
     id: emp.id,
     role: 'employee',
-    jobTitle: emp.role,
+    jobTitle: emp.jobTitle || emp.role,
     isManager: isManagerFromEmp(emp),
     isAreaManager: isAreaManagerFromEmp(emp)
   };

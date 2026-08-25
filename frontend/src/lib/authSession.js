@@ -16,9 +16,11 @@ export function toAuthEmail(userId) {
 }
 
 function jobTitleOf(emp) {
+  const jt = String(emp?.jobTitle || '').trim();
   const r = String(emp?.role || '').trim();
-  if (r === 'employee' || r === 'admin') return String(emp?.jobTitle || '').trim();
-  return r;
+  if (r === 'employee' || r === 'admin') return jt || r;
+  // Gop ca hai de nhan dien chuc danh du cho (role co the la STFT/STPT hoac chuc danh cu)
+  return [jt, r].filter(Boolean).join(' ');
 }
 
 export function isAreaManagerFromEmp(emp) {

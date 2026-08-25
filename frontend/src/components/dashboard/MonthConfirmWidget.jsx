@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, AlarmClock } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import * as api from '../../services/api';
 import { getPayrollCycle } from '../../utils/payrollCycle';
@@ -24,19 +24,22 @@ export default function MonthConfirmWidget() {
   const done = employees.filter(e => confirmedIds.has(e.id)).length;
   const pct = total ? Math.round((done / total) * 100) : 100;
   const missing = employees.filter(e => !confirmedIds.has(e.id)).slice(0, 5);
+  // Qua han chot (sau ngay 25): nhac SM ra tay xu ly
+  const overdue = new Date().getDate() > 25 && pct < 100;
 
   return (
-    <div className="rounded-2xl border p-4 bg-white border-slate-200 shadow-sm">
+    <div className={`rounded-2xl border p-4 bg-white shadow-sm ${overdue ? 'border-red-300' : 'border-slate-200'}`}>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
-          <BadgeCheck size={13} className="text-emerald-600" /> Xác nhận công {cycle.label}
+        <div className={`text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${overdue ? 'text-red-500' : 'text-slate-400'}`}>
+          {overdue ? <AlarmClock size={13} /> : <BadgeCheck size={13} className="text-emerald-600" />}
+          {overdue ? `Quá hạn chốt công ${cycle.label}` : `Xác nhận công ${cycle.label}`}
         </div>
         <span className={`text-xs font-black ${pct === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{pct}%</span>
       </div>
       <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
         <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} />
       </div>
-      <div className="text-xs text-slate-600 mt-1.5">{done}/{total} nhân viên đã xác nhận</div>
+      <div className="text-xs text-slate-600 mt-1.5">{done}/{total} nhân viên đã xác nhận{overdue ? ' · hệ thống ghi nhận công mặc định đúng, SM rà lại danh sách dưới' : ''}</div>
       {missing.length > 0 && (
         <div className="text-[11px] text-slate-400 mt-1 truncate">Chưa xác nhận: {missing.map(m => m.name).join(', ')}{employees.length - done > 5 ? ` +${employees.length - done - 5} người khác` : ''}</div>
       )}

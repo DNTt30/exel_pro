@@ -37,7 +37,7 @@ export function bootstrapQueryPlan(user) {
  * - Nhan vien: CH cua minh + cac CH cung SM (theo sm_id cua CH minh)
  */
 export function visibleDeptIds(user, stores) {
-  const list = Array.isArray(stores) ? stores : [];
+  const list = activeStores(stores);
   if (!user) return list.map(s => s.id);
   if (canPickStore(user)) return list.map(s => s.id);
   const myDept = user.dept || '';
@@ -54,6 +54,11 @@ export function visibleDeptIds(user, stores) {
 }
 /** Danh sach CUA HANG (object) duoc phep quan ly trong khu vuc admin */
 export function visibleStoresForAdmin(user, stores) {
-  const ids = new Set(visibleDeptIds(user, stores));
-  return (Array.isArray(stores) ? stores : []).filter(s => ids.has(s.id));
+  const act = activeStores(stores);
+  const ids = new Set(visibleDeptIds(user, act));
+  return act.filter(s => ids.has(s.id));
+}
+/** Danh sach CH dang hoat dong (is_active khac false) */
+export function activeStores(stores) {
+  return (Array.isArray(stores) ? stores : []).filter(s => s && s.is_active !== false);
 }

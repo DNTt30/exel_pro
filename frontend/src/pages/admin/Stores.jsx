@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Lock, Unlock } from 'lucide-react';
 import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
@@ -202,6 +202,24 @@ export default function Stores() {
                   ) : (
                     <>
                       <button onClick={() => { setEditingId(st.id); setFormData({ ...st, staffing: normalizeStaffingConfig(st.staffing), demand: normalizeStoreDemand(st.demand) }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
+                      {pickStore && (
+                        <button
+                          onClick={async () => {
+                            const next = st.is_active === false; // đang khóa -> mở
+                            if (!next && !confirm('Ngừng hoạt động cửa hàng ' + st.id + '? CH sẽ ẩn khỏi bộ chọn lịch/dashboard (dữ liệu giữ nguyên).')) return;
+                            try {
+                              await apiUpdateStore(st.id, { is_active: next });
+                              updateStore(st.id, { is_active: next });
+                            } catch (e) {
+                              toast.error('Lỗi: ' + e.message + ' (Chạy sql_stores_active.sql nếu chưa có cột is_active)');
+                            }
+                          }}
+                          className={`p-1.5 rounded transition-colors mr-1 ${st.is_active === false ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-slate-500 hover:bg-slate-100'}`}
+                          title={st.is_active === false ? 'Mở lại hoạt động' : 'Ngừng hoạt động'}
+                        >
+                          {st.is_active === false ? <Unlock size={15} /> : <Lock size={15} />}
+                        </button>
+                      )}
                       {pickStore && <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>}
                     </>
                   )}

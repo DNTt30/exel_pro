@@ -44,6 +44,8 @@ export function buildPayrollAOA({ cycleDates, groupedEmps, getDayValue, getActua
   let stt = 0;
   Object.keys(groupedEmps).forEach(dept => {
     (groupedEmps[dept] || []).forEach(emp => {
+      // Chot: xuat C&B theo CH GOC — bo ban sao chi-vien (isBorrowedTo) de khong trung dong
+      if (emp.isBorrowedTo) return;
       stt += 1;
       const isFT = emp.type === 'STFT' || (emp.role || '').includes('FT');
       let congPT = 0, congFT = 0, workingDays = 0, alCount = 0, plCount = 0, ulCount = 0, tong = 0;

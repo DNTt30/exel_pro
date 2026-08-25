@@ -17,16 +17,16 @@
 
 begin;
 
--- ---------- 000) PROFILES ----------
-create table if not exists public.profiles (
+-- ---------- 000) APP_PROFILES (ten rieng de tranh bang 'profiles' legacy neu co) ----------
+create table if not exists public.app_profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   emp_id       text unique not null,
   display_name text,
   created_at   timestamptz not null default now()
 );
-alter table public.profiles enable row level security;
+alter table public.app_profiles enable row level security;
 
-insert into public.profiles (id, emp_id, display_name)
+insert into public.app_profiles (id, emp_id, display_name)
 select u.id,
        case when u.email = 'admin@ofc.app' then 'admin' else split_part(u.email, '@', 1) end,
        coalesce(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name')
@@ -93,7 +93,7 @@ on conflict do nothing;
 -- ---------- 003) HELPERS (security definer, tranh de quy RLS) ----------
 create or replace function public.current_emp_id() returns text
 language sql stable security definer set search_path = public as $$
-  select p.emp_id from public.profiles p where p.id = auth.uid();
+  select p.emp_id from public.app_profiles p where p.id = auth.uid();
 $$;
 
 create or replace function public.has_role(r public.app_role) returns boolean
@@ -128,8 +128,8 @@ declare t text;
 begin
   if p_dept is null then return false; end if;
   foreach t in array string_to_array(p_dept, ',') loop
-    if exists (select 1 from public.my_managed_stores() m where m.store_id = trim(t))
-       or exists (select 1 from public.my_member_stores() m2 where m2.store_id = trim(t)) then
+    if exists (select 1 from public.my_managed_stores() ms where ms = trim(t))
+       or exists (select 1 from public.my_member_stores() mm where mm = trim(t)) then
       return true;
     end if;
   end loop;
@@ -143,9 +143,9 @@ grant execute on function public.current_emp_id(), public.has_role(public.app_ro
 -- ---------- 004) LOGIN LOOKUP RPC (truoc khi co phien) ----------
 create or replace function public.login_lookup(p_ma text)
 returns table (id text, name text, dept text, role text, type text, job_title text,
-               max_h numeric, is_active boolean, avatar text)
+               max_h numeric, is_active boolean)
 language sql stable security definer set search_path = public as $$
-  select e.id, e.name, e.dept, e.role, e."type", e.job_title, e.max_h, e.is_active, e.avatar
+  select e.id, e.name, e.dept, e.role, e."type", e.job_title, e.max_h, e.is_active
   from public.employees e
   where e.id = trim(p_ma) limit 1;
 $$;
@@ -156,7 +156,20 @@ do $$ declare r record; begin
   for r in select schemaname, tablename, policyname from pg_policies
            where schemaname='public' and (policyname like 'open_%' or policyname like 'p1_%')
   loop
-    execute format('drop policy if exists %I on %I.%I', r.policyname, r.tablename, r.tablename);
+    execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
+  end loop;
+end $$;
+-- Quét tổng: drop MỌI policy tên khác còn sót (từ các script đời trước) trên bảng nghiệp vụ + log
+-- để đảm bảo chỉ còn đúng bộ p1_* theo ma trận.
+do $$ declare r record; begin
+  for r in select schemaname, tablename, policyname from pg_policies
+           where schemaname='public'
+             and tablename in ('stores','employees','schedules','feedbacks','shift_swaps',
+                               'store_shelves','shelf_items','schedule_weeks','attendance',
+                               'admin_logs','activity_logs','audit_logs','ai_conversations')
+             and policyname not like 'p1\_%'
+  loop
+    execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
   end loop;
 end $$;
 
@@ -164,7 +177,7 @@ end $$;
 create policy p1_stores_sel on public.stores for select to authenticated using (true);
 create policy p1_stores_ins on public.stores for insert to authenticated with check (public.is_admin());
 create policy p1_stores_upd on public.stores for update to authenticated
-  using (public.is_admin() or exists(select 1 from public.my_managed_stores() m where m.store_id = id))
+  using (public.is_admin() or exists(select 1 from public.my_managed_stores() ms where ms = id))
   with check (true);
 create policy p1_stores_del on public.stores for delete to authenticated using (public.is_admin());
 

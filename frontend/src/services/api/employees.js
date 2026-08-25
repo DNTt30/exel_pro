@@ -17,6 +17,12 @@ function mapEmployee(e) {
 
 export async function getEmployeeById(id) {
   if (!id) return null;
+  // Ưu tiên RPC login_lookup (chạy được cả khi CHƯA có phiên — phục vụ màn hình đăng nhập
+  // sau khi RLS Phase 1 khoá SELECT employees cho anon). Fallback: đọc thẳng bảng.
+  try {
+    const { data: rpcRow, error: rpcErr } = await db().rpc('login_lookup', { p_ma: id }).maybeSingle();
+    if (!rpcErr && rpcRow) return mapEmployee(rpcRow);
+  } catch { /* bỏ qua, thử đường cũ */ }
   const { data, error } = await db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active').eq('id', id).maybeSingle();
   if (error) {
     console.error('Lỗi lấy nhân viên:', error);

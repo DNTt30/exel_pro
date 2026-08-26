@@ -406,7 +406,14 @@ export const useStore = create(
         const prevWeek = get().schedule[weekDate] || {};
         const oldSlice = {};
         Object.keys(scheduleMap).forEach(id => { oldSlice[id] = prevWeek[id] || {}; });
-        await api.saveBulkEmployeeSchedules(weekDate, scheduleMap);
+        try {
+          await api.saveBulkEmployeeSchedules(weekDate, scheduleMap);
+        } catch (err) {
+          if (err.code === 'CONFLICT') {
+            throw Object.assign(new Error('Lịch vừa được người khác cập nhật. Tải lại trang để nhận phiên bản mới nhất.'), { code: 'CONFLICT' });
+          }
+          throw err;
+        }
         set(state => ({
           schedule: {
             ...state.schedule,

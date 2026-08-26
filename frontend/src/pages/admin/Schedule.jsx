@@ -12,6 +12,8 @@ import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import WeekFlowBar from '../../components/WeekFlowBar';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
+import { analyzeWeek } from '../../utils/scheduleConflicts';
+import ConflictPanel from '../../components/schedule/ConflictPanel';
 
 import AddEmployeeModal from '../../components/modals/AddEmployeeModal';
 import AddStoreModal from '../../components/modals/AddStoreModal';
@@ -201,6 +203,21 @@ export default function Schedule() {
     }
   };
 
+  // Phase 4: Conflict engine — quét lịch tuần hiện tại của các NV trong phạm vi
+  const conflictFindings = useMemo(() => {
+    try {
+      const weekSched = schedule[currentWeek] || {};
+      const ids = new Set(employees.map(e => e.id));
+      const scoped = {};
+      for (const [id, sh] of Object.entries(weekSched)) {
+        if (ids.has(id)) scoped[id] = sh;
+      }
+      return analyzeWeek(employees, scoped);
+    } catch {
+      return [];
+    }
+  }, [employees, schedule, currentWeek]);
+
   // Tổng hợp chỉ số KPI
   const summaryMetrics = useMemo(() => {
     let totalEmps = 0;
@@ -293,6 +310,7 @@ export default function Schedule() {
 
       <div className="print:hidden px-2 pt-2">
         <WeekFlowBar storeId={flowStore} weekDate={currentWeek} />
+        <ConflictPanel findings={conflictFindings} />
       </div>
 
       {/* 3. KPI Summary Bar & Actions */}

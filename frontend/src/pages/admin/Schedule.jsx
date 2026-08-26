@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
@@ -15,13 +15,13 @@ import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 import { analyzeWeek } from '../../utils/scheduleConflicts';
 import ConflictPanel from '../../components/schedule/ConflictPanel';
 
-import AddEmployeeModal from '../../components/modals/AddEmployeeModal';
+const AddEmployeeModal = React.lazy(() => import('../../components/modals/AddEmployeeModal'));
 import AddStoreModal from '../../components/modals/AddStoreModal';
-import TransferModal from '../../components/modals/TransferModal';
-import PTOvertimeModal from '../../components/modals/PTOvertimeModal';
-import ImportScheduleModal from '../../components/modals/ImportScheduleModal';
-import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
-import AISchedulerModal from '../../components/modals/AISchedulerModal';
+const TransferModal = React.lazy(() => import('../../components/modals/TransferModal'));
+const PTOvertimeModal = React.lazy(() => import('../../components/modals/PTOvertimeModal'));
+const ImportScheduleModal = React.lazy(() => import('../../components/modals/ImportScheduleModal'));
+const ShiftSwapListModal = React.lazy(() => import('../../components/modals/ShiftSwapListModal'));
+const AISchedulerModal = React.lazy(() => import('../../components/modals/AISchedulerModal'));
 import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
@@ -262,26 +262,28 @@ export default function Schedule() {
   return (
     <div className="space-y-4">
       {/* 1. Modal Components */}
-      <AddEmployeeModal isOpen={showAddEmp} onClose={() => setShowAddEmp(false)} />
-      <AddStoreModal isOpen={showAddStore} onClose={() => setShowAddStore(false)} />
-      <TransferModal isOpen={showTransfer} onClose={() => setShowTransfer(false)} />
-      <PTOvertimeModal isOpen={showPTOvertime} onClose={() => setShowPTOvertime(false)} />
-      <ImportScheduleModal 
-        isOpen={showImportSchedule} 
-        onClose={() => setShowImportSchedule(false)} 
-        currentWeek={currentWeek}
-      />
-      <ShiftSwapListModal
-        isOpen={showSwapList}
-        onClose={() => setShowSwapList(false)}
-        currentWeek={currentWeek}
-      />
-      <AISchedulerModal
-        isOpen={showAIScheduler}
-        onClose={() => setShowAIScheduler(false)}
-        currentWeek={currentWeek}
-        storeId={filterDept}
-      />
+      <Suspense fallback={null}>
+        <AddEmployeeModal isOpen={showAddEmp} onClose={() => setShowAddEmp(false)} />
+        {React.createElement(AddStoreModal, { isOpen: showAddStore, onClose: () => setShowAddStore(false) })}
+        <TransferModal isOpen={showTransfer} onClose={() => setShowTransfer(false)} />
+        <PTOvertimeModal isOpen={showPTOvertime} onClose={() => setShowPTOvertime(false)} />
+        <ImportScheduleModal
+          isOpen={showImportSchedule}
+          onClose={() => setShowImportSchedule(false)}
+          currentWeek={currentWeek}
+        />
+        <ShiftSwapListModal
+          isOpen={showSwapList}
+          onClose={() => setShowSwapList(false)}
+          currentWeek={currentWeek}
+        />
+        <AISchedulerModal
+          isOpen={showAIScheduler}
+          onClose={() => setShowAIScheduler(false)}
+          currentWeek={currentWeek}
+          storeId={filterDept}
+        />
+      </Suspense>
       <AICopilotDrawer
         isOpen={showAICopilot}
         onClose={() => setShowAICopilot(false)}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { AlertTriangle, ShieldAlert, Info, ChevronDown } from 'lucide-react';
 import { SEVERITY } from '../../utils/scheduleConflicts';
 
@@ -11,7 +11,7 @@ const META = {
   [SEVERITY.INFO]:    { icon: Info, label: 'Ghi chú', cls: 'bg-sky-50 border-sky-200 text-sky-700', row: 'text-sky-700' },
 };
 
-export default function ConflictPanel({ findings = [] }) {
+function ConflictPanel({ findings = [] }) {
   const [open, setOpen] = useState(false);
   if (!findings.length) return null;
 
@@ -51,3 +51,4 @@ export default function ConflictPanel({ findings = [] }) {
     </div>
   );
 }
+export default memo(ConflictPanel);

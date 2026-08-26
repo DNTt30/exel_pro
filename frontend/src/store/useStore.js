@@ -3,15 +3,16 @@ import { persist } from 'zustand/middleware';
 import * as api from '../services/api';
 import { getCurrentMondayWeek, normalizeStaffingConfig, normalizeStoreDemand } from '../data/constants';
 import { buildSwappedSchedules, mergeAiSchedule } from '../utils/shiftHelper';
-import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, canPickStore, canApproveSchedule } from '../lib/authSession';
+import { ensureAuthSession, signOutAuth, provisionAuthUser, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, canPickStore, canApproveSchedule, toAuthEmail } from '../lib/authSession';
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { hasCustomAdminPassword, verifyAdminPassword } from '../lib/adminCredential';
 import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../lib/loginThrottle';
 import { checkDeviceTrusted } from '../lib/adminOtp';
 import { redact, describeDiff, clientMeta, rememberClientIp, capJson } from '../utils/appLogs';
 import { weekRecordKey } from '../utils/scheduleWeek';
-import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, userIsManager } from './guards';
-import { notifyTelegram } from '../utils/telegram';
+import { assertWeekEditable, assertCanEditShift, assertCanManageStaff, assertCanManageStore, assertCanManageEmpInDept, userIsManager } from './guards';
+import { notifyTelegram, telegramConfigured } from '../utils/telegram';
+import { supabase } from '../lib/supabase';
 import { toast } from '../components/ui/toastStore';
 
 function sessionUserFromEmp(emp) {
@@ -29,7 +30,13 @@ async function bindAuthSession(user) {
   // Bảo mật: ai đăng nhập app cũng tự cấp phiên Supabase Auth —
   // để RLS phía DB phân quyền được theo vai trò 'authenticated'.
   const result = await ensureAuthSession(user, { allowSignUp: true, password: user.authPassword });
-  if (result.ok) return null;
+  if (result.ok) {
+    // RLS Phase 1 tra current_emp_id() từ app_profiles — thiếu dòng này là policy
+    // chặn toàn bộ employees/stores. RPC SECURITY DEFINER nên chạy được ngay
+    // sau khi có phiên; lỗi không được làm hỏng đăng nhập.
+    try { await api.ensureAppProfile(); } catch { /* bỏ qua */ }
+    return null;
+  }
   if (result.reason === 'no-client' || result.reason === 'no-user') return null;
   console.warn('Supabase Auth chưa sẵn sàng:', result.reason);
   return result.reason;
@@ -68,8 +75,8 @@ export const useStore = create(
             nextUser = {
               id: 'admin',
               role: 'admin',
-              name: 'Cửa hàng trưởng',
-              jobTitle: 'Cửa hàng trưởng',
+              name: 'Quản trị viên',
+              jobTitle: 'Quản trị viên',
               isManager: true,
               mustSetupPassword: usingDefault,
               loginAt: Date.now()
@@ -185,7 +192,12 @@ export const useStore = create(
         try {
           const user = get().user;
           const week = get().currentWeek;
-          const plan = bootstrapQueryPlan(user);
+          // Chờ phiên Supabase gắn xong trước khi query: nếu fetch chạy khi còn anon,
+          // PostgREST trả mảng rỗng KHÔNG lỗi -> danh sách NV/cửa hàng trắng tinh.
+          if (user) {
+            await bindAuthSession(user).catch(() => {});
+          }
+          const plan = bootstrapQueryPlan(get().user || user);
           const settle = (p, fallback) => {
             const run = Promise.resolve(p).catch((err) => {
               console.error(err);
@@ -409,10 +421,13 @@ export const useStore = create(
         return saved;
       },
 
-      applyBulkSchedule: async (weekDate, scheduleMap) => {
+      applyBulkSchedule: async (weekDate, scheduleMap, storeId) => {
         assertCanManageStaff(get());
-        const storeId = get().user?.dept || Object.keys(scheduleMap)[0] && get().employees.find(e => e.id === Object.keys(scheduleMap)[0])?.dept;
-        assertWeekEditable(get(), storeId, weekDate);
+        // storeId do caller truyền rõ ràng; fallback về dept user hoặc dept NV đầu tiên
+        const effectiveStoreId = storeId
+          || get().user?.dept
+          || (Object.keys(scheduleMap)[0] && get().employees.find(e => e.id === Object.keys(scheduleMap)[0])?.dept);
+        assertWeekEditable(get(), effectiveStoreId, weekDate);
         const prevWeek = get().schedule[weekDate] || {};
         const oldSlice = {};
         Object.keys(scheduleMap).forEach(id => { oldSlice[id] = prevWeek[id] || {}; });
@@ -436,7 +451,7 @@ export const useStore = create(
         get().appendAdminLog('UPDATE_SHIFT_BULK', weekDate, `${Object.keys(scheduleMap).length} nhân sự`, {
           resourceType: 'shift',
           resourceId: weekDate,
-          storeId: get().user?.dept || '',
+          storeId: effectiveStoreId || '',
           oldData: oldSlice,
           newData: scheduleMap,
           description: describeDiff({ count: Object.keys(oldSlice).length }, { count: Object.keys(scheduleMap).length }) || `Cập nhật lịch ${Object.keys(scheduleMap).length} NV tuần ${weekDate}`
@@ -467,7 +482,7 @@ export const useStore = create(
 
       // CRUD Employees
       addEmployee: async (emp) => {
-        assertCanManageStaff(get());
+        assertCanManageEmpInDept(get(), emp.dept);
         await api.addEmployee(emp);
         const provisioned = await provisionAuthUser(emp);
         set((state) => ({ employees: [...state.employees, emp] }));
@@ -488,8 +503,8 @@ export const useStore = create(
         return { ok: true };
       },
       updateEmployee: async (id, updates) => {
-        assertCanManageStaff(get());
         const prev = get().employees.find(e => e.id === id) || {};
+        assertCanManageEmpInDept(get(), updates.dept || prev.dept);
         await api.updateEmployeeInfo(id, updates);
         set((state) => {
           const employees = state.employees.map(e => e.id === id ? { ...e, ...updates } : e);
@@ -513,8 +528,8 @@ export const useStore = create(
         });
       },
       deleteEmployee: async (id) => {
-        assertCanManageStaff(get());
         const prev = get().employees.find(e => e.id === id) || { id };
+        assertCanManageEmpInDept(get(), prev.dept);
         await api.deleteEmployeeData(id);
         set((state) => ({
           employees: state.employees.filter(e => e.id !== id)
@@ -531,7 +546,7 @@ export const useStore = create(
 
       // CRUD Stores
       addStore: async (store) => {
-        assertCanManageStaff(get());
+        assertCanManageStore(get());
         const payload = {
           ...store,
           staffing: normalizeStaffingConfig(store.staffing),
@@ -572,7 +587,7 @@ export const useStore = create(
         });
       },
       deleteStore: async (id) => {
-        assertCanManageStaff(get());
+        assertCanManageStore(get());
         const prev = get().stores.find(s => s.id === id) || { id };
         await api.deleteStore(id);
         set((state) => ({
@@ -678,11 +693,14 @@ export const useStore = create(
           });
         } catch (err) {
           console.error("Lỗi khi lưu lịch làm việc:", err);
-          // 3. Rollback lại state cũ nếu có lỗi
+          // 3. Rollback về previousShifts nhưng giữ nguyên các ô ca khác đã thay đổi thành công
           set((state) => ({
             schedule: {
               ...state.schedule,
-              [weekDate]: { ...weekSched, [empId]: previousShifts }
+              [weekDate]: {
+                ...(state.schedule[weekDate] || {}),  // state tươi, không dùng weekSched snapshot
+                [empId]: previousShifts
+              }
             }
           }));
           toast.error(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
@@ -725,25 +743,25 @@ export const useStore = create(
       },
       resolveFeedback: async (feedbackId, status, resolutionNote, newShiftData = null) => {
         const previousFeedbacks = get().feedbacks;
-        
-        // Optimistic UI Update
-        set(state => {
-          const updatedFeedbacks = state.feedbacks.map(fb => {
-            if (fb.id === feedbackId) {
-              return { ...fb, status, resolutionNote, resolvedAt: new Date().toISOString() };
-            }
-            return fb;
-          });
-          return { feedbacks: updatedFeedbacks };
-        });
-        
+        const prevFb = previousFeedbacks.find(f => f.id === feedbackId) || {};
+
         try {
-          await api.updateFeedback(feedbackId, status, resolutionNote);
+          // (1) Cập nhật lịch TRƯỚC — nếu fail thì feedback giữ nguyên 'pending'
           if (status === 'approved' && newShiftData) {
-            // BUG-06 fix: phải await để đảm bảo ca được lưu trước khi tiếp tục
             await get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
           }
-          const prevFb = previousFeedbacks.find(f => f.id === feedbackId) || {};
+          // (2) Sau đó mới đổi status feedback trong DB
+          await api.updateFeedback(feedbackId, status, resolutionNote);
+
+          // (3) Optimistic UI chỉ cập nhật sau khi cả hai bước thành công
+          set(state => ({
+            feedbacks: state.feedbacks.map(fb =>
+              fb.id === feedbackId
+                ? { ...fb, status, resolutionNote, resolvedAt: new Date().toISOString() }
+                : fb
+            )
+          }));
+
           get().appendAdminLog('UPDATE_FEEDBACK', feedbackId, status, {
             resourceType: 'feedback',
             resourceId: feedbackId,
@@ -753,8 +771,8 @@ export const useStore = create(
             description: `Bù công ${prevFb.empName || prevFb.empId || feedbackId}: ${prevFb.status || 'pending'} → ${status}`
           });
         } catch (err) {
-          console.error("Lỗi khi duyệt feedback:", err);
-          set({ feedbacks: previousFeedbacks });
+          console.error('Lỗi khi duyệt feedback:', err);
+          // feedbacks chưa bị thay đổi → không cần rollback
           toast.error(`Lỗi khi cập nhật trạng thái phản hồi: ${err.message || 'Lỗi kết nối'}`);
         }
       },
@@ -818,6 +836,16 @@ export const useStore = create(
         set({ shiftSwaps: updated });
 
         try {
+          // 1. Cập nhật trạng thái Swap trước (nhẹ hơn, an toàn hơn nếu fail)
+          if (!String(swapId).startsWith('swap_')) {
+            await api.updateShiftSwap(swapId, {
+              status: newStatus,
+              managerNote: note || targetSwap.managerNote || '',
+              resolvedAt: resolvedAt || null
+            });
+          }
+
+          // 2. Nếu approve thì mới tiến hành đổi lịch và lưu
           if (newStatus === 'approved') {
             const week = targetSwap.week;
             const weekSched = get().schedule[week] || {};
@@ -827,6 +855,8 @@ export const useStore = create(
               targetSwap
             );
             await api.saveBulkEmployeeSchedules(week, swapped);
+            
+            // UI Update lịch nếu lưu DB thành công
             set(state => ({
               schedule: {
                 ...state.schedule,
@@ -838,13 +868,6 @@ export const useStore = create(
             }));
           }
 
-          if (!String(swapId).startsWith('swap_')) {
-            await api.updateShiftSwap(swapId, {
-              status: newStatus,
-              managerNote: note || targetSwap.managerNote || '',
-              resolvedAt: resolvedAt || null
-            });
-          }
           get().appendAdminLog('UPDATE_SHIFT_SWAP', swapId, newStatus, {
             resourceType: 'shift_swap',
             resourceId: swapId,
@@ -962,7 +985,7 @@ export const useStore = create(
     }),
     {
       name: 'schedule-storage',
-      version: 4,
+      version: 5,
       partialize: (state) => ({
         currentWeek: state.currentWeek,
         user: state.user
@@ -973,8 +996,8 @@ export const useStore = create(
           user = {
             ...user,
             isManager: true,
-            jobTitle: user.jobTitle || 'Cửa hàng trưởng',
-            name: user.name === 'Quản trị viên' ? 'Cửa hàng trưởng' : (user.name || 'Cửa hàng trưởng')
+            jobTitle: user.jobTitle || 'Quản trị viên',
+            name: user.name === 'Cửa hàng trưởng' ? 'Quản trị viên' : (user.name || 'Quản trị viên')
           };
         }
         return {

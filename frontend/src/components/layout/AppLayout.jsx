@@ -44,6 +44,13 @@ const authWarning = useStore(state => state.authWarning);
     }
   }, [user, location.pathname, navigate]);
 
+  // ── Bảo mật 1b: SM/quản lý dùng mật khẩu mặc định '1' → ép đổi mật khẩu trước khi vào hệ thống
+  useEffect(() => {
+    if (user?.mustChangePassword && isOpsManager(user) && user?.id !== 'admin') {
+      setShowPw(true); // modal đổi mật khẩu — không cho đóng (xử lý ở modal)
+    }
+  }, [user]);
+
   // ── Bảo mật 2: tự đăng xuất khi không tương tác (20 phút) hoặc hết phiên tuyệt đối (12h)
   const logoutRef = useRef(handleLogout);
   logoutRef.current = handleLogout;

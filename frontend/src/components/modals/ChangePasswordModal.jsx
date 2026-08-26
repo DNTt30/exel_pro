@@ -10,6 +10,8 @@ const MIN_LEN = 8;
 export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null }) {
   // targetEmp != null → chế độ ADMIN RESET cho nhân viên đó
   const user = useStore(s => s.user);
+  // Khi SM/Manager dùng mật khẩu mặc định → ép đổi, không cho đóng modal
+  const isForced = !targetEmp && user?.mustChangePassword && !user?.id?.startsWith('admin');
   const [oldPw, setOldPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -43,8 +45,13 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
   };
 
   return (
-    <Modal title={title} isOpen={isOpen} onClose={onClose}>
+    <Modal title={title} isOpen={isOpen} onClose={isForced ? undefined : onClose} hideClose={isForced}>
       <div className="space-y-3 text-sm">
+        {isForced && (
+          <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 font-semibold">
+            ⚠️ Bạn đang dùng mật khẩu mặc định. Vui lòng đặt mật khẩu mới để tiếp tục sử dụng hệ thống.
+          </div>
+        )}
         {!isAdminReset && (
           <label className="block">
             <span className="text-xs font-bold text-slate-600">Mật khẩu hiện tại</span>

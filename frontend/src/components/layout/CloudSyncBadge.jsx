@@ -15,6 +15,8 @@ export default function CloudSyncBadge() {
   const syncStatus = useStore(s => s.syncStatus);
   const lastSyncedAt = useStore(s => s.lastSyncedAt);
 
+  const initializeData = useStore(s => s.initializeData);
+
   if (syncStatus === 'loading') {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-1" title="Đang tải từ Supabase">
@@ -24,14 +26,14 @@ export default function CloudSyncBadge() {
   }
   if (syncStatus === 'error') {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-1" title="Không kết nối được cloud">
-        <CloudOff size={12} /> <span className="hidden sm:inline">Lỗi cloud</span>
-      </span>
+      <button onClick={() => initializeData()} className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-1 hover:bg-red-100 transition-colors cursor-pointer" title="Lỗi cloud - Bấm để tải lại">
+        <CloudOff size={12} /> <span className="hidden sm:inline">Lỗi cloud (Bấm tải lại)</span>
+      </button>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-1" title="Lịch, NV, kệ, nhật ký lưu bảng Supabase. Máy chỉ giữ phiên đăng nhập.">
+    <button onClick={() => initializeData()} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-1 hover:bg-emerald-100 transition-colors cursor-pointer" title="Dữ liệu cloud đã đồng bộ. Bấm để tải lại lịch/nhân sự.">
       <Cloud size={12} /> <span className="hidden sm:inline">Cloud {lastSyncedAt ? timeAgo(lastSyncedAt) : 'sẵn sàng'}</span>
-    </span>
+    </button>
   );
 }

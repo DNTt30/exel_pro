@@ -6,7 +6,9 @@ import {
   Search, 
   FileText, 
   AlertCircle, 
-  X 
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
@@ -18,9 +20,21 @@ import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetMod
 import { useShallow } from 'zustand/react/shallow';
 
 export default function EmployeeTimesheet() {
-  const { user, schedule, currentWeek, ensureWeeksLoaded } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded })));
+  const { user, schedule, currentWeek, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
   const weekSchedule = schedule[currentWeek] || {};
   const myDept = user?.dept || '';
+
+  const handlePrevMonth = () => {
+    const parts = currentWeek.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 2, parseInt(parts[2], 10));
+    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const parts = currentWeek.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
 
   const [search, setSearch] = useState('');
   const [filterOnlyMe, setFilterOnlyMe] = useState(true);
@@ -136,6 +150,28 @@ export default function EmployeeTimesheet() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Điều hướng Tháng */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+              <button 
+                onClick={handlePrevMonth}
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                title="Tháng trước"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg min-w-[100px] text-center shadow-xs mx-1">
+                <span className="text-xs font-black text-slate-800">
+                  Tháng {payrollCycle.month}/{payrollCycle.year}
+                </span>
+              </div>
+              <button 
+                onClick={handleNextMonth}
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                title="Tháng sau"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
             <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold">
               <AlertCircle size={14} className="text-amber-600" />
               <span>Chốt C&B: <strong>17h30 Ngày 10</strong></span>

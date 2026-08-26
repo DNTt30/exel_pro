@@ -48,9 +48,18 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       const act = getActualValue(emp.id, day);
       if (act !== null && act !== undefined && act !== '') val = String(act);
     }
-    if (val && val !== 'OFF') {
-      const num = parseFloat(val);
-      if (!isNaN(num)) {
+    if (val && val !== 'OFF' && val !== 'off') {
+      const parsed = parseFloat(val);
+      let num = 0;
+      if (!isNaN(parsed)) {
+        num = parsed;
+      } else {
+        const u = String(val).trim().toUpperCase();
+        if (u === 'AL' || u === 'PL') num = 8;
+        else if (u === 'AL_H' || u === 'PL_H') num = 4;
+      }
+      
+      if (num > 0) {
         if (isPT) totalPT += num;
         else totalFT += num;
       }

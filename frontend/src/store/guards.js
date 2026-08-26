@@ -1,6 +1,6 @@
 // Guards phân quyền & khóa tuần — hàm thuần nhận `state`, tách khỏi store để kiểm thử trực tiếp.
 import { weekRecordKey, isWeekLocked } from '../utils/scheduleWeek';
-import { isOpsManager } from '../lib/authSession';
+import { isOpsManager, isBuiltinStoreManager, getUserDepts } from '../lib/authSession';
 
 export function userIsManager(user) {
   return isOpsManager(user);
@@ -35,10 +35,37 @@ export function assertCanEditShift(state, empId, weekDate) {
   }
 }
 
-/** Chỉ admin/SM mới được quản lý nhân sự, cửa hàng... */
+/** Chỉ admin/SM mới được quản lý nhân sự. */
 export function assertCanManageStaff(state) {
   const user = state.user;
   if (!user) throw new Error('Chưa đăng nhập');
   if (user.role === 'admin' || userIsManager(user)) return;
   throw new Error('Không có quyền quản lý nhân sự');
+}
+
+/**
+ * Chỉ Admin (tài khoản `admin` / isBuiltinStoreManager) mới được tạo/xóa cửa hàng.
+ * SM cửa hàng chỉ được cập nhật thông tin CH của mình (updateStore), không được tạo/xóa.
+ */
+export function assertCanManageStore(state) {
+  const user = state.user;
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (isBuiltinStoreManager(user)) return;
+  throw new Error('Chỉ Admin mới được thêm hoặc xóa cửa hàng');
+}
+
+/**
+ * SM chỉ được thao tác trên NV thuộc cửa hàng của mình.
+ * Admin không bị giới hạn.
+ * @param {string} empDept - dept của nhân viên cần kiểm tra
+ */
+export function assertCanManageEmpInDept(state, empDept) {
+  assertCanManageStaff(state);
+  const user = state.user;
+  if (isBuiltinStoreManager(user)) return; // admin toàn quyền
+  if (!empDept) return; // dept trống → để Supabase RLS quyết định
+  const userDepts = getUserDepts(user);
+  if (userDepts.length > 0 && !userDepts.includes(empDept)) {
+    throw new Error(`Không có quyền quản lý nhân viên cửa hàng ${empDept}`);
+  }
 }

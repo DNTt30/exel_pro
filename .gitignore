@@ -7,3 +7,5 @@ dist
 /generated/prisma
 k6.zip
 k6_bin/
+
+.vercel

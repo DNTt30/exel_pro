@@ -59,6 +59,12 @@ export default function Stores() {
   };
 
   const handleDelete = async (id) => {
+    // Kiểm tra tính toàn vẹn: Không cho xóa nếu vẫn còn nhân viên
+    const empsInStore = employees.filter(e => e.dept === id);
+    if (empsInStore.length > 0) {
+      return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${empsInStore.length} nhân viên trực thuộc. Vui lòng chuyển hoặc xóa nhân viên trước.`);
+    }
+
     if (confirm('Bạn có chắc chắn muốn xóa cửa hàng này?')) {
       try {
         await deleteStore(id);
@@ -181,8 +187,8 @@ export default function Stores() {
                       onChange={async (e) => {
                         const v = e.target.value;
                         try {
-                          await apiUpdateStore(st.id, { sm_id: v });
-                          updateStore(st.id, { sm_id: v });
+                          // updateStore passa qua guard assertCanManageStaff — đảm bảo phân quyền
+                          await updateStore(st.id, { sm_id: v });
                         } catch (err) {
                           toast.error('Lỗi lưu SM: ' + err.message);
                         }

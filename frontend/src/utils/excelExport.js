@@ -190,9 +190,18 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
         let cellStyle = 'color: #94a3b8;';
         let displayVal = val || '-';
 
-        if (val && val !== 'OFF') {
+        if (val && val !== 'OFF' && val !== 'off') {
           const num = parseFloat(val);
-          const hrs = isNaN(num) ? 8 : num;
+          let hrs = 0;
+          if (!isNaN(num)) {
+            hrs = num;
+          } else {
+            const u = String(val).trim().toUpperCase();
+            if (u === 'AL' || u === 'PL') hrs = 8;
+            else if (u === 'AL_H' || u === 'PL_H') hrs = 4;
+            else hrs = 0; // UL, KL, NS, v.v..
+          }
+          
           total += hrs;
           if (isPT) ptTotal += hrs;
           else ftTotal += hrs;
@@ -201,9 +210,8 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
           else if (val === '14-22') cellStyle = 'background-color: #bfdbfe; color: #1e40af; font-weight: bold;';
           else if (val === '10-18') cellStyle = 'background-color: #fed7aa; color: #9a3412; font-weight: bold;';
           else if (val === '22-6') cellStyle = 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
+          else if (['KL', 'UL'].includes(String(val).toUpperCase())) cellStyle = 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;';
           else cellStyle = 'background-color: #e2e8f0; color: #1e293b; font-weight: bold;';
-        } else if (val === 'KL') {
-          cellStyle = 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;';
         }
 
         return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${cellStyle}">${displayVal}</td>`;

@@ -88,7 +88,13 @@ export default function Employees() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm('Bạn có chắc chắn muốn xóa nhân sự này?')) {
+    // Kiểm tra tính toàn vẹn: Không cho xóa nếu nhân viên này đang là SM
+    const ownedStores = stores.filter(s => (s.sm_id || s.smId) === id);
+    if (ownedStores.length > 0) {
+      return toast.error(`Không thể xóa: Nhân sự này đang là SM phụ trách cửa hàng ${ownedStores.map(s => s.id).join(', ')}. Vui lòng gán SM khác cho các cửa hàng này trước khi xóa.`);
+    }
+
+    if (confirm('Bạn có chắc chắn muốn xóa nhân sự này (Khuyến nghị dùng nút KHÓA thay vì XÓA)?')) {
       try {
         await deleteEmployee(id);
       } catch (e) {

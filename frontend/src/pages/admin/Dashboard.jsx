@@ -11,6 +11,8 @@ import KpiCardsGrid from '../../components/dashboard/KpiCardsGrid';
 import MonthConfirmWidget from '../../components/dashboard/MonthConfirmWidget';
 import { visibleStoresForAdmin } from '../../utils/dataScope';
 import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards';
+import EmployeeDemographicsWidget from '../../components/dashboard/EmployeeDemographicsWidget';
+import OperationsInsightsWidget from '../../components/dashboard/OperationsInsightsWidget';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
 import { downloadOFCReportXlsx } from '../../utils/exportOFC';
 import { toast } from '../../components/ui/toastStore';
@@ -912,14 +914,31 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Store Breakdown Cards */}
-      <StoreBreakdownCards
-        storeStats={storeStats}
-        totalSystemHours={totalSystemHours}
-        filterDept={filterDept}
-        setFilterDept={setFilterDept}
-        viewMode={viewMode}
-        selectedMonthCycle={selectedMonthCycle}
+      {/* Phân tích nhân sự & cửa hàng */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="lg:col-span-1">
+          <EmployeeDemographicsWidget 
+            employees={employees} 
+            filterDept={filterDept} 
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <StoreBreakdownCards
+            storeStats={storeStats}
+            totalSystemHours={totalSystemHours}
+            filterDept={filterDept}
+            setFilterDept={setFilterDept}
+            viewMode={viewMode}
+            selectedMonthCycle={selectedMonthCycle}
+          />
+        </div>
+      </div>
+
+      {/* Phân tích Vắng mặt / Phép & Chi viện */}
+      <OperationsInsightsWidget 
+        employees={employees} 
+        weekSchedule={weekSchedule} 
+        filterDept={filterDept} 
       />
 
       {/* Employee Detail Drill-down Modal */}

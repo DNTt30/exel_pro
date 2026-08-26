@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
-import { Download, Printer, Pencil, Check, FileSpreadsheet } from 'lucide-react';
+import { Download, Printer, Pencil, Check, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { toast } from '../../components/ui/toastStore';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
@@ -13,7 +13,7 @@ import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function Timesheet() {
-  const { user, currentWeek, schedule, ensureWeeksLoaded } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, ensureWeeksLoaded: s.ensureWeeksLoaded })));
+  const { user, currentWeek, schedule, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
   const attendance = useStore((s) => s.attendance);
   const loadAttendanceRange = useStore((s) => s.loadAttendanceRange);
   const saveAttendanceCell = useStore((s) => s.saveAttendanceCell);
@@ -87,6 +87,18 @@ export default function Timesheet() {
     }
   }, [cycleDates, saveAttendanceCell, user?.id]);
 
+  const handlePrevMonth = () => {
+    const parts = currentWeek.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 2, parseInt(parts[2], 10));
+    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const parts = currentWeek.split('-');
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
   const overrideCount = Object.keys(attendance).filter(k => attendance[k] && attendance[k].actualHours > 0).length;
 
   return (
@@ -100,6 +112,29 @@ export default function Timesheet() {
           disableDeptFilter={false}
           rightActions={
             <>
+              {/* Điều hướng Tháng */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs mr-2">
+                <button 
+                  onClick={handlePrevMonth}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                  title="Tháng trước"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg min-w-[110px] text-center shadow-xs mx-1">
+                  <span className="text-xs font-black text-slate-800">
+                    Tháng {payrollCycle.month}/{payrollCycle.year}
+                  </span>
+                </div>
+                <button 
+                  onClick={handleNextMonth}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                  title="Tháng sau"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
               <button 
                 className="btn btn-outline text-xs py-1.5 px-3 hover:text-emerald-700 hover:border-emerald-300 font-semibold flex items-center gap-1.5 cursor-pointer" 
                 onClick={() => exportTimesheetToExcel({

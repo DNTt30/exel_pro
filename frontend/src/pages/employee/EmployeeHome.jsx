@@ -90,7 +90,7 @@ export default function EmployeeHome() {
   const expiryCount = expiryWarn.length;
 
   return (
-    <div className="p-3 sm:p-5 max-w-3xl lg:max-w-6xl mx-auto space-y-2.5 pb-8">
+    <div className="p-4 sm:p-6 w-full max-w-[1600px] mx-auto space-y-4 pb-8">
 
       {/* ── Header chào hỏi + chip tuần ── */}
       <div className="flex items-end justify-between gap-3">

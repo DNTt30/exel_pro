@@ -35,7 +35,7 @@ export async function getMyCredentialState() {
  */
 export async function adminResetPassword(targetEmpId, newPassword) {
   const fnUrl = String(import.meta.env?.VITE_ADMIN_OTP_URL || '').replace(/admin-otp$/, 'reset-password');
-  if (!fnUrl || !/reset-password$/.test(fnUrl)) throw new Error('RESET_FN_NOT_CONFIGURED');
+  if (!fnUrl || !/reset-password$/.test(fnUrl)) throw new Error('Tính năng đặt lại mật khẩu chưa được kích hoạt. Vui lòng liên hệ quản trị viên hệ thống.');
   const { data: sess } = await supabase.auth.getSession();
   const jwt = sess?.session?.access_token;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;

@@ -10,7 +10,7 @@ import { visibleDeptIds } from '../../utils/dataScope';
 import { parseDateDetails } from '../../utils/dateHelper';
 import { useShallow } from 'zustand/react/shallow';
 
-const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek }) => {
+const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek, user }) => {
   // Tìm thông tin nhân viên theo ID nếu trong feedback bị thiếu tên
   const emp = useMemo(() => employees.find(e => e.id === fb.empId), [employees, fb.empId]);
   const empName = fb.empName || fb.name || emp?.name || 'Chưa cập nhật';
@@ -272,6 +272,7 @@ export default function FeedbackCB() {
                     resolveFeedback={resolveFeedback}
                     employees={employees}
                     currentWeek={currentWeek}
+                    user={user}
                   />
                 ))
               )}

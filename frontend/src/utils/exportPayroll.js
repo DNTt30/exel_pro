@@ -88,10 +88,13 @@ export function buildPayrollAOA({ cycleDates, groupedEmps, getDayValue, getActua
         if (typeof v === 'number') {
           if (v > 0) { workingDays += 1; sumH += v; }
         } else {
-          const u = v.toUpperCase();
+          const u = String(v).trim().toUpperCase();
           if (u === 'AL') al += 1;
+          else if (u === 'AL_H') al += 0.5;
           else if (u === 'PL') pl += 1;
-          else if (u === 'UL') ul += 1;
+          else if (u === 'PL_H') pl += 0.5;
+          else if (u === 'UL' || u === 'KL') ul += 1;
+          else if (u === 'UL_H' || u === 'KL_H') ul += 0.5;
           else if (u === 'NS') night += 1;
         }
         return v;

@@ -15,7 +15,16 @@ import HelpDrawer from '../HelpDrawer';
 export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
-  const [showPw, setShowPw] = useState(Boolean(user?.mustChangePassword));
+  const [showPw, setShowPw] = useState(false);
+  // Nhắc đổi mật khẩu MỘT LẦN bằng effect (tránh mở modal trong cùng commit mount
+  // với lazy-load trang + redirect router — nguyên nhân tiềm ẩn React error #185)
+  const pwPromptedRef = useRef(false);
+  useEffect(() => {
+    if (user?.mustChangePassword && !pwPromptedRef.current) {
+      pwPromptedRef.current = true;
+      setShowPw(true);
+    }
+  }, [user]);
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
 const authWarning = useStore(state => state.authWarning);

@@ -57,80 +57,80 @@ export default function EmployeeDemographicsWidget({ employees, filterDept }) {
   )`;
 
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col justify-between h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <PieChartIcon size={18} />
+    <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col h-full">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <PieChartIcon size={20} />
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800">Cơ Cấu Nhân Sự</h3>
-            <p className="text-[11px] text-slate-500 font-medium">Tỷ lệ PT, FT, Quản lý tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `Cửa hàng ${filterDept}`}</p>
+            <p className="text-[11px] text-slate-500 font-medium">Tỷ lệ PT, FT, Quản lý tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `CH ${filterDept}`}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-6 mt-2 flex-1">
-        {/* Biểu đồ tròn (Donut) */}
-        <div className="relative w-36 h-36 shrink-0 mt-4">
+      <div className="flex flex-col items-center justify-center flex-1 py-4">
+        {/* Biểu đồ tròn (Donut) dày hơn */}
+        <div className="relative w-40 h-40 shrink-0 mb-6 group">
           <div 
-            className="w-full h-full rounded-full shadow-inner" 
+            className="w-full h-full rounded-full shadow-sm transition-transform duration-500 group-hover:scale-105" 
             style={{ background: gradient }}
           ></div>
-          <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-sm">
-            <Users size={16} className="text-slate-400 mb-0.5" />
-            <span className="text-sm font-black text-slate-800 leading-tight">{stats.total}</span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Nhân sự</span>
+          <div className="absolute inset-4 bg-white rounded-full flex flex-col items-center justify-center shadow-sm">
+            <Users size={18} className="text-slate-400 mb-0.5" />
+            <span className="text-xl font-black text-slate-800 leading-tight">{stats.total}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Nhân sự</span>
           </div>
         </div>
 
-        {/* Chú thích */}
-        <div className="grid grid-cols-2 gap-3 w-full mt-2">
+        {/* Chú thích gọn hơn */}
+        <div className="grid grid-cols-2 gap-3 w-full">
           {/* Part-time */}
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shrink-0"></div>
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="w-3 h-3 rounded-full bg-blue-500 shadow-sm shrink-0"></div>
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Part-time</div>
             </div>
-            <div className="flex items-baseline gap-1.5 ml-4">
-              <span className="text-sm font-black text-slate-800">{stats.pt}</span>
-              <span className="text-[10px] font-bold text-blue-600">({stats.ptPct.toFixed(1)}%)</span>
+            <div className="flex items-baseline gap-1.5 pl-4.5">
+              <span className="text-base font-black text-slate-800">{stats.pt}</span>
+              <span className="text-[11px] font-bold text-blue-600">({stats.ptPct.toFixed(1)}%)</span>
             </div>
           </div>
 
           {/* Full-time */}
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm shrink-0"></div>
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="w-3 h-3 rounded-full bg-purple-500 shadow-sm shrink-0"></div>
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Full-time</div>
             </div>
-            <div className="flex items-baseline gap-1.5 ml-4">
-              <span className="text-sm font-black text-slate-800">{stats.ft}</span>
-              <span className="text-[10px] font-bold text-purple-600">({stats.ftPct.toFixed(1)}%)</span>
+            <div className="flex items-baseline gap-1.5 pl-4.5">
+              <span className="text-base font-black text-slate-800">{stats.ft}</span>
+              <span className="text-[11px] font-bold text-purple-600">({stats.ftPct.toFixed(1)}%)</span>
             </div>
           </div>
 
           {/* SM */}
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shrink-0"></div>
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shrink-0"></div>
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Quản lý CH</div>
             </div>
-            <div className="flex items-baseline gap-1.5 ml-4">
-              <span className="text-sm font-black text-slate-800">{stats.sm}</span>
-              <span className="text-[10px] font-bold text-amber-600">({stats.smPct.toFixed(1)}%)</span>
+            <div className="flex items-baseline gap-1.5 pl-4.5">
+              <span className="text-base font-black text-slate-800">{stats.sm}</span>
+              <span className="text-[11px] font-bold text-amber-600">({stats.smPct.toFixed(1)}%)</span>
             </div>
           </div>
 
           {/* OFC */}
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shrink-0"></div>
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shrink-0"></div>
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Văn phòng</div>
             </div>
-            <div className="flex items-baseline gap-1.5 ml-4">
-              <span className="text-sm font-black text-slate-800">{stats.ofc}</span>
-              <span className="text-[10px] font-bold text-emerald-600">({stats.ofcPct.toFixed(1)}%)</span>
+            <div className="flex items-baseline gap-1.5 pl-4.5">
+              <span className="text-base font-black text-slate-800">{stats.ofc}</span>
+              <span className="text-[11px] font-bold text-emerald-600">({stats.ofcPct.toFixed(1)}%)</span>
             </div>
           </div>
         </div>

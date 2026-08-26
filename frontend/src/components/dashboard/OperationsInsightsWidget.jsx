@@ -80,56 +80,58 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
       
       {/* Cột 1: Tỷ lệ Đi làm & Nghỉ phép */}
-      <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col justify-between h-full">
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-            <UserX size={18} />
+      <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col h-full">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+            <UserX size={20} />
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800">Tình Trạng Đi Làm & Nghỉ Phép</h3>
-            <p className="text-[11px] text-slate-500 font-medium">Theo dõi vắng mặt tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `Cửa hàng ${filterDept}`} (Tuần này)</p>
+            <p className="text-[11px] text-slate-500 font-medium">Theo dõi vắng mặt tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `CH ${filterDept}`} (Tuần này)</p>
           </div>
         </div>
 
         {leaveStats.total === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-slate-400 font-medium">Chưa có dữ liệu lịch làm việc.</div>
+          <div className="flex-1 flex items-center justify-center text-xs text-slate-400 font-medium pb-4">
+            Chưa có dữ liệu lịch làm việc.
+          </div>
         ) : (
-          <div className="space-y-4">
-            {/* Stacked Bar */}
-            <div className="w-full h-4 rounded-full flex overflow-hidden shadow-inner">
+          <div className="space-y-6 flex-1 flex flex-col justify-center">
+            {/* Stacked Bar dày dặn */}
+            <div className="w-full h-8 rounded-2xl flex overflow-hidden shadow-inner bg-slate-100">
               <div style={{ width: `${leaveStats.workedPct}%` }} className="bg-blue-500 hover:bg-blue-600 transition-colors cursor-help" title={`Đi làm: ${leaveStats.worked} ca`}></div>
               <div style={{ width: `${leaveStats.paidPct}%` }} className="bg-emerald-400 hover:bg-emerald-500 transition-colors cursor-help" title={`Phép có lương: ${leaveStats.paidLeave} ca`}></div>
               <div style={{ width: `${leaveStats.unpaidPct}%` }} className="bg-rose-400 hover:bg-rose-500 transition-colors cursor-help" title={`Không lương: ${leaveStats.unpaidLeave} ca`}></div>
-              <div style={{ width: `${leaveStats.offPct}%` }} className="bg-slate-200 hover:bg-slate-300 transition-colors cursor-help" title={`OFF thường: ${leaveStats.off} ca`}></div>
+              <div style={{ width: `${leaveStats.offPct}%` }} className="bg-slate-300 hover:bg-slate-400 transition-colors cursor-help" title={`OFF thường: ${leaveStats.off} ca`}></div>
             </div>
 
-            {/* Legends */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between items-center">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shrink-0"></div>
-                  <span className="text-[10px] font-bold text-slate-600 uppercase">Đi làm</span>
+            {/* Legends bớt rời rạc */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 shadow-sm shrink-0"></div>
+                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Đi làm</span>
                 </div>
                 <span className="font-black text-slate-800 text-sm">{leaveStats.worked}</span>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between items-center">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 shadow-sm shrink-0"></div>
-                  <span className="text-[10px] font-bold text-slate-600 uppercase">OFF thường</span>
+              <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-slate-300 shadow-sm shrink-0"></div>
+                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">OFF thường</span>
                 </div>
                 <span className="font-black text-slate-800 text-sm">{leaveStats.off}</span>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-emerald-100 flex justify-between items-center">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shrink-0"></div>
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase">Phép lương</span>
+              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-sm shrink-0"></div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Phép lương</span>
                 </div>
                 <span className="font-black text-emerald-800 text-sm">{leaveStats.paidLeave}</span>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-rose-100 flex justify-between items-center">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-sm shrink-0"></div>
-                  <span className="text-[10px] font-bold text-rose-700 uppercase">Không lương</span>
+              <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-rose-400 shadow-sm shrink-0"></div>
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wide">Không lương</span>
                 </div>
                 <span className="font-black text-rose-800 text-sm">{leaveStats.unpaidLeave}</span>
               </div>
@@ -139,29 +141,32 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
       </div>
 
       {/* Cột 2: Hoạt động Chi viện (Chỉ áp dụng Toàn hệ thống) */}
-      <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col justify-between h-full relative overflow-hidden">
+      <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col h-full relative overflow-hidden">
         {filterDept !== 'ALL' && (
-          <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
-            <RefreshCcw size={24} className="text-slate-400 mb-2" />
-            <p className="text-xs font-bold text-slate-600">Báo cáo Chi viện chỉ hiển thị ở chế độ "Toàn Bộ Cửa Hàng".</p>
-            <p className="text-[10px] text-slate-500 mt-1">Vui lòng bỏ chọn bộ lọc cửa hàng để xem lưới chi viện.</p>
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-md z-10 flex flex-col items-center justify-center p-6 text-center">
+            <RefreshCcw size={28} className="text-slate-400 mb-3" />
+            <p className="text-sm font-extrabold text-slate-700">Chỉ hiển thị ở chế độ "Toàn Hệ Thống"</p>
+            <p className="text-[11px] text-slate-500 mt-1 font-medium max-w-[200px]">Vui lòng bỏ chọn bộ lọc cửa hàng để xem bức tranh chi viện tổng thể.</p>
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <RefreshCcw size={18} />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-sm text-slate-800">Hoạt Động Chi Viện (Cross-Store)</h3>
-              <p className="text-[11px] text-slate-500 font-medium">Toàn hệ thống ghi nhận <strong className="text-amber-600">{supportStats.totalTransfers} ca</strong> chi viện (Tuần này)</p>
-            </div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <RefreshCcw size={20} />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-sm text-slate-800">Hoạt Động Chi Viện (Cross-Store)</h3>
+            <p className="text-[11px] text-slate-500 font-medium">Toàn hệ thống ghi nhận <strong className="text-amber-600">{supportStats.totalTransfers} ca</strong> chi viện (Tuần này)</p>
           </div>
         </div>
 
         {supportStats.totalTransfers === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-slate-400 font-medium">Tuần này không có ca chi viện nào.</div>
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3 border border-slate-100">
+              <RefreshCcw size={20} className="text-slate-300" />
+            </div>
+            <p className="text-xs text-slate-500 font-bold">Tuần này không có ca chi viện nào.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
             {/* Top Mượn */}

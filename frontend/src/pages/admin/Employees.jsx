@@ -105,9 +105,8 @@ export default function Employees() {
 
   // Khóa/mở tài khoản: mã bị khóa không thể đăng nhập (dùng khi nghỉ việc)
   const handleToggleActive = async (emp) => {
-    const next = emp.isActive === false; // đang khóa -> mở
+    const next = emp.isActive === false;
     if (!next) {
-      // Cảnh báo vòng đời: khóa SM vẫn còn đứng tên quản lý cửa hàng
       const ownedStores = stores.filter(s => (s.sm_id || s.smId) === emp.id);
       if (isManagerFromEmp(emp) && ownedStores.length > 0) {
         if (!confirm('⚠️ ' + emp.name + ' (' + emp.id + ') đang là SM phụ trách: ' + ownedStores.map(s => s.id).join(', ') + '.\nKhóa mã này sẽ khiến các cửa hàng trên KHÔNG CÒN NGƯỜI PHỤ TRÁCH.\nHãy gán SM khác trước nếu cần. Vẫn tiếp tục khóa?')) return;
@@ -157,7 +156,7 @@ export default function Employees() {
               </button>
             )}
           </div>
-          {pickStore && (
+          {canEditEmps && (
           <button 
             onClick={() => { 
               setIsAdding(true); 
@@ -306,7 +305,7 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
-                        {pickStore && emp.id !== user?.id && (
+                        {canEditEmps && emp.id !== user?.id && (
                         <button
                           onClick={async () => {
                             const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';
@@ -324,16 +323,16 @@ export default function Employees() {
                           <Crown size={15} />
                         </button>
                         )}
-                        {pickStore && (
+                        {canEditEmps && (
                         <><button onClick={() => setResetTarget(emp)} title="Đặt lại mật khẩu" className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 mr-1"><KeyRound size={14} /></button>
             <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
                           {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
                         </button></>
                         )}
-                        {pickStore && (
+                        {canEditEmps && (
                         <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
                         )}
-                        {pickStore && (
+                        {canEditEmps && (
                         <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Xóa"><Trash2 size={15} /></button>
                         )}
                       </>

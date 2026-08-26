@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X, Lock, Unlock } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Lock, Unlock, Crown } from 'lucide-react';
 import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
@@ -178,33 +178,29 @@ export default function Stores() {
                   ) : getRegionBadge(st.region)}
                 </td>
                 <td className="p-3">
-                  {editingId === st.id ? (
-                    <input type="text" placeholder="Mã SM" className="w-full p-1.5 border border-blue-400 rounded bg-white font-mono text-xs outline-none" value={formData.sm_id || ''} onChange={e => setFormData({ ...formData, sm_id: e.target.value })} />
-                  ) : pickStore ? (
-                    <select
-                      className="w-full p-1.5 border border-slate-200 rounded bg-slate-50 text-xs cursor-pointer"
-                      value={st.sm_id || st.smId || ''}
-                      onChange={async (e) => {
-                        const v = e.target.value;
-                        try {
-                          // updateStore passa qua guard assertCanManageStaff — đảm bảo phân quyền
-                          await updateStore(st.id, { sm_id: v });
-                        } catch (err) {
-                          toast.error('Lỗi lưu SM: ' + err.message);
-                        }
-                      }}
-                    >
-                      <option value="">— Chưa gán —</option>
-                      {(employees || []).filter(isManagerFromEmp).map(m => (
-                        <option key={m.id} value={m.id}>{m.id} · {m.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    (() => {
-                      const m = (employees || []).find(x => x.id === (st.sm_id || st.smId));
-                      return <span className="text-xs font-mono font-bold text-slate-600">{m ? `${m.id} · ${m.name}` : '—'}</span>;
-                    })()
-                  )}
+                  {(() => {
+                    // Logic mới: Tự động tìm tất cả nhân sự có quyền Manager và có dept chứa mã cửa hàng này
+                    const storeManagers = (employees || []).filter(emp => {
+                      if (!isManagerFromEmp(emp)) return false;
+                      const depts = (emp.dept || '').split(',').map(d => d.trim());
+                      return depts.includes(st.id);
+                    });
+                    
+                    if (storeManagers.length === 0) {
+                      return <span className="text-[11px] italic text-slate-400">Chưa có quản lý</span>;
+                    }
+                    
+                    return (
+                      <div className="flex flex-col gap-1">
+                        {storeManagers.map(m => (
+                          <span key={m.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 text-[10px] font-bold">
+                            <Crown size={12} className="text-amber-500" />
+                            {m.id} - {m.name}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
                   {editingId === st.id ? (

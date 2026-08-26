@@ -1,5 +1,4 @@
-import { supabase } from '../lib/supabase';
-import { db } from './client';
+import { supabase } from '../../lib/supabase';
 
 /** Đổi mật khẩu của CHÍNH MÌNH: xác thực lại mật khẩu cũ rồi updateUser. */
 export async function changeMyPassword(oldPassword, newPassword) {
@@ -15,14 +14,14 @@ export async function changeMyPassword(oldPassword, newPassword) {
   if (upd.error) throw new Error(upd.error.message);
 
   // Đánh dấu đã tự đặt mật khẩu (RPC definer — vượt RLS app_profiles)
-  await db().rpc('mark_credential_set');
+  await supabase.rpc('mark_credential_set');
   return true;
 }
 
 /** Trạng thái mật khẩu của bản thân: null credential_set_at = còn mặc định. */
 export async function getMyCredentialState() {
   try {
-    const { data } = await db().rpc('get_credential_state');
+    const { data } = await supabase.rpc('get_credential_state');
     const row = Array.isArray(data) ? data[0] : data;
     return { setAt: row?.credential_set_at || null };
   } catch {

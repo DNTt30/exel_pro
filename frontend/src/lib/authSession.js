@@ -152,7 +152,7 @@ export async function provisionAuthUser(emp) {
   }
 }
 
-export async function ensureAuthSession(user, { allowSignUp = false } = {}) {
+export async function ensureAuthSession(user, { allowSignUp = false, password } = {}) {
   if (!supabase) return { ok: false, reason: 'no-client' };
   if (!user?.id) return { ok: false, reason: 'no-user' };
 
@@ -175,7 +175,7 @@ export async function ensureAuthSession(user, { allowSignUp = false } = {}) {
 
   try {
     const signedIn = await withTimeout(
-      supabase.auth.signInWithPassword({ email, password: toAuthPassword(user.id) }),
+      supabase.auth.signInWithPassword({ email, password: password || toAuthPassword(user.id) }),
       10000,
       'timeout-sign-in'
     );
@@ -205,7 +205,7 @@ export async function ensureAuthSession(user, { allowSignUp = false } = {}) {
     }
 
     const retry = await withTimeout(
-      supabase.auth.signInWithPassword({ email, password: toAuthPassword(user.id) }),
+      supabase.auth.signInWithPassword({ email, password: password || toAuthPassword(user.id) }),
       10000,
       'timeout-sign-in-retry'
     );

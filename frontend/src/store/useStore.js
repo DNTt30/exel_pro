@@ -28,7 +28,7 @@ function sessionUserFromEmp(emp) {
 async function bindAuthSession(user) {
   // Bảo mật: ai đăng nhập app cũng tự cấp phiên Supabase Auth —
   // để RLS phía DB phân quyền được theo vai trò 'authenticated'.
-  const result = await ensureAuthSession(user, { allowSignUp: true });
+  const result = await ensureAuthSession(user, { allowSignUp: true, password: user.authPassword });
   if (result.ok) return null;
   if (result.reason === 'no-client' || result.reason === 'no-user') return null;
   console.warn('Supabase Auth chưa sẵn sàng:', result.reason);
@@ -88,11 +88,21 @@ export const useStore = create(
               const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
               throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
             }
-            if (password !== '1') {
-              recordFailure(userId);
-              throw new Error('Mật khẩu không chính xác');
+            if (password === '1') {
+              // Mật khẩu mặc định — sau khi NV đổi mật khẩu riêng sẽ đi nhánh dưới
+              nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: true, loginAt: Date.now() };
+            } else {
+              // Mật khẩu riêng (đã đặt qua Đổi mật khẩu): xác thực thẳng Supabase Auth
+              const pwCheck = await supabase.auth.signInWithPassword({
+                email: toAuthEmail(emp.id),
+                password,
+              });
+              if (pwCheck.error || !pwCheck.data?.session) {
+                recordFailure(userId);
+                throw new Error('Mật khẩu không chính xác');
+              }
+              nextUser = { ...sessionUserFromEmp(emp), authPassword: password, mustChangePassword: false, loginAt: Date.now() };
             }
-            nextUser = { ...sessionUserFromEmp(emp), loginAt: Date.now() };
           }
 
           resetFailures(userId);

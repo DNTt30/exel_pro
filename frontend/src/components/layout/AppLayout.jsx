@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager } from '../../lib/authSession';
-import { CalendarDays, Clock, FileText, LogOut, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
+import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import ChangePasswordModal from '../modals/ChangePasswordModal';
 import Toaster from '../ui/toast';
 import { toast } from '../ui/toastStore';
 import { AdminPageSkeleton, EmployeePageSkeleton } from '../ui/Skeleton';
@@ -14,6 +15,7 @@ import HelpDrawer from '../HelpDrawer';
 export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
+  const [showPw, setShowPw] = useState(Boolean(user?.mustChangePassword));
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
 const authWarning = useStore(state => state.authWarning);
@@ -131,6 +133,7 @@ const authWarning = useStore(state => state.authWarning);
             <span className="text-xs font-bold text-slate-700 max-w-[90px] sm:max-w-[150px] truncate">{user?.name}</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border hidden sm:inline ${ri.top}`}>{ri.label}</span>
           </div>
+          <button type="button" onClick={() => setShowPw(true)} title="Đổi mật khẩu" className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><KeyRound size={15} /></button>
           <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors ml-0.5" title="Đăng xuất"><LogOut size={16} /></button>
         </div>
         {isInitializing && (<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden"><div className="h-full w-1/3 bg-blue-500 animate-pulse" /></div>)}
@@ -205,6 +208,7 @@ const authWarning = useStore(state => state.authWarning);
         <HelpDrawer isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} isAdmin={isManager} />
         <AICopilotDrawer isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} currentWeek={currentWeek} storeId={user?.dept || 'ALL'} />
       </div>
-    </div>
+    
+      <ChangePasswordModal isOpen={showPw} onClose={() => setShowPw(false)} /></div>
   );
 }

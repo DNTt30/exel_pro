@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound } from 'lucide-react';
+import ChangePasswordModal from '../../components/modals/ChangePasswordModal';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore, isManagerFromEmp } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
@@ -16,6 +17,7 @@ export default function Employees() {
   const homeDept = pickStore ? (stores[0]?.id || '') : (user?.dept || '');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL'); // ALL | sm | nv
   
@@ -317,9 +319,10 @@ export default function Employees() {
                         </button>
                         )}
                         {pickStore && (
-                        <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
+                        <><button onClick={() => setResetTarget(emp)} title="Đặt lại mật khẩu" className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 mr-1"><KeyRound size={14} /></button>
+            <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
                           {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
-                        </button>
+                        </button></>
                         )}
                         {pickStore && (
                         <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
@@ -346,6 +349,7 @@ export default function Employees() {
           </tbody>
         </table>
       </div>
-    </div>
+    
+      {resetTarget && <ChangePasswordModal isOpen onClose={() => setResetTarget(null)} targetEmp={resetTarget} />}</div>
   );
 }

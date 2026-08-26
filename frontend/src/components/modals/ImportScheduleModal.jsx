@@ -10,6 +10,7 @@ import { getShiftCode, getCoveringStore } from '../../utils/shiftHelper';
 
 
 import { useShallow } from 'zustand/react/shallow';
+import { validateImportRows } from '../../utils/scheduleImportSchema';
 import { toast } from '../../components/ui/toastStore';
 
 export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
@@ -19,6 +20,7 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [autoCreateEmps, setAutoCreateEmps] = useState(true);
+  const [importReport, setImportReport] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -91,6 +93,7 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
   const processFile = (fileObj) => {
     setErrorMsg('');
     setParsedData([]);
+    setImportReport(null);
     if (!fileObj) return;
 
     setFile(fileObj);
@@ -217,7 +220,16 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         if (parsedList.length === 0) {
           setErrorMsg('Không tìm thấy bản ghi nhân viên hợp lệ nào trong file!');
         } else {
-          setParsedData(parsedList);
+          // PHASE 5 PIPELINE: schema (Zod) + business rules → phân loại valid/warning/error
+          const storeIds = new Set(stores.map(s => s.id));
+          const existingIds = new Set(employees.map(e => e.id));
+          const weekShifts = schedule[currentWeek] || {};
+          const report = validateImportRows(parsedList, { existingIds, storeIds, existingShiftsById: weekShifts });
+          setImportReport(report);
+          if (report.valid.length === 0) {
+            setErrorMsg('Tất cả ' + report.errors.length + ' dòng đều lỗi — xem chi tiết bên dưới.');
+          }
+          setParsedData(report.valid);
         }
       } catch (err) {
         console.error('Lỗi phân tích file Excel:', err);
@@ -356,6 +368,24 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
           </div>
         </div>
 
+        {/* PHASE 5: báo cáo pipeline */}
+        {importReport && importReport.errors.length > 0 && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1 max-h-32 overflow-auto">
+            <div className="font-black">🚫 {importReport.errors.length} dòng bị chặn:</div>
+            {importReport.errors.slice(0, 20).map((e, i) => (
+              <div key={i}>· {e.message}</div>
+            ))}
+          </div>
+        )}
+        {importReport && importReport.warnings.length > 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1 max-h-28 overflow-auto">
+            <div className="font-bold">⚠️ {importReport.warnings.length} cảnh báo (vẫn nhập):</div>
+            {importReport.warnings.slice(0, 15).map((w, i) => (
+              <div key={i}>· {w.message}</div>
+            ))}
+          </div>
+        )}
+
         {/* Drag & Drop Zone */}
         {!file && (
           <div
@@ -490,11 +520,11 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
             <button
               type="button"
               onClick={handleApply}
-              disabled={loading || parsedData.length === 0}
+              disabled={loading || parsedData.length === 0 || (importReport && importReport.errors.length > 0)}
               className="btn btn-primary text-xs px-4 py-2 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload size={14} />
-              <span>{loading ? 'Đang lưu lịch...' : `Áp dụng ${parsedData.length} nhân sự`}</span>
+              <span>{loading ? 'Đang lưu lịch...' : `Áp dụng ${parsedData.length} NV${importReport?.warnings?.length ? ' · ' + importReport.warnings.length + ' cảnh báo' : ''}${importReport?.errors?.length ? ' · CHẶN ' + importReport.errors.length + ' lỗi' : ''}`}</span>
             </button>
           </div>
         </div>

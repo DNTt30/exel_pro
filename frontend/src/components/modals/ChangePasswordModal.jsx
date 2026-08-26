@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { changeMyPassword, adminResetPassword } from '../../services/api/password';
-import { toast } from './ui/toastStore';
+import { toast } from '../ui/toastStore';
 import { KeyRound } from 'lucide-react';
 
 const MIN_LEN = 8;

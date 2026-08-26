@@ -46,7 +46,7 @@ export default function EmployeeDemographicsWidget({ employees, filterDept }) {
       { key: 'FT', label: 'Full-time', value: stats.ft, pct: stats.ftPct, color: '#a855f7', bg: 'bg-purple-500' }, // purple-500
       { key: 'SM', label: 'Quản lý CH', value: stats.sm, pct: stats.smPct, color: '#f59e0b', bg: 'bg-amber-500' }, // amber-500
       { key: 'OFC', label: 'Văn phòng', value: stats.ofc, pct: stats.ofcPct, color: '#10b981', bg: 'bg-emerald-500' } // emerald-500
-    ].filter(d => d.value > 0);
+    ];
 
     let cumulativePct = 0;
     return data.map(d => {
@@ -97,8 +97,8 @@ export default function EmployeeDemographicsWidget({ employees, filterDept }) {
                 strokeDasharray={slice.dasharray}
                 strokeDashoffset={slice.dashoffset}
                 transform="rotate(-90 21 21)"
-                className="transition-all duration-300 cursor-pointer outline-none"
-                onMouseEnter={() => setHovered(slice.key)}
+                className={`transition-all duration-300 outline-none ${slice.value > 0 ? 'cursor-pointer' : 'pointer-events-none opacity-0'}`}
+                onMouseEnter={() => slice.value > 0 && setHovered(slice.key)}
                 onMouseLeave={() => setHovered(null)}
               />
             ))}
@@ -133,14 +133,14 @@ export default function EmployeeDemographicsWidget({ employees, filterDept }) {
           {chartData.map(slice => (
             <div 
               key={slice.key}
-              onMouseEnter={() => setHovered(slice.key)}
+              onMouseEnter={() => slice.value > 0 && setHovered(slice.key)}
               onMouseLeave={() => setHovered(null)}
-              className={`p-3 rounded-xl border flex flex-col justify-center transition-all cursor-pointer ${
-                hovered === slice.key 
+              className={`p-3 rounded-xl border flex flex-col justify-center transition-all ${slice.value > 0 ? 'cursor-pointer' : 'opacity-60 grayscale'} ${
+                hovered === slice.key && slice.value > 0
                   ? 'bg-white shadow-sm scale-[1.02] ring-2 ring-slate-100' 
                   : 'bg-slate-50/70 border-slate-100 hover:bg-slate-50'
               }`}
-              style={{ borderColor: hovered === slice.key ? slice.color : '' }}
+              style={{ borderColor: hovered === slice.key && slice.value > 0 ? slice.color : '' }}
             >
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`w-3 h-3 rounded-full ${slice.bg} shadow-sm shrink-0`} style={{ backgroundColor: slice.color }}></div>

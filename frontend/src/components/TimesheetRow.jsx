@@ -60,14 +60,22 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       }
       
       if (num > 0) {
-        if (isPT) totalPT += num;
-        else totalFT += num;
+        // Phụ cấp ca đêm (x1.3)
+        const isNight = String(val).includes('22-6');
+        const effectiveHours = isNight ? num * 1.3 : num;
+
+        if (isPT) totalPT += effectiveHours;
+        else totalFT += effectiveHours;
       }
     }
   });
 
   const isPTOvertimed = isPT && totalPT > 91;
   const tongCong = totalPT + totalFT;
+  
+  // Ước tính lương (Ví dụ cơ bản: 25k/h cho PT)
+  const estSalary = isPT ? Math.round(totalPT * 25000).toLocaleString('vi-VN') + 'đ' : '—';
+
   const badgeInfo = getRoleBadgeInfo(emp.role || emp.type);
 
   return (
@@ -161,6 +169,7 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
         {isPTOvertimed ? `⚠️ ${totalPT.toFixed(2)}` : (totalPT > 0 ? totalPT.toFixed(2) : '0.00')}
       </td>
       <td className="min-w-[64px] w-[64px] text-center font-black text-emerald-700 bg-emerald-50">{tongCong > 0 ? tongCong.toFixed(2) : '0.00'}</td>
+      <td className="min-w-[80px] w-[80px] text-center font-bold text-amber-700 bg-amber-50">{estSalary}</td>
     </tr>
   );
 });

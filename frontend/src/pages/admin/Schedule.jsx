@@ -7,6 +7,7 @@ import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../
 import { Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
+import { exportScheduleToPDF } from '../../utils/pdfExport';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
@@ -407,6 +408,15 @@ export default function Schedule() {
           >
             <Download size={13} />
             <span>Xuất Excel</span>
+          </button>
+
+          <button
+            onClick={() => exportScheduleToPDF(currentWeek, filteredEmployees, schedule[currentWeek] || {}, filterDept)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            title="Xuất file PDF để in"
+          >
+            <Printer size={13} />
+            <span>Xuất PDF</span>
           </button>
 
           {/* Nút In */}

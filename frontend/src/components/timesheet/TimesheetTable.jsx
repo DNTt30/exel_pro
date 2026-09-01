@@ -57,6 +57,9 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
                 <th className="p-2 text-center bg-blue-100 text-blue-900 font-black sticky right-0 z-20 min-w-[64px] w-[64px] border-l border-slate-400">
                   Tổng
                 </th>
+                <th className="p-2 text-center bg-amber-200 text-amber-900 font-black sticky right-0 z-20 min-w-[80px] w-[80px] border-l border-slate-400">
+                  Lương (Ước tính)
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -64,7 +67,7 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
                 <React.Fragment key={dept}>
                   {/* Tiêu đề Phân nhóm Cửa hàng */}
                   <tr className="bg-blue-50/70 border-y border-blue-200">
-                    <td colSpan={5 + cycleDates.length + 3} className="px-3 py-1.5 font-bold text-blue-900 text-xs">
+                    <td colSpan={5 + cycleDates.length + 4} className="px-3 py-1.5 font-bold text-blue-900 text-xs">
                       🏬 Cửa hàng {dept} ({groupedEmps[dept].length} nhân sự)
                     </td>
                   </tr>

@@ -5,6 +5,7 @@ import { MA_RE, STANDARD_ROLES } from '../../data/constants';
 import { canPickStore, getUserDepts } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
+import { employeeSchema } from '../../schemas/validationSchemas';
 
 export default function AddEmployeeModal({ isOpen, onClose }) {
   const { stores, addEmployee, user } = useStore(useShallow((s) => ({ stores: s.stores, addEmployee: s.addEmployee, user: s.user })));
@@ -42,22 +43,20 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
     const trimmedId = formData.id.trim();
     const trimmedName = formData.name.trim();
 
-    if (!trimmedId || !trimmedName || !formData.dept) {
-      return toast.error('Vui lòng nhập đủ thông tin bắt buộc (*)');
-    }
+    const payload = {
+      ...formData,
+      id: trimmedId,
+      name: trimmedName
+    };
 
-    // Validate mã nhân viên đúng 9 chữ số theo regex MA_RE
-    if (!MA_RE.test(trimmedId)) {
-      return toast.error('Mã nhân viên không hợp lệ! Mã phải bao gồm đúng 9 chữ số (Ví dụ: 260512008).');
+    const validation = employeeSchema.safeParse(payload);
+    if (!validation.success) {
+      return toast.error(validation.error.issues[0].message);
     }
 
     setLoading(true);
     try {
-      const result = await addEmployee({
-        ...formData,
-        id: trimmedId,
-        name: trimmedName
-      });
+      const result = await addEmployee(validation.data);
       if (result?.provisionWarning) {
         toast.info(result.provisionWarning);
       }

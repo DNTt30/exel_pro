@@ -7,6 +7,7 @@ import { getUserDepts } from '../../lib/authSession';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
+import { shiftSwapSchema } from '../../schemas/validationSchemas';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -121,23 +122,31 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
     if (!toEmpId) return toast.error('Vui lòng chọn đồng nghiệp muốn đổi ca.');
     if (!selectedPartnerShift) return toast.error('Đồng nghiệp được chọn không có ca làm việc nào để đổi sang.');
 
+    const payload = {
+      week: currentWeek,
+      store: user?.dept || '',
+      fromEmpId: user?.id,
+      fromEmpName: user?.name,
+      fromDay: selectedMyShift.dayKey,
+      fromDayLabel: selectedMyShift.dayLabel,
+      fromShift: selectedMyShift.shift,
+      toEmpId,
+      toEmpName: selectedPartnerObj?.name || toEmpId,
+      toDay: selectedPartnerShift.dayKey,
+      toDayLabel: selectedPartnerShift.dayLabel,
+      toShift: selectedPartnerShift.shift,
+      reason: reason.trim()
+    };
+
+    const validation = shiftSwapSchema.safeParse(payload);
+    if (!validation.success) {
+      return toast.error(validation.error.issues[0].message);
+    }
+
     try {
-      await addShiftSwap({
-        week: currentWeek,
-        store: user?.dept,
-        fromEmpId: user?.id,
-        fromEmpName: user?.name,
-        fromDay: selectedMyShift.dayKey,
-        fromDayLabel: selectedMyShift.dayLabel,
-        fromShift: selectedMyShift.shift,
-        toEmpId,
-        toEmpName: selectedPartnerObj?.name || toEmpId,
-        toDay: selectedPartnerShift.dayKey,
-        toDayLabel: selectedPartnerShift.dayLabel,
-        toShift: selectedPartnerShift.shift,
-        reason: reason.trim()
-      });
+      await addShiftSwap(payload);
       toast.success('Đã gửi yêu cầu đổi ca. Đang chờ đồng nghiệp xác nhận.');
+      setReason('');
       onClose();
     } catch (err) {
       toast.error('Không thể gửi đơn đổi ca: ' + (err.message || 'Lỗi kết nối'));

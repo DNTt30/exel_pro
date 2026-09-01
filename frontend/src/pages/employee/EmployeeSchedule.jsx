@@ -14,13 +14,14 @@ import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import { useShallow } from 'zustand/react/shallow';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { toast } from '../../components/ui/toastStore';
+import { weekRecordKey } from '../../utils/scheduleWeek';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
   // 'employees' không dùng ở đây — bỏ để tránh đăng ký thừa
-  const { user, schedule, updateShift, currentWeek, setCurrentWeek, shiftSwaps, stores } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores })));
+  const { user, schedule, updateShift, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const [search] = useState('');
@@ -36,6 +37,9 @@ export default function EmployeeSchedule() {
   const pendingMySwapsCount = useMemo(() => {
     return (shiftSwaps || []).filter(s => s.toEmpId === user?.id && s.status === 'pending_partner').length;
   }, [shiftSwaps, user?.id]);
+
+  const currentWeekStatus = (scheduleWeeks || {})[weekRecordKey(activeDept, currentWeek)]?.status || 'draft';
+  const isDraft = currentWeekStatus !== 'approved';
 
   // 1. Ngày hiển thị cố định theo Tuần (T2 -> CN)
   const activeDays = WEEK_DAYS;
@@ -200,7 +204,8 @@ export default function EmployeeSchedule() {
       currentWeek,
       deptName: myDept,
       groupedEmps,
-      weekSchedule
+      weekSchedule,
+      userName: user?.name
     });
   };
 
@@ -438,6 +443,15 @@ export default function EmployeeSchedule() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="bg-blue-50/50 p-3 sm:px-5 sm:py-3 border-b border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900">
+        <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY TẮC & TRẠNG THÁI XẾP LỊCH:</div>
+        <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
+          <li><strong>Nền trắng (không màu):</strong> Ca đăng ký / Lịch nháp. Đang chờ Quản lý duyệt.</li>
+          <li><strong>Có màu nền theo ca:</strong> Lịch đã được Quản lý CHỐT & BAN HÀNH chính thức.</li>
+          <li><strong>Ưu tiên AI tự động xếp:</strong> Giữ nguyên lịch đăng ký ➔ Ưu tiên Full-time đạt chuẩn 48h ➔ Part-time lấp ca thiếu. Không ép Part-time dư giờ nếu cửa hàng không cần.</li>
+        </ul>
       </div>
 
       {/* VIEW 1: LỊCH BIỂU THẺ CÁ NHÂN (CARD VIEW - TỐI ƯU MOBILE & TRỰC QUAN) */}
@@ -690,10 +704,13 @@ export default function EmployeeSchedule() {
 
                         {/* Shift Badge */}
                         <div 
-                          className="p-2.5 rounded-xl font-black text-sm text-center shadow-2xs"
-                          style={{
+                          className={`p-2.5 rounded-xl font-black text-sm text-center shadow-2xs ${isDraft ? 'border border-slate-300 border-dashed' : ''}`}
+                          style={!isDraft ? {
                             backgroundColor: card.shiftInfo?.bg || '#bfdbfe',
                             color: card.shiftInfo?.text || '#1e40af'
+                          } : {
+                            backgroundColor: '#ffffff',
+                            color: '#475569'
                           }}
                         >
                           {card.shift}

@@ -8,7 +8,8 @@ export default function ShiftInput({
   onChange, 
   rowIndex, 
   colIndex, 
-  readOnly = false 
+  readOnly = false,
+  isDraft = false
 }) {
   const selectRef = useRef(null);
 
@@ -37,12 +38,18 @@ export default function ShiftInput({
     cellText = '#64748b'; // Xám đậm
     displayLabel = 'OFF';
   } else if (shiftInfo) {
-    cellBg = shiftInfo.bg;
-    cellText = shiftInfo.text;
+    if (isDraft) {
+      // Khi là bản nháp/đăng ký, không hiện màu nền, chỉ hiện viền hoặc chữ
+      cellBg = '#ffffff';
+      cellText = '#475569'; // Chữ xám đậm dễ đọc
+    } else {
+      cellBg = shiftInfo.bg;
+      cellText = shiftInfo.text;
+    }
     displayLabel = shiftInfo.label || shiftCode;
   } else if (!isUnset) {
-    cellBg = '#dbeafe';
-    cellText = '#1e40af';
+    cellBg = isDraft ? '#ffffff' : '#dbeafe';
+    cellText = isDraft ? '#475569' : '#1e40af';
     displayLabel = shiftCode;
   }
 

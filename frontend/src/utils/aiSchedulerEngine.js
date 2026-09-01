@@ -371,87 +371,19 @@ export function generateAISchedule(employees, storeId, options = {}) {
     return true;
   };
 
-  // GIAI ĐOẠN 1: PHÂN BỔ THEO NGUYỆN VỌNG & ƯU TIÊN PART-TIME
+  // GIAI ĐOẠN 0: GHI NHẬN LỊCH ĐÃ XẾP TAY / LỊCH RẢNH (NẾU CÓ)
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
-    shiftPriorities.forEach(shiftCode => {
-      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
-      const neededCount = dayMatrix[shiftCode] || 0;
-      let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
-
-      if (shiftCode === '22-6') {
-        const volunteers = storeEmployees.filter(e => 
-          nightShiftVolunteers.includes(e.id) || 
-          normalizeShift(existingSchedule[e.id]?.[dayKey]).shift === '22-6'
-        );
-
-        for (const emp of volunteers) {
-          if (assignedCount >= neededCount) break;
-          if (neededCount === 1 && !isSeniorStaff(emp)) continue;
-          if (canTakeShift(emp, dayKey, dayIdx, shiftCode)) {
-            assignShiftTo(emp, dayKey, shiftCode);
-            assignedCount++;
-          }
-        }
-
-        if (assignedCount < neededCount) {
-          const availablePT = ptEmployees.filter(isSeniorStaff).sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
-          for (const emp of availablePT) {
-            if (assignedCount >= neededCount) break;
-            if (canTakeShift(emp, dayKey, dayIdx, shiftCode)) {
-              assignShiftTo(emp, dayKey, shiftCode);
-              assignedCount++;
-            }
-          }
-        }
-      } else {
-        const codeHours = getShiftHours(shiftCode);
-        const isShortPeak = codeHours > 0 && codeHours < 8;
-        const currentAssigned = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode);
-        const hasSenior = currentAssigned.some(isSeniorStaff);
-
-        if (!hasSenior && !isShortPeak) {
-          const availableSeniors = seniorEmployees.sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
-          for (const senior of availableSeniors) {
-            if (canTakeShift(senior, dayKey, dayIdx, shiftCode)) {
-              assignShiftTo(senior, dayKey, shiftCode);
-              assignedCount++;
-              break;
-            }
-          }
-        }
-
-        if (assignedCount < neededCount && storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).some(isSeniorStaff)) {
-          const availableNew = newEmployees.sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
-          for (const newEmp of availableNew) {
-            if (assignedCount >= neededCount) break;
-            if (canTakeShift(newEmp, dayKey, dayIdx, shiftCode)) {
-              assignShiftTo(newEmp, dayKey, shiftCode);
-              assignedCount++;
-            }
-          }
-        }
-
-        if (assignedCount < neededCount) {
-          const shortPeak = getShiftHours(shiftCode) > 0 && getShiftHours(shiftCode) < 8;
-          const sortedPT = shortPeak
-            ? [...ptEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id])
-            : [
-                ...newEmployees.sort((a, b) => employeeHours[a.id] - employeeHours[b.id]),
-                ...ptEmployees.filter(e => !newEmployees.some(n => n.id === e.id)).sort((a, b) => employeeHours[a.id] - employeeHours[b.id])
-              ];
-          for (const emp of sortedPT) {
-            if (assignedCount >= neededCount) break;
-            if (canTakeShift(emp, dayKey, dayIdx, shiftCode)) {
-              assignShiftTo(emp, dayKey, shiftCode);
-              assignedCount++;
-            }
-          }
+    storeEmployees.forEach(emp => {
+      const existingShift = normalizeShift(existingSchedule[emp.id]?.[dayKey]).shift;
+      if (existingShift && existingShift !== 'off') {
+        if (canTakeShift(emp, dayKey, dayIdx, existingShift)) {
+           assignShiftTo(emp, dayKey, existingShift);
         }
       }
     });
   });
 
-  // GIAI ĐOẠN 2: FULL-TIME BÙ VÀO TẤT CẢ CÁC CA THIẾU
+  // GIAI ĐOẠN 1: ƯU TIÊN FULL-TIME ĐẠT ĐỦ 48H VÀ ĐÚNG 1 NGÀY OFF
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
     shiftPriorities.forEach(shiftCode => {
       const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
@@ -462,6 +394,9 @@ export function generateAISchedule(employees, storeId, options = {}) {
         const candidateFT = [...ftEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
         for (const ft of candidateFT) {
           if (assignedCount >= neededCount) break;
+          // Ưu tiên nguyện vọng ca đêm
+          if (shiftCode === '22-6' && nightShiftVolunteers.length > 0 && !nightShiftVolunteers.includes(ft.id)) continue;
+          
           if (canTakeShift(ft, dayKey, dayIdx, shiftCode, true)) {
             assignShiftTo(ft, dayKey, shiftCode);
             assignedCount++;
@@ -471,7 +406,7 @@ export function generateAISchedule(employees, storeId, options = {}) {
     });
   });
 
-  // GIAI ĐOẠN 3: FULL-TIME ĐẠT ĐỦ 48H VÀ ĐÚNG 1 NGÀY OFF
+  // GIAI ĐOẠN 2: ÉP FULL-TIME ĐẠT ĐỦ ĐỊNH MỨC NẾU CÒN THIẾU
   ftEmployees.forEach(ft => {
     if (employeeShiftsCount[ft.id] < 6) {
       for (let dayIdx = 0; dayIdx < WEEK_DAYS.length; dayIdx++) {
@@ -479,35 +414,58 @@ export function generateAISchedule(employees, storeId, options = {}) {
         const dayKey = WEEK_DAYS[dayIdx];
 
         if (resultSchedule[ft.id][dayKey] === 'off' && ftMandatoryOffDays[ft.id] !== dayKey) {
-          const candidateShifts = ['14-22', '6-14', '10-18'];
-          for (const sCode of candidateShifts) {
-            if (canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
-              assignShiftTo(ft, dayKey, sCode);
-              break;
-            }
+          let pickedShift = null;
+          for(const sCode of shiftPriorities) {
+             const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+             const needed = dayMatrix[sCode] || 0;
+             const actual = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === sCode).length;
+             if (actual < needed && canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
+                 pickedShift = sCode;
+                 break;
+             }
+          }
+          if (!pickedShift) {
+             const fallback = ['14-22', '6-14', '10-18'];
+             for (const sCode of fallback) {
+               if (canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
+                 pickedShift = sCode;
+                 break;
+               }
+             }
+          }
+
+          if (pickedShift) {
+             assignShiftTo(ft, dayKey, pickedShift);
           }
         }
       }
     }
   });
 
-  // GIAI ĐOẠN 4: TỐI ƯU PART-TIME (16h - 23h)
-  ptEmployees.forEach(emp => {
-    if (employeeHours[emp.id] < SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK) {
-      for (let dayIdx = 0; dayIdx < WEEK_DAYS.length; dayIdx++) {
-        const dayKey = WEEK_DAYS[dayIdx];
-        if (resultSchedule[emp.id][dayKey] === 'off') {
-          const needed = SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK - employeeHours[emp.id];
-          const assignShift = needed <= 4 ? '18-22' : needed <= 6 ? '6-12' : '6-14';
+  // GIAI ĐOẠN 3: LẤP ĐẦY MATRIX BẰNG PART-TIME
+  WEEK_DAYS.forEach((dayKey, dayIdx) => {
+    shiftPriorities.forEach(shiftCode => {
+      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+      const neededCount = dayMatrix[shiftCode] || 0;
+      let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
-          if (canTakeShift(emp, dayKey, dayIdx, assignShift)) {
-            assignShiftTo(emp, dayKey, assignShift);
-            if (employeeHours[emp.id] >= SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK) break;
+      if (assignedCount < neededCount) {
+        const candidatePT = [...ptEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
+        for (const pt of candidatePT) {
+          if (assignedCount >= neededCount) break;
+          // ưu tiên nguyện vọng ca đêm
+          if (shiftCode === '22-6' && nightShiftVolunteers.length > 0 && !nightShiftVolunteers.includes(pt.id)) continue;
+
+          if (canTakeShift(pt, dayKey, dayIdx, shiftCode)) {
+            assignShiftTo(pt, dayKey, shiftCode);
+            assignedCount++;
           }
         }
       }
-    }
+    });
   });
+
+  // GIAI ĐOẠN 4: Đã xóa (không ép PT đủ 16h nếu phá vỡ định biên)
 
   // Thống kê
   let totalAssignedHours = 0;

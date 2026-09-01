@@ -23,7 +23,8 @@ const EmployeeRow = memo(({
   handleShiftChange, 
   isAdmin, 
   canEdit,
-  days 
+  days,
+  isDraft
 }) => {
   const canEditShifts = canEdit ?? isAdmin;
   const updateEmployee = useStore(state => state.updateEmployee);
@@ -170,6 +171,7 @@ const EmployeeRow = memo(({
               rowIndex={absoluteRowIdx}
               colIndex={dIdx}
               readOnly={!canEditShifts}
+              isDraft={isDraft}
             />
           </td>
         );
@@ -221,7 +223,8 @@ const EmployeeRow = memo(({
     prevProps.isAdmin === nextProps.isAdmin && 
     prevProps.canEdit === nextProps.canEdit && 
     prevProps.absoluteRowIdx === nextProps.absoluteRowIdx && 
-    prevProps.days === nextProps.days
+    prevProps.days === nextProps.days &&
+    prevProps.isDraft === nextProps.isDraft
   );
 });
 

@@ -681,7 +681,8 @@ export const useStore = create(
 
         // 2. Gửi request lưu lên server
         try {
-          await api.saveEmployeeSchedule(weekDate, empId, updatedShifts);
+          const freshShiftsToSave = get().schedule[weekDate]?.[empId] || updatedShifts;
+          await api.saveEmployeeSchedule(weekDate, empId, freshShiftsToSave);
           const emp = get().employees.find(e => e.id === empId);
           get().appendAdminLog('UPDATE_SHIFT', empId, describeDiff({ [day]: previousShifts[day] }, { [day]: shiftCode }), {
             resourceType: 'shift',
@@ -693,16 +694,20 @@ export const useStore = create(
           });
         } catch (err) {
           console.error("Lỗi khi lưu lịch làm việc:", err);
-          // 3. Rollback về previousShifts nhưng giữ nguyên các ô ca khác đã thay đổi thành công
-          set((state) => ({
-            schedule: {
-              ...state.schedule,
-              [weekDate]: {
-                ...(state.schedule[weekDate] || {}),  // state tươi, không dùng weekSched snapshot
-                [empId]: previousShifts
+          // 3. Rollback chỉ riêng ô ngày vừa đổi bị lỗi, giữ nguyên các ngày khác
+          set((state) => {
+            const currentWeekSched = state.schedule[weekDate] || {};
+            const currentEmpSched = currentWeekSched[empId] || {};
+            return {
+              schedule: {
+                ...state.schedule,
+                [weekDate]: {
+                  ...currentWeekSched,
+                  [empId]: { ...currentEmpSched, [day]: previousShifts[day] }
+                }
               }
-            }
-          }));
+            };
+          });
           toast.error(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
         }
       },
@@ -848,12 +853,15 @@ export const useStore = create(
           // 2. Nếu approve thì mới tiến hành đổi lịch và lưu
           if (newStatus === 'approved') {
             const week = targetSwap.week;
-            const weekSched = get().schedule[week] || {};
-            const swapped = buildSwappedSchedules(
-              weekSched[targetSwap.fromEmpId] || {},
-              weekSched[targetSwap.toEmpId] || {},
-              targetSwap
-            );
+            
+            // Lấy dữ liệu mới nhất từ DB để tránh race condition (2 manager duyệt swap cùng lúc)
+            const freshSched = await api.getSchedulesByWeek(week, { 
+              empIds: [targetSwap.fromEmpId, targetSwap.toEmpId] 
+            });
+            const fromShifts = freshSched[targetSwap.fromEmpId] || get().schedule[week]?.[targetSwap.fromEmpId] || {};
+            const toShifts = freshSched[targetSwap.toEmpId] || get().schedule[week]?.[targetSwap.toEmpId] || {};
+
+            const swapped = buildSwappedSchedules(fromShifts, toShifts, targetSwap);
             await api.saveBulkEmployeeSchedules(week, swapped);
             
             // UI Update lịch nếu lưu DB thành công

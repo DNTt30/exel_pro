@@ -229,11 +229,11 @@ export default function ShelfDateBoard() {
         name: form.name.trim(),
         assigneeId: form.assigneeId.join(','),
         dueDate: form.dueDate,
-        notifyDays: Number(form.notifyDays) || DEFAULT_NOTIFY_DAYS
+        notifyDays: form.notifyDays === '' || form.notifyDays == null ? DEFAULT_NOTIFY_DAYS : Number(form.notifyDays)
       });
       setForm({ id: null, code: '', assigneeId: [], name: '', dueDate: '', notifyDays: DEFAULT_NOTIFY_DAYS });
-      if (!form.id) openShelf(saved);
-      else toast.success('Đã cập nhật kệ!');
+      openShelf(saved);
+      if (form.id) toast.success('Đã cập nhật kệ!');
     } catch (e) {
       toast.error(e.message || 'Không lưu được. Kiểm tra kết nối.');
     }
@@ -313,7 +313,7 @@ export default function ShelfDateBoard() {
           </div>
           <label className="inline-flex items-center gap-2 text-xs text-slate-500 mt-4">
             Báo NV trước khi HSD còn
-            <input type="number" min={1} max={14} className="w-14 border rounded-lg px-1.5 py-1 outline-none focus:ring-2 focus:ring-blue-500" value={form.notifyDays} onChange={e => setForm({ ...form, notifyDays: e.target.value })} />
+            <input type="number" min={0} max={14} className="w-14 border rounded-lg px-1.5 py-1 outline-none focus:ring-2 focus:ring-blue-500" value={form.notifyDays} onChange={e => setForm({ ...form, notifyDays: e.target.value })} />
             ngày
           </label>
         </div>

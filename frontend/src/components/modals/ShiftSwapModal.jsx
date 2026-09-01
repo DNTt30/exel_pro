@@ -3,6 +3,7 @@ import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { RefreshCw, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { getUserDepts } from '../../lib/authSession';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
@@ -14,6 +15,7 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   const { user, employees, schedule, addShiftSwap } = useStore(useShallow((s) => ({ user: s.user, employees: s.employees, schedule: s.schedule, addShiftSwap: s.addShiftSwap })));
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
   const mySched = weekSched[user?.id] || EMPTY_SCHED;
+  const myDepts = getUserDepts(user);
 
   // 1. Chỉ lấy những ngày BẢN THÂN CÓ CA LÀM VIỆC (khác OFF)
   const myShiftsList = useMemo(() => {
@@ -43,7 +45,7 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   // 2. Chỉ lấy những đồng nghiệp trong cùng cửa hàng CÓ ÍT NHẤT 1 CA LÀM VIỆC trong tuần
   const colleaguesWithShifts = useMemo(() => {
     return employees.filter(e => {
-      if (e.id === user?.id || e.dept !== user?.dept) return false;
+      if (e.id === user?.id || (myDepts.length > 0 && !myDepts.includes(e.dept))) return false;
       const empSched = weekSched[e.id] || {};
       return WEEK_DAYS.some(d => {
         const { shift } = normalizeShift(empSched[d] || '');

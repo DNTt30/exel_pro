@@ -121,7 +121,7 @@ export default function Schedule() {
       deptName: (pickStore ? filterDept : user?.dept) === 'ALL' ? 'Toan_Bo_Cua_Hang' : (pickStore ? filterDept : user?.dept),
       groupedEmps,
       weekSchedule,
-      viewMode
+      userName: user?.name
     });
   };
 
@@ -428,6 +428,15 @@ export default function Schedule() {
         filterDept={filterDept} 
       />
 
+      <div className="bg-blue-50/60 p-3 sm:px-5 sm:py-3 border-y border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900 print:hidden">
+        <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY TẮC & TRẠNG THÁI XẾP LỊCH:</div>
+        <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
+          <li><strong>Ô lịch nền trắng (không màu):</strong> Ca đăng ký / Lịch nháp. Đang chờ Quản lý duyệt.</li>
+          <li><strong>Ô lịch có màu nền theo ca:</strong> Lịch đã được Quản lý CHỐT & BAN HÀNH chính thức.</li>
+          <li><strong>Ưu tiên AI tự động xếp:</strong> Giữ nguyên lịch đăng ký (Lịch rảnh) ➔ Ưu tiên Full-time đạt chuẩn 48h ➔ Part-time lấp ca thiếu. Không ép Part-time dư giờ nếu cửa hàng không cần.</li>
+        </ul>
+      </div>
+
       {/* 4. Main Schedule Grid Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none">
         
@@ -518,6 +527,16 @@ export default function Schedule() {
                         const empSched = viewMode === 'month'
                           ? Object.fromEntries(cycleDates.map(d => [d.key, schedule[d.weekKey]?.[emp.id]?.[d.dayKey] || '']))
                           : (weekSchedule[emp.id] || {});
+                        
+                        // Nếu là view tháng thì ta kiểm tra status của tuần đầu tiên chứa ngày đang render hoặc cứ mặc định nếu không rõ.
+                        // Để đơn giản, nếu view tuần thì lấy currentWeekStatus, view tháng thì check mỗi tuần
+                        let isDraftRow = false;
+                        if (viewMode === 'week') {
+                          const wKey = weekRecordKey(flowStore === 'ALL' ? '' : flowStore, currentWeek);
+                          const currentWeekStatus = (scheduleWeeks || {})[wKey]?.status || 'draft';
+                          isDraftRow = currentWeekStatus !== 'approved';
+                        }
+                        
                         const currentRow = absoluteRowIdx++;
                         return (
                           <EmployeeRow 
@@ -530,6 +549,7 @@ export default function Schedule() {
                             isAdmin={canEditGrid}
                             canEdit={canEditGrid}
                             days={activeDays}
+                            isDraft={isDraftRow}
                           />
                         );
                       })}

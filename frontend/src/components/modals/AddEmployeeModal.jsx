@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { MA_RE, STANDARD_ROLES } from '../../data/constants';
-import { canPickStore } from '../../lib/authSession';
+import { canPickStore, getUserDepts } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 
@@ -12,7 +12,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({ 
     id: '', 
     name: '', 
-    dept: pickStore ? (stores[0]?.id || '') : (user?.dept || ''), 
+    dept: pickStore ? (stores[0]?.id || '') : (getUserDepts(user)[0] || ''), 
     role: 'STFT',
     type: 'STFT', 
     maxH: 48 
@@ -23,10 +23,10 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
     if (isOpen) {
       setFormData(prev => ({ 
         ...prev, 
-        dept: pickStore ? (stores[0]?.id || '') : (user?.dept || '') 
+        dept: pickStore ? (stores[0]?.id || '') : (getUserDepts(user)[0] || '') 
       }));
     }
-  }, [isOpen, pickStore, user?.dept, stores]);
+  }, [isOpen, pickStore, user, stores]);
 
   const handleRoleChange = (selectedRole) => {
     const roleInfo = STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
@@ -65,7 +65,7 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
       setFormData({ 
         id: '', 
         name: '', 
-        dept: pickStore ? (stores[0]?.id || '') : (user?.dept || ''), 
+        dept: pickStore ? (stores[0]?.id || '') : (getUserDepts(user)[0] || ''), 
         role: 'STFT',
         type: 'STFT', 
         maxH: 48 

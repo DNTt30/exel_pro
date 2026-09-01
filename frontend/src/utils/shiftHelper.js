@@ -10,22 +10,31 @@ import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
  */
 export function normalizeShift(val) {
   if (!val) return { shift: '', covering_store: null };
+  
+  let shiftStr = '';
+  let covering_store = null;
+  
   if (typeof val === 'object') {
-    return {
-      shift: val.shift || '',
-      covering_store: val.covering_store || null
-    };
-  }
-  if (typeof val === 'string') {
-    if (val.includes('_')) {
-      const parts = val.split('_');
-      const covering_store = parts.pop();
-      const shift = parts.join('_');
-      return { shift, covering_store };
+    shiftStr = val.shift || '';
+    covering_store = val.covering_store || null;
+  } else if (typeof val === 'string') {
+    shiftStr = val;
+    if (shiftStr.includes('_')) {
+      const parts = shiftStr.split('_');
+      covering_store = parts.pop();
+      shiftStr = parts.join('_');
     }
-    return { shift: val, covering_store: null };
   }
-  return { shift: '', covering_store: null };
+
+  // Chuẩn hóa viết tắt (Từ hình Excel thực tế)
+  shiftStr = shiftStr.trim();
+  if (shiftStr === '1') shiftStr = '6-14';
+  if (shiftStr === '2') shiftStr = '14-22';
+  if (shiftStr === '3') shiftStr = '22-6';
+  if (shiftStr === '0') shiftStr = 'off';
+  if (shiftStr.toLowerCase() === 'off') shiftStr = 'off';
+
+  return { shift: shiftStr, covering_store };
 }
 
 /**
@@ -62,6 +71,16 @@ export function formatShiftTime(val) {
 export function getShiftHours(shiftCode) {
   if (!shiftCode || shiftCode === 'off') return 0;
   if (SHIFTS[shiftCode]) return SHIFTS[shiftCode].hours;
+
+  // Xử lý ca đúp (VD: 14-22/22-6)
+  if (shiftCode.includes('/')) {
+    const subShifts = shiftCode.split('/');
+    let total = 0;
+    subShifts.forEach(sub => {
+      total += getShiftHours(sub.trim());
+    });
+    return total;
+  }
 
   const match = shiftCode.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
   if (match) {

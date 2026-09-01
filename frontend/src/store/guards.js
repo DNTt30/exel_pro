@@ -22,10 +22,12 @@ export function assertCanEditShift(state, empId, weekDate) {
   const user = state.user;
   if (!user) throw new Error('Chưa đăng nhập');
   const emp = (state.employees || []).find(e => e.id === empId);
-  assertWeekEditable(state, emp?.dept || user.dept, weekDate);
+  const myDepts = getUserDepts(user);
+  const targetDept = emp?.dept || myDepts[0] || '';
+  assertWeekEditable(state, targetDept, weekDate);
   if (user.role === 'admin') return;
   if (userIsManager(user)) {
-    if (emp && emp.dept && user.dept && emp.dept !== user.dept && empId !== user.id) {
+    if (emp && emp.dept && myDepts.length > 0 && !myDepts.includes(emp.dept) && empId !== user.id) {
       throw new Error('Không có quyền sửa lịch cửa hàng khác');
     }
     return;
@@ -62,10 +64,10 @@ export function assertCanManageStore(state) {
 export function assertCanManageEmpInDept(state, empDept) {
   assertCanManageStaff(state);
   const user = state.user;
-  if (isBuiltinStoreManager(user)) return; // admin toàn quyền
-  if (!empDept) return; // dept trống → để Supabase RLS quyết định
-  const userDepts = getUserDepts(user);
-  if (userDepts.length > 0 && !userDepts.includes(empDept)) {
-    throw new Error(`Không có quyền quản lý nhân viên cửa hàng ${empDept}`);
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+  const myDepts = getUserDepts(user);
+  if (empDept && myDepts.length > 0 && !myDepts.includes(empDept)) {
+    throw new Error('Nhân viên không thuộc cửa hàng quản lý');
   }
 }

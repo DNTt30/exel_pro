@@ -5,21 +5,25 @@ import { AlertTriangle, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
 import { WEEK_DAYS } from '../data/constants';
 import { normalizeShift, getShiftHours } from '../utils/shiftHelper';
 import { canPickStore } from '../lib/authSession';
+import { visibleDeptIds } from '../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
 
 export default function ManagerActionList({ storeId = 'ALL' }) {
-  const { user, feedbacks, shiftSwaps, employees, schedule, currentWeek } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, shiftSwaps: s.shiftSwaps, employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek })));
+  const { user, feedbacks, shiftSwaps, employees, schedule, currentWeek, stores } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, shiftSwaps: s.shiftSwaps, employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek, stores: s.stores })));
   const pickStore = canPickStore(user);
   const effectiveStore = (!pickStore && user?.dept) ? user.dept : storeId;
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
 
   const items = useMemo(() => {
     const list = [];
+    const allowedDepts = new Set(visibleDeptIds(user, stores));
+
     const pendingFb = (feedbacks || []).filter(f => 
-      f.status === 'pending' && (effectiveStore === 'ALL' || f.dept === effectiveStore)
+      f.status === 'pending' && 
+      (effectiveStore === 'ALL' ? allowedDepts.has(f.dept) : f.dept === effectiveStore)
     );
     if (pendingFb.length) {
       list.push({
@@ -32,7 +36,8 @@ export default function ManagerActionList({ storeId = 'ALL' }) {
     }
 
     const pendingSwaps = (shiftSwaps || []).filter(s => 
-      s.status === 'pending_manager' && (effectiveStore === 'ALL' || s.store === effectiveStore)
+      s.status === 'pending_manager' && 
+      (effectiveStore === 'ALL' ? allowedDepts.has(s.store) : s.store === effectiveStore)
     );
     if (pendingSwaps.length) {
       list.push({
@@ -48,7 +53,7 @@ export default function ManagerActionList({ storeId = 'ALL' }) {
     employees.forEach(emp => {
       const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
       if (!isPT) return;
-      if (effectiveStore !== 'ALL' && emp.dept !== effectiveStore) return;
+      if (effectiveStore === 'ALL' ? !allowedDepts.has(emp.dept) : emp.dept !== effectiveStore) return;
       let h = 0;
       WEEK_DAYS.forEach(d => {
         const { shift } = normalizeShift(weekSched[emp.id]?.[d]);

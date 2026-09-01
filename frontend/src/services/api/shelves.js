@@ -38,7 +38,7 @@ function mapShelfItem(row) {
 export async function getShelves(opts = {}) {
   try {
     let q = db().from('store_shelves').select('*').order('code', { ascending: true });
-    if (opts.assigneeId) q = q.eq('assignee_id', opts.assigneeId);
+    if (opts.assigneeId) q = q.ilike('assignee_id', `%${opts.assigneeId}%`);
     else if (opts.storeId) q = q.eq('store_id', opts.storeId);
     const { data, error } = await q;
     if (error) {
@@ -113,12 +113,6 @@ export async function deleteShelf(id) {
 }
 
 export async function replaceShelfItems(shelfId, storeId, rows, empId) {
-  // BUG-02 fix: backup dữ liệu cũ trước khi xóa để có thể phục hồi nếu insert thất bại
-  const { data: backup } = await db().from('shelf_items').select('*').eq('shelf_id', shelfId);
-
-  const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
-  if (delErr) throw delErr;
-
   const payload = (rows || [])
     .filter(r => String(r.productName || '').trim())
     .map(r => ({
@@ -132,7 +126,37 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
       note: r.note || '',
       updated_by: empId || null
     }));
-  if (!payload.length) return [];
+
+  if (!payload.length) {
+    const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
+    if (delErr) throw delErr;
+    return [];
+  }
+
+  // 1. Thử gọi RPC atomic (BUG-02 fix)
+  const { data: rpcData, error: rpcErr } = await db().rpc('replace_shelf_items_atomic', {
+    p_shelf_id: shelfId,
+    p_store_id: storeId,
+    p_items: payload,
+    p_updated_by: empId || ''
+  });
+
+  if (!rpcErr) {
+    return (rpcData || []).map(mapShelfItem);
+  }
+
+  // Nếu RPC chưa được tạo trong DB, lỗi sẽ chứa "function ... does not exist" -> Fallback về logic cũ
+  if (!rpcErr.message?.includes('function') && !rpcErr.message?.includes('does not exist')) {
+    throw rpcErr;
+  }
+
+  console.warn('RPC replace_shelf_items_atomic chưa có. Đang fallback về logic cũ.');
+
+  // 2. Fallback: backup dữ liệu cũ trước khi xóa để có thể phục hồi nếu insert thất bại
+  const { data: backup } = await db().from('shelf_items').select('*').eq('shelf_id', shelfId);
+
+  const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
+  if (delErr) throw delErr;
 
   const { data, error } = await db().from('shelf_items').insert(payload).select();
   if (error) {

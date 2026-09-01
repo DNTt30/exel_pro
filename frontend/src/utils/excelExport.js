@@ -3,109 +3,115 @@ import { normalizeShift } from './shiftHelper';
 
 /**
  * Xuất lịch làm việc ra file Excel (.xls) có đầy đủ định dạng bảng biểu, màu sắc ca làm việc,
- * header ngày tháng chi tiết và KHÔNG bị lỗi Excel tự động chuyển 6-14 thành ngày tháng (14-Jun).
+ * header ngày tháng chi tiết và KHÔNG bị lỗi Excel tự động chuyển 6-14 thành ngày tháng.
  */
-export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, weekSchedule }) {
+export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, weekSchedule, userName = 'OFC' }) {
   const parts = currentWeek.split('-');
   const y = parseInt(parts[0], 10);
   const m = parseInt(parts[1], 10);
   const d = parseInt(parts[2], 10);
 
   const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  const dayNameMap = {'T2':'THỨ HAI', 'T3':'THỨ BA', 'T4':'THỨ TƯ', 'T5':'THỨ NĂM', 'T6':'THỨ SÁU', 'T7':'THỨ BẢY', 'CN':'CHỦ NHẬT'};
+  
   const weekStartDate = new Date(y, m - 1, d);
 
-  // Tạo danh sách 7 ngày kèm ngày/tháng cụ thể
+  // Tạo header 7 ngày
   const dayColumns = WEEK_DAYS.map((dayKey, idx) => {
     const dateObj = new Date(weekStartDate);
     dateObj.setDate(weekStartDate.getDate() + idx);
-    const dNum = dateObj.getDate().toString().padStart(2, '0');
+    const dNum = dateObj.getDate().toString();
+    const dPad = dNum.padStart(2, '0');
     const mNum = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const yNum = dateObj.getFullYear();
+    
+    // Ngày đầu tuần hiển thị full năm: 24/8/2026, các ngày sau hiển thị 25/08
+    const dateStr = idx === 0 ? `${dNum}/${dateObj.getMonth() + 1}/${yNum}` : `${dPad}/${mNum}`;
+    
     return {
       dayKey,
-      dateStr: `${dNum}/${mNum}`,
-      header: `${dayKey} (${dNum}/${mNum})`
+      html: `${dateStr}<br/>${dayNameMap[dayKey]}`
     };
   });
 
-  const weekEndDate = new Date(weekStartDate);
-  weekEndDate.setDate(weekStartDate.getDate() + 6);
-  const startStr = `${weekStartDate.getDate().toString().padStart(2, '0')}/${(weekStartDate.getMonth() + 1).toString().padStart(2, '0')}`;
-  const endStr = `${weekEndDate.getDate().toString().padStart(2, '0')}/${(weekEndDate.getMonth() + 1).toString().padStart(2, '0')}`;
-  const weekRangeLabel = `${startStr} → ${endStr}/${y}`;
-
-  // Helper lấy class/style màu cho ca làm việc
-  const getShiftStyle = (rawVal) => {
-    if (!rawVal) return 'color: #94a3b8;';
+  // Khớp màu ca theo đúng Excel Template
+  const getShiftStyle = (rawVal, empType) => {
+    if (!rawVal) return 'background-color: #FFFFFF; color: #000000;';
     const { shift, covering_store } = normalizeShift(rawVal);
-    if (!shift || shift === 'off') return 'color: #94a3b8;';
-    if (covering_store) return 'background-color: #fef08a; color: #854d0e; font-weight: bold;'; // Chi viện
-    if (shift === '6-14') return 'background-color: #bbf7d0; color: #166534; font-weight: bold;';
-    if (shift === '14-22') return 'background-color: #bfdbfe; color: #1e40af; font-weight: bold;';
-    if (shift === '10-18') return 'background-color: #fed7aa; color: #9a3412; font-weight: bold;';
-    if (shift === '22-6') return 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
-    return 'background-color: #e2e8f0; color: #334155; font-weight: bold;';
+    if (!shift || shift.toLowerCase() === 'off') return 'background-color: #FFFFFF; color: #000000;';
+    
+    if (covering_store) return 'background-color: #FFFF00; color: #000000; font-weight: bold;'; // Hỗ trợ (Vàng)
+    
+    const s = shift.toLowerCase();
+    
+    // Ca 1 (Sáng): Xanh lá #00FF00
+    if (['6-14', '5-14', '6-10', '10-14', '5-10', '6-12', '14-18h'].includes(s) || s.startsWith('6-') || s.startsWith('5-') || s === '10-14') {
+      return 'background-color: #00FF00; color: #000000; font-weight: bold;';
+    }
+    // Ca 2 (Chiều): Xanh lơ #00FFFF
+    if (['14-22', '14-18', '18-22', '10-18', '14-22/22-6', '14h-18h'].includes(s) || s.startsWith('14-') || s.startsWith('18-') || s.startsWith('10-18')) {
+      return 'background-color: #00FFFF; color: #000000; font-weight: bold;';
+    }
+    // Ca 3 (Đêm): Xanh dương đậm #4169E1
+    if (['22-6', '12-20'].includes(s) || s.startsWith('22-')) {
+      return 'background-color: #4169E1; color: #FFFFFF; font-weight: bold;';
+    }
+    
+    // CSR NEW (Đỏ) - nếu có vai trò đặc biệt
+    if (empType === 'CSR_NEW' || empType === 'CSR NEW') {
+      return 'background-color: #FF0000; color: #FFFFFF; font-weight: bold;';
+    }
+
+    return 'background-color: #FFFFFF; color: #000000; font-weight: bold;';
   };
 
   let rowsHtml = '';
-  let globalIndex = 1;
 
   Object.entries(groupedEmps).forEach(([dept, emps]) => {
-    // Header Cửa Hàng
+    // Header dòng của từng cửa hàng
     rowsHtml += `
-      <tr style="background-color: #e0e7ff; font-weight: bold; color: #1e3a8a;">
-        <td colspan="${dayColumns.length + 6}" style="text-align: left; padding: 8px 12px; font-size: 11pt; border: 1px solid #94a3b8;">
-          🏬 CỬA HÀNG: ${dept} (${emps.length} nhân sự)
-        </td>
+      <tr style="background-color: #92D050; font-weight: bold; text-align: center;">
+        <td style="border: 1px solid #000000; width: 100px;">Mã nhân viên</td>
+        <td style="border: 1px solid #000000; width: 180px;">Họ và Tên</td>
+        <td style="border: 1px solid #000000; width: 80px;">Phòng ban</td>
+        <td style="border: 1px solid #000000; width: 80px;">Loại NV</td>
+        ${dayColumns.map(col => `<td style="border: 1px solid #000000; width: 80px;">${col.html}</td>`).join('')}
       </tr>
     `;
 
     emps.forEach((emp) => {
       const empSched = weekSchedule[emp.id] || {};
-      let totalH = 0;
-      let shiftCount = 0;
 
       const dayCells = dayColumns.map(col => {
         const rawVal = empSched[col.dayKey] || '';
         const { shift, covering_store } = normalizeShift(rawVal);
+        let display = shift === 'off' ? 'off' : shift;
+        if (covering_store) display += ` ${covering_store}`;
         
-        if (shift && shift !== 'off') {
-          shiftCount++;
-          if (SHIFTS[shift]) totalH += SHIFTS[shift].hours;
-          else {
-            const match = shift.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
-            if (match) {
-              let sH = parseInt(match[1], 10);
-              let eH = parseInt(match[2], 10);
-              if (eH < sH) eH += 24;
-              totalH += (eH - sH);
-            }
-          }
-        }
-        const style = getShiftStyle(rawVal);
-        const display = covering_store ? `${shift} ${covering_store}` : (shift || '-');
-        // mso-number-format: "\@" đảm bảo Excel đọc đúng dạng Text, không biến 6-14 thành 14-Jun
-        return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${style}">${display}</td>`;
+        let style = getShiftStyle(rawVal, emp.type);
+        
+        return `<td style="border: 1px solid #000000; text-align: center; mso-number-format: '\\@'; ${style}">${display || ''}</td>`;
       }).join('');
-
-      const isPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
-      const isOver = isPT && totalH > 23;
-      const totalStyle = isOver 
-        ? 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;' 
-        : 'background-color: #f8fafc; color: #1e40af; font-weight: bold;';
 
       rowsHtml += `
         <tr>
-          <td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@';">${globalIndex++}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; mso-number-format: '\\@';">${emp.id}</td>
-          <td style="border: 1px solid #94a3b8; text-align: left; font-weight: bold; padding-left: 8px;">${emp.name}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center;">${emp.role || emp.type || 'STPT'}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; color: #2563eb;">${emp.dept || dept}</td>
+          <td style="border: 1px solid #000000; text-align: left; mso-number-format: '\\@';">${emp.id}</td>
+          <td style="border: 1px solid #000000; text-align: left; padding-left: 5px;">${emp.name}</td>
+          <td style="border: 1px solid #000000; text-align: left;">${emp.dept || dept}</td>
+          <td style="border: 1px solid #000000; text-align: left;">${emp.role || emp.type || 'STPT'}</td>
           ${dayCells}
-          <td style="border: 1px solid #94a3b8; text-align: center; ${totalStyle}">${isOver ? '⚠️ ' : ''}${totalH}h</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; background-color: #f8fafc;">${shiftCount} ca</td>
         </tr>
       `;
     });
+
+    // Thêm các dòng trống giữa các cửa hàng (để giống template)
+    rowsHtml += `
+      <tr><td colspan="11"></td></tr>
+      <tr><td colspan="11"></td></tr>
+      <tr><td colspan="11"></td></tr>
+      <tr><td colspan="11"></td></tr>
+      <tr><td colspan="11"></td></tr>
+    `;
   });
 
   const html = `
@@ -113,40 +119,47 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
     <head>
       <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
       <style>
-        table { border-collapse: collapse; font-family: 'Segoe UI', Calibri, Arial, sans-serif; font-size: 10pt; width: 100%; }
-        th, td { border: 1px solid #94a3b8; padding: 6px 8px; text-align: center; }
-        th { background-color: #cbd5e1; font-weight: bold; color: #0f172a; font-size: 10pt; }
-        .main-title { font-size: 14pt; font-weight: bold; background-color: #1e3a8a; color: #ffffff; text-align: center; height: 40px; }
-        .sub-info { font-size: 9.5pt; font-style: italic; background-color: #f1f5f9; color: #334155; text-align: left; padding: 6px 12px; }
+        table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; }
+        td { white-space: nowrap; vertical-align: middle; }
       </style>
     </head>
     <body>
       <table>
-        <thead>
-          <tr>
-            <th colspan="${dayColumns.length + 7}" class="main-title" style="border: 1px solid #1e3a8a;">
-              BẢNG PHÂN CÔNG LỊCH LÀM VIỆC - TUẦN: ${weekRangeLabel}
-            </th>
-          </tr>
-          <tr>
-            <th colspan="${dayColumns.length + 7}" class="sub-info" style="border: 1px solid #cbd5e1;">
-              Cửa hàng: <strong>${deptName || 'Toàn bộ cửa hàng'}</strong> | Ngày xuất file: ${new Date().toLocaleDateString('vi-VN')} | Đơn vị: Chuỗi Cửa Hàng OFC
-            </th>
-          </tr>
-          <tr style="background-color: #cbd5e1;">
-            <th style="width: 45px; border: 1px solid #94a3b8;">STT</th>
-            <th style="width: 90px; border: 1px solid #94a3b8;">Mã NV</th>
-            <th style="width: 180px; text-align: left; padding-left: 8px; border: 1px solid #94a3b8;">Họ và Tên</th>
-            <th style="width: 70px; border: 1px solid #94a3b8;">Vị trí</th>
-            <th style="width: 80px; border: 1px solid #94a3b8;">Cửa hàng</th>
-            ${dayColumns.map(col => `<th style="width: 75px; border: 1px solid #94a3b8; ${col.dayKey === 'CN' ? 'background-color: #fed7aa; color: #9a3412;' : ''}">${col.header}</th>`).join('')}
-            <th style="width: 75px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Tổng giờ</th>
-            <th style="width: 60px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Số ca</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
+        <!-- Row 1: Title and Legend (ca 1) -->
+        <tr>
+          <td colspan="4" style="font-weight: bold; font-size: 12pt; text-align: left;">Lịch làm việc SM ${userName}</td>
+          <td colspan="7"></td>
+          <td style="background-color: #00FF00; color: #000000; font-weight: bold; text-align: left; border: 1px solid #000000;">ca 1</td>
+        </tr>
+        <!-- Row 2: ca 2 -->
+        <tr>
+          <td colspan="11"></td>
+          <td style="background-color: #00FFFF; color: #000000; font-weight: bold; text-align: left; border: 1px solid #000000;">ca 2</td>
+        </tr>
+        <!-- Row 3: ca 3 -->
+        <tr>
+          <td colspan="11"></td>
+          <td style="background-color: #4169E1; color: #FFFFFF; font-weight: bold; text-align: left; border: 1px solid #000000;">ca 3</td>
+        </tr>
+        <!-- Row 4: CSR NEW -->
+        <tr>
+          <td colspan="11"></td>
+          <td style="background-color: #FF0000; color: #FFFFFF; font-weight: bold; text-align: left; border: 1px solid #000000;">CSR NEW</td>
+        </tr>
+        <!-- Row 5: Suport -->
+        <tr>
+          <td colspan="11"></td>
+          <td style="background-color: #FFFF00; color: #000000; font-weight: bold; text-align: left; border: 1px solid #000000;">Suport</td>
+        </tr>
+        <!-- Row 6: TRANINING -->
+        <tr>
+          <td colspan="11"></td>
+          <td style="background-color: #8A2BE2; color: #FFFFFF; font-weight: bold; text-align: left; border: 1px solid #000000;">TRANINING</td>
+        </tr>
+        <tr><td colspan="12"></td></tr>
+        
+        <!-- Main Table Body -->
+        ${rowsHtml}
       </table>
     </body>
     </html>
@@ -158,6 +171,7 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
   link.download = `Lich_Lam_Viec_${deptName || 'OFC'}_${currentWeek}.xls`;
   link.click();
 }
+
 
 /**
  * Xuất bảng chấm công (31 ngày chu kỳ 26-25) ra file Excel (.xls) có kẻ bảng, màu sắc và bảo vệ text.

@@ -1120,6 +1120,62 @@ Yêu cầu định dạng:
     const data = await response.json();
     return data.message?.content || localReply;
   } catch {
-    return localReply;
+    // Ollama không chạy → thử Hugging Face GS25 Model
+    return askGS25HFModel(question, systemPrompt, chatHistory, localReply);
+  }
+}
+
+/**
+ * Gọi model GS25 đã train trên Hugging Face Inference API.
+ * Được kích hoạt khi model MiniMind GS25 đã được deploy.
+ * Cấu hình trong .env: VITE_GS25_AI_MODEL_URL và VITE_HF_TOKEN
+ */
+export async function askGS25HFModel(question, systemPrompt, chatHistory = [], fallbackReply = '') {
+  const modelUrl = import.meta.env.VITE_GS25_AI_MODEL_URL;
+  const hfToken = import.meta.env.VITE_HF_TOKEN;
+
+  // Nếu chưa cấu hình model URL → bỏ qua
+  if (!modelUrl) return fallbackReply;
+
+  const messages = [
+    { role: 'system', content: systemPrompt || 'Bạn là trợ lý AI nghiệp vụ GS25.' },
+    ...chatHistory.map(m => ({
+      role: m.sender === 'ai' ? 'assistant' : 'user',
+      content: m.text
+    })),
+    { role: 'user', content: question }
+  ];
+
+  try {
+    const response = await fetch(modelUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
+      },
+      body: JSON.stringify({
+        inputs: question,
+        parameters: {
+          max_new_tokens: 400,
+          temperature: 0.7,
+          return_full_text: false
+        }
+      }),
+      signal: AbortSignal.timeout(15000) // 15s timeout cho HF
+    });
+
+    if (!response.ok) return fallbackReply;
+    const data = await response.json();
+
+    // HF Inference API trả về array
+    if (Array.isArray(data) && data[0]?.generated_text) {
+      return data[0].generated_text;
+    }
+    // Hoặc dạng object trực tiếp
+    if (data?.generated_text) return data.generated_text;
+
+    return fallbackReply;
+  } catch {
+    return fallbackReply;
   }
 }

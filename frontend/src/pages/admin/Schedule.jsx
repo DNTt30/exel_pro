@@ -96,6 +96,7 @@ export default function Schedule() {
 
   // Nhóm nhân viên theo cửa hàng + xử lý mượn nhân sự
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole, weekSchedule);
+  const allVisibleEmployees = useMemo(() => Object.values(groupedEmps).flat(), [groupedEmps]);
 
   // Xử lý thay đổi ca làm việc (Lưu dạng Object nếu là ca chi viện)
   const [viewMode, setViewMode] = useState('week');
@@ -516,7 +517,7 @@ export default function Schedule() {
             </button>
             <button
               type="button"
-              onClick={() => exportScheduleToPDF(currentWeek, filteredEmployees, schedule[currentWeek] || {}, filterDept)}
+              onClick={() => exportScheduleToPDF(currentWeek, allVisibleEmployees, schedule[currentWeek] || {}, filterDept)}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-white text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
               title="Xuất file PDF để in"
             >

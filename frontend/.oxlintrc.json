@@ -1,8 +1,56 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "oxc"],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "globals": {
+    "window": "readonly",
+    "document": "readonly",
+    "console": "readonly",
+    "alert": "readonly",
+    "confirm": "readonly",
+    "prompt": "readonly",
+    "setTimeout": "readonly",
+    "clearTimeout": "readonly",
+    "setInterval": "readonly",
+    "clearInterval": "readonly",
+    "localStorage": "readonly",
+    "sessionStorage": "readonly",
+    "performance": "readonly",
+    "FileReader": "readonly",
+    "Blob": "readonly",
+    "URL": "readonly",
+    "fetch": "readonly",
+    "process": "readonly",
+    "require": "readonly",
+    "module": "readonly",
+    "exports": "readonly",
+    "__dirname": "readonly",
+    "vi": "readonly",
+    "describe": "readonly",
+    "it": "readonly",
+    "test": "readonly",
+    "expect": "readonly",
+    "beforeEach": "readonly",
+    "afterEach": "readonly",
+    "beforeAll": "readonly",
+    "afterAll": "readonly"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "*.cjs",
+    "seed_*.js",
+    "tailwind.config.js",
+    "postcss.config.js"
+  ],
   "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "no-undef": "error",
+    "unicorn/no-empty-file": "off",
+    "unicorn/no-useless-fallback-in-spread": "off",
+    "unicorn/no-new-array": "off",
+    "unicorn/prefer-string-starts-ends-with": "off",
+    "unicorn/no-invalid-fetch-options": "off"
   }
 }

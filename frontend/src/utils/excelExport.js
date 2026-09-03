@@ -1,5 +1,5 @@
-import { SHIFTS } from '../data/initialData';
 import { normalizeShift } from './shiftHelper';
+import { WEEK_DAYS } from '../data/constants';
 
 /**
  * Xuất lịch làm việc ra file Excel (.xls) có đầy đủ định dạng bảng biểu, màu sắc ca làm việc,
@@ -11,7 +11,6 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
   const m = parseInt(parts[1], 10);
   const d = parseInt(parts[2], 10);
 
-  const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   const dayNameMap = {'T2':'THỨ HAI', 'T3':'THỨ BA', 'T4':'THỨ TƯ', 'T5':'THỨ NĂM', 'T6':'THỨ SÁU', 'T7':'THỨ BẢY', 'CN':'CHỦ NHẬT'};
   
   const weekStartDate = new Date(y, m - 1, d);

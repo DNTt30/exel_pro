@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect } from 'react';
 import { SHIFTS } from '../data/initialData';
-import { getRoleBadgeInfo } from '../data/constants';
+import { getRoleBadgeInfo, SCHEDULE_RULES, NIGHT_SHIFT_MULTIPLIER, DEFAULT_PT_HOURLY_RATE } from '../data/constants';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
 /**
@@ -62,7 +62,7 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       if (num > 0) {
         // Phụ cấp ca đêm (x1.3)
         const isNight = String(val).includes('22-6');
-        const effectiveHours = isNight ? num * 1.3 : num;
+        const effectiveHours = isNight ? num * NIGHT_SHIFT_MULTIPLIER : num;
 
         if (isPT) totalPT += effectiveHours;
         else totalFT += effectiveHours;
@@ -70,11 +70,11 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
     }
   });
 
-  const isPTOvertimed = isPT && totalPT > 91;
+  const isPTOvertimed = isPT && totalPT > SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH;
   const tongCong = totalPT + totalFT;
   
   // Ước tính lương (Ví dụ cơ bản: 25k/h cho PT)
-  const estSalary = isPT ? Math.round(totalPT * 25000).toLocaleString('vi-VN') + 'đ' : '—';
+  const estSalary = isPT ? Math.round(totalPT * DEFAULT_PT_HOURLY_RATE).toLocaleString('vi-VN') + 'đ' : '—';
 
   const badgeInfo = getRoleBadgeInfo(emp.role || emp.type);
 

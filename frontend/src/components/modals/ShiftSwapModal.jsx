@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
-import { RefreshCw, ArrowRightLeft, AlertTriangle } from 'lucide-react';
+import { RefreshCw, ArrowRightLeft, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { getUserDepts } from '../../lib/authSession';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import { rankSwapPartners } from '../../utils/shiftSuggestionHelper';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 import { shiftSwapSchema } from '../../schemas/validationSchemas';
@@ -16,8 +17,6 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   const { user, employees, schedule, addShiftSwap } = useStore(useShallow((s) => ({ user: s.user, employees: s.employees, schedule: s.schedule, addShiftSwap: s.addShiftSwap })));
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
   const mySched = weekSched[user?.id] || EMPTY_SCHED;
-  const myDepts = getUserDepts(user);
-
   // 1. Chỉ lấy những ngày BẢN THÂN CÓ CA LÀM VIỆC (khác OFF)
   const myShiftsList = useMemo(() => {
     const parts = currentWeek.split('-').map(Number);
@@ -45,6 +44,7 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
 
   // 2. Chỉ lấy những đồng nghiệp trong cùng cửa hàng CÓ ÍT NHẤT 1 CA LÀM VIỆC trong tuần
   const colleaguesWithShifts = useMemo(() => {
+    const myDepts = getUserDepts(user);
     return employees.filter(e => {
       if (e.id === user?.id || (myDepts.length > 0 && !myDepts.includes(e.dept))) return false;
       const empSched = weekSched[e.id] || {};
@@ -60,6 +60,20 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   const [toDay, setToDay] = useState('');
   const [reason, setReason] = useState('');
 
+  // 2b. Lấy ca đang chọn của bản thân và xếp hạng đồng nghiệp
+  const activeMyShift = useMemo(() => {
+    return myShiftsList.find(s => s.dayKey === fromDay);
+  }, [myShiftsList, fromDay]);
+
+  const rankedColleagues = useMemo(() => {
+    return rankSwapPartners({
+      myDayKey: fromDay || 'T2',
+      myShiftHours: activeMyShift?.hours || 8,
+      colleagues: colleaguesWithShifts,
+      weekSched
+    });
+  }, [fromDay, activeMyShift, colleaguesWithShifts, weekSched]);
+
   // Tự động gán mặc định khi danh sách thay đổi
   useEffect(() => {
     if (myShiftsList.length > 0 && !fromDay) {
@@ -68,10 +82,10 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   }, [myShiftsList, fromDay]);
 
   useEffect(() => {
-    if (colleaguesWithShifts.length > 0 && !toEmpId) {
-      setToEmpId(colleaguesWithShifts[0].id);
+    if (rankedColleagues.length > 0 && (!toEmpId || !rankedColleagues.some(c => c.id === toEmpId))) {
+      setToEmpId(rankedColleagues[0].id);
     }
-  }, [colleaguesWithShifts, toEmpId]);
+  }, [rankedColleagues, toEmpId]);
 
   // 3. Ca của đồng nghiệp được chọn (Chỉ lấy ngày ĐỒNG NGHIỆP CÓ CA LÀM VIỆC)
   const partnerSched = useMemo(() => {
@@ -203,18 +217,47 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
         {!hasNoMyShifts && !hasNoColleagues && (
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">2. Chọn đồng nghiệp đổi cùng (Có ca tuần này):</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">2. Chọn đồng nghiệp đổi cùng:</label>
+                <span className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
+                  <Sparkles size={11} className="text-amber-500" /> Tự động xếp theo mức độ phù hợp
+                </span>
+              </div>
               <select
                 className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 value={toEmpId}
                 onChange={e => setToEmpId(e.target.value)}
               >
-                {colleaguesWithShifts.map(c => (
+                {rankedColleagues.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.id} - {c.role || c.type})
+                    {c.swapScore === 100 ? '⭐ ' : ''}{c.name} ({c.id}) — {c.swapBadge}
                   </option>
                 ))}
               </select>
+
+              {(() => {
+                const partnerRanked = rankedColleagues.find(c => c.id === toEmpId);
+                if (!partnerRanked) return null;
+                return (
+                  <div className={`mt-2 p-2 rounded-lg text-xs font-semibold flex items-center justify-between border ${
+                    partnerRanked.badgeType === 'recommended'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : partnerRanked.badgeType === 'warning'
+                        ? 'bg-amber-50 border-amber-200 text-amber-800'
+                        : 'bg-slate-100 border-slate-200 text-slate-600'
+                  }`}>
+                    <div className="flex items-center gap-1.5">
+                      {partnerRanked.badgeType === 'recommended' 
+                        ? <CheckCircle2 size={13} className="text-emerald-600" /> 
+                        : <AlertTriangle size={13} className="text-amber-600" />}
+                      <span>{partnerRanked.swapBadge}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Hiện có {partnerRanked.currentHours}h
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div>

@@ -6,7 +6,9 @@ import {
   calculateStaffingGap,
   validateEmployeeSchedule,
   buildSwappedSchedules,
-  mergeAiSchedule
+  mergeAiSchedule,
+  parseShiftForCell,
+  calculateEmployeeWeeklyHours
 } from '../utils/shiftHelper';
 import { getCurrentMondayWeek, getWeekAndDayKey, getPayrollCycleDates, getStaffingMatrix, normalizeStaffingConfig, suggestStaffingFromDemand } from '../data/constants';
 
@@ -110,6 +112,90 @@ describe('Shift Helper Logic & Business Rules', () => {
       const validation = validateEmployeeSchedule(ptEmp, 20, 3, false);
       expect(validation.hasErrors).toBe(false);
       expect(validation.hasWarnings).toBe(false);
+    });
+
+    it('should flag PT month view when hours > 91', () => {
+      const ptEmp = { id: 'pt1', type: 'STPT' };
+      const validation = validateEmployeeSchedule(ptEmp, 95, 12, true);
+      expect(validation.hasErrors).toBe(true);
+      expect(validation.warnings.some(w => w.badge.includes('> 91h'))).toBe(true);
+    });
+
+    it('should flag FT when hours < 48 or shifts < 6 in weekly view', () => {
+      const ftEmp = { id: 'ft1', type: 'STFT' };
+      const underHours = validateEmployeeSchedule(ftEmp, 40, 5, false);
+      expect(underHours.hasWarnings).toBe(true);
+      expect(underHours.warnings.some(w => w.badge.includes('< 48h'))).toBe(true);
+      expect(underHours.warnings.some(w => w.badge.includes('< 6 ca'))).toBe(true);
+
+      const validFT = validateEmployeeSchedule(ftEmp, 48, 6, false);
+      expect(validFT.hasWarnings).toBe(false);
+      expect(validFT.hasErrors).toBe(false);
+    });
+  });
+
+  describe('parseShiftForCell (Rendering Logic for Cells & Support Staff)', () => {
+    it('returns empty display for falsy values', () => {
+      expect(parseShiftForCell({ id: '1' }, '')).toEqual({ display: '', isBorrowedSlot: false, colorClass: '' });
+      expect(parseShiftForCell({ id: '1' }, null)).toEqual({ display: '', isBorrowedSlot: false, colorClass: '' });
+    });
+
+    it('renders normal shift at home store', () => {
+      const cell = parseShiftForCell({ id: '1', dept: 'VN0485' }, '6-14');
+      expect(cell.display).toBe('6-14');
+      expect(cell.isBorrowedSlot).toBe(false);
+      expect(cell.colorClass).toBe('');
+    });
+
+    it('renders italic gray shift at home store when employee goes to support another store', () => {
+      const cell = parseShiftForCell({ id: '1', dept: 'VN0485' }, { shift: '6-14', covering_store: 'VN0497' });
+      expect(cell.display).toBe('6-14 VN0497');
+      expect(cell.isBorrowedSlot).toBe(true);
+      expect(cell.colorClass).toContain('bg-slate-100');
+      expect(cell.colorClass).toContain('italic');
+    });
+
+    it('renders orange badge shift at destination store when borrowed', () => {
+      const borrowedEmp = { id: '1', dept: 'VN0485', isBorrowedTo: 'VN0497' };
+      const cell = parseShiftForCell(borrowedEmp, { shift: '6-14', covering_store: 'VN0497' });
+      expect(cell.display).toBe('6-14');
+      expect(cell.isBorrowedSlot).toBe(true);
+      expect(cell.colorClass).toBe('bg-orange-50 text-orange-700');
+    });
+
+    it('renders empty slot at destination store if employee works elsewhere or normal shift', () => {
+      const borrowedEmp = { id: '1', dept: 'VN0485', isBorrowedTo: 'VN0497' };
+      const normalShift = parseShiftForCell(borrowedEmp, '6-14');
+      expect(normalShift.display).toBe('');
+      expect(normalShift.colorClass).toBe('bg-slate-100');
+    });
+  });
+
+  describe('calculateEmployeeWeeklyHours', () => {
+    it('calculates hours for home store employee and ignores covering shifts sent out', () => {
+      const emp = { id: 'e1', dept: 'VN0485' };
+      const sched = {
+        T2: '6-14', // 8h
+        T3: '14-22', // 8h
+        T4: { shift: '6-14', covering_store: 'VN0497' }, // Chi viện VN0497 -> không tính vào VN0485
+        T5: 'off'
+      };
+      const result = calculateEmployeeWeeklyHours(emp, sched);
+      expect(result.totalHours).toBe(16);
+      expect(result.totalShifts).toBe(2);
+    });
+
+    it('calculates hours for borrowed employee only matching isBorrowedTo store', () => {
+      const borrowedEmp = { id: 'e1', dept: 'VN0485', isBorrowedTo: 'VN0497' };
+      const sched = {
+        T2: '6-14', // làm tại CH gốc VN0485 -> không tính cho VN0497
+        T3: { shift: '6-14', covering_store: 'VN0497' }, // 8h cho VN0497
+        T4: { shift: '14-22', covering_store: 'VN0497' }, // 8h cho VN0497
+        T5: { shift: '6-14', covering_store: 'VN0999' } // làm cho CH khác -> không tính
+      };
+      const result = calculateEmployeeWeeklyHours(borrowedEmp, sched);
+      expect(result.totalHours).toBe(16);
+      expect(result.totalShifts).toBe(2);
     });
   });
 

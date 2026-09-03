@@ -11,6 +11,7 @@ import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
+import ShiftSuggestionModal from '../../components/modals/ShiftSuggestionModal';
 import { useShallow } from 'zustand/react/shallow';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { toast } from '../../components/ui/toastStore';
@@ -21,7 +22,7 @@ const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
   // 'employees' không dùng ở đây — bỏ để tránh đăng ký thừa
-  const { user, schedule, updateShift, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks })));
+  const { user, schedule, updateShift, updateEmployeeWeeklyShifts, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, updateEmployeeWeeklyShifts: s.updateEmployeeWeeklyShifts, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const [search] = useState('');
@@ -33,6 +34,7 @@ export default function EmployeeSchedule() {
   const activeDept = viewDept || user?.dept || '';
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSwapListModal, setShowSwapListModal] = useState(false);
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
   const pendingMySwapsCount = useMemo(() => {
     return (shiftSwaps || []).filter(s => s.toEmpId === user?.id && s.status === 'pending_partner').length;
@@ -91,20 +93,32 @@ export default function EmployeeSchedule() {
     setTimeout(() => setSaveStatus('saved'), 400);
   }, [currentWeek, updateShift, user?.id, isFutureWeek]);
 
-  // 8. Đăng ký nhanh cả tuần mẫu (Chỉ tuần tương lai mới được sửa)
+  // 8. Đăng ký nhanh cả tuần mẫu (Gom thành 1 request duy nhất)
   const handleQuickRegister = async (shiftCode) => {
     if (!isFutureWeek) {
       toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     setSaveStatus('saving');
+    const shiftsMap = {};
     for (let i = 0; i < WEEK_DAYS.length; i++) {
       const day = WEEK_DAYS[i];
-      // Mặc định CN nghỉ nếu chọn ca làm việc
-      const code = (day === 'CN' && shiftCode !== 'off') ? 'off' : shiftCode;
-      await updateShift(currentWeek, user.id, day, code);
+      shiftsMap[day] = (day === 'CN' && shiftCode !== 'off') ? 'off' : shiftCode;
     }
+    await updateEmployeeWeeklyShifts(currentWeek, user.id, shiftsMap);
     setTimeout(() => setSaveStatus('saved'), 400);
+  };
+
+  // 8b. Áp dụng lịch gợi ý thông minh (1 request duy nhất)
+  const handleApplySuggestion = async (suggestedShifts) => {
+    if (!isFutureWeek) {
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
+      return;
+    }
+    setSaveStatus('saving');
+    await updateEmployeeWeeklyShifts(currentWeek, user.id, suggestedShifts);
+    setTimeout(() => setSaveStatus('saved'), 400);
+    toast.success('Đã áp dụng lịch gợi ý thành công!');
   };
 
   // 9. Tính tổng giờ & số ca cá nhân
@@ -225,6 +239,12 @@ export default function EmployeeSchedule() {
         isOpen={showSwapListModal}
         onClose={() => setShowSwapListModal(false)}
         currentWeek={currentWeek}
+      />
+      <ShiftSuggestionModal
+        isOpen={showSuggestionModal}
+        onClose={() => setShowSuggestionModal(false)}
+        emp={user}
+        onApply={handleApplySuggestion}
       />
       
       {/* Top Toolbar */}
@@ -376,6 +396,15 @@ export default function EmployeeSchedule() {
 
               {/* Quick Template Buttons */}
               <div className="flex items-center gap-1.5 ml-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSuggestionModal(true)}
+                  className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-[10px] transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                  title="Mở trợ lý gợi ý ca làm việc tự động theo nguyện vọng"
+                >
+                  <Sparkles size={11} className="text-amber-300" />
+                  <span>✨ Gợi ý ca cho tôi</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('6-14')}

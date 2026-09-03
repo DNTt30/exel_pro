@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import Modal from './Modal';
+import StatusBadge from '../ui/StatusBadge';
 import { useStore } from '../../store/useStore';
-import { ArrowRightLeft, CheckCircle2, XCircle, Clock, Check, Sparkles } from 'lucide-react';
+import { ArrowRightLeft, Check, Sparkles } from 'lucide-react';
 
 import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
@@ -57,43 +58,6 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
   const handleCancel = (swapId) => {
     if (window.confirm('Bạn có chắc chắn muốn hủy yêu cầu đổi ca này?')) {
       respondShiftSwap(swapId, 'cancelled', 'Người tạo đã hủy yêu cầu.');
-    }
-  };
-
-  const getStatusBadge = (status, swap) => {
-    switch (status) {
-      case 'pending_partner':
-        return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-            <Clock size={11} /> Chờ {swap.toEmpName} đồng ý
-          </span>
-        );
-      case 'pending_manager':
-        return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
-            <Clock size={11} /> Chờ Quản lý duyệt
-          </span>
-        );
-      case 'approved':
-        return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-            <CheckCircle2 size={11} /> Đã đổi ca thành công
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
-            <XCircle size={11} /> Đã từ chối
-          </span>
-        );
-      case 'cancelled':
-        return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-            Đã hủy
-          </span>
-        );
-      default:
-        return null;
     }
   };
 
@@ -161,7 +125,18 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                   {/* Top info */}
                   <div className="flex items-center justify-between text-xs gap-2">
                     <span className="font-mono text-slate-400 text-[11px]">Tuần: {swap.week}</span>
-                    {getStatusBadge(swap.status, swap)}
+                    <StatusBadge 
+                      status={swap.status} 
+                      customText={
+                        swap.status === 'pending_partner' 
+                          ? `Chờ ${swap.toEmpName} đồng ý` 
+                          : swap.status === 'approved' 
+                            ? 'Đã đổi ca thành công' 
+                            : swap.status === 'rejected' 
+                              ? 'Đã từ chối' 
+                              : undefined
+                      } 
+                    />
                   </div>
 
                   {/* Swap Visual Pair */}

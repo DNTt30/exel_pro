@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { UserX, RefreshCcw, ArrowRight, ArrowLeft } from 'lucide-react';
 import { getShiftCode, getCoveringStore } from '../../utils/shiftHelper';
-
-const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+import { WEEK_DAYS } from '../../data/constants';
 
 export default function OperationsInsightsWidget({ employees, weekSchedule, filterDept }) {
 

@@ -19,6 +19,35 @@ export async function getSchedulesByWeek(weekDate, opts = {}) {
   return scheduleMap;
 }
 
+// Lấy lịch làm việc của NHIỀU tuần trong 1 query duy nhất (chống N+1 query)
+export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
+  const uniqueWeeks = [...new Set(weekDates.filter(Boolean))];
+  if (uniqueWeeks.length === 0) return {};
+  if (opts.empIds && opts.empIds.length === 0) return {};
+
+  let q = db().from('schedules').select('week_date,emp_id,shifts').in('week_date', uniqueWeeks);
+  if (opts.empId) q = q.eq('emp_id', opts.empId);
+  else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('Lỗi lấy lịch làm việc theo nhiều tuần:', error);
+    return {};
+  }
+
+  const result = {};
+  uniqueWeeks.forEach(w => {
+    result[w] = {};
+  });
+
+  (data || []).forEach(row => {
+    if (!result[row.week_date]) result[row.week_date] = {};
+    result[row.week_date][row.emp_id] = row.shifts || {};
+  });
+
+  return result;
+}
+
 // Lưu/Cập nhật toàn bộ lịch của 1 nhân viên trong 1 tuần
 export async function saveEmployeeSchedule(weekDate, empId, shifts) {
   const { error } = await db().from('schedules').upsert({

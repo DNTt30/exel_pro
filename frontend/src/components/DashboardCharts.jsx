@@ -2,17 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { TrendingUp, PieChart, BarChart3, Clock, Building2, CheckCircle2, Sparkles, Calendar, Layers } from 'lucide-react';
 import { SHIFTS } from '../data/initialData';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
-
-const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const DAY_FULL_NAMES = {
-  'T2': 'Thứ Hai',
-  'T3': 'Thứ Ba',
-  'T4': 'Thứ Tư',
-  'T5': 'Thứ Năm',
-  'T6': 'Thứ Sáu',
-  'T7': 'Thứ Bảy',
-  'CN': 'Chủ Nhật'
-};
+import { WEEK_DAYS, DAY_FULL_NAMES } from '../data/constants';
 
 export default function DashboardCharts({ 
   viewMode, 

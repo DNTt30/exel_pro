@@ -1146,6 +1146,8 @@ export async function askGS25HFModel(question, systemPrompt, chatHistory = [], f
     { role: 'user', content: question }
   ];
 
+  const formattedPrompt = messages.map(m => `${m.role === 'system' ? 'HỆ THỐNG' : m.role === 'assistant' ? 'AI' : 'NGƯỜI DÙNG'}: ${m.content}`).join('\n') + '\nAI:';
+
   try {
     const response = await fetch(modelUrl, {
       method: 'POST',
@@ -1154,7 +1156,7 @@ export async function askGS25HFModel(question, systemPrompt, chatHistory = [], f
         ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
       },
       body: JSON.stringify({
-        inputs: question,
+        inputs: formattedPrompt,
         parameters: {
           max_new_tokens: 400,
           temperature: 0.7,

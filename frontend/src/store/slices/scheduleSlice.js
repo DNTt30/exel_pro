@@ -20,16 +20,14 @@ export const createScheduleSlice = (set, get) => ({
     const unique = [...new Set(weekKeys.filter(Boolean))];
     const missing = unique.filter(k => get().schedule[k] === undefined);
     if (missing.length === 0) return;
-    const entries = await Promise.all(
-      missing.map(async (k) => [k, await api.getSchedulesByWeek(k)])
-    );
-    set(state => {
-      const schedule = { ...state.schedule };
-      entries.forEach(([k, data]) => {
-        schedule[k] = data;
-      });
-      return { schedule };
-    });
+    // Khử N+1 query: lấy toàn bộ tuần còn thiếu chỉ trong 1 truy vấn duy nhất
+    const weeksData = await api.getSchedulesByWeeks(missing);
+    set(state => ({
+      schedule: {
+        ...state.schedule,
+        ...weeksData
+      }
+    }));
   },
 
   loadAttendanceRange: async (fromDate, toDate) => {
@@ -223,6 +221,58 @@ export const createScheduleSlice = (set, get) => ({
         };
       });
       toast.error(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
+    }
+  },
+
+  // Cập nhật trọn gói cả tuần cho 1 nhân viên trong 1 request duy nhất (giảm 85% tải ghi)
+  updateEmployeeWeeklyShifts: async (weekDate, empId, newShiftsMap) => {
+    assertCanEditShift(get(), empId, weekDate);
+    const weekSched = get().schedule[weekDate] || {};
+    const empSched = weekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+    const previousShifts = { ...empSched };
+    const mergedShifts = { ...empSched, ...newShiftsMap };
+
+    // Optimistic UI update — cập nhật ngay lập tức 0ms
+    set((state) => {
+      const latestWeekSched = state.schedule[weekDate] || {};
+      const latestEmpSched = latestWeekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+      return {
+        schedule: {
+          ...state.schedule,
+          [weekDate]: {
+            ...latestWeekSched,
+            [empId]: { ...latestEmpSched, ...newShiftsMap }
+          }
+        }
+      };
+    });
+
+    try {
+      // Đúng 1 request tới cơ sở dữ liệu thay vì loop 7 lần
+      await api.saveEmployeeSchedule(weekDate, empId, mergedShifts);
+      const emp = get().employees.find(e => e.id === empId);
+      get().appendAdminLog('UPDATE_SHIFT_WEEKLY', empId, `Cập nhật ca tuần ${weekDate}`, {
+        resourceType: 'shift',
+        resourceId: `${weekDate}:${empId}`,
+        storeId: emp?.dept || get().user?.dept || '',
+        oldData: previousShifts,
+        newData: mergedShifts,
+        description: `${emp?.name || empId}: cập nhật trọn gói ca tuần ${weekDate}`
+      });
+    } catch (err) {
+      console.error("Lỗi khi lưu lịch tuần:", err);
+      // Rollback optimistic update khi API lỗi
+      set((state) => ({
+        schedule: {
+          ...state.schedule,
+          [weekDate]: {
+            ...(state.schedule[weekDate] || {}),
+            [empId]: previousShifts
+          }
+        }
+      }));
+      toast.error(`Không thể lưu lịch tuần của nhân viên (${empId}): ${err.message || 'Lỗi kết nối'}`);
+      throw err;
     }
   },
 

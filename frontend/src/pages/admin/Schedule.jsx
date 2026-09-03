@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
-import { Download, Printer, Copy, Upload, Sparkles, Bot } from 'lucide-react';
+import { Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock, UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { exportScheduleToPDF } from '../../utils/pdfExport';
@@ -15,6 +15,7 @@ import WeekFlowBar from '../../components/WeekFlowBar';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 import { analyzeWeek } from '../../utils/scheduleConflicts';
 import ConflictPanel from '../../components/schedule/ConflictPanel';
+import { analyzeScheduleVulnerabilities } from '../../utils/vulnerabilityRadarHelper';
 
 const AddEmployeeModal = React.lazy(() => import('../../components/modals/AddEmployeeModal'));
 import AddStoreModal from '../../components/modals/AddStoreModal';
@@ -23,6 +24,7 @@ const PTOvertimeModal = React.lazy(() => import('../../components/modals/PTOvert
 const ImportScheduleModal = React.lazy(() => import('../../components/modals/ImportScheduleModal'));
 const ShiftSwapListModal = React.lazy(() => import('../../components/modals/ShiftSwapListModal'));
 const AISchedulerModal = React.lazy(() => import('../../components/modals/AISchedulerModal'));
+const VulnerabilityRadarModal = React.lazy(() => import('../../components/modals/VulnerabilityRadarModal'));
 import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
@@ -59,7 +61,25 @@ export default function Schedule() {
   const [showSwapList, setShowSwapList] = useState(false);
   const [showAIScheduler, setShowAIScheduler] = useState(false);
   const [showAICopilot, setShowAICopilot] = useState(false);
+  const [showRadarModal, setShowRadarModal] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+
+  // Tính toán lỗ hổng ca trực & định biên thời gian thực (Vulnerability Radar)
+  const currentStoreInfo = useMemo(() => {
+    if (!filterDept || filterDept === 'ALL') {
+      return stores.find(s => s.id === user?.dept) || stores[0] || {};
+    }
+    return stores.find(s => s.id === filterDept) || {};
+  }, [stores, filterDept, user?.dept]);
+
+  const radarResults = useMemo(() => {
+    return analyzeScheduleVulnerabilities({
+      weekSchedule,
+      employees,
+      storeInfo: currentStoreInfo,
+      weekDate: currentWeek
+    });
+  }, [weekSchedule, employees, currentStoreInfo, currentWeek]);
 
   // Tự động mở modal đơn đổi ca nếu có URL param ?openSwaps=true
   useEffect(() => {
@@ -284,6 +304,13 @@ export default function Schedule() {
           currentWeek={currentWeek}
           storeId={filterDept}
         />
+        <VulnerabilityRadarModal
+          isOpen={showRadarModal}
+          onClose={() => setShowRadarModal(false)}
+          radarResults={radarResults}
+          storeName={currentStoreInfo?.name || filterDept}
+          currentWeek={currentWeek}
+        />
       </Suspense>
       <AICopilotDrawer
         isOpen={showAICopilot}
@@ -317,117 +344,194 @@ export default function Schedule() {
       </div>
 
       {/* 3. KPI Summary Bar & Actions */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4 text-xs flex-wrap">
-          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-            <span>Tổng nhân sự: <strong className="font-mono text-slate-900">{summaryMetrics.totalEmps}</strong> ({summaryMetrics.totalFT} FT, {summaryMetrics.totalPT} PT)</span>
+      {/* 3. KPI Summary Bar & Segmented Action Center */}
+      <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4 print:hidden">
+        
+        {/* Left Metric Badges */}
+        <div className="flex items-center gap-2.5 text-xs flex-wrap">
+          {/* Total Staff Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+            <Users size={15} className="text-blue-600" />
+            <span className="text-slate-600 font-medium">Nhân sự:</span>
+            <span className="font-mono font-bold text-slate-900">{summaryMetrics.totalEmps}</span>
+            <span className="text-[11px] text-slate-400 font-semibold">({summaryMetrics.totalFT} FT • {summaryMetrics.totalPT} PT)</span>
           </div>
-          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span>Tổng giờ công: <strong className="font-mono text-emerald-700">{summaryMetrics.totalHours}h</strong></span>
+
+          {/* Total Hours Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-emerald-900">
+            <Clock size={15} className="text-emerald-600" />
+            <span className="font-medium">Tổng giờ:</span>
+            <span className="font-mono font-black text-emerald-700 text-sm">{summaryMetrics.totalHours}h</span>
           </div>
+
+          {/* PT Overtime Alert Pill */}
           {summaryMetrics.ptOver91Count > 0 && (
             <div 
               onClick={() => setShowPTOvertime(true)}
-              className="flex items-center gap-1.5 font-extrabold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-red-100 transition-all shadow-2xs"
+              className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl font-bold cursor-pointer hover:bg-rose-100 hover:border-rose-300 transition-all shadow-2xs group"
+              title="Click để xem chi tiết danh sách Part-time vượt ngưỡng"
             >
-              <span className="animate-pulse">⚠️</span>
-              <span>Có {summaryMetrics.ptOver91Count} nhân sự Part-Time vượt {viewMode === 'month' ? '91h/tháng' : '23h/tuần'}! (Xem chi tiết)</span>
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              <span>{summaryMetrics.ptOver91Count} Part-Time vượt {viewMode === 'month' ? '91h/tháng' : '23h/tuần'}</span>
+              <span className="text-[10px] text-rose-500 underline ml-1 group-hover:text-rose-700">Chi tiết ↗</span>
             </div>
           )}
+
+          {/* Radar Ca Trực & An Ninh Pill */}
+          <div 
+            onClick={() => setShowRadarModal(true)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all shadow-2xs group border ${
+              radarResults.hasCritical
+                ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100 hover:border-rose-300'
+                : radarResults.warningCount > 0
+                  ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 hover:border-amber-300'
+                  : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800 hover:bg-emerald-100'
+            }`}
+            title="Bấm để xem chi tiết Radar cảnh báo rủi ro ca trực & an ninh"
+          >
+            <span className={`w-2 h-2 rounded-full ${
+              radarResults.hasCritical ? 'bg-rose-500 animate-pulse' : radarResults.warningCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}></span>
+            <span>
+              {radarResults.hasCritical 
+                ? `🚨 ${radarResults.criticalCount} Lỗ hổng ca đêm nghiêm trọng` 
+                : radarResults.warningCount > 0 
+                  ? `⚠️ ${radarResults.warningCount} Ca cần lưu ý`
+                  : '🛡️ Ca trực an toàn (0 rủi ro)'}
+            </span>
+            <span className="text-[10px] opacity-70 underline ml-0.5 group-hover:opacity-100">Chi tiết ↗</span>
+          </div>
         </div>
 
+        {/* Right Segmented Actions Bar */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Nút AI Xếp Lịch Thông Minh */}
-          <button
-            type="button"
-            onClick={() => setShowAIScheduler(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold"
-            title="Xếp lịch từ định biên hoặc ảnh doanh số"
-          >
-            <Sparkles size={13} />
-            AI xếp lịch
-          </button>
+          
+          {/* Group 1: Staff & Transfer */}
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setShowAddEmp(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Thêm nhân viên mới"
+            >
+              <UserPlus size={13} className="text-blue-600" />
+              <span>Thêm NV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTransfer(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-700 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Điều chuyển / Mượn nhân sự giữa các cửa hàng"
+            >
+              <ArrowRightLeft size={13} className="text-orange-600" />
+              <span>Chi viện</span>
+            </button>
+          </div>
 
-          {/* Nút Trợ lý AI Copilot */}
-          <button
-            type="button"
-            onClick={() => setShowAICopilot(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="Mở trợ lý AI giải đáp thắc mắc và phân tích tình hình nhân sự"
-          >
-            <Bot size={13} className="text-purple-600" />
-            <span>Trợ lý AI</span>
-          </button>
+          {/* Group 2: AI & Swaps & Radar */}
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setShowRadarModal(true)}
+              className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer border ${
+                radarResults.hasCritical 
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100' 
+                  : radarResults.warningCount > 0
+                    ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                    : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+              }`}
+              title="Mở Radar quét lỗ hổng ca trực & định biên an ninh 24/7"
+            >
+              {radarResults.hasCritical ? (
+                <ShieldAlert size={13} className="text-rose-600 animate-pulse" />
+              ) : radarResults.warningCount > 0 ? (
+                <AlertTriangle size={13} className="text-amber-600" />
+              ) : (
+                <ShieldCheck size={13} className="text-emerald-600" />
+              )}
+              <span>Radar {radarResults.totalCount > 0 ? `(${radarResults.totalCount})` : ''}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAIScheduler(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              title="Tự động xếp lịch thông minh từ định biên hoặc ảnh chụp doanh số"
+            >
+              <Sparkles size={13} className="text-amber-300" />
+              <span>AI xếp ca</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAICopilot(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-purple-700 hover:bg-purple-50 border border-purple-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Mở trợ lý AI giải đáp thắc mắc và phân tích tình hình nhân sự"
+            >
+              <Bot size={13} className="text-purple-600" />
+              <span>Trợ lý AI</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSwapList(true)}
+              className="relative flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Xem và duyệt các yêu cầu đổi ca"
+            >
+              <RefreshCw size={13} className="text-indigo-600" />
+              <span>Đổi ca</span>
+              {pendingManagerSwapsCount > 0 && (
+                <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black animate-pulse">
+                  {pendingManagerSwapsCount}
+                </span>
+              )}
+            </button>
+            <button 
+              type="button"
+              onClick={handleCopyPreviousWeek}
+              disabled={isCopying || weekLocked}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Sao chép toàn bộ ca làm việc từ tuần trước sang tuần này"
+            >
+              <Copy size={13} className="text-slate-500" />
+              <span>{isCopying ? 'Đang chép...' : 'Chép tuần trước'}</span>
+            </button>
+          </div>
 
-          {/* Nút Đơn Đổi Ca */}
-          <button
-            type="button"
-            onClick={() => setShowSwapList(true)}
-            className="relative flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="Xem và duyệt các yêu cầu đổi ca"
-          >
-            <span>🔄 Đơn đổi ca</span>
-            {pendingManagerSwapsCount > 0 && (
-              <span className="px-1.5 py-0.2 bg-red-600 text-white rounded-full text-[10px] font-black animate-pulse">
-                {pendingManagerSwapsCount}
-              </span>
-            )}
-          </button>
+          {/* Group 3: Data IO & Export */}
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/70 shadow-2xs">
+            <button 
+              type="button"
+              onClick={() => setShowImportSchedule(true)}
+              className="p-1.5 bg-white text-amber-800 hover:bg-amber-50 border border-slate-200/80 rounded-lg transition-all shadow-2xs cursor-pointer"
+              title="Nhập lịch từ file Excel"
+            >
+              <Upload size={14} className="text-amber-600" />
+            </button>
+            <button 
+              type="button"
+              onClick={handleExportExcel}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              title="Xuất file Excel chuẩn"
+            >
+              <Download size={13} />
+              <span>Excel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => exportScheduleToPDF(currentWeek, filteredEmployees, schedule[currentWeek] || {}, filterDept)}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Xuất file PDF để in"
+            >
+              <span>PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="p-1.5 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80 rounded-lg transition-all shadow-2xs cursor-pointer"
+              title="In bảng lịch (Print)"
+            >
+              <Printer size={14} className="text-slate-600" />
+            </button>
+          </div>
 
-          {/* Nút Sao Chép Tuần Trước */}
-          <button 
-            type="button"
-            onClick={handleCopyPreviousWeek}
-            disabled={isCopying || weekLocked}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Sao chép toàn bộ ca làm việc từ tuần trước sang tuần này"
-          >
-            <Copy size={13} />
-            <span>{isCopying ? 'Đang sao chép...' : 'Sao chép tuần trước'}</span>
-          </button>
-
-          {/* Nút Nhập Excel */}
-          <button 
-            type="button"
-            onClick={() => setShowImportSchedule(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="Nhập lịch từ file Excel hoặc CSV"
-          >
-            <Upload size={13} />
-            <span>Nhập Excel</span>
-          </button>
-
-          {/* Nút Xuất Excel */}
-          <button 
-            type="button"
-            onClick={handleExportExcel}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="Xuất file Excel chuẩn"
-          >
-            <Download size={13} />
-            <span>Xuất Excel</span>
-          </button>
-
-          <button
-            onClick={() => exportScheduleToPDF(currentWeek, filteredEmployees, schedule[currentWeek] || {}, filterDept)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-            title="Xuất file PDF để in"
-          >
-            <Printer size={13} />
-            <span>Xuất PDF</span>
-          </button>
-
-          {/* Nút In */}
-          <button 
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-          >
-            <Printer size={13} />
-            <span>In / PDF</span>
-          </button>
         </div>
       </div>
 

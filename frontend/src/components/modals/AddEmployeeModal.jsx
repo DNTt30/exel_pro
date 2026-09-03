@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
-import { MA_RE, STANDARD_ROLES } from '../../data/constants';
+import { STANDARD_ROLES } from '../../data/constants';
 import { canPickStore, getUserDepts } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';

@@ -72,7 +72,7 @@ export default function ManagerActionList({ storeId = 'ALL' }) {
     }
 
     return list;
-  }, [feedbacks, shiftSwaps, employees, weekSched, effectiveStore]);
+  }, [feedbacks, shiftSwaps, employees, weekSched, effectiveStore, user, stores]);
 
   if (items.length === 0) {
     return (

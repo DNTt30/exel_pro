@@ -88,27 +88,46 @@ const authWarning = useStore(state => state.authWarning);
   }, [user]);
 
   const isFullAdmin = isBuiltinStoreManager(user);
-  const adminLinksFullOnly = [
-    { to: '/admin/logs',       icon: <ScrollText size={17} />, label: 'Nhật ký' },
+  const feedbacks = useStore(state => state.feedbacks);
+  const shiftSwaps = useStore(state => state.shiftSwaps);
+  const pendingFeedbacksCount = (feedbacks || []).filter(f => f.status === 'pending').length;
+  const pendingSwapsCount = (shiftSwaps || []).filter(s => s.status === 'pending_manager').length;
+
+  const adminSections = [
+    {
+      title: 'VẬN HÀNH',
+      items: [
+        { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
+        { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca', badge: pendingSwapsCount, badgeColor: 'bg-amber-400 text-slate-950 font-bold' },
+        { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
+        { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B', badge: pendingFeedbacksCount, badgeColor: 'bg-rose-400 text-white font-bold' },
+        { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
+      ]
+    },
+    {
+      title: 'HỆ THỐNG',
+      items: [
+        { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
+        { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
+        ...(isFullAdmin ? [{ to: '/admin/logs', icon: <ScrollText size={17} />, label: 'Nhật ký' }] : [])
+      ]
+    }
   ];
-  const adminLinksBase = [
-    { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
-    { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca' },
-    { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
-    { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B' },
-    { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
-    { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
-    { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
+
+  const employeeSections = [
+    {
+      title: 'CÁ NHÂN',
+      items: [
+        { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
+        { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
+        { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
+        { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
+        { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Kệ của tôi' },
+      ]
+    }
   ];
-  const adminLinks = [...adminLinksBase, ...(isFullAdmin ? adminLinksFullOnly : [])];
-  const employeeLinks = [
-    { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
-    { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
-    { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
-    { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
-    { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Kệ của tôi' },
-  ];
-  const links = isManager ? adminLinks : employeeLinks;
+
+  const sections = isManager ? adminSections : employeeSections;
 
   const getRoleInfo = () => {
     const role = appRoleOf(user); const label = appRoleLabel(user);
@@ -123,19 +142,27 @@ const authWarning = useStore(state => state.authWarning);
     <div className="flex flex-col h-screen bg-slate-50 print:bg-white print:h-auto print:block overflow-hidden">
 
       {/* ── Header ── */}
-      <header className="relative bg-white/90 backdrop-blur-md border-b border-slate-200/70 shadow-2xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
+      <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2.5">
             {/* GS25 logo */}
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">GS25</div>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">GS25</div>
             <div className="hidden sm:block">
               <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">OFC Schedule</h1>
               <p className="text-[10px] text-slate-400 font-medium">Quản lý Lịch & C&B</p>
             </div>
           </div>
+          
+          {/* Active store context pill */}
+          {isManager && (
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 border border-slate-200 rounded-full text-xs font-semibold text-slate-700 ml-2">
+              <Store size={13} className="text-blue-600" />
+              <span>{user?.dept ? `Cửa hàng: ${user.dept}` : 'Toàn khu vực (OFC)'}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -186,17 +213,29 @@ const authWarning = useStore(state => state.authWarning);
           </div>
 
           {/* Nav links */}
-          <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
-            {links.map((link) => (
-              <NavLink key={link.to} to={link.to} onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all group ${isActive ? 'bg-white text-blue-700 shadow-md' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}
-              >
-                {({ isActive }) => (<>
-                  <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-white/40 group-hover:text-white/80'}`}>{link.icon}</span>
-                  <span className="truncate flex-1">{link.label}</span>
-                  {isActive && <ChevronRight size={13} className="text-blue-400 flex-shrink-0" />}
-                </>)}
-              </NavLink>
+          <nav className="flex-1 px-2.5 py-3 space-y-3.5 overflow-y-auto">
+            {sections.map((section, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <div className="px-3 pt-1 pb-0.5 text-[10px] font-black uppercase tracking-wider text-blue-200/50">
+                  {section.title}
+                </div>
+                {section.items.map((link) => (
+                  <NavLink key={link.to} to={link.to} onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all group ${isActive ? 'bg-white text-blue-700 shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    {({ isActive }) => (<>
+                      <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-white/50 group-hover:text-white/90'}`}>{link.icon}</span>
+                      <span className="truncate flex-1">{link.label}</span>
+                      {link.badge > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 shadow-2xs ${link.badgeColor || 'bg-amber-400 text-slate-950 font-bold'}`}>
+                          {link.badge}
+                        </span>
+                      )}
+                      {isActive && <ChevronRight size={13} className="text-blue-400 flex-shrink-0" />}
+                    </>)}
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
 

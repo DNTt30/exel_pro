@@ -45,6 +45,7 @@ export const SCHEDULE_RULES = {
   STPT_MIN_HOURS_PER_WEEK: 16,    // Tối thiểu 16 giờ/tuần
   STPT_MAX_HOURS_PER_WEEK: 23,    // Ngưỡng tuần tối đa ~23 giờ (tương đương 91h/tháng)
   STPT_MAX_HOURS_PER_MONTH: 91,   // Tối đa 91 giờ/tháng
+  STPT_OPTIMAL_MIN_HOURS_PER_MONTH: 50, // Ngưỡng đạt chuẩn tháng tối thiểu
 
   // Quy chuẩn Full-time (STFT / CSR)
   STFT_MIN_HOURS_PER_WEEK: 48,    // Tối thiểu 48 giờ/tuần
@@ -52,6 +53,10 @@ export const SCHEDULE_RULES = {
   STFT_MAX_HOURS_PER_WEEK: 48,    // Định mức 48 giờ/tuần
   STFT_MAX_HOURS_PER_MONTH: 192,  // Định mức tháng
 };
+
+// Hệ số lương ca đêm và lương cơ bản part-time
+export const NIGHT_SHIFT_MULTIPLIER = 1.3;
+export const DEFAULT_PT_HOURLY_RATE = 25000;
 
 // 7 ngày trong tuần
 export const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];

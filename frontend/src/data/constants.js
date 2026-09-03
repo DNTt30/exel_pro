@@ -217,10 +217,16 @@ export function getPayrollCycleDates(year, month) {
   for (let day = 26; day <= daysInPrevMonth; day++) {
     const dateObj = new Date(prevY, prevM - 1, day);
     const { weekKey, dayKey } = getWeekAndDayKey(dateObj);
+    const dayPad = String(day).padStart(2, '0');
+    const monthPad = String(prevM).padStart(2, '0');
+    const fullDateStr = `${prevY}-${monthPad}-${dayPad}`;
     dates.push({
       key: String(day),
-      display: `${day}/${prevM}`,
+      display: `${dayPad}/${monthPad}`,
+      shortDisplay: `${dayPad}/${monthPad}`,
+      dateFormatted: `${dayPad}/${monthPad}`,
       dayNum: String(day),
+      fullDateStr,
       weekKey,
       dayKey,
       dateObj
@@ -229,10 +235,16 @@ export function getPayrollCycleDates(year, month) {
   for (let day = 1; day <= 25; day++) {
     const dateObj = new Date(year, month - 1, day);
     const { weekKey, dayKey } = getWeekAndDayKey(dateObj);
+    const dayPad = String(day).padStart(2, '0');
+    const monthPad = String(month).padStart(2, '0');
+    const fullDateStr = `${year}-${monthPad}-${dayPad}`;
     dates.push({
       key: String(day),
-      display: `${day}/${month}`,
+      display: `${dayPad}/${monthPad}`,
+      shortDisplay: `${dayPad}/${monthPad}`,
+      dateFormatted: `${dayPad}/${monthPad}`,
       dayNum: String(day),
+      fullDateStr,
       weekKey,
       dayKey,
       dateObj

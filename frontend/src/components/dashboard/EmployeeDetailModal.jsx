@@ -15,6 +15,20 @@ export default function EmployeeDetailModal({
 }) {
   if (!emp) return null;
 
+  const weekDayDates = React.useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const start = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((d, idx) => {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + idx);
+      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
+
   return (
     <Modal
       isOpen={Boolean(emp)}
@@ -133,6 +147,11 @@ export default function EmployeeDetailModal({
                 return (
                   <div key={day} className={`p-2.5 rounded-xl border ${shiftVal ? 'bg-blue-50 border-blue-200 shadow-2xs' : 'bg-white border-slate-200'}`}>
                     <span className="font-black text-xs text-blue-800 block">{day}</span>
+                    {weekDayDates[day] && (
+                      <span className="text-[10px] font-mono font-medium text-slate-400 block -mt-0.5">
+                        {weekDayDates[day]}
+                      </span>
+                    )}
                     <span className={`text-xs font-extrabold font-mono mt-1 block ${shiftVal ? 'text-blue-700' : 'text-slate-300'}`}>
                       {shiftVal || '-'}
                     </span>

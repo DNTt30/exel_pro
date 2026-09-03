@@ -46,6 +46,20 @@ export default function EmployeeHome() {
   }, [mySched]);
 
   const swapsWeek = getSwapsForWeek(shiftSwaps, user?.id, currentWeek);
+
+  const weekDayDates = useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const start = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((d, idx) => {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + idx);
+      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
   const swapToday = getSwapBadgeForDay(swapsWeek, user?.id, todayKey);
   const pendingForMe = (shiftSwaps || []).filter((s) => s.toEmpId === user?.id && s.status === 'pending_partner');
 
@@ -173,7 +187,10 @@ export default function EmployeeHome() {
             return (
               <div key={d}
                 className={`rounded-lg px-0.5 py-1.5 text-center border ${working ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}>
-                <div className={`text-[9px] font-bold ${isToday ? 'text-blue-700' : 'text-slate-400'}`}>{d}</div>
+                <div className={`text-[9px] font-black ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>{d}</div>
+                {weekDayDates[d] && (
+                  <div className="text-[7.5px] font-mono text-slate-400 font-medium leading-none -mt-0.5">{weekDayDates[d]}</div>
+                )}
                 <div className={`text-[11px] font-black mt-0.5 ${working ? 'text-blue-700' : 'text-slate-300'}`}>{working ? shift : 'Nghỉ'}</div>
                 <div className="text-[8px] font-medium text-slate-400 truncate">{working ? (covering_store ? '→ ' + covering_store : shiftLabel(shift).replace('Ca ', '')) : ''}</div>
               </div>

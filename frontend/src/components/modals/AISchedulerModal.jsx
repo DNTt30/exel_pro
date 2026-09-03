@@ -78,6 +78,20 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
   const staffing = useMemo(() => suggestStaffingFromDemand(demand), [demand]);
   const hasDemand = !!(demand.weekday.sales || demand.weekday.customers || demand.weekend.sales || demand.weekend.customers);
 
+  const weekDayDates = useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const start = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((d, idx) => {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + idx);
+      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
+
   useEffect(() => {
     if (!isOpen) return;
     setSelectedStoreId(defaultStoreId);
@@ -303,7 +317,12 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
                   <thead className="bg-slate-50 sticky top-0">
                     <tr>
                       <th className="text-left p-1.5 font-semibold">NV</th>
-                      {WEEK_DAYS.map(d => <th key={d} className="p-1 font-mono">{d}</th>)}
+                      {WEEK_DAYS.map(d => (
+                        <th key={d} className="p-1 text-center font-mono">
+                          <div className="font-bold">{d}</div>
+                          {weekDayDates[d] && <div className="text-[9px] font-normal text-slate-400">{weekDayDates[d]}</div>}
+                        </th>
+                      ))}
                       <th className="p-1.5">h</th>
                     </tr>
                   </thead>

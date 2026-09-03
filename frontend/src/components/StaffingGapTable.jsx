@@ -9,8 +9,22 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../components/ui/toastStore';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
-  const { stores, user, updateStore } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore })));
+  const { stores, user, updateStore, currentWeek } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore, currentWeek: s.currentWeek })));
   const isAdmin = isOpsManager(user);
+
+  const dayDatesMap = useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const weekStartDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((dayKey, idx) => {
+      const d = new Date(weekStartDate);
+      d.setDate(weekStartDate.getDate() + idx);
+      map[dayKey] = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
 
   const storeOptions = stores.length ? stores : [{ id: filterDept && filterDept !== 'ALL' ? filterDept : 'VN0485', name: filterDept }];
   const defaultStoreId = filterDept && filterDept !== 'ALL'
@@ -104,13 +118,18 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                 key={dayKey}
                 type="button"
                 onClick={() => setSelectedDay(dayKey)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   selectedDay === dayKey
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {dayKey}
+                <span>{dayKey}</span>
+                {dayDatesMap[dayKey] && (
+                  <span className={`text-[10px] font-mono ${selectedDay === dayKey ? 'text-blue-100' : 'text-slate-400'}`}>
+                    ({dayDatesMap[dayKey]})
+                  </span>
+                )}
               </button>
             ))}
           </div>

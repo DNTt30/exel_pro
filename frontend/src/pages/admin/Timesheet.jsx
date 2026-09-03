@@ -144,7 +144,8 @@ export default function Timesheet() {
                   getDayValue,
                   activeDays,
                   filterOnlyMe: false,
-                  currentUserId: user?.id
+                  currentUserId: user?.id,
+                  cycleDates
                 })}
                 title="Xuất file Excel có đầy đủ bảng biểu và màu sắc"
               >

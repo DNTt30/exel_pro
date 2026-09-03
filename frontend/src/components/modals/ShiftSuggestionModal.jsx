@@ -12,12 +12,26 @@ const SHIFT_OPTIONS = [
   { id: '22-6', label: 'Ca Đêm (22:00 - 06:00)', desc: 'Ưu tiên ca đêm (x1.3 lương)', color: 'border-purple-300 bg-purple-50/70 text-purple-900' }
 ];
 
-export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply }) {
+export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply, currentWeek }) {
   const [preferredShift, setPreferredShift] = useState('any');
   const [busyDays, setBusyDays] = useState([]);
   const [isApplying, setIsApplying] = useState(false);
 
   const isPT = String(emp?.type || emp?.role || '').toUpperCase().includes('PT');
+
+  const weekDayDates = useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const start = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((d, idx) => {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + idx);
+      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
 
   const toggleBusyDay = (dayKey) => {
     setBusyDays(prev => 
@@ -121,6 +135,11 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply }) 
                   }`}
                 >
                   <span>{dayKey}</span>
+                  {weekDayDates[dayKey] && (
+                    <span className="text-[8.5px] font-mono text-slate-400 font-normal">
+                      {weekDayDates[dayKey]}
+                    </span>
+                  )}
                   <span className={`text-[9px] font-medium ${isBusy ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
                     {isBusy ? 'Bận' : 'Rảnh'}
                   </span>
@@ -155,13 +174,18 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply }) 
               return (
                 <div 
                   key={dayKey} 
-                  className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[52px] ${
+                  className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[56px] ${
                     isOff 
                       ? 'bg-slate-100/90 border-slate-200 text-slate-400' 
                       : 'bg-white border-blue-200 text-blue-700 shadow-2xs font-bold'
                   }`}
                 >
-                  <span className="text-[10px] font-bold text-slate-500 mb-0.5">{dayKey}</span>
+                  <span className="text-[10px] font-bold text-slate-600 leading-tight">{dayKey}</span>
+                  {weekDayDates[dayKey] && (
+                    <span className="text-[8.5px] font-mono text-slate-400 mb-0.5 leading-tight">
+                      {weekDayDates[dayKey]}
+                    </span>
+                  )}
                   <span className={`text-xs font-black ${isOff ? 'text-slate-400 font-medium' : 'text-slate-900'}`}>
                     {isOff ? 'OFF' : shift}
                   </span>

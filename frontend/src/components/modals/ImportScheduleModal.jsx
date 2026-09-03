@@ -24,6 +24,20 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
+  const weekDayDates = React.useMemo(() => {
+    if (!currentWeek) return {};
+    const parts = currentWeek.split('-').map(Number);
+    if (parts.length !== 3) return {};
+    const start = new Date(parts[0], parts[1] - 1, parts[2]);
+    const map = {};
+    WEEK_DAYS.forEach((d, idx) => {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + idx);
+      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return map;
+  }, [currentWeek]);
+
   // Tải file mẫu Excel (xlsx nạp động để không nhét vào bundle chính)
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx');
@@ -462,7 +476,10 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
                     <th className="p-2">Cửa hàng</th>
                     <th className="p-2 text-center">Vị trí</th>
                     {WEEK_DAYS.map(d => (
-                      <th key={d} className="p-2 text-center w-12">{d}</th>
+                      <th key={d} className="p-1.5 text-center w-12 font-mono">
+                        <div>{d}</div>
+                        {weekDayDates[d] && <div className="text-[9px] font-normal text-slate-400">{weekDayDates[d]}</div>}
+                      </th>
                     ))}
                   </tr>
                 </thead>

@@ -4,7 +4,7 @@ import { Printer, ShieldCheck } from 'lucide-react';
 import { getRoleBadgeInfo } from '../../data/constants';
 import { getShiftHours, normalizeShift } from '../../utils/shiftHelper';
 
-export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDays, weekSchedule }) {
+export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDays = [], cycleDates = [], getDayValue, weekSchedule = {} }) {
   if (!user) return null;
 
   const roleInfo = getRoleBadgeInfo(user.role || user.type);
@@ -16,21 +16,27 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
   let nightShiftsCount = 0;
   let offDaysCount = 0;
 
-  const daysDetail = activeDays.map((day) => {
-    const rawVal = weekSchedule[user.id]?.[day] || '';
+  const daysDetail = (cycleDates.length > 0 ? cycleDates : activeDays.map(d => ({ key: d, dayKey: d, display: '' }))).map((cell) => {
+    const rawVal = getDayValue ? getDayValue(user.id, cell.key) : (weekSchedule[user.id]?.[cell.key || cell.dayKey] || '');
     const { shift } = normalizeShift(rawVal);
-    const isOff = !shift || shift === 'off';
-    const hours = isOff ? 0 : getShiftHours(shift);
+    const isOff = !shift || shift === 'off' || rawVal === 'OFF';
+    const hours = isOff ? 0 : (getShiftHours(shift) || parseFloat(rawVal) || 0);
 
     if (isOff) {
       offDaysCount++;
     } else {
       totalShifts++;
       totalHours += hours;
-      if (shift.startsWith('22')) nightShiftsCount++;
+      if (String(shift).startsWith('22')) nightShiftsCount++;
     }
 
-    return { day, shift: isOff ? 'OFF' : shift, hours };
+    return { 
+      day: cell.key, 
+      dayKey: cell.dayKey, 
+      display: cell.display || cell.shortDisplay || '',
+      shift: isOff ? 'OFF' : (shift || rawVal), 
+      hours 
+    };
   });
 
   const isPT = user.type === 'STPT' || user.type === 'PARTTIME' || (user.role && user.role.includes('PT'));
@@ -85,22 +91,27 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
             </div>
 
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-11 gap-1 text-center text-xs">
-              {daysDetail.map(({ day, shift, hours }) => {
+              {daysDetail.map(({ day, dayKey, display, shift, hours }) => {
                 const isOff = shift === 'OFF';
                 return (
                   <div
-                    key={day}
-                    className={`p-1.5 rounded-lg border flex flex-col items-center justify-between ${
+                    key={display || day}
+                    className={`p-1 rounded-lg border flex flex-col items-center justify-between min-h-[58px] ${
                       isOff 
                         ? 'bg-slate-50 border-slate-200 text-slate-400' 
                         : 'bg-blue-50/70 border-blue-200 text-blue-900 font-bold'
                     }`}
                   >
-                    <span className="text-[9px] font-mono text-slate-500">{day}</span>
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className={`text-[10px] font-black ${dayKey === 'CN' ? 'text-rose-600' : 'text-slate-700'}`}>
+                        {dayKey || day}
+                      </span>
+                      {display && <span className="text-[8.5px] font-mono text-slate-500">{display}</span>}
+                    </div>
                     <span className={`text-[11px] font-black my-0.5 ${isOff ? 'text-slate-400' : 'text-blue-700'}`}>
                       {shift}
                     </span>
-                    <span className="text-[9px] font-mono opacity-80">{isOff ? '-' : `${hours}h`}</span>
+                    <span className="text-[8.5px] font-mono opacity-80">{isOff ? '-' : `${hours}h`}</span>
                   </div>
                 );
               })}

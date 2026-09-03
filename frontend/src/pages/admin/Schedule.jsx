@@ -576,8 +576,9 @@ export default function Schedule() {
                 {activeDays.map((day, idx) => {
                   let isToday = false;
                   let dateStr = '';
+                  let cell = null;
                   if (viewMode === 'month') {
-                    const cell = cycleDates[idx];
+                    cell = cycleDates[idx];
                     dateStr = cell?.display || '';
                     const now = new Date();
                     isToday = cell && cell.dateObj.toDateString() === now.toDateString();
@@ -594,17 +595,23 @@ export default function Schedule() {
                     dateStr = `${curr.getDate().toString().padStart(2, '0')}/${(curr.getMonth() + 1).toString().padStart(2, '0')}`;
                   }
 
+                  const dayLabel = viewMode === 'month' ? (cell?.dayKey || day) : day;
+                  const isSunday = dayLabel === 'CN';
+
                   return (
                     <th 
                       key={day} 
                       className={`min-w-[70px] max-w-[80px] text-center font-bold border-r border-slate-300 py-1 px-0.5 transition-colors ${
                         isToday 
                           ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500' 
-                          : (viewMode === 'week' && day === 'CN' ? 'bg-orange-50/80 text-orange-900' : 'bg-slate-200 text-slate-700')
+                          : (isSunday ? 'bg-orange-50/80 text-orange-950' : 'bg-slate-200 text-slate-700')
                       }`}
+                      title={`${dayLabel} ngày ${dateStr}`}
                     >
                       <div className="flex flex-col items-center justify-center leading-tight">
-                        <span className="text-xs font-black">{day}</span>
+                        <span className={`text-xs font-black ${isSunday ? 'text-rose-600' : ''}`}>
+                          {dayLabel}
+                        </span>
                         {dateStr && <span className="text-[10px] font-mono font-bold opacity-80 mt-0.5">{dateStr}</span>}
                         {isToday && (
                           <span className="text-[8px] uppercase tracking-tighter bg-blue-600 text-white px-1 rounded font-black mt-0.5 shadow-2xs">

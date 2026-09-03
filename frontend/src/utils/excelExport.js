@@ -1,5 +1,5 @@
 import { normalizeShift } from './shiftHelper';
-import { WEEK_DAYS } from '../data/constants';
+import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../data/constants';
 
 /**
  * Xuất lịch làm việc ra file Excel (.xls) có đầy đủ định dạng bảng biểu, màu sắc ca làm việc,
@@ -175,9 +175,16 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
 /**
  * Xuất bảng chấm công (31 ngày chu kỳ 26-25) ra file Excel (.xls) có kẻ bảng, màu sắc và bảo vệ text.
  */
-export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, getDayValue, activeDays, filterOnlyMe, currentUserId }) {
+export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, getDayValue, activeDays, filterOnlyMe, currentUserId, cycleDates }) {
   let rowsHtml = '';
   let globalIndex = 1;
+
+  const cycle = getPayrollCycleFromWeek(currentWeek);
+  const cycleDatesList = cycleDates || getPayrollCycleDates(cycle.year, cycle.month);
+  const dateMap = {};
+  cycleDatesList.forEach(d => {
+    dateMap[d.key] = d;
+  });
 
   Object.entries(groupedEmps).forEach(([dept, emps]) => {
     const filtered = filterOnlyMe ? emps.filter(e => e.id === currentUserId) : emps;
@@ -280,7 +287,12 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
             <th style="width: 170px; text-align: left; padding-left: 8px; border: 1px solid #94a3b8;">Họ và Tên</th>
             <th style="width: 75px; border: 1px solid #94a3b8;">Bộ phận</th>
             <th style="width: 85px; border: 1px solid #94a3b8;">Vị trí</th>
-            ${activeDays.map(day => `<th style="width: 45px; border: 1px solid #94a3b8;">${day}</th>`).join('')}
+            ${activeDays.map(day => {
+              const c = dateMap[day];
+              const dayText = c?.dayKey || day;
+              const dateText = c?.display || c?.shortDisplay || '';
+              return `<th style="width: 48px; border: 1px solid #94a3b8; text-align: center;"><div style="font-weight: bold;">${dayText}</div>${dateText ? `<div style="font-size: 8pt; color: #475569; font-weight: normal;">${dateText}</div>` : ''}</th>`;
+            }).join('')}
             <th style="width: 65px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Công FT</th>
             <th style="width: 65px; border: 1px solid #94a3b8; background-color: #94a3b8; color: #ffffff;">Công PT</th>
             <th style="width: 75px; border: 1px solid #94a3b8; background-color: #1e3a8a; color: #ffffff;">Tổng cộng</th>

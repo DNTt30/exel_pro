@@ -98,7 +98,8 @@ export default function EmployeeTimesheet() {
       getDayValue,
       activeDays,
       filterOnlyMe,
-      currentUserId: user?.id
+      currentUserId: user?.id,
+      cycleDates
     });
   };
 
@@ -110,6 +111,8 @@ export default function EmployeeTimesheet() {
         onClose={() => setShowPersonalSlip(false)}
         user={user}
         activeDays={activeDays}
+        cycleDates={cycleDates}
+        getDayValue={getDayValue}
         weekSchedule={weekSchedule}
       />
       

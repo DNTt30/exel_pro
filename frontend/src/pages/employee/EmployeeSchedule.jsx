@@ -244,6 +244,7 @@ export default function EmployeeSchedule() {
         isOpen={showSuggestionModal}
         onClose={() => setShowSuggestionModal(false)}
         emp={user}
+        currentWeek={currentWeek}
         onApply={handleApplySuggestion}
       />
       
@@ -616,8 +617,9 @@ export default function EmployeeSchedule() {
                     card.swapInfo?.label || ''
                   ].filter(Boolean).join(' · ')}
                 >
-                  <div className="text-[10px] font-black text-slate-600">{card.dayKey}</div>
-                  <div className="text-[10px] font-bold text-slate-800 truncate">
+                  <div className="text-[10px] font-black text-slate-700">{card.dayKey}</div>
+                  <div className="text-[8.5px] font-mono text-slate-400 font-semibold">{card.dateFormatted.slice(0, 5)}</div>
+                  <div className="text-[10px] font-bold text-slate-800 truncate mt-0.5">
                     {card.isOff ? 'OFF' : (card.shift || '—')}
                   </div>
                   {card.isSupport && (

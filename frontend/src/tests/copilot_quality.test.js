@@ -63,6 +63,20 @@ describe('AI Copilot — các intent nâng cấp', () => {
     expect(r).toContain('Quy trình đổi ca');
     expect(r).not.toContain('Trà');
   });
+
+  it('trả lời mã nhân viên của tôi chính xác', () => {
+    const ctxWithUser = { ...ctx, user: { id: '260716009', name: 'DƯƠNG NGỌC TÚ', dept: 'VN0485', role: 'STFT' } };
+    const r = askAICopilot('mã nhân viên của tôi', ctxWithUser);
+    expect(r).toContain('260716009');
+    expect(r).toContain('DƯƠNG NGỌC TÚ');
+  });
+
+  it('trả lời thông tin tài khoản của tôi', () => {
+    const ctxWithUser = { ...ctx, user: { id: '260716009', name: 'DƯƠNG NGỌC TÚ', dept: 'VN0485', role: 'STFT' } };
+    const r = askAICopilot('thông tin của tôi', ctxWithUser);
+    expect(r).toContain('260716009');
+    expect(r).toContain('Thông tin tài khoản');
+  });
 });
 
 describe('AI Copilot — giữ hành vi cũ (không hồi quy)', () => {

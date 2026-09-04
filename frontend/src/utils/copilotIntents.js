@@ -181,6 +181,39 @@ export function tryAnswerWithData(ctx) {
   const words = tokenize(qn);
   const selfAsk = words.some((w) => w === 'toi' || w === 'minh' || w === 'tui') || inc(qn, ['cua toi', 'cua minh']);
 
+  // 0) HỎI THÔNG TIN BẢN THÂN / MÃ NHÂN VIÊN / PROFILE
+  if (user && (selfAsk || inc(qn, ['ma nhan vien', 'ma nv', 'ma cua toi', 'ten cua toi', 'thong tin cua toi', 'toi la ai', 'chuc vu cua toi', 'cua hang cua toi', 'tai khoan cua toi']))) {
+    // 0.1) Hỏi mã nhân viên
+    if (inc(qn, ['ma nhan vien', 'ma nv', 'ma so', 'id cua toi', 'ma cua toi', 'so the'])) {
+      const deptStr = user.dept ? ` (Cửa hàng: ${user.dept})` : '';
+      return `🪪 Mã nhân viên của bạn là: **${user.id}** (${user.name || 'Nhân viên'}${deptStr}).`;
+    }
+
+    // 0.2) Hỏi cửa hàng trực thuộc
+    if (inc(qn, ['cua hang cua toi', 'toi lam o dau', 'truc cua hang nao', 'chi nhanh nao', 'store nao', 'dept'])) {
+      return `🏪 Bạn đang làm việc tại cửa hàng: **${user.dept || 'Chưa gán cửa hàng cụ thể'}** (${user.name || user.id}).`;
+    }
+
+    // 0.3) Hỏi chức vụ / loại nhân viên
+    if (inc(qn, ['chuc vu', 'chuc danh', 'vi tri', 'loai hop dong', 'part time hay full time', 'ft hay pt'])) {
+      const typeStr = user.type === 'STPT' || String(user.role).includes('PT') ? 'Part-Time (STPT)' : 'Full-Time (STFT)';
+      return `💼 Chức vụ của bạn: **${user.jobTitle || user.role || 'Nhân sự cửa hàng'}** · Loại: **${typeStr}**.`;
+    }
+
+    // 0.4) Hỏi thông tin tổng quát / tôi là ai
+    if (inc(qn, ['thong tin', 'toi la ai', 'ten toi', 'ten cua toi', 'ho so', 'profile', 'tai khoan'])) {
+      const typeStr = user.type === 'STPT' || String(user.role).includes('PT') ? 'Part-Time (STPT)' : 'Full-Time (STFT)';
+      return [
+        `👤 **Thông tin tài khoản:**`,
+        `- Họ tên: **${user.name || user.id}**`,
+        `- Mã NV: **${user.id}**`,
+        `- Cửa hàng: **${user.dept || 'Toàn hệ thống'}**`,
+        `- Chức danh: **${user.jobTitle || user.role || 'Nhân viên'}** (${typeStr})`,
+        `- Trạng thái: Đang hoạt động ✓`
+      ].join('\n');
+    }
+  }
+
   // 1) Hướng dẫn đổi ca (đón TRƯỚC intent liệt kê đơn của engine)
   if (inc(qn, ['muon doi ca', 'doi ca lam sao', 'cach doi ca', 'doi ca the nao', 'huong dan doi ca'])) return SWAP_GUIDE;
 

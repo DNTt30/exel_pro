@@ -1131,11 +1131,16 @@ Yêu cầu định dạng:
  * Cấu hình trong .env: VITE_GS25_AI_MODEL_URL và VITE_HF_TOKEN
  */
 export async function askGS25HFModel(question, systemPrompt, chatHistory = [], fallbackReply = '') {
-  const modelUrl = import.meta.env.VITE_GS25_AI_MODEL_URL;
+  let modelUrl = import.meta.env.VITE_GS25_AI_MODEL_URL;
   const hfToken = import.meta.env.VITE_HF_TOKEN;
 
   // Nếu chưa cấu hình model URL → bỏ qua
   if (!modelUrl) return fallbackReply;
+
+  // Tự động chuyển đổi endpoint cũ sang router mới nếu cần
+  if (modelUrl.includes('api-inference.huggingface.co/models/')) {
+    modelUrl = modelUrl.replace('api-inference.huggingface.co/models/', 'router.huggingface.co/hf-inference/models/');
+  }
 
   const messages = [
     { role: 'system', content: systemPrompt || 'Bạn là trợ lý AI nghiệp vụ GS25.' },

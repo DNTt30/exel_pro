@@ -253,7 +253,7 @@ export default function NotificationBell() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-blue-100"
+        className="relative p-1.5 sm:p-2 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-blue-100"
         title="Thông báo hệ thống"
       >
         <Bell size={18} />
@@ -267,9 +267,17 @@ export default function NotificationBell() {
         )}
       </button>
 
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-2xs z-40 sm:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
       {/* Floating Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed inset-x-3 top-14 max-w-sm mx-auto sm:static sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-w-none bg-white rounded-2xl shadow-2xl sm:shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
           <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">

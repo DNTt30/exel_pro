@@ -253,32 +253,32 @@ export default function EmployeeSchedule() {
         <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
           
           {/* Left: View Switcher & Shift Swap Action */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full pb-0.5 sm:pb-0 flex-nowrap sm:flex-wrap">
             {/* Tab View Switcher */}
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 shadow-inner">
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 shadow-inner flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setDisplayView('card')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   displayView === 'card' 
                     ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200' 
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <LayoutGrid size={14} />
-                <span>Lịch của tôi (Thẻ)</span>
+                <span>Lịch của tôi</span>
               </button>
               <button
                 type="button"
                 onClick={() => setDisplayView('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   displayView === 'table' 
                     ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200' 
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Table size={14} />
-                <span>Lịch cả cửa hàng (Bảng)</span>
+                <span>Toàn cửa hàng</span>
               </button>
             </div>
 
@@ -286,7 +286,7 @@ export default function EmployeeSchedule() {
             <button
               type="button"
               onClick={() => setShowSwapModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
               title="Gửi yêu cầu đổi ca cho đồng nghiệp"
             >
               <RotateCcw size={13} className="text-indigo-600" />
@@ -297,7 +297,7 @@ export default function EmployeeSchedule() {
             <button
               type="button"
               onClick={() => setShowSwapListModal(true)}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              className="relative flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
               title="Xem danh sách đơn đổi ca"
             >
               <span>📋 Đơn đổi ca</span>
@@ -386,21 +386,23 @@ export default function EmployeeSchedule() {
 
         {/* Quick Shift Registration Bar (When future week) */}
         {isFutureWeek && (
-          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 px-4 py-2 border-b border-emerald-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs">
-                <Sparkles size={12} /> ĐANG MỞ ĐĂNG KÝ CA LÀM
-              </span>
-              <span className="text-slate-700 font-semibold">
-                Chọn ca làm việc cho tuần sau hoặc bấm chọn nhanh mẫu:
-              </span>
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 px-3 sm:px-4 py-2 border-b border-emerald-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">
+                  <Sparkles size={12} /> ĐANG MỞ ĐĂNG KÝ CA LÀM
+                </span>
+                <span className="text-slate-700 font-semibold hidden md:inline">
+                  Chọn ca làm việc cho tuần sau hoặc bấm chọn nhanh mẫu:
+                </span>
+              </div>
 
               {/* Quick Template Buttons */}
-              <div className="flex items-center gap-1.5 ml-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-0.5 flex-nowrap sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => setShowSuggestionModal(true)}
-                  className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-[10px] transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-[10px] transition-all shadow-xs flex items-center gap-1 cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Mở trợ lý gợi ý ca làm việc tự động theo nguyện vọng"
                 >
                   <Sparkles size={11} className="text-amber-300" />
@@ -409,7 +411,7 @@ export default function EmployeeSchedule() {
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('6-14')}
-                  className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Đăng ký ca 6-14 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 6-14
@@ -417,7 +419,7 @@ export default function EmployeeSchedule() {
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('14-22')}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Đăng ký ca 14-22 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 14-22
@@ -425,7 +427,7 @@ export default function EmployeeSchedule() {
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('10-18')}
-                  className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer"
+                  className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Đăng ký ca 10-18 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 10-18
@@ -433,7 +435,7 @@ export default function EmployeeSchedule() {
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('off')}
-                  className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold text-[10px] flex items-center gap-0.5 transition-colors cursor-pointer"
+                  className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold text-[10px] flex items-center gap-0.5 transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Xóa tất cả ca tuần này"
                 >
                   <RotateCcw size={10} /> Đặt lại

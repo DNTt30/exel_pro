@@ -157,19 +157,19 @@ export default function AppLayout() {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <CloudSyncBadge />
-          <button onClick={() => setIsHelpOpen(true)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
+          <button onClick={() => setIsHelpOpen(true)} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell />
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 pl-2 pr-3 py-1 rounded-full ml-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1.5 sm:pl-2 pr-2 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1">
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={12} />}
             </div>
-            <span className="text-xs font-bold text-slate-700 max-w-[90px] sm:max-w-[150px] truncate">{user?.name}</span>
+            <span className="text-xs font-bold text-slate-700 max-w-[65px] sm:max-w-[150px] truncate">{user?.name}</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border hidden sm:inline ${ri.top}`}>{ri.label}</span>
           </div>
-          <button type="button" onClick={() => setShowPw(true)} title="Đổi mật khẩu" className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><KeyRound size={15} /></button>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors ml-0.5" title="Đăng xuất"><LogOut size={16} /></button>
+          <button type="button" onClick={() => setShowPw(true)} title="Đổi mật khẩu" className="hidden sm:flex p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><KeyRound size={15} /></button>
+          <button onClick={handleLogout} className="p-1.5 sm:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors ml-0.5" title="Đăng xuất"><LogOut size={16} /></button>
         </div>
         {isInitializing && (<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden"><div className="h-full w-1/3 bg-blue-500 animate-pulse" /></div>)}
       </header>
@@ -232,8 +232,22 @@ export default function AppLayout() {
           </nav>
 
           {/* Footer */}
-          <div className="px-3 py-3 border-t border-white/10">
-            <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/40 hover:text-red-300 hover:bg-white/10 transition-all text-xs font-semibold">
+          <div className="px-3 py-3 border-t border-white/10 space-y-1">
+            <button 
+              type="button" 
+              onClick={() => { setMobileMenuOpen(false); setShowPw(true); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer"
+            >
+              <KeyRound size={14} className="text-blue-300" /> Đổi mật khẩu
+            </button>
+            <button 
+              type="button" 
+              onClick={() => { setMobileMenuOpen(false); setIsHelpOpen(true); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer"
+            >
+              <HelpCircle size={14} className="text-blue-300" /> Hướng dẫn sử dụng
+            </button>
+            <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/50 hover:text-red-300 hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer">
               <LogOut size={14} /> Đăng xuất
             </button>
             <p className="text-white/20 text-[10px] text-center mt-2">© 2026 GS25 OFC System</p>

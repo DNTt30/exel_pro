@@ -5,6 +5,7 @@ import heroImg from '../assets/gs25_hero.jpg';
 import { isOpsManager } from '../lib/authSession';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
 import ForgotPasswordModal from '../components/modals/ForgotPasswordModal';
+import GS25Mascot3D from '../components/3d/GS25Mascot3D';
 import { 
   LogIn,
   Eye,
@@ -17,7 +18,6 @@ import {
   Bot,
   Sparkles,
   Clock,
-  Crown,
   Zap
 } from 'lucide-react';
 
@@ -30,6 +30,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+  const [focusField, setFocusField] = useState(null);
 
   // ── Bước 2FA: nhập mã OTP gửi qua Telegram của admin ──
   const [otpStep, setOtpStep] = useState(false);
@@ -115,12 +116,6 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleQuickSelect = (id, pass = '1') => {
-    setEmpId(id);
-    setPassword(pass);
-    setError('');
   };
 
   return (
@@ -242,20 +237,20 @@ export default function Login() {
       </div>
 
       {/* ── Main Futuristic Glass Card ── */}
-      <div className="relative z-10 w-full max-w-5xl min-h-[640px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] border border-white/15 anim-neon-card grid grid-cols-1 lg:grid-cols-[1.12fr_1fr] bg-slate-900/60 backdrop-blur-2xl transition-all duration-300">
+      <div className="relative z-10 w-full max-w-5xl min-h-[640px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] border border-white/15 anim-neon-card grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] bg-slate-900/60 backdrop-blur-2xl transition-all duration-300">
         
-        {/* ── LEFT SHOWCASE PANEL ── */}
-        <div className="relative hidden lg:flex flex-col justify-between p-10 xl:p-12 overflow-hidden border-r border-white/10">
+        {/* ── LEFT SHOWCASE PANEL WITH 3D MASCOT ── */}
+        <div className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 overflow-hidden border-r border-white/10">
           {/* Background Image with Slow Breathing Zoom */}
           <div className="absolute inset-0 overflow-hidden">
             <img 
               src={heroImg} 
               alt="GS25 Store Ambient" 
-              className="w-full h-full object-cover anim-kenburns opacity-70"
+              className="w-full h-full object-cover anim-kenburns opacity-60"
             />
             {/* Multi-layer Gradient Mask */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-[#0b1329]/80 to-[#070b14]/50" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#070b14]/90 via-transparent to-[#070b14]/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070b14] via-[#0b1329]/85 to-[#070b14]/60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#070b14]/90 via-transparent to-[#070b14]/80" />
             
             {/* Laser Scanning Line */}
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-40 animate-pulse" />
@@ -281,76 +276,75 @@ export default function Login() {
             )}
           </div>
 
-          {/* Center Content: Brand Title & Value Props */}
-          <div className="relative z-10 my-auto py-8">
-            <div className="inline-flex items-center gap-2 text-cyan-400 text-xs font-extrabold uppercase tracking-wider mb-2">
-              <Sparkles size={14} className="animate-spin" style={{ animationDuration: '8s' }} />
-              <span>Next-Gen Retail Scheduling & Ops</span>
-            </div>
-
-            <h1 className="text-3xl xl:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
-              Hệ Thống Điều Hành <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300">
-                Chuỗi Cửa Hàng GS25
-              </span>
-            </h1>
-
-            <p className="text-sm text-slate-300 font-normal mt-3.5 max-w-md leading-relaxed drop-shadow">
-              Nền tảng quản trị ca kíp tự động bằng AI Copilot, kiểm soát hạn mức 91h Part-time chuẩn chu kỳ và vận hành SOP 24/7.
-            </p>
-
-            {/* Feature Cards Grid */}
-            <div className="grid grid-cols-2 gap-3 mt-7">
-              <div className="p-3.5 rounded-2xl bg-white/[0.08] backdrop-blur-xl border border-white/15 shadow-sm hover:bg-white/[0.12] transition-all group">
-                <div className="flex items-center gap-2.5 mb-1.5">
-                  <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 group-hover:scale-110 transition-transform">
-                    <Bot size={17} />
-                  </div>
-                  <span className="text-xs font-black text-white">AI Copilot</span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-tight">
-                  Tự động xếp ca thông minh & giải đáp SOP vận hành.
-                </p>
+          {/* Center Stage: Title + Interactive 3D Mascot */}
+          <div className="relative z-10 my-auto py-2 flex flex-col items-center">
+            <div className="w-full text-left">
+              <div className="inline-flex items-center gap-2 text-cyan-400 text-xs font-extrabold uppercase tracking-wider mb-1">
+                <Sparkles size={14} className="animate-spin" style={{ animationDuration: '8s' }} />
+                <span>AI Copilot Smart Assistant</span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-white/[0.08] backdrop-blur-xl border border-white/15 shadow-sm hover:bg-white/[0.12] transition-all group">
-                <div className="flex items-center gap-2.5 mb-1.5">
-                  <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 group-hover:scale-110 transition-transform">
-                    <Zap size={17} />
-                  </div>
-                  <span className="text-xs font-black text-white">Chu Kỳ 26 → 25</span>
+              <h1 className="text-2xl xl:text-3xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
+                Hệ Thống Điều Hành <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300">
+                  Chuỗi Cửa Hàng GS25
+                </span>
+              </h1>
+            </div>
+
+            {/* 🌟 Interactive 3D Mascot (Tracks cursor and points finger in real-time) */}
+            <div className="w-full my-1 relative">
+              <GS25Mascot3D height="320px" focusField={focusField} />
+            </div>
+
+            {/* Feature Mini Pills */}
+            <div className="grid grid-cols-2 gap-2.5 w-full">
+              <div className="p-2.5 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/15 flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                  <Bot size={15} />
                 </div>
-                <p className="text-[11px] text-slate-300 leading-tight">
-                  Kiểm soát tuyệt đối trần 91h Part-time chống vượt quỹ.
-                </p>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-white block">AI Copilot</span>
+                  <span className="text-[10px] text-slate-300">Tự động xếp ca chuẩn SOP</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/15 flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                  <Zap size={15} />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-white block">Chu Kỳ 26 → 25</span>
+                  <span className="text-[10px] text-slate-300">Kiểm soát trần 91h PT</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Bottom Status Ticker */}
-          <div className="relative z-10 flex items-center justify-between text-xs text-slate-300 border-t border-white/10 pt-4 font-medium">
-            <div className="flex items-center gap-2.5">
+          <div className="relative z-10 flex items-center justify-between text-xs text-slate-300 border-t border-white/10 pt-3 font-medium">
+            <div className="flex items-center gap-2">
               <div className="relative flex items-center justify-center">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 <span className="absolute w-3.5 h-3.5 rounded-full bg-emerald-400/50 animate-ping" />
               </div>
-              <span className="text-slate-300 text-xs font-semibold">Cơ sở dữ liệu Supabase kết nối trực tuyến</span>
+              <span className="text-slate-300 text-xs font-semibold">Cơ sở dữ liệu Supabase kết nối</span>
             </div>
-            <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-400/30">
+            <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-400/30 text-[11px]">
               v2.5 Pro
             </span>
           </div>
         </div>
 
         {/* ── RIGHT LOGIN FORM PANEL ── */}
-        <div className="bg-white/95 backdrop-blur-2xl p-7 sm:p-10 lg:p-12 flex flex-col justify-between relative">
+        <div className="bg-white/95 backdrop-blur-2xl p-7 sm:p-9 lg:p-11 flex flex-col justify-between relative">
           
           {/* Subtle Corner Glow Accent */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full pointer-events-none blur-2xl" />
 
           <div>
             {/* Header Brand */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 anim-float">
                   <Store size={24} />
@@ -370,45 +364,9 @@ export default function Login() {
               </span>
             </div>
 
-            {/* Quick Fast-Login Demo Chips */}
-            <div className="mb-5 p-3 rounded-2xl bg-slate-100/90 border border-slate-200/80">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-2 flex items-center justify-between">
-                <span>Chọn nhanh tài khoản thử nghiệm:</span>
-                <span className="text-[10px] text-blue-600 font-bold">1-Click</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickSelect('admin', '1')}
-                  className={`px-2.5 py-1.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2 ${
-                    empId === 'admin'
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 shadow-2xs'
-                  }`}
-                >
-                  <Crown size={14} className={empId === 'admin' ? 'text-amber-300' : 'text-purple-600'} />
-                  <div className="truncate">
-                    <span className="text-xs font-bold block leading-none">Admin Chuỗi</span>
-                    <span className={`text-[10px] ${empId === 'admin' ? 'text-purple-200' : 'text-slate-500'}`}>admin (full quyền)</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickSelect('251104004', '1')}
-                  className={`px-2.5 py-1.5 rounded-xl text-left border transition-all cursor-pointer flex items-center gap-2 ${
-                    empId === '251104004'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 shadow-2xs'
-                  }`}
-                >
-                  <Store size={14} className={empId === '251104004' ? 'text-cyan-300' : 'text-blue-600'} />
-                  <div className="truncate">
-                    <span className="text-xs font-bold block leading-none">SM VN0485</span>
-                    <span className={`text-[10px] ${empId === '251104004' ? 'text-blue-200' : 'text-slate-500'}`}>251104004 (Quản lý)</span>
-                  </div>
-                </button>
-              </div>
+            {/* Mobile 3D Mascot Banner (Shown only on small screens) */}
+            <div className="lg:hidden flex justify-center -mt-1 mb-4">
+              <GS25Mascot3D height="190px" focusField={focusField} />
             </div>
 
             {/* Error Banner */}
@@ -498,6 +456,8 @@ export default function Login() {
                       type="text"
                       value={empId}
                       onChange={e => setEmpId(e.target.value)}
+                      onFocus={() => setFocusField('empId')}
+                      onBlur={() => setFocusField(null)}
                       className="block w-full pl-10 pr-4 py-3 text-sm bg-slate-50/80 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
                       placeholder="VD: 251104004 hoặc admin"
                       required
@@ -527,6 +487,8 @@ export default function Login() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      onFocus={() => setFocusField('password')}
+                      onBlur={() => setFocusField(null)}
                       className="block w-full pl-10 pr-11 py-3 text-sm bg-slate-50/80 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
                       placeholder="Nhập mật khẩu..."
                       required
@@ -561,6 +523,8 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={submitting}
+                  onMouseEnter={() => setFocusField('submit')}
+                  onMouseLeave={() => setFocusField(null)}
                   className="btn-glow-effect relative w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 transition-all transform active:scale-[0.99] mt-2"
                 >
                   {submitting ? (

@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://plitfdjzuealjxbylwxy.supabase.co';
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_NSojsCWhOgiUvZIrMpoXEg_So_tE3O_';
 
 // Khởi tạo Supabase Client
-// Lưu ý: Sẽ báo lỗi nếu chưa điền Key trong file .env
 export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {

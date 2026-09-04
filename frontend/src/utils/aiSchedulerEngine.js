@@ -1223,7 +1223,7 @@ Yêu cầu định dạng:
  */
 export async function askGS25HFModel(question, systemPrompt, chatHistory = [], fallbackReply = '') {
   let modelUrl = import.meta.env.VITE_GS25_AI_MODEL_URL;
-  const hfToken = import.meta.env.VITE_HF_TOKEN;
+  const hfToken = (typeof localStorage !== 'undefined' ? (localStorage.getItem('gs25_hf_token') || '') : '') || import.meta.env.VITE_HF_TOKEN || '';
 
   // Nếu chưa cấu hình model URL → bỏ qua
   if (!modelUrl) return fallbackReply;

@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAnonKey } from '../../lib/supabase';
 import { toAuthEmail, toAuthPassword } from '../../lib/authSession';
 
 /** Đổi mật khẩu của CHÍNH MÌNH: xác thực lại mật khẩu cũ rồi updateUser. */
@@ -62,7 +62,7 @@ export async function adminResetPassword(targetEmpId, newPassword) {
   if (!fnUrl || !/reset-password$/.test(fnUrl)) throw new Error('Tính năng đặt lại mật khẩu chưa được kích hoạt. Vui lòng liên hệ quản trị viên hệ thống.');
   const { data: sess } = await supabase.auth.getSession();
   const jwt = sess?.session?.access_token;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || supabaseAnonKey;
   const res = await fetch(fnUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: key, Authorization: 'Bearer ' + jwt },

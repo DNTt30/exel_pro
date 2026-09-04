@@ -95,6 +95,18 @@ export function canApproveSchedule(user) {
   return r === 'admin' || r === 'am';
 }
 
+/** Chỉ Admin (Super-admin) hoặc OFC (Area Manager) mới có quyền bổ nhiệm / bãi nhiệm Quản lý (SM). */
+export function canAssignManager(user) {
+  if (!user) return false;
+  return isBuiltinStoreManager(user) || isAreaManagerFromEmp(user);
+}
+
+/** Chỉ Admin / OFC mới được quyền quản lý danh sách chuỗi cửa hàng. */
+export function canManageStoreList(user) {
+  if (!user) return false;
+  return isBuiltinStoreManager(user) || isAreaManagerFromEmp(user);
+}
+
 export function authMetadata(user) {
   return {
     emp_id: user.id,

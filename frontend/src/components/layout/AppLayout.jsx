@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager } from '../../lib/authSession';
+import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager, canManageStoreList } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ChangePasswordModal from '../modals/ChangePasswordModal';
@@ -101,7 +101,7 @@ export default function AppLayout() {
       title: 'HỆ THỐNG',
       items: [
         { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
-        { to: '/admin/stores',     icon: <Store size={17} />,           label: 'Cửa hàng' },
+        ...(canManageStoreList(user) ? [{ to: '/admin/stores', icon: <Store size={17} />, label: 'Cửa hàng' }] : []),
         ...(isFullAdmin ? [{ to: '/admin/logs', icon: <ScrollText size={17} />, label: 'Nhật ký' }] : [])
       ]
     }

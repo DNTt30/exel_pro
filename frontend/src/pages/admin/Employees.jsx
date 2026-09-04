@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound } from 'lucide-react';
 import ChangePasswordModal from '../../components/modals/ChangePasswordModal';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
-import { canPickStore, isManagerFromEmp, isOpsManager } from '../../lib/authSession';
+import { canPickStore, isManagerFromEmp, isOpsManager, canAssignManager } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
@@ -12,6 +12,7 @@ import { updateEmployeeInfo } from '../../services/api';
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
   const pickStore = canPickStore(user);
+  const canPromote = canAssignManager(user);
   const canEditEmps = pickStore || isOpsManager(user);
   const allowedDepts = new Set(visibleDeptIds(user, stores));
   const visibleStores = pickStore ? stores : stores.filter(s => allowedDepts.has(s.id));
@@ -22,6 +23,12 @@ export default function Employees() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL'); // ALL | sm | nv
   
+  // SM cơ sở chỉ quản lý nhân sự cơ sở (STFT, STPT, CSR); Admin toàn quyền bổ nhiệm CHT/OFC
+  const availableRoles = useMemo(() => {
+    if (canPromote) return STANDARD_ROLES;
+    return STANDARD_ROLES.filter(r => r.id !== 'Cửa hàng trưởng' && r.id !== 'OFC');
+  }, [canPromote]);
+
   const [formData, setFormData] = useState({ 
     id: '', 
     name: '', 
@@ -42,7 +49,7 @@ export default function Employees() {
   }, [employees, search, roleFilter, pickStore, user?.dept]);
 
   const handleRoleChange = (selectedRole) => {
-    const roleInfo = STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
+    const roleInfo = availableRoles.find(r => r.id === selectedRole) || STANDARD_ROLES.find(r => r.id === selectedRole) || { type: 'STFT', defaultMaxH: 48 };
     setFormData(prev => ({
       ...prev,
       role: selectedRole,
@@ -184,7 +191,7 @@ export default function Employees() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {pickStore && isAdding && (
+            {canEditEmps && isAdding && (
               <tr className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
                 <td className="p-2.5">
                   <input 
@@ -222,7 +229,7 @@ export default function Employees() {
                     value={formData.role} 
                     onChange={e => handleRoleChange(e.target.value)}
                   >
-                    {STANDARD_ROLES.map(r => (
+                    {availableRoles.map(r => (
                       <option key={r.id} value={r.id}>{r.label}</option>
                     ))}
                   </select>
@@ -278,7 +285,7 @@ export default function Employees() {
                         value={formData.role} 
                         onChange={e => handleRoleChange(e.target.value)}
                       >
-                        {STANDARD_ROLES.map(r => (
+                        {availableRoles.map(r => (
                           <option key={r.id} value={r.id}>{r.label}</option>
                         ))}
                       </select>
@@ -306,7 +313,7 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
-                        {canEditEmps && emp.id !== user?.id && (
+                        {canPromote && emp.id !== user?.id && (
                         <button
                           onClick={async () => {
                             const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';

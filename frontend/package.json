@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "cross-env VITE_BASE_PATH=/exel_pro/ vite build",
+    "deploy": "npm run build:gh && npx gh-pages -d dist --branch gh-pages --dotfiles",
     "postbuild": "node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "test": "vitest run",
     "lint": "oxlint",
@@ -30,6 +32,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "autoprefixer": "^10.5.4",
+    "cross-env": "^10.1.0",
     "oxlint": "^1.75.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",

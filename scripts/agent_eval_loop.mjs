@@ -39,7 +39,8 @@ try {
 try {
   process.stdout.write('⏳ [2/4] Kiểm tra Code Quality (oxlint)... ');
   const lintOutput = execSync('npm run lint', { cwd: FRONTEND_DIR, stdio: 'pipe' }).toString();
-  const warningCount = (lintOutput.match(/warning/g) || []).length;
+  const match = lintOutput.match(/Found (\d+) warning/i);
+  const warningCount = match ? parseInt(match[1], 10) : (lintOutput.toLowerCase().includes('warning') && !lintOutput.includes('0 warning') ? 1 : 0);
   if (warningCount === 0) {
     results.lintClean.passed = true;
     results.lintClean.score = 25;

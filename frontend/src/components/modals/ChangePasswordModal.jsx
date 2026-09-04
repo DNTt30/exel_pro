@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { changeMyPassword, adminResetPassword } from '../../services/api/password';
 import { toast } from '../ui/toastStore';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, LogOut } from 'lucide-react';
 
 const MIN_LEN = 8;
 
 export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null }) {
   // targetEmp != null → chế độ ADMIN RESET cho nhân viên đó
   const user = useStore(s => s.user);
-  // Khi SM/Manager dùng mật khẩu mặc định → ép đổi, không cho đóng modal
+  const logout = useStore(s => s.logout);
+  const navigate = useNavigate();
+  // Khi SM/Manager dùng mật khẩu mặc định → nhắc đổi mật khẩu
   const isForced = !targetEmp && user?.mustChangePassword && !user?.id?.startsWith('admin');
   const [oldPw, setOldPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -44,8 +47,19 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      onClose();
+      navigate('/login');
+    } catch {
+      onClose();
+      navigate('/login');
+    }
+  };
+
   return (
-    <Modal title={title} isOpen={isOpen} onClose={isForced ? undefined : onClose} hideClose={isForced}>
+    <Modal title={title} isOpen={isOpen} onClose={onClose} hideClose={false}>
       <div className="space-y-3 text-sm">
         {isForced && (
           <div className="px-3.5 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-medium leading-relaxed">
@@ -80,6 +94,26 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
             Bạn đang dùng mật khẩu mặc định — hãy đổi để bảo vệ tài khoản.
           </p>
         )}
+
+        {/* Thoát / Đăng xuất hoặc Để sau */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-rose-600 font-semibold cursor-pointer transition-colors"
+          >
+            <LogOut size={13} /> Đăng xuất tài khoản
+          </button>
+          {isForced && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+            >
+              Để sau, vào xem lịch →
+            </button>
+          )}
+        </div>
       </div>
     </Modal>
   );

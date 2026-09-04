@@ -218,6 +218,60 @@ export const GS25_LABOR_RULES_KNOWLEDGE = {
       '🗣️ **Tiêu chuẩn câu chào khách**: Khi khách bước vào cửa hàng, tất cả nhân viên trong ca tươi cười và chào to rõ ràng: **"GS25 xin chào!"**. Khi khách thanh toán xong và ra về: **"GS25 cảm ơn và hẹn gặp lại quý khách!"**.',
       '📵 **Tác phong làm việc**: Tuyệt đối không bấm điện thoại cá nhân trong giờ làm, giữ gìn quầy thu ngân và khu vực ăn uống luôn sạch sẽ, ngăn nắp.'
     ]
+  },
+
+  // 8. Sổ tay Chất lượng & Quy định Giờ hủy hàng GS25
+  handbookQualityExpiry: {
+    title: 'Đảm Bảo Chất Lượng & Quy Định Giờ Hủy Hàng GS25',
+    lawRef: 'Sổ tay Vận hành & ATVSTP GS25',
+    details: [
+      '🕒 **11:00 & 22:00**: Hủy thức ăn nhanh tươi & có rau (Sandwich có rau, burger, gimbap, soup).',
+      '🕒 **19:00**: Hủy nhóm cơm, mì, sushi (Cơm nắm onigiri, bento, sandwich không rau, mì, sushi).',
+      '🏷️ **Theo HSD / Tem**: FF Onsite, BTP, dessert trên tủ OSC, bánh tươi Patachou.',
+      '📦 **Hàng bách hóa (GM)**: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.',
+      '⚠️ **Quy tắc bắt buộc**: Phải xé rách bao bì hoặc làm biến dạng sản phẩm trước khi cho vào túi rác, tránh thất thoát.',
+      '🌡️ **Nhiệt độ chuẩn**: Tủ mát 0°C - 5°C; Tủ đông < -18°C; Nồi súp lẩu 70°C; Tủ hấp bánh bao 90°C (hấp ≥ 30 phút, CẤM lò vi sóng!).'
+    ]
+  },
+
+  // 9. Danh mục Hóa chất SARAYA & ECOLAB GS25
+  handbookChemicals: {
+    title: 'Danh Mục Hóa Chất Vệ Sinh Cửa Hàng GS25',
+    lawRef: 'Quy trình Vệ sinh & An toàn Hóa chất GS25 - Saraya Greentek',
+    details: [
+      '⚪ **Trắng (H-1 Smart San)**: Nước rửa tay nhân viên, dùng NGUYÊN CHẤT không pha loãng.',
+      '🔴 **Đỏ đô (S-4 Alcohol Sanitizer)**: Cồn sát khuẩn tay & dao thớt, dùng NGUYÊN CHẤT (giữ xa lửa!).',
+      '🟢 **Xanh lá (N-12 Sara Wash)**: Rửa CCDC (pha 6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (pha 1 lần nhấn 30ml + nước đầy bình).',
+      '🟤 **Nâu (G-2 Smart San Degreaser)**: Tẩy dầu mỡ bếp chiên, tủ hút, dùng NGUYÊN CHẤT (bắt buộc mang găng tay cao su!).',
+      '🔴 **Đỏ tươi (211 Pro WC)**: Tẩy bồn cầu & sàn toilet (pha 4 lần nhấn 120ml + nước đầy bình).',
+      '🔵🟡 **Xanh + Vàng (311 Multi Floor & Glass)**: Lau kính mặt tiền và sàn gạch (pha 1 lần nhấn 30ml + nước đầy bình).'
+    ]
+  },
+
+  // 10. SOP Chế biến & Bán hàng Lẩu - Miền Bắc
+  handbookHotpotSOP: {
+    title: 'SOP Chế Biến & Bán Hàng Lẩu Chả Cá Cay (BM: SOP-FFONSITE-CB-LAU-HN V.06)',
+    lawRef: 'SOP Fresh Food Onsite GS25',
+    details: [
+      '🍲 **Nước súp chả cá cay**: 2000ml nước lọc + 1 gói bột súp (120g). Nấu bếp từ công suất **2000W** trong **15 phút**.',
+      '🍢 **Chả cá xoắn xiên**: 10 xiên, nấu công suất **1200W** trong **10 phút** (sau 5 phút lật mặt). Nhiệt độ tâm sau nấu ≥ 75°C.',
+      '🍜 **Mì chả cá cay**: Nước sôi ≥ 95°C, trụng mì đúng **2 phút 30 giây**.',
+      '🥣 **Múc nước súp**: Ly lẩu = *Số xiên + 1 vá súp*. Tô mì = *4 vá nước súp* (~30g/vá). Luôn THÁO XIÊN trước khi cho vào ly hoặc tô.',
+      '🔥 **Nút bấm lò vi sóng công nghiệp**: Ly chả cá **BẤM SỐ 3** (gia dụng 30s). Tô mì **BẤM SỐ 5** (gia dụng 2 phút).',
+      '⏱️ **Thời gian trưng bày**: Tối đa 2 tiếng ở công suất 200W. Trữ đông BTP tối đa 15 ngày (-23°C đến -18°C).'
+    ]
+  },
+
+  // 11. Phân công Vệ sinh 3 Ca & Quy trình Rửa tay 12 bước
+  handbookCleaningAndHygiene: {
+    title: 'Phân Công Vệ Sinh Ca & Quy Trình Rửa Tay Saraya 60s',
+    lawRef: 'Lịch Vệ sinh Định kỳ & Chuẩn Vệ sinh Saraya GS25',
+    details: [
+      '☀️ **Ca 1 (6h - 14h)**: Vệ sinh quạt hút, thanh nẹp, dọn WH kho bãi, tủ mát kho, quét mạng nhện, lau kệ hàng.',
+      '🌤️ **Ca 2 (14h - 22h)**: Vệ sinh chân bàn ghế, rổ mua sắm, tủ đông/mát counter, kệ snack, sọt rác, xô lau.',
+      '🌙 **Ca 3 (22h - 6h)**: Chà sàn gạch xám, cọ rửa toilet, hộc counter, và **BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3**.',
+      '🧼 **Rửa tay 12 bước Saraya (60 giây)**: Rửa nước -> 2 nhấn H-1 -> chà lòng tay, mu tay, kẽ ngón, đầu ngón, ngón cái, cổ tay đến khuỷu, chà móng tay -> xả nước (≥60s) -> lau khô -> xịt cồn S-4. 4 vùng hay bị sót: móng tay, ngón cái, kẽ ngón, mu bàn tay.'
+    ]
   }
 };
 
@@ -1084,6 +1138,36 @@ HƯỚNG DẪN ĐỌC LỊCH:
 - Khi được hỏi "Lịch làm việc của X" hoặc "X làm ca nào": BẮT BUỘC phải liệt kê đầy đủ từng ngày trong tuần của người đó (Từ T2 đến CN) dựa vào [Lịch cá nhân từng người]. Tuyệt đối KHÔNG ĐƯỢC gộp chung chung "cả tuần" hay bỏ sót ngày. Tuyệt đối ghi ĐÚNG HỌ TÊN, không tự chế tên.
 - Để trả lời "ai làm cùng ai vào ngày X", hãy nhìn vào [Danh sách ca trực theo ngày], chọn ngày X, tìm xem nhân viên đó đang làm ca nào, và những ai đang có cùng ca đó. Phải đọc dữ liệu tuyệt đối CHÍNH XÁC, không đoán mò!
 - Nếu hỏi "ai nghỉ/rảnh", tìm những nhân viên không có tên trong bất kỳ ca nào của ngày hôm đó.
+
+SỔ TAY QUY CHUẨN VẬN HÀNH GS25 (BẮT BUỘC NẮM RÕ):
+1. Khung giờ hủy Thức ăn nhanh (Fast Food - FF):
+- 11:00 & 22:00: FF rau & tươi (Sandwich có rau, burger, gimbap, soup).
+- 19:00: Cơm, mì, sushi (Cơm nắm onigiri, bento, sandwich không rau, mì, sushi).
+- Theo HSD tem BTP: FF Onsite, BTP, bánh Patachou, dessert tủ OSC.
+- Hàng GM: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.
+- Bắt buộc xé rách bao bì trước khi cho vào túi rác.
+2. Nhiệt độ chuẩn thiết bị:
+- Tủ mát 0°C - 5°C; Tủ đông < -18°C.
+- Tủ hấp bánh bao 90°C (hấp ít nhất 30 phút, CẤM hâm lò vi sóng!).
+- Nồi súp lẩu 70°C (công suất 200W khi trưng bày, tối đa 2 tiếng).
+3. Hóa chất Saraya (Hệ 6 mã màu chuẩn GS25):
+- Trắng (H-1 Smart San): Rửa tay nhân viên (dùng NGUYÊN CHẤT).
+- Đỏ đô (S-4 Sanitizer): Cồn sát khuẩn tay & dao thớt (NGUYÊN CHẤT, tránh xa lửa).
+- Xanh lá (N-12 Sara Wash): Rửa CCDC (6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (1 lần nhấn 30ml + nước đầy bình).
+- Nâu (G-2 Smart San Degreaser): Tẩy dầu mỡ bếp chiên/tủ hút (NGUYÊN CHẤT, mang găng cao su).
+- Đỏ tươi (211 Pro WC): Tẩy bồn cầu toilet (4 lần nhấn 120ml + nước đầy bình).
+- Xanh+Vàng (311 Multi Floor & Glass): Lau kính & sàn gạch (1 lần nhấn 30ml + nước đầy bình).
+4. SOP Chế biến & Bán hàng Lẩu Miền Bắc (BM: SOP-FFONSITE-CB-LAU-HN V.06):
+- Nước súp chả cá cay: 2000ml nước + 1 gói bột súp 120g, nấu 2000W trong 15 phút.
+- Chả cá xiên: 10 xiên, nấu 1200W trong 10 phút (sau 5 phút lật mặt). Nhiệt độ tâm ≥ 75°C.
+- Mì chả cá: Nước sôi ≥ 95°C, trụng 2 phút 30 giây.
+- Múc súp: Ly lẩu = Số xiên + 1 vá. Tô mì = 4 vá súp (~30g/vá). Tháo xiên trước khi cho vào ly/tô.
+- Nút bấm lò vi sóng công nghiệp: Ly chả cá BẤM SỐ 3 (gia dụng 30s); Tô mì BẤM SỐ 5 (gia dụng 2 phút).
+5. Phân công Vệ sinh 3 Ca & Rửa tay 12 bước:
+- Ca 1 (6-14h): Quạt hút, thanh nẹp, kho WH, tủ mát kho, quét mạng nhện, lau kệ hàng.
+- Ca 2 (14-22h): Chân bàn ghế, rổ mua sắm, tủ mát/đông counter, kệ snack, sọt rác, xô lau.
+- Ca 3 (22-6h): Chà sàn gạch xám, toilet, hộc counter, và BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3.
+- Rửa tay: 12 bước 60 giây Saraya. 4 vị trí hay sót: móng tay, ngón cái, kẽ ngón, mu bàn tay.
 
 NGUYÊN TẮC XỬ LÝ NGỮ CẢNH:
 1. Theo dõi toàn bộ lịch sử hội thoại, không chỉ tin nhắn gần nhất.

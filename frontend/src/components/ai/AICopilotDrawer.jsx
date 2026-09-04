@@ -18,7 +18,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   const initialWelcome = {
     id: 'welcome',
     sender: 'ai',
-    text: `Chào ${firstName}. Hỏi ca, giờ, lương hoặc công thức món.`
+    text: `Chào ${firstName}! Em là TÚ mini 🥸. Hỏi ca làm, giờ công, bù công C&B hoặc cẩm nang GS25: giờ hủy hàng, nút vi sóng, công thức lẩu chả cá, hóa chất Saraya...`
   };
 
   const [messages, setMessages] = useState(() => {
@@ -54,14 +54,14 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   const isAdmin = isOpsManager(user);
   const quickPrompts = isAdmin ? [
     '🔍 Quét lỗi & vi phạm lịch tuần',
-    '📊 Nhân viên nào làm nhiều giờ nhất?',
+    '🕒 Giờ hủy hàng FF & GM GS25',
     '🔄 Có đơn đổi ca nào đang chờ?',
-    '📋 Kiểm tra đơn báo bù công C&B'
+    '🧪 Hóa chất Saraya 6 mã màu'
   ] : [
     '📅 Hôm nay tôi làm ca mấy giờ?',
-    '🍊 Công thức trà tắc',
-    '🍫 Pha milo như nào?',
-    '🍢 Công thức xốt tok'
+    '🕒 Khi nào hủy sandwich & cơm nắm?',
+    '🔥 Lò vi sóng chả cá bấm số mấy?',
+    '🍲 Công thức nấu súp chả cá cay'
   ];
 
   const handleSend = async (textToSend = null) => {

@@ -1,20 +1,44 @@
 import { supabase } from '../../lib/supabase';
+import { toAuthEmail, toAuthPassword } from '../../lib/authSession';
 
 /** Đổi mật khẩu của CHÍNH MÌNH: xác thực lại mật khẩu cũ rồi updateUser. */
-export async function changeMyPassword(oldPassword, newPassword) {
-  const { data: sess } = await supabase.auth.getSession();
-  const email = sess?.session?.user?.email;
-  if (!email) throw new Error('Chưa có phiên đăng nhập');
+export async function changeMyPassword(oldPassword, newPassword, opts = {}) {
+  const { isFirstTime = false, userId } = opts;
+  let { data: sess } = await supabase.auth.getSession();
+  let email = sess?.session?.user?.email;
 
-  // Xác thực mật khẩu cũ bằng cách sign-in lại
-  const check = await supabase.auth.signInWithPassword({ email, password: oldPassword });
-  if (check.error) throw new Error('Mật khẩu hiện tại không đúng');
+  // Nếu chưa có session nhưng có userId, thử thiết lập phiên bằng default password
+  if (!email && userId) {
+    email = toAuthEmail(userId);
+    const defPw = toAuthPassword(userId);
+    const signRes = await supabase.auth.signInWithPassword({ email, password: defPw });
+    if (signRes.data?.session) {
+      sess = signRes.data;
+    }
+  }
+
+  if (!email) throw new Error('Chưa có phiên đăng nhập. Vui lòng tải lại trang.');
+
+  // Chỉ xác thực mật khẩu cũ nếu KHÔNG phải lần đầu đổi mật khẩu mặc định
+  if (!isFirstTime) {
+    let check = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+    // Nếu thất bại và mật khẩu cũ là '1' (hoặc người dùng đang dùng mặc định), thử mật khẩu mặc định của hệ thống
+    if (check.error && (oldPassword === '1' || !oldPassword)) {
+      const uId = userId || email.split('@')[0];
+      check = await supabase.auth.signInWithPassword({ email, password: toAuthPassword(uId) });
+    }
+    if (check.error) throw new Error('Mật khẩu hiện tại không đúng');
+  }
 
   const upd = await supabase.auth.updateUser({ password: newPassword });
-  if (upd.error) throw new Error(upd.error.message);
+  if (upd.error) throw new Error(upd.error.message || 'Không thể cập nhật mật khẩu');
 
   // Đánh dấu đã tự đặt mật khẩu (RPC definer — vượt RLS app_profiles)
-  await supabase.rpc('mark_credential_set');
+  try {
+    await supabase.rpc('mark_credential_set');
+  } catch {
+    // bỏ qua nếu RPC chưa khởi tạo
+  }
   return true;
 }
 

@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import heroImg from '../assets/gs25_hero.jpg';
 import { isOpsManager } from '../lib/authSession';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
+import ForgotPasswordModal from '../components/modals/ForgotPasswordModal';
 import { 
   LogIn,
   Eye,
@@ -23,6 +24,7 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   // ── Bước 2FA: nhập mã OTP gửi qua Telegram của admin ──
   const [otpStep, setOtpStep] = useState(false);
@@ -367,7 +369,13 @@ export default function Login() {
                     <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
                       Mật Khẩu
                     </label>
-                    <span className="text-[11px] text-slate-400">Mặc định: 1</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(true)}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
+                      Quên mật khẩu?
+                    </button>
                   </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -388,6 +396,9 @@ export default function Login() {
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                    <span>Mặc định: <strong>1</strong></span>
                   </div>
                 </div>
 
@@ -436,6 +447,12 @@ export default function Login() {
 
       </div>
 
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        initialEmpId={empId}
+        onUseDefaultPassword={() => setPassword('1')}
+      />
     </div>
   );
 }

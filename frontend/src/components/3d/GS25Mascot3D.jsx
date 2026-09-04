@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import chibiImg from '../../assets/chibi_scientist.png';
+import chibiCutoutImg from '../../assets/chibi_cutout.png';
 import allainHeroImg from '../../assets/allain_hero.png';
 import { Sparkles, Bot, Swords, Eye } from 'lucide-react';
 
 /**
  * GS25 Multi-Mascot System:
- * 1. 🧪 Chibi Nhà Bác Học Nhí (Ảnh mới - Hoạt ảnh 2D sắc nét, cử động sinh động):
- *    - Cực kỳ chi tiết, không bị thô (dùng nguyên mẫu sắc nét 100%).
- *    - Ống ngắm kính ngọc bích luôn xoay và phóng tia sáng xanh khóa theo con trỏ chuột.
- *    - Cặp mắt to tròn lấp lánh liếc nhìn theo con trỏ chuột thời gian thực.
- *    - Chớp mắt tự nhiên sau mỗi 3 - 4s, nhịp thở bồng bềnh và nghiêng người 3D (Parallax).
- *    - Nhấp chuột để kích hoạt hiệu ứng nhảy vui sướng (Cheer Bounce) & bùng nổ sao lấp lánh.
- * 2. ⚔️ Allain Kiếm Khách (Liên Quân): Thần kiếm phóng tia laser ánh kim khóa theo chuột.
- * 3. 🤖 G-Bot 3D: Người máy 3D Three.js chỉ tay theo chuột.
+ * 1. 🧪 Chibi Nhà Bác Học Nhí (Bản Cutout Trong Suốt - Hoạt ảnh cử động chân thực):
+ *    - Tách nền trong suốt 100%, nhân vật đứng trực tiếp trên sàn giao diện, không còn viền khung ảnh chữ nhật.
+ *    - Bỏ đường kẻ thô cắt ngang màn hình — thay bằng luồng ánh sáng ngọc bích tỏa nón mềm mại và tâm điểm ánh sáng.
+ *    - Cặp mắt to tròn có con ngươi sao lấp lánh LIẾC NHÌN THEO CHUỘT thời gian thực.
+ *    - Nhịp chớp mắt tự nhiên (Blinking), bóng đổ sàn động (Ground Shadow).
+ *    - Ống kính ngọc bích xoay hướng ngắm theo góc di chuyển chuột và nhấp nháy phát quang.
+ *    - Nhấp chuột (Click) để kích hoạt hiệu ứng nhảy bật (Cheer Jump) & bùng nổ sao lung linh.
+ * 2. ⚔️ Allain Kiếm Khách (Liên Quân).
+ * 3. 🤖 G-Bot 3D (Three.js Mascot).
  */
 export default function GS25Mascot3D({ 
   className = '', 
@@ -30,7 +31,6 @@ export default function GS25Mascot3D({
   // ── Chibi Specific State & Refs ──
   const chibiCardRef = useRef(null);
   const lensRef = useRef(null);
-  const [lensScreenPos, setLensScreenPos] = useState({ x: 0, y: 0 });
   const [pupilOffset, setPupilOffset] = useState({ x: 0, y: 0 });
   const [isBlinking, setIsBlinking] = useState(false);
   const [isCheering, setIsCheering] = useState(false);
@@ -38,8 +38,6 @@ export default function GS25Mascot3D({
 
   // ── Allain Specific State & Refs ──
   const allainCardRef = useRef(null);
-  const [allainSwordPos, setAllainSwordPos] = useState({ x: 0, y: 0 });
-  const [isSlashing, setIsSlashing] = useState(false);
 
   // ── Robot Three.js Canvas Ref ──
   const robotCanvasRef = useRef(null);
@@ -57,14 +55,14 @@ export default function GS25Mascot3D({
       const dx = (e.clientX - cx) / cx;
       const dy = (e.clientY - cy) / cy;
       setTilt({
-        x: -dy * 12,
-        y: dx * 15
+        x: -dy * 10,
+        y: dx * 14
       });
 
       // Pupil Tracking calculation (relative to center of screen)
       setPupilOffset({
-        x: Math.max(-9, Math.min(9, dx * 10)),
-        y: Math.max(-7, Math.min(7, dy * 8))
+        x: Math.max(-8, Math.min(8, dx * 9)),
+        y: Math.max(-6, Math.min(6, dy * 7))
       });
 
       // Telescope Angle calculation (aiming toward cursor)
@@ -74,7 +72,7 @@ export default function GS25Mascot3D({
         const ly = rect.top + rect.height / 2;
         const angleRad = Math.atan2(e.clientY - ly, e.clientX - lx);
         const deg = (angleRad * 180) / Math.PI;
-        setTelescopeAngle(Math.max(-35, Math.min(35, deg * 0.4)));
+        setTelescopeAngle(Math.max(-28, Math.min(28, deg * 0.35)));
       }
     };
 
@@ -82,9 +80,6 @@ export default function GS25Mascot3D({
       if (mode === 'chibi') {
         setIsCheering(true);
         setTimeout(() => setIsCheering(false), 450);
-      } else if (mode === 'allain') {
-        setIsSlashing(true);
-        setTimeout(() => setIsSlashing(false), 350);
       }
     };
 
@@ -98,65 +93,21 @@ export default function GS25Mascot3D({
   }, [mode]);
 
   // ─────────────────────────────────────────────────────────────
-  // 2. CHIBI NATURAL BLINKING & LENS POSITION UPDATE
+  // 2. CHIBI NATURAL BLINKING
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (mode !== 'chibi') return undefined;
 
-    // Natural Eye Blinking loop
     const blinkInterval = setInterval(() => {
       setIsBlinking(true);
       setTimeout(() => setIsBlinking(false), 140);
     }, 3600);
 
-    // Update Lens screen position for emerald laser beam
-    const updateLensPos = () => {
-      if (!lensRef.current) return;
-      const rect = lensRef.current.getBoundingClientRect();
-      setLensScreenPos({
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-      });
-    };
-
-    updateLensPos();
-    window.addEventListener('resize', updateLensPos);
-    const posTimer = setInterval(updateLensPos, 600);
-
-    return () => {
-      clearInterval(blinkInterval);
-      clearInterval(posTimer);
-      window.removeEventListener('resize', updateLensPos);
-    };
+    return () => clearInterval(blinkInterval);
   }, [mode]);
 
   // ─────────────────────────────────────────────────────────────
-  // 3. ALLAIN SWORD POSITION UPDATE
-  // ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (mode !== 'allain') return undefined;
-
-    const updateSword = () => {
-      if (!allainCardRef.current) return;
-      const rect = allainCardRef.current.getBoundingClientRect();
-      setAllainSwordPos({
-        x: rect.left + rect.width * 0.15,
-        y: rect.top + rect.height * 0.85
-      });
-    };
-
-    updateSword();
-    window.addEventListener('resize', updateSword);
-    const timer = setInterval(updateSword, 600);
-
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('resize', updateSword);
-    };
-  }, [mode]);
-
-  // ─────────────────────────────────────────────────────────────
-  // 4. ROBOT THREE.JS ANIMATION
+  // 3. ROBOT THREE.JS ANIMATION
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (mode !== 'robot') return undefined;
@@ -328,7 +279,7 @@ export default function GS25Mascot3D({
           }`}
         >
           <Eye size={13} className={mode === 'chibi' ? 'text-emerald-200 animate-pulse' : ''} />
-          <span>Chibi Đáng Yêu</span>
+          <span>Chibi Bác Học</span>
         </button>
 
         <button
@@ -359,37 +310,46 @@ export default function GS25Mascot3D({
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 1. CHIBI NHÀ BÁC HỌC NHÍ (HOẠT ẢNH 2D SỐNG ĐỘNG CỬ ĐỘNG)  */}
+      {/* 1. CHIBI NHÀ BÁC HỌC NHÍ (CUTOUT TÁCH NỀN TRONG SUỐT 100%) */}
       {/* ────────────────────────────────────────────────────────── */}
       {mode === 'chibi' && (
         <div className="relative w-full flex flex-col items-center">
           
-          {/* Parallax 3D Card Stage */}
+          {/* Free-standing Character Stage (No card frame, no rectangle box!) */}
           <div 
-            style={{ perspective: '1000px' }}
-            className="w-full flex justify-center items-center"
+            style={{ perspective: '900px' }}
+            className="w-full flex justify-center items-center py-1"
           >
             <div 
               ref={chibiCardRef}
               style={{
-                transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(${isCheering ? '-16px' : '0px'})`,
+                transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(${isCheering ? '-20px' : '0px'})`,
                 transition: isCheering ? 'transform 0.15s cubic-bezier(0.18, 0.89, 0.32, 1.28)' : 'transform 0.08s ease-out'
               }}
-              className="relative w-full max-w-[320px] aspect-[855/1024] rounded-3xl overflow-hidden border-2 border-emerald-400/50 shadow-[0_20px_60px_rgba(16,185,129,0.3)] bg-gradient-to-b from-slate-900/90 to-slate-950 group select-none"
+              className="relative w-full max-w-[280px] aspect-[855/1024] flex items-center justify-center cursor-pointer"
+              onClick={() => {
+                setIsCheering(true);
+                setTimeout(() => setIsCheering(false), 450);
+              }}
             >
-              {/* Authentic High-Res Chibi Artwork */}
-              <img 
-                src={chibiImg} 
-                alt="Chibi Explorer Scientist" 
-                className="w-full h-full object-cover object-center filter brightness-[1.03] contrast-[1.05]"
+              {/* Soft Ground Shadow beneath shoes */}
+              <div 
+                className="absolute -bottom-3 w-48 h-9 bg-black/60 rounded-full blur-xl pointer-events-none transition-transform duration-200"
+                style={{
+                  transform: `scale(${isCheering ? 0.75 : 1})`,
+                  opacity: isCheering ? 0.25 : 0.7
+                }}
               />
 
-              {/* Ambient Glows */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
+              {/* Seamless Transparent Cutout Figure */}
+              <img 
+                src={chibiCutoutImg} 
+                alt="Chibi Explorer Scientist" 
+                className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.65)] brightness-[1.04] select-none pointer-events-none"
+              />
 
-              {/* ── INTERACTIVE ANIMATED EYES (Follows Mouse Cursor!) ── */}
-              {/* Left Eye Pupil */}
+              {/* ── INTERACTIVE ANIMATED PUPILS (Follows Mouse Cursor!) ── */}
+              {/* Left Eye Socket */}
               <div 
                 className="absolute pointer-events-none overflow-hidden"
                 style={{
@@ -414,14 +374,14 @@ export default function GS25Mascot3D({
 
                 {/* Natural Eyelid Blink Overlay */}
                 <div 
-                  className="absolute inset-0 bg-[#fde9df] transition-transform duration-100 ease-in-out origin-top"
+                  className="absolute inset-0 bg-[#fce9df] transition-transform duration-100 ease-in-out origin-top"
                   style={{
                     transform: isBlinking ? 'scaleY(1)' : 'scaleY(0)'
                   }}
                 />
               </div>
 
-              {/* Right Eye Pupil */}
+              {/* Right Eye Socket */}
               <div 
                 className="absolute pointer-events-none overflow-hidden"
                 style={{
@@ -446,7 +406,7 @@ export default function GS25Mascot3D({
 
                 {/* Natural Eyelid Blink Overlay */}
                 <div 
-                  className="absolute inset-0 bg-[#fde9df] transition-transform duration-100 ease-in-out origin-top"
+                  className="absolute inset-0 bg-[#fce9df] transition-transform duration-100 ease-in-out origin-top"
                   style={{
                     transform: isBlinking ? 'scaleY(1)' : 'scaleY(0)'
                   }}
@@ -454,7 +414,6 @@ export default function GS25Mascot3D({
               </div>
 
               {/* ── TELESCOPE & EMERALD LENS INTERACTION ── */}
-              {/* Glowing Emerald Gem Lens */}
               <div 
                 ref={lensRef}
                 style={{
@@ -467,117 +426,59 @@ export default function GS25Mascot3D({
                 }}
                 className="absolute pointer-events-none flex items-center justify-center"
               >
+                {/* Soft Emerald Spotlight Cone radiating outward towards the right */}
+                <div 
+                  className="absolute left-1/2 top-1/2 -translate-y-1/2 w-48 h-32 pointer-events-none opacity-40 blur-lg"
+                  style={{
+                    background: 'radial-gradient(ellipse at left, rgba(52, 211, 153, 0.7) 0%, rgba(16, 185, 129, 0.2) 45%, transparent 75%)',
+                    transform: 'rotate(-10deg)',
+                    transformOrigin: 'left center'
+                  }}
+                />
+
                 {/* Emerald Core Pulsing Aura */}
-                <div className="w-7 h-7 rounded-full bg-emerald-400/40 shadow-[0_0_20px_#10b981] animate-ping" />
-                <div className="absolute w-5 h-5 rounded-full bg-emerald-300/80 shadow-[0_0_12px_#34d399] flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white opacity-90 animate-pulse" />
+                <div className="w-7 h-7 rounded-full bg-emerald-400/50 shadow-[0_0_20px_#10b981] animate-ping" />
+                <div className="absolute w-5 h-5 rounded-full bg-emerald-300/90 shadow-[0_0_12px_#34d399] flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-white opacity-95 animate-pulse" />
                 </div>
               </div>
 
-              {/* Character Name Tag Badge */}
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-emerald-400/40 text-emerald-300 text-[11px] font-black uppercase tracking-wider shadow-md pointer-events-none">
-                <Sparkles size={12} className="text-emerald-400 animate-spin" style={{ animationDuration: '6s' }} />
-                <span>GS25 Chibi Scientist • Đang quan sát bạn</span>
-              </div>
+              {/* Cheer Star Burst Effect on Click */}
+              {isCheering && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <span className="absolute -top-6 left-12 text-xl animate-bounce">✨</span>
+                  <span className="absolute -top-4 right-14 text-xl animate-bounce" style={{ animationDelay: '0.1s' }}>⭐</span>
+                  <span className="absolute top-16 -left-6 text-xl animate-bounce" style={{ animationDelay: '0.15s' }}>💖</span>
+                  <span className="absolute top-20 -right-6 text-xl animate-bounce" style={{ animationDelay: '0.2s' }}>✨</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ── EMERALD LASER SPOTLIGHT BEAM FROM LENS TO CURSOR ── */}
-          {lensScreenPos.x > 0 && cursorPos.x > 0 && (
-            <svg 
-              className="fixed inset-0 w-screen h-screen pointer-events-none z-50 overflow-visible"
+          {/* ── Subdued Interactive Focus Beacon (Follows mouse over inputs without harsh lines) ── */}
+          {cursorPos.x > 0 && (
+            <div 
+              className="fixed pointer-events-none z-50 transition-transform duration-75 ease-out"
+              style={{
+                left: cursorPos.x,
+                top: cursorPos.y,
+                transform: 'translate(-50%, -50%)'
+              }}
             >
-              <defs>
-                {/* Emerald Glow Filter */}
-                <filter id="emeraldLaserGlow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="3.0" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-                {/* Emerald Spotlight Gradient */}
-                <linearGradient id="emeraldBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.85" />
-                  <stop offset="65%" stopColor="#34d399" stopOpacity="0.75" />
-                  <stop offset="100%" stopColor="#6ee7b7" stopOpacity="0.95" />
-                </linearGradient>
-              </defs>
-
-              {/* Outer Glowing Beam */}
-              <line 
-                x1={lensScreenPos.x} 
-                y1={lensScreenPos.y} 
-                x2={cursorPos.x} 
-                y2={cursorPos.y} 
-                stroke="#10b981" 
-                strokeWidth="4.5" 
-                strokeOpacity="0.3"
-                strokeDasharray="6, 4"
-                filter="url(#emeraldLaserGlow)"
-              />
-
-              {/* Sharp Center Laser */}
-              <line 
-                x1={lensScreenPos.x} 
-                y1={lensScreenPos.y} 
-                x2={cursorPos.x} 
-                y2={cursorPos.y} 
-                stroke="url(#emeraldBeamGrad)" 
-                strokeWidth="2.0" 
-                strokeOpacity="0.9"
-              />
-
-              {/* Emerald Target Reticle at Cursor */}
-              <g transform={`translate(${cursorPos.x}, ${cursorPos.y})`}>
-                {/* Rotating Outer Target Ring */}
-                <circle 
-                  r="16" 
-                  fill="none" 
-                  stroke="#34d399" 
-                  strokeWidth="1.5" 
-                  strokeDasharray="6, 4"
-                  className="animate-spin"
-                  style={{ animationDuration: '5s' }}
-                />
-                {/* Inner Reticle */}
-                <circle 
-                  r="7" 
-                  fill="none" 
-                  stroke="#10b981" 
-                  strokeWidth="1.5" 
-                />
-                {/* Center Core Dot */}
-                <circle 
-                  r="3" 
-                  fill="#6ee7b7" 
-                  filter="url(#emeraldLaserGlow)"
-                />
-                {/* Corner Crosshair Marks */}
-                <line x1="-12" y1="0" x2="-8" y2="0" stroke="#34d399" strokeWidth="2" />
-                <line x1="8" y1="0" x2="12" y2="0" stroke="#34d399" strokeWidth="2" />
-                <line x1="0" y1="-12" x2="0" y2="-8" stroke="#34d399" strokeWidth="2" />
-                <line x1="0" y1="8" x2="0" y2="12" stroke="#34d399" strokeWidth="2" />
-              </g>
-
-              {/* Cheer Star Burst on Click */}
-              {isCheering && (
-                <g transform={`translate(${cursorPos.x}, ${cursorPos.y})`}>
-                  <circle r="26" fill="none" stroke="#34d399" strokeWidth="2" className="animate-ping" />
-                  <text x="-8" y="-18" fontSize="16" fill="#fde047">✨</text>
-                  <text x="14" y="-8" fontSize="14" fill="#34d399">⭐</text>
-                  <text x="-22" y="16" fontSize="14" fill="#10b981">✨</text>
-                  <text x="10" y="22" fontSize="16" fill="#6ee7b7">💖</text>
-                </g>
-              )}
-            </svg>
+              {/* Elegant Subtle Emerald Focus Reticle */}
+              <div className="relative w-8 h-8 flex items-center justify-center">
+                <div className="absolute w-7 h-7 rounded-full border border-emerald-400/50 animate-ping opacity-60" />
+                <div className="absolute w-4 h-4 rounded-full border border-emerald-300/80" />
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+              </div>
+            </div>
           )}
 
           {/* Interactive Helper Badge */}
-          <div className="mt-2 text-center pointer-events-none">
+          <div className="mt-1 text-center pointer-events-none">
             <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-emerald-400/40 text-[11px] font-bold text-emerald-300 shadow-md">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>Ống ngắm & Mắt liếc theo chuột • Click để nhảy nhót bắn sao lấp lánh</span>
+              <span>Chibi tách nền sống động • Mắt liếc & Ống ngắm xoay theo chuột • Click để nhảy nhót</span>
             </div>
           </div>
         </div>
@@ -613,29 +514,10 @@ export default function GS25Mascot3D({
             </div>
           </div>
 
-          {allainSwordPos.x > 0 && cursorPos.x > 0 && (
-            <svg className="fixed inset-0 w-screen h-screen pointer-events-none z-50 overflow-visible">
-              <line 
-                x1={allainSwordPos.x} 
-                y1={allainSwordPos.y} 
-                x2={cursorPos.x} 
-                y2={cursorPos.y} 
-                stroke="#f59e0b" 
-                strokeWidth="2.5" 
-                strokeOpacity="0.85" 
-                strokeDasharray="8, 4" 
-              />
-              <circle cx={cursorPos.x} cy={cursorPos.y} r="12" fill="none" stroke="#fbbf24" strokeWidth="1.5" />
-              {isSlashing && (
-                <line x1={cursorPos.x - 30} y1={cursorPos.y - 30} x2={cursorPos.x + 30} y2={cursorPos.y + 30} stroke="#fff" strokeWidth="3" />
-              )}
-            </svg>
-          )}
-
           <div className="mt-2 text-center pointer-events-none">
             <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-amber-400/40 text-[11px] font-bold text-amber-300 shadow-md">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-              <span>Tia thần kiếm khóa mục tiêu theo chuột • Click để chém kiếm</span>
+              <span>Nghiêng 3D theo góc nhìn chuột</span>
             </div>
           </div>
         </div>

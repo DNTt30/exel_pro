@@ -17,17 +17,16 @@ export default function AppLayout() {
   const logout = useStore(state => state.logout);
   const [showPw, setShowPw] = useState(false);
   // Nhắc đổi mật khẩu MỘT LẦN bằng effect (tránh mở modal trong cùng commit mount
-  // với lazy-load trang + redirect router — nguyên nhân tiềm ẩn React error #185)
   const pwPromptedRef = useRef(false);
   useEffect(() => {
     if (user?.mustChangePassword && !pwPromptedRef.current) {
       pwPromptedRef.current = true;
       setShowPw(true);
     }
-  }, [user]);
+  }, [user?.mustChangePassword]);
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
-const authWarning = useStore(state => state.authWarning);
+  const authWarning = useStore(state => state.authWarning);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -42,14 +41,7 @@ const authWarning = useStore(state => state.authWarning);
     if (user?.id === 'admin' && user?.mustSetupPassword && location.pathname !== '/admin/security/change-password') {
       navigate('/admin/security/change-password', { replace: true });
     }
-  }, [user, location.pathname, navigate]);
-
-  // ── Bảo mật 1b: SM/quản lý dùng mật khẩu mặc định '1' → ép đổi mật khẩu trước khi vào hệ thống
-  useEffect(() => {
-    if (user?.mustChangePassword && isOpsManager(user) && user?.id !== 'admin') {
-      setShowPw(true); // modal đổi mật khẩu — không cho đóng (xử lý ở modal)
-    }
-  }, [user]);
+  }, [user?.id, user?.mustSetupPassword, location.pathname, navigate]);
 
   // ── Bảo mật 2: tự đăng xuất khi không tương tác (20 phút) hoặc hết phiên tuyệt đối (12h)
   const logoutRef = useRef(handleLogout);
@@ -250,8 +242,8 @@ const authWarning = useStore(state => state.authWarning);
 
         {/* ── Page content ── */}
         <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
-          {/* Skeleton khi đang khởi tạo dữ liệu — tránh trang trắng */}
-          {isInitializing ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
+          {/* Skeleton khi chưa có dữ liệu người dùng — khi đã có user thì Outlet luôn giữ mount */}
+          {isInitializing && !user ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
         </main>
 
         {/* Floating AI Button - blue */}

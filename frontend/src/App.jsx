@@ -35,16 +35,30 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-md max-w-md">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl max-w-md w-full">
             <div className="text-3xl mb-2">⚠️</div>
             <h2 className="text-sm font-bold text-slate-800 mb-1">Đã có lỗi hiển thị giao diện</h2>
-            <p className="text-xs text-slate-500 mb-4">{this.state.error?.message || 'Vui lòng bấm tải lại trang.'}</p>
-            <button 
-              onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-              className="btn btn-primary text-xs px-4 py-2"
-            >
-              Tải lại trang
-            </button>
+            <p className="text-xs text-slate-500 mb-4 font-mono break-all">{this.state.error?.message || 'Vui lòng bấm tải lại trang.'}</p>
+            <div className="flex gap-2 justify-center">
+              <button 
+                onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+                className="btn btn-primary text-xs px-4 py-2 cursor-pointer"
+              >
+                Tải lại trang
+              </button>
+              <button 
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('schedule-storage');
+                    sessionStorage.clear();
+                  } catch {}
+                  window.location.href = import.meta.env.BASE_URL || '/';
+                }}
+                className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4 py-2 rounded-lg cursor-pointer"
+              >
+                Xóa cache & Đăng nhập lại
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -57,12 +71,25 @@ const PrivateRoute = ({ children, allowedRoles, fullAdminOnly }) => {
   const user = useStore(state => state.user);
   
   if (!user) return <Navigate to="/login" replace />;
-  if (fullAdminOnly && !isBuiltinStoreManager(user)) return <Navigate to="/admin/dashboard" replace />;
+
+  const isMgr = isOpsManager(user);
+  const homePath = isMgr ? "/admin/dashboard" : "/employee/home";
+
+  if (fullAdminOnly && !isBuiltinStoreManager(user)) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   if (allowedRoles && allowedRoles.length > 0) {
-    const hasRole = allowedRoles.includes(user.role);
-    const managerGetsAdmin = isOpsManager(user) && allowedRoles.includes('admin');
-    if (!hasRole && !managerGetsAdmin) {
-      return <Navigate to="/" replace />;
+    const role = user.role || '';
+    const hasDirectRole = allowedRoles.includes(role);
+    const managerGetsAdmin = isMgr && allowedRoles.includes('admin');
+    const employeeGetsAccess = !isMgr && allowedRoles.includes('employee');
+    const managerGetsEmployee = isMgr && allowedRoles.includes('employee');
+
+    const isAllowed = hasDirectRole || managerGetsAdmin || employeeGetsAccess || managerGetsEmployee;
+    if (!isAllowed) {
+      // Triệt tiêu vòng lặp: tuyệt đối không redirect về "/" vì "/" sẽ redirect ngược lại!
+      return <Navigate to={homePath} replace />;
     }
   }
   
@@ -76,6 +103,12 @@ const IndexRedirect = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
   return <Navigate to="/employee/home" replace />;
+};
+
+const CatchAllRedirect = () => {
+  const user = useStore(state => state.user);
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={isOpsManager(user) ? "/admin/dashboard" : "/employee/home"} replace />;
 };
 
 function App() {
@@ -122,7 +155,7 @@ function App() {
               <Route path="employee/shelves" element={<PrivateRoute allowedRoles={['employee', 'admin']}><ShelfDateBoard /></PrivateRoute>} />
             </Route>
             
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<CatchAllRedirect />} />
           </Routes>
         </Suspense>
       </Router>

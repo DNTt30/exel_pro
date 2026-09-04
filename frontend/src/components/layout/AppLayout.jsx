@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager } from '../../lib/authSession';
-import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight } from 'lucide-react';
+import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ChangePasswordModal from '../modals/ChangePasswordModal';
 import Toaster from '../ui/toast';
@@ -94,6 +94,7 @@ export default function AppLayout() {
         { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
         { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B', badge: pendingFeedbacksCount, badgeColor: 'bg-rose-400 text-white font-bold' },
         { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
+        { to: '/admin/handbook',   icon: <BookOpen size={17} />,        label: 'Sổ tay SOP' },
       ]
     },
     {
@@ -115,6 +116,7 @@ export default function AppLayout() {
         { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
         { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
         { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Kệ của tôi' },
+        { to: '/employee/handbook',  icon: <BookOpen size={17} />,     label: 'Sổ tay GS25' },
       ]
     }
   ];

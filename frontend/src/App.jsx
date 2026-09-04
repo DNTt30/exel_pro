@@ -19,6 +19,7 @@ const EmployeeSchedule = lazy(() => import('./pages/employee/EmployeeSchedule'))
 const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'));
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
 const ShelfDateBoard = lazy(() => import('./pages/shared/ShelfDateBoard'));
+const Handbook = lazy(() => import('./pages/shared/Handbook'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -146,6 +147,7 @@ function App() {
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><AdminLogs /></PrivateRoute>} />
               <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
+              <Route path="admin/handbook" element={<PrivateRoute allowedRoles={['admin']}><Handbook /></PrivateRoute>} />
 
               {/* Employee Routes */}
               <Route path="employee/home" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeHome /></PrivateRoute>} />
@@ -153,6 +155,7 @@ function App() {
               <Route path="employee/timesheet" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeTimesheet /></PrivateRoute>} />
               <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />
               <Route path="employee/shelves" element={<PrivateRoute allowedRoles={['employee', 'admin']}><ShelfDateBoard /></PrivateRoute>} />
+              <Route path="employee/handbook" element={<PrivateRoute allowedRoles={['employee', 'admin']}><Handbook /></PrivateRoute>} />
             </Route>
             
             <Route path="*" element={<CatchAllRedirect />} />

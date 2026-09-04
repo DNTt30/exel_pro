@@ -167,6 +167,92 @@ function answerLeastHours(storeEmps, weekSchedule) {
 // =====================================================================
 // ROUTER: thử các intent dữ liệu mới trước khi rơi xuống chuỗi cũ.
 // Trả về chuỗi nếu đã trả lời được, null nếu nhường engine cũ xử lý.
+export function answerHandbookQuestions(qn) {
+  // 1. Giờ hủy & hạn sử dụng
+  if (inc(qn, ['gio huy', 'huy hang', 'khi nao huy', 'gio huy ff', 'gio huy gm', 'huy sandwich', 'huy onigiri', 'huy bento', 'huy gimbap', 'xoa bao bi'])) {
+    return [
+      '🕒 **Quy định Giờ Hủy Hàng & HSD tại GS25:**',
+      '- **11:00 & 22:00 (Trưa & Đêm)**: FF rau & thức ăn nhanh tươi (*Sandwich có rau, Burger, Gimbap, Soup*).',
+      '- **19:00 (Tối)**: FF cơm, mì & sushi (*Cơm nắm Onigiri, Bento, Sandwich không rau, Mì hộp, Sushi*).',
+      '- **Theo HSD / Tem**: FF Onsite, Salad, Bánh mì que, Dessert tủ OSC, Bánh tươi Patachou.',
+      '- **Hàng GM (Bách hóa)**: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.',
+      '⚠️ *Quy tắc bắt buộc: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác!*'
+    ].join('\n');
+  }
+
+  // 2. Nhiệt độ thiết bị
+  if (inc(qn, ['nhiet do tu mat', 'nhiet do tu dong', 'nhiet do noi lau', 'nhiet do banh bao', 'nhiet do chuan'])) {
+    return [
+      '🌡️ **Nhiệt độ chuẩn thiết bị bảo quản & chế biến:**',
+      '- **Tủ mát / Kho mát**: `0°C đến 5°C` (sữa, nước, sandwich, BTP)',
+      '- **Tủ đông / Kho đông**: `< -18°C` (kem, đá viên, chả cá)',
+      '- **Tủ hấp bánh bao**: `90°C` (hấp ít nhất 30 phút, CẤM hâm lò vi sóng!)',
+      '- **Nồi súp lẩu**: `70°C` (duy trì công suất 200W; đun sôi 110°C / 2000W)'
+    ].join('\n');
+  }
+
+  // 3. Lò vi sóng công nghiệp bấm số mấy
+  if (inc(qn, ['vi song', 'lo vi song', 'bam so may', 'bam nut', 'so 3', 'so 5', 'ham nong cha ca', 'ham nong to mi'])) {
+    return [
+      '🔥 **Quy tắc bấm Lò vi sóng Công nghiệp (GS25):**',
+      '- **Ly lẩu chả cá**: Lò gia dụng `30 giây` | Lò công nghiệp **BẤM SỐ 3**.',
+      '- **Tô mì chả cá**: Lò gia dụng `2 phút` | Lò công nghiệp **BẤM SỐ 5**.',
+      '- **Xôi bánh bao**: Bánh bao hấp tủ 90°C (CẤM vi sóng). Xôi cắt bao nilon quay vi sóng 1 phút.',
+      '⚠️ *Lưu ý: Luôn tháo xiên chả cá ra trước khi cho vào ly/tô!*'
+    ].join('\n');
+  }
+
+  // 4. Công thức lẩu chả cá & mì kimchi
+  if (inc(qn, ['nau lau', 'sup cha ca', 'bot sup', 'nau cha ca', 'dinh luong sup', 'va sup', 'so va sup'])) {
+    return [
+      '🍲 **Công thức & SOP Lẩu chả cá cay (GS25 Miền Bắc):**',
+      '- **Nước súp**: 2000ml nước lọc + 1 gói bột súp cay (120g). Nấu công suất **2000W** trong **15 phút**.',
+      '- **Chả cá xoắn**: 10 xiên, nấu **1200W** trong **10 phút** (sau 5 phút lật mặt 1 lần). Nhiệt độ tâm sau nấu ≥ 75°C.',
+      '- **Mì chả cá**: Nước sôi ≥ 95°C, trụng đúng **2 phút 30 giây**.',
+      '- **Múc nước súp bán**: Ly lẩu = *Số xiên + 1 vá súp*. Tô mì = *4 vá nước súp* (~30g/vá). Tháo xiên trước khi trao khách.',
+      '- **Trưng bày chảo**: Tối đa 2 tiếng ở công suất 200W.'
+    ].join('\n');
+  }
+
+  // 5. Hóa chất Saraya / Ecolab
+  if (inc(qn, ['hoa chat', 'saraya', 'ecolab', 'smart san', 'h-1', 's-4', 'n-12', 'g-2', '211', '311', 'con sat khuan', 'tay dau mo'])) {
+    return [
+      '🧪 **Hệ 6 Mã Màu Hóa Chất SARAYA Greentek tại GS25:**',
+      '- ⚪ **Trắng (H-1 Smart San)**: Xà phòng rửa tay nhân viên, dùng NGUYÊN CHẤT.',
+      '- 🔴 **Đỏ đô (S-4 Sanitizer)**: Cồn sát khuẩn tay & dao thớt, dùng NGUYÊN CHẤT (giữ xa lửa!).',
+      '- 🟢 **Xanh lá (N-12 Sara Wash)**: Rửa CCDC (pha 6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (1 lần nhấn 30ml + nước).',
+      '- 🟤 **Nâu (G-2 Smart San Degreaser)**: Tẩy dầu mỡ bếp chiên, tủ hút khói, dùng NGUYÊN CHẤT (mang găng cao su!).',
+      '- 🔴 **Đỏ tươi (211 Pro WC)**: Tẩy bồn cầu & sàn toilet (4 lần nhấn 120ml + nước).',
+      '- 🔵🟡 **Xanh + Vàng (311 Multi Floor & Glass)**: Lau kính và sàn gạch (1 lần nhấn 30ml + nước).'
+    ].join('\n');
+  }
+
+  // 6. Quy trình rửa tay 12 bước
+  if (inc(qn, ['rua tay', '12 buoc', 've sinh tay', '60 giay', 'saraya rua tay'])) {
+    return [
+      '🧼 **Quy trình Vệ sinh tay 12 bước Saraya (60 giây):**',
+      '1. Rửa nước -> 2. Lấy 2 lần nhấn H-1 -> 3. Xoa 2 lòng bàn tay (5 lần)',
+      '4. Đan ngón tay cọ lòng bàn tay -> 5. Cọ mu bàn tay -> 6. Cọ đầu ngón tay',
+      '7. Vặn ngón tay cái -> 8. Cọ cổ tay đến khuỷu tay -> 9. Chà móng tay bằng bàn chải',
+      '10. Xả sạch nước dưới vòi (quá trình ≥ 60s) -> 11. Lau khô khăn giấy -> 12. Xịt cồn S-4 để khô.',
+      '⚠️ *4 vùng hay bị sót: Đầu móng tay, ngón cái, kẽ ngón và mu bàn tay.*'
+    ].join('\n');
+  }
+
+  // 7. Vệ sinh ca / Phân công ca
+  if (inc(qn, ['ve sinh ca', 'ca 1 lam gi', 'ca 2 lam gi', 'ca 3 lam gi', 'thay dau bep', 'thay dau'])) {
+    return [
+      '📋 **Phân công Vệ sinh theo Ca (GS25):**',
+      '- ☀️ **Ca 1 (6h - 14h)**: Quạt hút, thanh nẹp, kho bãi WH, tủ mát kho, quét mạng nhện, lau kệ hàng.',
+      '- 🌤️ **Ca 2 (14h - 22h)**: Chân bàn ghế, rổ mua sắm, tủ mát/đông counter, kệ snack, sọt rác, xô lau sàn.',
+      '- 🌙 **Ca 3 (22h - 6h)**: Chà sàn gạch xám, vệ sinh toilet, hộc quầy counter, và **BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3**.',
+      '💡 *Mẹo: Vào mục "Sổ tay GS25 / Sổ tay SOP" trên thanh menu để tick checklist theo ca và ngày hiện tại!*'
+    ].join('\n');
+  }
+
+  return null;
+}
+
 // =====================================================================
 export function tryAnswerWithData(ctx) {
   const {
@@ -176,6 +262,11 @@ export function tryAnswerWithData(ctx) {
     storeId = '',
     user = null,
   } = ctx || {};
+
+  // Handbook intent check
+  const handbookAnswer = answerHandbookQuestions(qn);
+  if (handbookAnswer) return handbookAnswer;
+
   const storeEmps = employees.filter((e) => e.dept === storeId);
   const people = findPeople(qn, employees);
   const words = tokenize(qn);

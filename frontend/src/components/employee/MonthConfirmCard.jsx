@@ -13,7 +13,8 @@ const DAY_KEYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
  * Luu duoi bang feedbacks: shift='XAC_NHAN_CONG', date=cycleKey ('YYYY-MM').
  */
 export default function MonthConfirmCard() {
-  const { user, schedule } = useStore(st => ({ user: st.user, schedule: st.schedule }));
+  const user = useStore(st => st.user);
+  const schedule = useStore(st => st.schedule);
   const attendance = useStore(st => st.attendance);
   const loadAttendanceRange = useStore(st => st.loadAttendanceRange);
   

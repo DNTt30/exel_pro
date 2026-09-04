@@ -3,7 +3,7 @@ import {
   BookOpen, Search, Clock, Thermometer, Sparkles, CheckCircle2,
   AlertTriangle, ShieldCheck, Flame, Droplets, UtensilsCrossed,
   ChefHat, RefreshCw, ZoomIn, X, ExternalLink, Calendar,
-  ChevronRight, Info, Check, AlertCircle, Eye
+  ChevronRight, Info, Check, AlertCircle, Eye, Camera
 } from 'lucide-react';
 import { GS25_HANDBOOK_DATA } from '../../data/gs25HandbookData';
 
@@ -111,10 +111,11 @@ export default function Handbook() {
   // Tab definitions
   const tabs = [
     { id: 'quality', label: '🕒 Giờ hủy & Nhiệt độ', shortLabel: 'Hủy & Date', icon: Clock },
+    { id: 'reports', label: '📸 Báo cáo Ca (Zalo / App Times)', shortLabel: 'Báo cáo Ca', icon: Camera },
     { id: 'cleaning', label: '📋 Checklist Vệ sinh Ca', shortLabel: 'Checklist Ca', icon: CheckCircle2 },
     { id: 'chemicals', label: '🧪 Hóa chất Vệ sinh', shortLabel: 'Hóa chất', icon: Droplets },
     { id: 'sop', label: '🍲 SOP & Công thức', shortLabel: 'SOP Lẩu', icon: UtensilsCrossed },
-    { id: 'scans', label: '🖼️ Tài liệu Gốc (8 Ảnh)', shortLabel: 'Ảnh gốc', icon: Eye }
+    { id: 'scans', label: '🖼️ Tài liệu Gốc (9 Ảnh)', shortLabel: 'Ảnh gốc', icon: Eye }
   ];
 
   // Shift & Day calculation for Tab 2
@@ -122,6 +123,26 @@ export default function Handbook() {
   const currentDayTasks = currentShiftData.days?.[selectedDay] || [];
   const completedCurrentTasksCount = currentDayTasks.filter((_, idx) => checkedTasks[`${selectedShift}_${selectedDay}_${idx}`]).length;
   const shiftProgressPercent = currentDayTasks.length > 0 ? Math.round((completedCurrentTasksCount / currentDayTasks.length) * 100) : 0;
+
+  // Shift Reports calculation for Tab reports
+  const currentShiftReports = GS25_HANDBOOK_DATA.shiftReports?.shifts[selectedShift]?.timeline || [];
+  const completedReportCount = currentShiftReports.filter((_, idx) => checkedTasks[`report_${selectedShift}_${idx}`]).length;
+  const reportProgressPercent = currentShiftReports.length > 0 ? Math.round((completedReportCount / currentShiftReports.length) * 100) : 0;
+
+  const resetCurrentShiftReports = () => {
+    setCheckedTasks(prev => {
+      const updated = { ...prev };
+      currentShiftReports.forEach((_, idx) => {
+        delete updated[`report_${selectedShift}_${idx}`];
+      });
+      try {
+        localStorage.setItem('gs25_handbook_tasks', JSON.stringify(updated));
+      } catch (e) {
+        console.error("Could not reset report tasks", e);
+      }
+      return updated;
+    });
+  };
 
   // Filtered chemicals for Tab 3
   const [chemProvider, setChemProvider] = useState('saraya'); // 'saraya' or 'ecolab'
@@ -252,6 +273,28 @@ export default function Handbook() {
         });
       }
     });
+
+    // Search shift reports
+    if (GS25_HANDBOOK_DATA.shiftReports) {
+      Object.entries(GS25_HANDBOOK_DATA.shiftReports.shifts).forEach(([sKey, sVal]) => {
+        sVal.timeline.forEach(item => {
+          if (
+            item.time.toLowerCase().includes(q) ||
+            item.action.toLowerCase().includes(q) ||
+            item.detail.toLowerCase().includes(q) ||
+            sVal.name.toLowerCase().includes(q)
+          ) {
+            results.push({
+              type: 'Báo cáo Ca',
+              title: `${sVal.name} [${item.time}]`,
+              desc: `${item.action} — ${item.detail}`,
+              tab: 'reports',
+              shift: sKey
+            });
+          }
+        });
+      });
+    }
 
     // Search scans
     GS25_HANDBOOK_DATA.originalScans.forEach(sc => {
@@ -572,6 +615,156 @@ export default function Handbook() {
                     <p className="text-xs text-slate-600 leading-relaxed pl-7">{rule.desc}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+        {/* ========================================================================= */}
+        {/* TAB: CÁC MỤC BÁO CÁO MỖI CA TRONG NGÀY (APP TIMES & ZALO)                 */}
+        {/* ========================================================================= */}
+        {activeTab === 'reports' && (
+          <div className="space-y-6">
+            {/* Top Operational Notice */}
+            <div className="bg-white rounded-2xl border border-blue-200 shadow-2xs p-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
+                    <Camera size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white">
+                        Quy Chuẩn Báo Cáo NV
+                      </span>
+                      <span className="text-xs text-blue-700 font-bold">Group Zalo Cửa Hàng</span>
+                    </div>
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
+                      {GS25_HANDBOOK_DATA.shiftReports.title}
+                    </h2>
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                      📸 <strong>Lưu ý bắt buộc:</strong> Tất cả hình ảnh gửi báo cáo phải chụp bằng <span className="font-bold text-blue-700">App TIMES</span> (để lưu watermark ngày, giờ và định vị cửa hàng chuẩn xác).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Shift Selector */}
+                <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0 self-start md:self-auto">
+                  {[
+                    { id: 'ca1', label: 'Ca 1 (Sáng: 6h-14h)' },
+                    { id: 'ca2', label: 'Ca 2 (Chiều: 14h-22h)' },
+                    { id: 'ca3', label: 'Ca 3 (Đêm: 22h-6h)' }
+                  ].map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedShift(s.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        selectedShift === s.id
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 6 FF Checklist Card */}
+              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-950 mb-2">
+                  <Sparkles size={15} className="text-amber-600" />
+                  <span>Danh mục 6 góc chụp Hình FF (Trước khi chụp phải chỉnh tem giá, check trưng bày, POSM):</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {GS25_HANDBOOK_DATA.shiftReports.ffPhotoItems.map((item, idx) => (
+                    <div key={idx} className="bg-white/90 px-2.5 py-1.5 rounded-lg border border-amber-200/80 text-[11px] font-bold text-amber-900 flex items-center gap-1.5 shadow-2xs">
+                      <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Checklist Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-slate-900">
+                      Mốc Báo Cáo {GS25_HANDBOOK_DATA.shiftReports.shifts[selectedShift]?.name}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                      {completedReportCount}/{currentShiftReports.length} mục đã nộp
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2 max-w-xs">
+                    <div
+                      className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${reportProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={resetCurrentShiftReports}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors self-start sm:self-auto"
+                >
+                  <RefreshCw size={13} />
+                  <span>Đặt lại báo cáo ca này</span>
+                </button>
+              </div>
+
+              {/* Timeline Items */}
+              <div className="space-y-3">
+                {currentShiftReports.map((item, idx) => {
+                  const taskKey = `report_${selectedShift}_${idx}`;
+                  const isDone = !!checkedTasks[taskKey];
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => toggleTask(taskKey)}
+                      className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all ${
+                        isDone
+                          ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                          : item.highlight
+                            ? `${item.highlight} shadow-2xs`
+                            : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center mt-0.5 sm:mt-0 transition-colors shrink-0 ${
+                          isDone ? 'bg-emerald-600 text-white' : 'border-2 border-slate-300 bg-white'
+                        }`}>
+                          {isDone && <Check size={14} strokeWidth={3} />}
+                        </div>
+
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white text-[10px] font-mono font-bold tracking-wide">
+                              {item.time}
+                            </span>
+                            {item.urgent && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500 text-white animate-pulse">
+                                Bắt buộc
+                              </span>
+                            )}
+                          </div>
+                          <div className={`text-xs sm:text-sm font-bold ${isDone ? 'line-through opacity-75' : 'text-slate-900'}`}>
+                            {item.action}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            {item.detail}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-400 font-mono self-end sm:self-auto shrink-0">
+                        Mốc #{idx + 1}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1057,14 +1250,14 @@ export default function Handbook() {
                 <div>
                   <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
                     <Eye size={18} className="text-blue-600" />
-                    Bộ Ảnh Gốc 8 Quy trình & Bảng biểu Thực tế Cửa hàng GS25
+                    Bộ Ảnh Gốc 9 Quy trình & Bảng biểu Thực tế Cửa hàng GS25
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Nhấp vào bất kỳ ảnh nào để phóng to, đối chiếu chi tiết các bảng biểu đang dán tại cửa hàng.
                   </p>
                 </div>
                 <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-bold self-start sm:self-auto">
-                  8 Bản scan chất lượng cao
+                  9 Bản scan chất lượng cao
                 </span>
               </div>
             </div>

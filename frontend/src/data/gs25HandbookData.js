@@ -501,8 +501,203 @@ export const GS25_HANDBOOK_DATA = {
     ]
   },
 
-  // 7. DANH MỤC ẢNH GỐC ĐÍNH KÈM TẠI CỬA HÀNG
+  // 7. CÁC MỤC BÁO CÁO MỖI CA TRONG NGÀY - NHÂN VIÊN
+  shiftReports: {
+    title: "Các Mục Báo Cáo Mỗi Ca Trong Ngày (NV)",
+    destination: "Group Zalo Cửa Hàng",
+    cameraApp: "App TIMES (Chụp hình có watermark giờ & địa điểm)",
+    ffPhotoItems: [
+      "Nguyên tủ OSC (1-2 tấm)",
+      "Kệ bakery",
+      "Tủ bánh bao",
+      "Tủ warmer",
+      "Kệ khuyến mãi",
+      "Máy Nestea (mở nắp ra chụp)"
+    ],
+    shifts: {
+      ca1: {
+        name: "Ca 1 (Sáng: 6h - 14h)",
+        timeline: [
+          {
+            time: "Khi vô ca",
+            action: "Check in, hình tác phong đồng phục",
+            detail: "Đồng phục chuẩn, sơ vin, thẻ tên ngực trái",
+            urgent: false
+          },
+          {
+            time: "6h - 7h",
+            action: "Hình FF (Trước khi chụp phải chỉnh tem giá, check lại trưng bày, POSM, thứ tự sắp xếp của Ca 3)",
+            detail: "Gồm 6 mục: Nguyên tủ OSC (1-2 tấm), Kệ bakery, Tủ bánh bao, Tủ warmer, Kệ khuyến mãi, Máy nestea (mở nắp ra chụp)",
+            urgent: true
+          },
+          {
+            time: "6h - 7h (Quan trọng)",
+            action: "CHECK VÀ XÁC NHẬN KO CÓ HÀNG HẾT DATE TRÊN TỦ OSC VÀ KỆ BÁNH MÌ + NVL TRONG COUNTER",
+            detail: "Check date toàn bộ quầy kệ, cách ly hàng hết hạn",
+            urgent: true,
+            highlight: "bg-amber-100 border-amber-300 text-amber-900"
+          },
+          {
+            time: "7h - 8h",
+            action: "Kiểm tra vệ sinh khu vực mặt tiền, lau bề mặt kính, cạo đá sơ tủ đông kem + lau tầng cuối tủ OSC",
+            detail: "Giữ mặt tiền sáng sủa, sạch sẽ đón khách sáng",
+            urgent: false
+          },
+          {
+            time: "Trong ca",
+            action: "Fill hàng + Vệ sinh theo lịch SM giao",
+            detail: "Châm đầy kệ hàng vơi và làm theo lịch phân công",
+            urgent: false
+          },
+          {
+            time: "11:00",
+            action: "GỬI HÌNH HỦY HÀNG (Chụp thấy được số lượng và hạn sử dụng)",
+            detail: "Đợt hủy FF trưa. Bắt buộc xé rách bao bì trước khi vứt rác",
+            urgent: true,
+            highlight: "bg-rose-100 border-rose-300 text-rose-900"
+          },
+          {
+            time: "Trong ca",
+            action: "Fill hàng + Vệ sinh theo lịch SM giao + Kiểm tra khu vực ăn uống, thay bao rác 2 tiếng/lần",
+            detail: "Khu vực ăn uống luôn sạch, không để thùng rác tràn",
+            urgent: false
+          },
+          {
+            time: "13:30",
+            action: "Dọn bên trong quầy Counter + Chụp hình gửi báo cáo",
+            detail: "Dọn sạch quầy sơ chế chuẩn bị giao ca cho Ca 2",
+            urgent: false
+          },
+          {
+            time: "14:00",
+            action: "Báo cáo kết ca + Hình tổng quan WC, bàn ăn, thùng rác",
+            detail: "Xác nhận: ĐÃ DỌN DẸP, THAY RÁC, VỆ SINH",
+            urgent: true
+          }
+        ]
+      },
+      ca2: {
+        name: "Ca 2 (Chiều: 14h - 22h)",
+        timeline: [
+          {
+            time: "Khi vô ca",
+            action: "Check in, hình tác phong đồng phục",
+            detail: "Kiểm tra thẻ tên, đồng phục, tạp dề",
+            urgent: false
+          },
+          {
+            time: "14h - 14h30",
+            action: "Hình FF (Bổ sung chế biến nếu còn số lượng ít)",
+            detail: "Gồm 6 mục: Nguyên tủ OSC (1-2 tấm), Kệ bakery, Tủ bánh bao, Tủ warmer, Kệ khuyến mãi, Máy nestea (mở nắp ra chụp)",
+            urgent: true
+          },
+          {
+            time: "14h - 15h (Quan trọng)",
+            action: "CHECK VÀ XÁC NHẬN KO CÓ HÀNG HẾT DATE TRÊN TỦ OSC VÀ KỆ BÁNH MÌ + NVL TRONG COUNTER",
+            detail: "Rà soát toàn diện date đầu ca chiều",
+            urgent: true,
+            highlight: "bg-amber-100 border-amber-300 text-amber-900"
+          },
+          {
+            time: "15h - 17h",
+            action: "CHECK tem giá quầy kệ + Hình tất cả quầy kệ, tủ trong cửa hàng",
+            detail: "Chỉnh tem giá ngay ngắn, đúng vị trí sản phẩm",
+            urgent: false
+          },
+          {
+            time: "17:00",
+            action: "BÁO CÁO FF 17H + CHỤP BÁO CÁO ĐÈN BẢNG HIỆU",
+            detail: "Bật đèn bảng hiệu mặt tiền đón khách tối và chụp báo cáo",
+            urgent: true
+          },
+          {
+            time: "19:00",
+            action: "Xác nhận rút date theo khung giờ + GỬI HÌNH HỦY HÀNG (chụp thấy rõ số lượng và HSD)",
+            detail: "Đợt hủy FF chiều (Cơm nắm onigiri, bento, mì, sushi). Xé bao bì.",
+            urgent: true,
+            highlight: "bg-rose-100 border-rose-300 text-rose-900"
+          },
+          {
+            time: "19h - 21h",
+            action: "Fill hàng + Vệ sinh theo lịch SM giao + Kiểm tra khu vực ăn uống, thay bao rác 2 tiếng/lần",
+            detail: "Duy trì quầy kệ đầy đặn và bàn ăn sạch sẽ",
+            urgent: false
+          },
+          {
+            time: "22:00",
+            action: "Báo cáo kết ca + Hình tổng quan WC, bàn ăn, thùng rác",
+            detail: "Xác nhận: ĐÃ DỌN DẸP, THAY RÁC, VỆ SINH",
+            urgent: true
+          }
+        ]
+      },
+      ca3: {
+        name: "Ca 3 (Đêm: 22h - 6h)",
+        timeline: [
+          {
+            time: "Khi vô ca",
+            action: "Check in, hình tác phong đồng phục",
+            detail: "Đồng phục chỉn chu ca đêm",
+            urgent: false
+          },
+          {
+            time: "22h - 23h (Quan trọng)",
+            action: "CHECK VÀ XÁC NHẬN KO CÓ HÀNG HẾT DATE TRÊN TỦ OSC VÀ KỆ BÁNH MÌ + NVL TRONG COUNTER",
+            detail: "Xác nhận rút date khung 22h + Gửi hình hủy hàng (thấy rõ số lượng & HSD)",
+            urgent: true,
+            highlight: "bg-rose-100 border-rose-300 text-rose-900"
+          },
+          {
+            time: "24:00",
+            action: "BÁO CÁO KẾT NGÀY",
+            detail: "Tổng kết doanh thu và tình hình cửa hàng cuối ngày",
+            urgent: true
+          },
+          {
+            time: "24h - 1h sáng",
+            action: "Hình vệ sinh toàn bộ thiết bị",
+            detail: "Chụp ảnh lò vi sóng, bếp chiên, máy móc sau vệ sinh",
+            urgent: false
+          },
+          {
+            time: "4h - 5h sáng",
+            action: "Hình tất cả quầy kệ, tủ trong cửa hàng",
+            detail: "Hàng hóa đã fill đầy đặn, mặt tiền kệ thẳng tắp",
+            urgent: false
+          },
+          {
+            time: "5h - 6h sáng",
+            action: "HÌNH FF CHẾ BIẾN",
+            detail: "Gồm 6 mục: Nguyên tủ OSC (1-2 tấm), Kệ bakery, Tủ bánh bao, Tủ warmer, Kệ khuyến mãi, Máy nestea (mở nắp ra chụp)",
+            urgent: true
+          },
+          {
+            time: "6h sáng",
+            action: "Hình in tem HSD, số lượng của FF chế biến",
+            detail: "Dán tem BTP chuẩn xác vào khay thành phẩm",
+            urgent: true
+          },
+          {
+            time: "6h sáng (Giao ca)",
+            action: "BÁO CÁO KẾT CA + Hình tổng quan WC, bàn ăn, thùng rác",
+            detail: "Xác nhận: ĐÃ DỌN DẸP, THAY RÁC, VỆ SINH",
+            urgent: true
+          }
+        ]
+      }
+    }
+  },
+
+  // 8. DANH MỤC ẢNH GỐC ĐÍNH KÈM TẠI CỬA HÀNG
   originalScans: [
+    {
+      id: "bao_cao_moi_ca",
+      title: "Các Mục Báo Cáo Mỗi Ca Trong Ngày (NV)",
+      filename: "bao_cao_moi_ca.png",
+      url: "handbook/bao_cao_moi_ca.png",
+      category: "Báo cáo & Vận hành",
+      desc: "Mốc thời gian và danh mục chụp ảnh báo cáo Zalo bằng App Times cho Ca 1, Ca 2, Ca 3"
+    },
     {
       id: "sop_che_bien_lau",
       title: "SOP Chế biến Nhóm Lẩu - Miền Bắc",

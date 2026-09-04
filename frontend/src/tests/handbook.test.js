@@ -4,9 +4,10 @@ import { answerHandbookQuestions } from '../utils/copilotIntents';
 import { stripVi } from '../data/ffOnsiteRecipes';
 
 describe('GS25 Handbook Data Structure', () => {
-  it('contains all 8 store operational scan documents', () => {
-    expect(GS25_HANDBOOK_DATA.originalScans).toHaveLength(8);
+  it('contains all 9 store operational scan documents', () => {
+    expect(GS25_HANDBOOK_DATA.originalScans).toHaveLength(9);
     const filenames = GS25_HANDBOOK_DATA.originalScans.map(s => s.filename);
+    expect(filenames).toContain('bao_cao_moi_ca.png');
     expect(filenames).toContain('chat_luong_gio_huy.jpg');
     expect(filenames).toContain('hoa_chat_saraya.jpg');
     expect(filenames).toContain('hoa_chat_ecolab.jpg');
@@ -15,6 +16,15 @@ describe('GS25 Handbook Data Structure', () => {
     expect(filenames).toContain('sop_ban_hang_lau.jpg');
     expect(filenames).toContain('ve_sinh_counter.jpg');
     expect(filenames).toContain('ve_sinh_tay.jpg');
+  });
+
+  it('contains shift reports data for all 3 shifts and 6 FF items', () => {
+    const reports = GS25_HANDBOOK_DATA.shiftReports;
+    expect(reports).toBeDefined();
+    expect(reports.ffPhotoItems).toHaveLength(6);
+    expect(reports.shifts.ca1.timeline.length).toBeGreaterThan(0);
+    expect(reports.shifts.ca2.timeline.length).toBeGreaterThan(0);
+    expect(reports.shifts.ca3.timeline.length).toBeGreaterThan(0);
   });
 
   it('has 3 shift cleaning definitions covering all days T2-CN', () => {
@@ -85,5 +95,19 @@ describe('AI Copilot Handbook Intent Q&A', () => {
     const ans = answerHandbookQuestions(q);
     expect(ans).toContain('Ca 3');
     expect(ans).toContain('THAY DẦU BẾP CHIÊN');
+  });
+
+  it('answers shift reporting and app times questions', () => {
+    const q1 = stripVi('quy dinh bao cao ca');
+    const ans1 = answerHandbookQuestions(q1);
+    expect(ans1).toContain('Group Zalo Cửa Hàng');
+    expect(ans1).toContain('App TIMES');
+    expect(ans1).toContain('Máy Nestea');
+
+    const q2 = stripVi('khi nao gui bao cao');
+    const ans2 = answerHandbookQuestions(q2);
+    expect(ans2).toContain('Ca 1');
+    expect(ans2).toContain('Ca 2');
+    expect(ans2).toContain('Ca 3');
   });
 });

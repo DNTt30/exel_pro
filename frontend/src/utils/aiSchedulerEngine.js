@@ -1168,6 +1168,13 @@ SỔ TAY QUY CHUẨN VẬN HÀNH GS25 (BẮT BUỘC NẮM RÕ):
 - Ca 2 (14-22h): Chân bàn ghế, rổ mua sắm, tủ mát/đông counter, kệ snack, sọt rác, xô lau.
 - Ca 3 (22-6h): Chà sàn gạch xám, toilet, hộc counter, và BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3.
 - Rửa tay: 12 bước 60 giây Saraya. 4 vị trí hay sót: móng tay, ngón cái, kẽ ngón, mu bàn tay.
+6. Quy định Báo cáo Ca (Group Zalo Cửa Hàng & App TIMES):
+- Nơi gửi: Group Zalo Cửa Hàng. Hình ảnh bắt buộc chụp bằng App TIMES (có watermark ngày giờ & địa điểm).
+- 6 góc chụp FF: Tủ OSC (1-2 tấm), Kệ bakery, Tủ bánh bao, Tủ warmer, Kệ khuyến mãi, Máy Nestea (mở nắp ra chụp).
+- Ca 1: Check-in tác phong -> 6-7h chụp FF & check date -> 7-8h vệ sinh mặt tiền/tủ đông -> 11h gửi hình hủy hàng -> 13h30 dọn quầy counter -> 14h báo cáo kết ca (WC, bàn ăn, thùng rác).
+- Ca 2: Check-in tác phong -> 14-14h30 chụp FF bổ sung -> 14-15h check date -> 15-17h check tem giá quầy kệ -> 17h báo cáo FF & đèn bảng hiệu -> 19h gửi hình hủy hàng -> 22h báo cáo kết ca.
+- Ca 3: Check-in -> 22-23h check date & hình hủy -> 24h báo cáo kết ngày -> 24-1h chụp vệ sinh thiết bị -> 4-5h chụp quầy kệ -> 5-6h chụp FF chế biến -> 6h chụp in tem HSD & báo cáo kết ca.
+- Luôn kiểm tra khu vực ăn uống và thay bao rác 2 tiếng/lần.
 
 NGUYÊN TẮC XỬ LÝ NGỮ CẢNH:
 1. Theo dõi toàn bộ lịch sử hội thoại, không chỉ tin nhắn gần nhất.

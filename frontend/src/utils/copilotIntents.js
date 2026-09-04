@@ -250,6 +250,20 @@ export function answerHandbookQuestions(qn) {
     ].join('\n');
   }
 
+  // 8. Báo cáo ca trong ngày (Zalo & App Times)
+  if (inc(qn, ['bao cao ca', 'gui bao cao', 'app times', 'zalo cua hang', 'bao cao 17h', 'bao cao ff', 'chup may nestea', 'chup tu osc', 'bao cao ket ca', 'thay bao rac', 'moc bao cao'])) {
+    return [
+      '📸 **Quy Định Báo Cáo Mỗi Ca Trong Ngày (GS25):**',
+      '📌 **Nơi gửi**: Group Zalo Cửa Hàng · **App chụp hình**: `App TIMES` (bắt buộc có watermark ngày giờ & vị trí).',
+      '📷 **6 góc chụp hình FF bắt buộc**: (1) Nguyên tủ OSC (1-2 tấm), (2) Kệ bakery, (3) Tủ bánh bao, (4) Tủ warmer, (5) Kệ khuyến mãi, (6) Máy Nestea (mở nắp ra chụp).',
+      '',
+      '• ☀️ **Ca 1 (6h - 14h)**: Khi vô ca check-in tác phong -> 6-7h chụp FF & check date tủ OSC/bánh mì/counter -> 7-8h vệ sinh mặt tiền/tủ đông -> 11h gửi hình hủy hàng -> 13h30 dọn quầy counter -> 14h báo cáo kết ca (WC, bàn ăn, thùng rác).',
+      '• 🌤️ **Ca 2 (14h - 22h)**: Khi vô ca check-in tác phong -> 14-14h30 chụp FF bổ sung -> 14-15h check date -> 15-17h check tem giá quầy kệ -> 17h báo cáo FF & chụp đèn bảng hiệu -> 19h gửi hình hủy hàng -> 22h báo cáo kết ca.',
+      '• 🌙 **Ca 3 (22h - 6h)**: Khi vô ca check-in -> 22-23h check date & gửi hình hủy -> 24h báo cáo kết ngày -> 24-1h chụp vệ sinh thiết bị -> 4-5h chụp quầy kệ -> 5-6h chụp FF chế biến -> 6h chụp in tem HSD & báo cáo kết ca.',
+      '⚠️ *Lưu ý: Thay bao rác định kỳ 2 tiếng/lần và giữ sạch khu vực ăn uống của khách!*'
+    ].join('\n');
+  }
+
   return null;
 }
 

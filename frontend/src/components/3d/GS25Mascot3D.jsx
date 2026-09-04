@@ -1,37 +1,151 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import allainHeroImg from '../../assets/allain_hero.png';
+import { Sparkles, Bot, Swords } from 'lucide-react';
 
 /**
- * GS25 3D Anime Knight Swordsman (Inspired by Allain - Liên Quân)
- * - Detailed 3D anime character with blond bowl-cut hair, piercing blue eyes, high collar, white & teal knight coat.
- * - Wields the legendary Golden Energy Greatsword with flaming amber edge and floating ember sparks.
- * - Dynamic 3D mouse tracking: Sword arm & blade continuously aim directly at the user's cursor in 3D world space!
- * - Head and eyes track cursor with intense warrior focus.
- * - Click reaction: sword thrust slash action.
+ * GS25 Dual Mascot System:
+ * 1. ⚔️ Allain Kiếm Khách (Cinematic Live 2.5D):
+ *    - Authentic, ultra-sharp high-definition artwork (không bị thô, chuẩn 100% nguyên tác Liên Quân).
+ *    - 3D Holographic Parallax Tilt: nhân vật nghiêng người và xoay theo con trỏ chuột trong không gian 3D.
+ *    - Lưỡi kiếm năng lượng phóng tia laser ánh kim khóa theo con trỏ chuột trên toàn màn hình.
+ *    - Hệ thống tàn lửa & tia sáng (Fire Embers Canvas) bay lơ lửng thời gian thực.
+ *    - Click để tung trảm kích chém kiếm năng lượng (Slash Burst).
+ * 2. 🤖 G-Bot 3D (Three.js Procedural Cyber Mascot):
+ *    - Mô hình 3D người máy dễ thương với cánh tay robot vươn ra và ngón tay trỏ chỉ theo chuột.
  */
 export default function GS25Mascot3D({ 
   className = '', 
   height = '340px',
-  focusField = null 
+  _focusField = null 
 }) {
+  const [mode, setMode] = useState('allain'); // 'allain' | 'robot'
   const containerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const mouseRef = useRef(new THREE.Vector2(0.6, 0.1)); // default aiming towards login form
-  const isPointerDownRef = useRef(false);
 
+  // ── Allain 2.5D State & Refs ──
+  const allainCardRef = useRef(null);
+  const emberCanvasRef = useRef(null);
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [swordTipPos, setSwordTipPos] = useState({ x: 0, y: 0 });
+  const [isSlashing, setIsSlashing] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  // ── Robot Three.js Canvas Ref ──
+  const robotCanvasRef = useRef(null);
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. ALLAIN 2.5D INTERACTION & REAL-TIME EMBER CANVAS
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
+    if (mode !== 'allain') return undefined;
 
-    let width = container.clientWidth || 320;
-    let heightPx = container.clientHeight || 340;
+    const handlePointerMove = (e) => {
+      setCursorPos({ x: e.clientX, y: e.clientY });
 
-    // ── 1. Scene & Camera Setup ──
+      // 3D Parallax Tilt Calculation
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = (e.clientX - cx) / cx;
+      const dy = (e.clientY - cy) / cy;
+      setTilt({
+        x: -dy * 14, // tilt up/down
+        y: dx * 16   // tilt left/right
+      });
+    };
+
+    const handlePointerDown = () => {
+      setIsSlashing(true);
+      setTimeout(() => setIsSlashing(false), 350);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerdown', handlePointerDown);
+
+    // Calculate Sword Tip screen position
+    const updateSwordTip = () => {
+      if (!allainCardRef.current) return;
+      const rect = allainCardRef.current.getBoundingClientRect();
+      // The sword tip in the artwork is located at roughly x: 12%, y: 88% of the card
+      setSwordTipPos({
+        x: rect.left + rect.width * 0.15,
+        y: rect.top + rect.height * 0.85
+      });
+    };
+
+    updateSwordTip();
+    window.addEventListener('resize', updateSwordTip);
+    const tipInterval = setInterval(updateSwordTip, 500);
+
+    // Canvas Fire Embers Loop
+    const canvas = emberCanvasRef.current;
+    let animId;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+
+      const embers = Array.from({ length: 30 }, () => ({
+        x: Math.random() * (canvas.width * 0.45) + canvas.width * 0.05,
+        y: Math.random() * (canvas.height * 0.6) + canvas.height * 0.35,
+        size: Math.random() * 2.5 + 1,
+        speedY: Math.random() * 1.5 + 0.6,
+        speedX: (Math.random() - 0.4) * 0.8,
+        opacity: Math.random() * 0.8 + 0.2,
+        hue: 35 + Math.random() * 25 // golden amber to orange
+      }));
+
+      const renderEmbers = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        embers.forEach((p) => {
+          p.y -= p.speedY;
+          p.x += p.speedX;
+          p.opacity -= 0.005;
+
+          if (p.y < 0 || p.opacity <= 0) {
+            p.y = canvas.height * 0.85 + Math.random() * 20;
+            p.x = Math.random() * (canvas.width * 0.35) + canvas.width * 0.08;
+            p.opacity = Math.random() * 0.9 + 0.3;
+          }
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 100%, 55%, ${p.opacity})`;
+          ctx.shadowColor = `hsl(${p.hue}, 100%, 50%)`;
+          ctx.shadowBlur = 8;
+          ctx.fill();
+        });
+
+        animId = requestAnimationFrame(renderEmbers);
+      };
+
+      renderEmbers();
+    }
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('resize', updateSwordTip);
+      clearInterval(tipInterval);
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [mode]);
+
+  // ─────────────────────────────────────────────────────────────
+  // 2. ROBOT 3D (THREE.JS PROCEDURAL MASCOT)
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'robot') return undefined;
+
+    const canvas = robotCanvasRef.current;
+    if (!canvas) return;
+
+    let width = canvas.clientWidth || 320;
+    let heightPx = canvas.clientHeight || 340;
+
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, width / heightPx, 0.1, 100);
-    camera.position.set(-0.15, 0.55, 4.3); // Frame from waist up
-    camera.updateMatrixWorld();
+    const camera = new THREE.PerspectiveCamera(40, width / heightPx, 0.1, 100);
+    camera.position.set(0, 0.1, 4.3);
 
     const renderer = new THREE.WebGLRenderer({
       canvas,
@@ -42,588 +156,385 @@ export default function GS25Mascot3D({
     renderer.setSize(width, heightPx, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-    // ── 2. Atmospheric & Dramatic Lighting ──
-    // Ambient light (cold dark slate)
-    const ambientLight = new THREE.AmbientLight(0x334155, 1.2);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x8ba2c4, 1.1);
     scene.add(ambientLight);
 
-    // Key Light (cool white highlighting face and white armor)
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.9);
-    keyLight.position.set(-3.5, 4.5, 4);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    keyLight.position.set(4, 5, 5);
     scene.add(keyLight);
 
-    // Cyan Rim Light (from behind/top for dramatic anime silhouette)
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 2.6);
-    rimLight.position.set(3.5, 3.5, -3);
+    const rimLight = new THREE.DirectionalLight(0x00f5ff, 2.8);
+    rimLight.position.set(-4, 2, -3);
     scene.add(rimLight);
 
-    // Fill Light
-    const fillLight = new THREE.DirectionalLight(0x1e293b, 0.8);
-    fillLight.position.set(0, -3, 2);
-    scene.add(fillLight);
+    // Materials
+    const whiteBodyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.22, metalness: 0.28 });
+    const gs25BlueMat = new THREE.MeshStandardMaterial({ color: 0x0072ce, roughness: 0.25, metalness: 0.4 });
+    const darkVisorMat = new THREE.MeshStandardMaterial({ color: 0x050a14, roughness: 0.04, metalness: 0.95 });
+    const cyanGlowMat = new THREE.MeshBasicMaterial({ color: 0x00f5ff });
+    const titaniumMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.8 });
+    const laserBeamMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45 });
 
-    // Dynamic Golden Sword Light (casts warm amber fire on knight as sword moves)
-    const swordLight = new THREE.PointLight(0xffa200, 3.2, 4.5);
-    scene.add(swordLight);
+    // Mascot Hierarchy
+    const mascot = new THREE.Group();
+    scene.add(mascot);
 
-    // ── 3. Materials ──
-    const skinMat = new THREE.MeshStandardMaterial({
-      color: 0xfceade,
-      roughness: 0.65,
-      metalness: 0.05
-    });
+    // Torso
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.38, 0.85, 32), gs25BlueMat);
+    mascot.add(torso);
 
-    const hairMat = new THREE.MeshStandardMaterial({
-      color: 0xedd69a, // Light blonde
-      roughness: 0.45,
-      metalness: 0.1
-    });
+    const chestPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.40, 0.72, 32, 1, false, -Math.PI / 3, (2 * Math.PI) / 3), whiteBodyMat);
+    chestPlate.position.y = 0.04;
+    mascot.add(chestPlate);
 
-    const hairHighlightMat = new THREE.MeshStandardMaterial({
-      color: 0xffeec7, // Highlight lock
-      roughness: 0.4,
-      metalness: 0.08
-    });
+    // Thruster
+    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.32, 32, 1, true), titaniumMat);
+    nozzle.position.set(0, -0.48, 0);
+    nozzle.rotation.x = Math.PI;
+    mascot.add(nozzle);
 
-    const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const eyeIrisMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff }); // Piercing light cyan/blue
-    const eyePupilMat = new THREE.MeshBasicMaterial({ color: 0x075985 });
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 24), cyanGlowMat);
+    flame.position.set(0, -0.84, 0);
+    flame.rotation.x = Math.PI;
+    mascot.add(flame);
 
-    const turtleneckMat = new THREE.MeshStandardMaterial({
-      color: 0x090e17,
-      roughness: 0.6,
-      metalness: 0.15
-    });
-
-    const whiteCoatMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.28,
-      metalness: 0.22
-    });
-
-    const tealCoatMat = new THREE.MeshStandardMaterial({
-      color: 0x054f4a, // Signature Emerald/Teal Coat pattern
-      roughness: 0.32,
-      metalness: 0.25
-    });
-
-    const goldTrimMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      roughness: 0.22,
-      metalness: 0.85
-    });
-
-    const bronzeArmorMat = new THREE.MeshStandardMaterial({
-      color: 0x483a2c, // Antique bronze gauntlets
-      roughness: 0.32,
-      metalness: 0.82
-    });
-
-    const darkSteelMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.3,
-      metalness: 0.8
-    });
-
-    // Sword Materials
-    const bladeSpineMat = new THREE.MeshStandardMaterial({
-      color: 0x161c28,
-      roughness: 0.2,
-      metalness: 0.9
-    });
-
-    const glowingEdgeMat = new THREE.MeshBasicMaterial({
-      color: 0xffb703
-    });
-
-    const flamingAuraMat = new THREE.MeshBasicMaterial({
-      color: 0xff6600,
-      transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending
-    });
-
-    // ── 4. Build Character Hierarchy ──
-    const characterRoot = new THREE.Group();
-    scene.add(characterRoot);
-
-    // Floating/Breathing Group
-    const knight = new THREE.Group();
-    characterRoot.add(knight);
-
-    // ── A. Torso & Coat ──
-    const torsoGroup = new THREE.Group();
-    knight.add(torsoGroup);
-
-    // Lower Waist
-    const waistGeo = new THREE.CylinderGeometry(0.32, 0.30, 0.35, 24);
-    const waist = new THREE.Mesh(waistGeo, turtleneckMat);
-    waist.position.set(0, 0.15, 0);
-    torsoGroup.add(waist);
-
-    // Golden Belt
-    const beltGeo = new THREE.CylinderGeometry(0.33, 0.31, 0.07, 24);
-    const belt = new THREE.Mesh(beltGeo, goldTrimMat);
-    belt.position.set(0, 0.08, 0);
-    torsoGroup.add(belt);
-
-    // Belt Dagger/Buckle Motif
-    const buckleGeo = new THREE.BoxGeometry(0.08, 0.16, 0.06);
-    const buckle = new THREE.Mesh(buckleGeo, goldTrimMat);
-    buckle.position.set(0.12, 0.04, 0.32);
-    buckle.rotation.z = -0.3;
-    torsoGroup.add(buckle);
-
-    // Coat Skirt Tails (draping down)
-    const coatSkirtGeo = new THREE.ConeGeometry(0.46, 0.65, 24, 1, true);
-    const coatWhiteTail = new THREE.Mesh(coatSkirtGeo, whiteCoatMat);
-    coatWhiteTail.position.set(0, -0.22, 0);
-    coatWhiteTail.rotation.y = Math.PI / 4;
-    torsoGroup.add(coatWhiteTail);
-
-    // Chest (V-tapered Knight Torso)
-    const chestGeo = new THREE.CylinderGeometry(0.42, 0.33, 0.55, 24);
-    const chest = new THREE.Mesh(chestGeo, whiteCoatMat);
-    chest.position.set(0, 0.52, 0);
-    torsoGroup.add(chest);
-
-    // Teal Diagonal Cross Panel (Iconic chest pattern)
-    const tealPanelGeo = new THREE.BoxGeometry(0.24, 0.52, 0.08);
-    const tealPanel = new THREE.Mesh(tealPanelGeo, tealCoatMat);
-    tealPanel.position.set(0.08, 0.52, 0.38);
-    tealPanel.rotation.z = -0.32;
-    torsoGroup.add(tealPanel);
-
-    // Gold Trim on Chest
-    const goldRibGeo = new THREE.BoxGeometry(0.03, 0.56, 0.09);
-    const goldRib = new THREE.Mesh(goldRibGeo, goldTrimMat);
-    goldRib.position.set(0.08, 0.52, 0.385);
-    goldRib.rotation.z = -0.32;
-    torsoGroup.add(goldRib);
-
-    // High Turtle Neck Collar
-    const collarGeo = new THREE.CylinderGeometry(0.19, 0.22, 0.22, 24);
-    const collar = new THREE.Mesh(collarGeo, turtleneckMat);
-    collar.position.set(0, 0.86, 0);
-    torsoGroup.add(collar);
-
-    const collarGoldRimGeo = new THREE.TorusGeometry(0.195, 0.015, 12, 24);
-    collarGoldRimGeo.rotateX(Math.PI / 2);
-    const collarGoldRim = new THREE.Mesh(collarGoldRimGeo, goldTrimMat);
-    collarGoldRim.position.set(0, 0.96, 0);
-    torsoGroup.add(collarGoldRim);
-
-    // ── B. Shoulders (Pauldrons) ──
-    // Right Shoulder Armor (Multi-tiered White & Gold)
-    const rightPauldron = new THREE.Group();
-    rightPauldron.position.set(0.44, 0.72, 0);
-    const p1Geo = new THREE.SphereGeometry(0.18, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    const p1 = new THREE.Mesh(p1Geo, whiteCoatMat);
-    p1.scale.set(1.1, 0.8, 1.2);
-    rightPauldron.add(p1);
-
-    const pGoldRim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.02, 12, 24), goldTrimMat);
-    pGoldRim.rotation.x = Math.PI / 2;
-    pGoldRim.position.y = -0.02;
-    rightPauldron.add(pGoldRim);
-
-    const pSteelLayer = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.08, 16), darkSteelMat);
-    pSteelLayer.position.y = -0.07;
-    rightPauldron.add(pSteelLayer);
-    torsoGroup.add(rightPauldron);
-
-    // Left Shoulder Armor
-    const leftPauldron = rightPauldron.clone();
-    leftPauldron.position.set(-0.44, 0.72, 0);
-    leftPauldron.scale.x = -1;
-    torsoGroup.add(leftPauldron);
-
-    // ── C. Head & Hair Group ──
+    // Head
     const headPivot = new THREE.Group();
-    headPivot.position.set(0, 0.98, 0);
-    knight.add(headPivot);
+    headPivot.position.set(0, 0.6, 0);
+    mascot.add(headPivot);
 
-    // Anime Face
-    const faceGeo = new THREE.SphereGeometry(0.24, 24, 24);
-    faceGeo.scale(0.85, 1.15, 0.95);
-    const face = new THREE.Mesh(faceGeo, skinMat);
-    face.position.set(0, 0.16, 0.02);
-    headPivot.add(face);
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), whiteBodyMat);
+    helmet.position.set(0, 0.32, 0);
+    headPivot.add(helmet);
 
-    // Piercing Anime Eyes
-    const createEye = (xPos) => {
-      const eyeGroup = new THREE.Group();
-      eyeGroup.position.set(xPos, 0.19, 0.22);
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.44, 32, 16, 0, Math.PI, 0, Math.PI / 1.7), darkVisorMat);
+    visor.position.set(0, 0.31, 0.12);
+    visor.rotation.x = -Math.PI / 12;
+    headPivot.add(visor);
 
-      const sclera = new THREE.Mesh(new THREE.PlaneGeometry(0.065, 0.038), eyeWhiteMat);
-      eyeGroup.add(sclera);
-
-      const iris = new THREE.Mesh(new THREE.CircleGeometry(0.025, 16), eyeIrisMat);
-      iris.position.z = 0.002;
-      eyeGroup.add(iris);
-
-      const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.012, 16), eyePupilMat);
-      pupil.position.z = 0.003;
-      eyeGroup.add(pupil);
-
-      // Sharp upper eyelid eyeliner
-      const liner = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.008, 0.005), turtleneckMat);
-      liner.position.set(0, 0.02, 0.004);
-      eyeGroup.add(liner);
-
-      return eyeGroup;
-    };
-
-    const leftEye = createEye(-0.085);
+    // Eyes
+    const eyeGeo = new THREE.CapsuleGeometry(0.045, 0.08, 12, 16);
+    eyeGeo.rotateZ(Math.PI / 2);
+    const leftEye = new THREE.Mesh(eyeGeo, cyanGlowMat);
+    leftEye.position.set(-0.16, 0.33, 0.5);
     headPivot.add(leftEye);
 
-    const rightEye = createEye(0.085);
+    const rightEye = new THREE.Mesh(eyeGeo, cyanGlowMat);
+    rightEye.position.set(0.16, 0.33, 0.5);
     headPivot.add(rightEye);
 
-    // Warrior Scar on right cheek
-    const scarGeo = new THREE.BoxGeometry(0.008, 0.045, 0.005);
-    const scar = new THREE.Mesh(scarGeo, new THREE.MeshBasicMaterial({ color: 0xbe123c }));
-    scar.position.set(0.12, 0.13, 0.22);
-    scar.rotation.z = -0.4;
-    headPivot.add(scar);
-
-    // ── Signature Blond Bowl-cut Anime Hair ──
-    const hairGroup = new THREE.Group();
-    headPivot.add(hairGroup);
-
-    // Hair Top Dome
-    const hairDomeGeo = new THREE.SphereGeometry(0.27, 24, 24);
-    hairDomeGeo.scale(0.95, 1.05, 1.05);
-    const hairDome = new THREE.Mesh(hairDomeGeo, hairMat);
-    hairDome.position.set(0, 0.22, -0.02);
-    hairGroup.add(hairDome);
-
-    // Front Bangs (Iconic straight/tapered fringe over forehead)
-    const bangsGeo = new THREE.CylinderGeometry(0.265, 0.28, 0.18, 24, 1, false, -Math.PI / 2.3, (2 * Math.PI) / 2.3);
-    const bangs = new THREE.Mesh(bangsGeo, hairMat);
-    bangs.position.set(0, 0.24, 0.03);
-    bangs.rotation.x = 0.15;
-    hairGroup.add(bangs);
-
-    // Front Hair Tapered Locks (Wisps)
-    for (let i = -3; i <= 3; i++) {
-      const lockGeo = new THREE.ConeGeometry(0.035, 0.14, 8);
-      const lock = new THREE.Mesh(lockGeo, i % 2 === 0 ? hairHighlightMat : hairMat);
-      lock.position.set(i * 0.042, 0.21, 0.24 - Math.abs(i) * 0.02);
-      lock.rotation.z = i * -0.08;
-      lock.rotation.x = Math.PI + 0.25;
-      hairGroup.add(lock);
-    }
-
-    // Side Hair Flaps (framing cheeks)
-    const sideHairL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.16), hairMat);
-    sideHairL.position.set(-0.21, 0.18, 0.04);
-    sideHairL.rotation.z = -0.15;
-    hairGroup.add(sideHairL);
-
-    const sideHairR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.16), hairMat);
-    sideHairR.position.set(0.21, 0.18, 0.04);
-    sideHairR.rotation.z = 0.15;
-    hairGroup.add(sideHairR);
-
-    // ── D. Left Arm (Heroic Stance on Hip) ──
-    const leftArm = new THREE.Group();
-    leftArm.position.set(-0.46, 0.70, 0);
-
-    const leftUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.35, 16), turtleneckMat);
-    leftUpperArm.position.set(-0.12, -0.18, 0.02);
-    leftUpperArm.rotation.z = 0.55;
-    leftArm.add(leftUpperArm);
-
-    // Heavy Bronze Gauntlet (Forearm)
-    const leftGauntletGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.38, 16);
-    const leftGauntlet = new THREE.Mesh(leftGauntletGeo, bronzeArmorMat);
-    leftGauntlet.position.set(-0.20, -0.42, 0.14);
-    leftGauntlet.rotation.set(-0.6, 0, 0.3);
-    leftArm.add(leftGauntlet);
-
-    // Gauntlet Elbow Blade Flare
-    const elbowFlare = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 8), bronzeArmorMat);
-    elbowFlare.position.set(-0.26, -0.32, 0.02);
-    elbowFlare.rotation.set(0.4, 0, 0.8);
-    leftArm.add(elbowFlare);
-
-    // Armored Gauntlet Fist on Hip
-    const leftFist = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), bronzeArmorMat);
-    leftFist.position.set(-0.22, -0.58, 0.26);
-    leftArm.add(leftFist);
-
-    torsoGroup.add(leftArm);
-
-    // ── E. THE INTERACTIVE SWORD ARM & BLAZING ENERGY GREATSWORD ──
-    // Mounted on right shoulder (facing towards the login form & inputs)
-    const swordArmPivot = new THREE.Group();
-    swordArmPivot.position.set(0.46, 0.70, 0);
-    knight.add(swordArmPivot);
+    // Pointer Arm (tracks cursor)
+    const pointerArmPivot = new THREE.Group();
+    pointerArmPivot.position.set(0.56, 0.25, 0);
+    mascot.add(pointerArmPivot);
 
     const armLookAtDummy = new THREE.Object3D();
-    armLookAtDummy.position.copy(swordArmPivot.position);
-    knight.add(armLookAtDummy);
+    armLookAtDummy.position.copy(pointerArmPivot.position);
+    mascot.add(armLookAtDummy);
 
-    // Shoulder Joint
-    const swordShoulder = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), turtleneckMat);
-    swordArmPivot.add(swordShoulder);
-
-    // Upper Arm along +Z
-    const upperArmGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.36, 16);
+    const upperArmGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.4, 16);
     upperArmGeo.rotateX(Math.PI / 2);
-    const swordUpperArm = new THREE.Mesh(upperArmGeo, turtleneckMat);
-    swordUpperArm.position.set(0, 0, 0.18);
-    swordArmPivot.add(swordUpperArm);
+    const upperArm = new THREE.Mesh(upperArmGeo, whiteBodyMat);
+    upperArm.position.set(0, 0, 0.2);
+    pointerArmPivot.add(upperArm);
 
-    // Bronze Armored Gauntlet (Forearm)
-    const gauntletGeo = new THREE.CylinderGeometry(0.11, 0.085, 0.42, 16);
-    gauntletGeo.rotateX(Math.PI / 2);
-    const swordGauntlet = new THREE.Mesh(gauntletGeo, bronzeArmorMat);
-    swordGauntlet.position.set(0, 0, 0.52);
-    swordArmPivot.add(swordGauntlet);
+    const forearmGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.42, 16);
+    forearmGeo.rotateX(Math.PI / 2);
+    const forearm = new THREE.Mesh(forearmGeo, gs25BlueMat);
+    forearm.position.set(0, 0, 0.65);
+    pointerArmPivot.add(forearm);
 
-    // Gauntlet Spiked Cuff
-    const cuffGeo = new THREE.TorusGeometry(0.11, 0.022, 12, 24);
-    const cuff = new THREE.Mesh(cuffGeo, bronzeArmorMat);
-    cuff.position.set(0, 0, 0.38);
-    swordArmPivot.add(cuff);
+    const fingerGeo = new THREE.CylinderGeometry(0.026, 0.032, 0.28, 14);
+    fingerGeo.rotateX(Math.PI / 2);
+    const finger = new THREE.Mesh(fingerGeo, whiteBodyMat);
+    finger.position.set(0.01, 0.02, 1.18);
+    pointerArmPivot.add(finger);
 
-    // Gauntlet Hand gripping Greatsword Hilt
-    const swordHand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.11, 0.14), bronzeArmorMat);
-    swordHand.position.set(0, 0, 0.78);
-    swordArmPivot.add(swordHand);
+    const fingerTip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 16), cyanGlowMat);
+    fingerTip.position.set(0.01, 0.02, 1.32);
+    pointerArmPivot.add(fingerTip);
 
-    // ── THE LEGENDARY GOLDEN ENERGY GREATSWORD ──
-    const swordGroup = new THREE.Group();
-    swordGroup.position.set(0, 0, 0.82);
-    swordArmPivot.add(swordGroup);
+    const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.035, 1.8, 12), laserBeamMat);
+    laser.rotateX(Math.PI / 2);
+    laser.position.set(0.01, 0.02, 2.25);
+    pointerArmPivot.add(laser);
 
-    // Sword Hilt & Gun Trigger Guard
-    const hiltGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.32, 16);
-    hiltGeo.rotateX(Math.PI / 2);
-    const hilt = new THREE.Mesh(hiltGeo, bronzeArmorMat);
-    hilt.position.set(0, 0, 0);
-    swordGroup.add(hilt);
-
-    const triggerGuardGeo = new THREE.TorusGeometry(0.08, 0.015, 8, 16, Math.PI);
-    triggerGuardGeo.rotateY(Math.PI / 2);
-    const triggerGuard = new THREE.Mesh(triggerGuardGeo, bronzeArmorMat);
-    triggerGuard.position.set(0, -0.06, -0.02);
-    swordGroup.add(triggerGuard);
-
-    // Heavy Dark Steel Blade Spine (extends along +Z towards cursor!)
-    const spineGeo = new THREE.BoxGeometry(0.08, 0.28, 1.55);
-    const swordSpine = new THREE.Mesh(spineGeo, bladeSpineMat);
-    swordSpine.position.set(0, 0.06, 0.88);
-    swordGroup.add(swordSpine);
-
-    // Golden Core Energy Chambers inside Spine
-    const chamberGeo = new THREE.BoxGeometry(0.085, 0.06, 0.8);
-    const energyChamber = new THREE.Mesh(chamberGeo, glowingEdgeMat);
-    energyChamber.position.set(0, 0.06, 0.9);
-    swordGroup.add(energyChamber);
-
-    // ── BLAZING GOLDEN ENERGY CUTTING EDGE ──
-    // Bottom primary razor energy edge
-    const mainEdgeGeo = new THREE.BoxGeometry(0.035, 0.12, 1.6);
-    const mainEdge = new THREE.Mesh(mainEdgeGeo, glowingEdgeMat);
-    mainEdge.position.set(0, -0.12, 0.88);
-    swordGroup.add(mainEdge);
-
-    // Sharp Angled Buster Sword Tip
-    const tipGeo = new THREE.ConeGeometry(0.18, 0.45, 4);
-    tipGeo.rotateX(Math.PI / 2);
-    const swordTip = new THREE.Mesh(tipGeo, glowingEdgeMat);
-    swordTip.position.set(0, 0.02, 1.8);
-    swordTip.scale.set(0.35, 1.2, 1);
-    swordGroup.add(swordTip);
-
-    // Flaming Energy Aura (Additive Glow)
-    const auraGeo = new THREE.BoxGeometry(0.12, 0.42, 1.85);
-    const swordAura = new THREE.Mesh(auraGeo, flamingAuraMat);
-    swordAura.position.set(0, 0.02, 0.95);
-    swordGroup.add(swordAura);
-
-    // ── Floating Fire Ember Sparks along Blade ──
-    const sparkCount = 36;
-    const sparkGeo = new THREE.BufferGeometry();
-    const sparkPos = new Float32Array(sparkCount * 3);
-    for (let i = 0; i < sparkCount; i++) {
-      sparkPos[i * 3] = (Math.random() - 0.5) * 0.22;
-      sparkPos[i * 3 + 1] = (Math.random() - 0.5) * 0.32;
-      sparkPos[i * 3 + 2] = Math.random() * 1.7 + 0.3;
-    }
-    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
-    const sparkMat = new THREE.PointsMaterial({
-      color: 0xffaa00,
-      size: 0.065,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending
-    });
-    const sparks = new THREE.Points(sparkGeo, sparkMat);
-    swordGroup.add(sparks);
-
-    // ── 5. Mouse Raycaster Setup ──
+    // Mouse Tracking
+    const mouse = new THREE.Vector2(0.6, 0);
     const raycaster = new THREE.Raycaster();
     const targetPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const worldCursorTarget = new THREE.Vector3(2.5, 0.3, 0);
-    const headTargetDummy = new THREE.Object3D();
+    const worldTarget = new THREE.Vector3(2.5, 0.2, 0);
 
     const onPointerMove = (e) => {
-      if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      mouseRef.current.set(x, y);
-    };
-
-    const onPointerDown = () => {
-      isPointerDownRef.current = true;
-    };
-
-    const onPointerUp = () => {
-      isPointerDownRef.current = false;
+      mouse.set(x, y);
     };
 
     window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerdown', onPointerDown, { passive: true });
-    window.addEventListener('pointerup', onPointerUp, { passive: true });
 
-    // ── 6. Resize Observer ──
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        if (cr.width > 0 && cr.height > 0) {
-          width = cr.width;
-          heightPx = cr.height;
-          camera.aspect = width / heightPx;
-          camera.updateProjectionMatrix();
-          renderer.setSize(width, heightPx, false);
-        }
-      }
-    });
-    ro.observe(container);
-
-    // ── 7. Animation Loop ──
     let animId;
     let clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
 
-      const elapsedTime = clock.getElapsedTime();
+      mascot.position.y = Math.sin(t * 2.2) * 0.07;
+      flame.scale.y = 0.85 + Math.sin(t * 18) * 0.25;
 
-      // Heroic breathing & subtle stance sway
-      knight.position.y = Math.sin(elapsedTime * 2.0) * 0.04;
-      knight.rotation.z = Math.sin(elapsedTime * 1.2) * 0.015;
-
-      // Flaming Aura Heat Pulse
-      flamingAuraMat.opacity = 0.35 + Math.sin(elapsedTime * 9) * 0.18;
-      swordAura.scale.y = 1.0 + Math.sin(elapsedTime * 12) * 0.06;
-
-      // Update Floating Fire Sparks
-      const pArr = sparks.geometry.attributes.position.array;
-      for (let i = 0; i < sparkCount; i++) {
-        pArr[i * 3 + 2] += 0.025; // Drift towards tip
-        pArr[i * 3 + 1] += Math.sin(elapsedTime * 4 + i) * 0.003;
-        if (pArr[i * 3 + 2] > 2.1) {
-          pArr[i * 3 + 2] = 0.35;
-          pArr[i * 3] = (Math.random() - 0.5) * 0.18;
-          pArr[i * 3 + 1] = (Math.random() - 0.5) * 0.28;
-        }
-      }
-      sparks.geometry.attributes.position.needsUpdate = true;
-
-      // ── Cursor 3D Raycasting & Sword Aiming ──
-      const mx = THREE.MathUtils.clamp(mouseRef.current.x, -3.5, 3.5);
-      const my = THREE.MathUtils.clamp(mouseRef.current.y, -2.5, 2.5);
-
+      // Arm Aiming
+      const mx = THREE.MathUtils.clamp(mouse.x, -3.5, 3.5);
+      const my = THREE.MathUtils.clamp(mouse.y, -2.5, 2.5);
       raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
-      raycaster.ray.intersectPlane(targetPlane, worldCursorTarget);
+      raycaster.ray.intersectPlane(targetPlane, worldTarget);
 
-      // Sword Arm Aiming: LookAt targets world cursor point!
-      armLookAtDummy.position.copy(swordArmPivot.position);
-      armLookAtDummy.lookAt(worldCursorTarget);
+      armLookAtDummy.position.copy(pointerArmPivot.position);
+      armLookAtDummy.lookAt(worldTarget);
+      pointerArmPivot.quaternion.slerp(armLookAtDummy.quaternion, 0.12);
 
-      // Smoothly slerp sword arm rotation towards cursor
-      swordArmPivot.quaternion.slerp(armLookAtDummy.quaternion, 0.12);
+      headPivot.lookAt(worldTarget.x * 0.4, worldTarget.y * 0.4 + 0.6, worldTarget.z + 3);
 
-      // Sword Slash / Thrust Click Reaction
-      if (isPointerDownRef.current) {
-        swordArmPivot.position.z = THREE.MathUtils.lerp(swordArmPivot.position.z, 0.16, 0.25);
-        swordLight.intensity = 4.8; // Flare up light on click
-      } else {
-        swordArmPivot.position.z = THREE.MathUtils.lerp(swordArmPivot.position.z, 0, 0.1);
-        swordLight.intensity = 3.2 + Math.sin(elapsedTime * 8) * 0.6;
-      }
-
-      // Sync Golden Light position with the Sword Blade
-      const bladeWorldPos = new THREE.Vector3();
-      swordSpine.getWorldPosition(bladeWorldPos);
-      swordLight.position.copy(bladeWorldPos);
-
-      // Head lookAt targeting (Warrior gaze follows cursor)
-      headTargetDummy.position.copy(headPivot.position);
-      headTargetDummy.lookAt(
-        worldCursorTarget.x * 0.4,
-        worldCursorTarget.y * 0.4 + 1.1,
-        worldCursorTarget.z + 3.0
-      );
-      headPivot.quaternion.slerp(headTargetDummy.quaternion, 0.08);
-
-      // Subtle torso lean
-      torsoGroup.rotation.y = THREE.MathUtils.lerp(torsoGroup.rotation.y, (mx * 0.12), 0.05);
-
-      // Render Scene
       renderer.render(scene, camera);
     };
 
     animate();
 
-    // ── 8. Cleanup on Unmount ──
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointerup', onPointerUp);
-      ro.disconnect();
-
-      scene.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose());
-          } else {
-            child.material.dispose();
-          }
+      scene.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
         }
       });
-
       renderer.dispose();
     };
-  }, [focusField]);
+  }, [mode]);
 
   return (
     <div 
       ref={containerRef} 
-      className={`relative w-full overflow-visible pointer-events-none ${className}`}
-      style={{ height }}
+      className={`relative w-full flex flex-col items-center select-none ${className}`}
+      style={{ minHeight: height }}
     >
-      <canvas 
-        ref={canvasRef} 
-        className="w-full h-full block" 
-        style={{ touchAction: 'none' }}
-      />
-      
-      {/* Interactive Helper Badge */}
-      <div className="absolute bottom-1 inset-x-0 flex items-center justify-center pointer-events-none">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-amber-400/40 text-[11px] font-bold text-amber-300 shadow-lg">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-          <span>Kiếm Khách Ánh Kim 3D • Thanh thần kiếm luôn hướng theo con trỏ chuột</span>
-        </div>
+      {/* ── Mode Toggle Header ── */}
+      <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-950/80 backdrop-blur-xl border border-white/20 mb-3 z-30 shadow-lg">
+        <button
+          type="button"
+          onClick={() => setMode('allain')}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            mode === 'allain'
+              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Swords size={13} className={mode === 'allain' ? 'text-amber-200' : ''} />
+          <span>Allain Kiếm Khách</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMode('robot')}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            mode === 'robot'
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-cyan-500/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Bot size={13} className={mode === 'robot' ? 'text-cyan-200' : ''} />
+          <span>G-Bot 3D</span>
+        </button>
       </div>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 1. ALLAIN 2.5D CINEMATIC LIVE MODE                         */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {mode === 'allain' && (
+        <div className="relative w-full flex flex-col items-center">
+          
+          {/* Parallax 3D Card Container */}
+          <div 
+            style={{ perspective: '1000px' }}
+            className="w-full flex justify-center items-center"
+          >
+            <div 
+              ref={allainCardRef}
+              style={{
+                transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(1.02, 1.02, 1.02)`,
+                transition: 'transform 0.08s ease-out'
+              }}
+              className="relative w-full max-w-[420px] aspect-[16/10] rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-[0_20px_50px_rgba(245,158,11,0.25)] bg-slate-950/80 group"
+            >
+              {/* High Definition Authentic Allain Splash Art */}
+              <img 
+                src={allainHeroImg} 
+                alt="Allain Swordsman" 
+                className="w-full h-full object-cover object-center filter brightness-[1.05] contrast-[1.08] transition-transform duration-300"
+              />
+
+              {/* Cinematic Vignette & Ambient Glow Mask */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/40 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/60 via-transparent to-transparent pointer-events-none" />
+              
+              {/* Warm Flaming Sword Aura Glow on the Left */}
+              <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-amber-500/35 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+              {/* Fire Embers Real-time Canvas */}
+              <canvas 
+                ref={emberCanvasRef}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+              />
+
+              {/* Laser Sword Tip Indicator */}
+              <div 
+                className="absolute w-4 h-4 rounded-full bg-amber-400/90 shadow-[0_0_15px_#f59e0b] pointer-events-none animate-ping"
+                style={{
+                  left: '15%',
+                  top: '85%'
+                }}
+              />
+
+              {/* Character Name Tag Badge */}
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/70 backdrop-blur-md border border-amber-500/30 text-amber-300 text-[11px] font-black uppercase tracking-wider shadow-md">
+                <Sparkles size={12} className="text-amber-400" />
+                <span>Allain • Kiếm Khách Ánh Kim</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Fullscreen Real-Time Laser Energy Beam from Sword to Cursor ── */}
+          {swordTipPos.x > 0 && cursorPos.x > 0 && (
+            <svg 
+              className="fixed inset-0 w-screen h-screen pointer-events-none z-50 overflow-visible"
+            >
+              <defs>
+                {/* Glow Filter */}
+                <filter id="swordLaserGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                {/* Linear Gradient from Sword Amber to Cursor Cyan */}
+                <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" />
+                  <stop offset="70%" stopColor="#fbbf24" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
+                </linearGradient>
+              </defs>
+
+              {/* Outer Glowing Energy Beam Line */}
+              <line 
+                x1={swordTipPos.x} 
+                y1={swordTipPos.y} 
+                x2={cursorPos.x} 
+                y2={cursorPos.y} 
+                stroke="#f59e0b" 
+                strokeWidth="4.5"
+                strokeOpacity="0.35"
+                strokeDasharray="8, 4"
+                filter="url(#swordLaserGlow)"
+              />
+
+              {/* Sharp Inner Laser Core */}
+              <line 
+                x1={swordTipPos.x} 
+                y1={swordTipPos.y} 
+                x2={cursorPos.x} 
+                y2={cursorPos.y} 
+                stroke="url(#beamGradient)" 
+                strokeWidth="2.0"
+                strokeOpacity="0.85"
+              />
+
+              {/* Laser Crosshair Target Lock-On at Cursor */}
+              <g transform={`translate(${cursorPos.x}, ${cursorPos.y})`}>
+                {/* Outer Spinning Reticle */}
+                <circle 
+                  r="14" 
+                  fill="none" 
+                  stroke="#38bdf8" 
+                  strokeWidth="1.5" 
+                  strokeDasharray="6, 4"
+                  className="animate-spin"
+                  style={{ animationDuration: '4s' }}
+                />
+                {/* Inner Reticle */}
+                <circle 
+                  r="6" 
+                  fill="none" 
+                  stroke="#fbbf24" 
+                  strokeWidth="1.5" 
+                />
+                {/* Center Core Dot */}
+                <circle 
+                  r="2.5" 
+                  fill="#f59e0b" 
+                  filter="url(#swordLaserGlow)"
+                />
+              </g>
+
+              {/* Slash Strike Burst Effect on Click */}
+              {isSlashing && (
+                <g transform={`translate(${cursorPos.x}, ${cursorPos.y})`}>
+                  <line 
+                    x1="-40" 
+                    y1="-40" 
+                    x2="40" 
+                    y2="40" 
+                    stroke="#fff" 
+                    strokeWidth="4" 
+                    filter="url(#swordLaserGlow)" 
+                  />
+                  <line 
+                    x1="-30" 
+                    y1="30" 
+                    x2="30" 
+                    y2="-30" 
+                    stroke="#fbbf24" 
+                    strokeWidth="3" 
+                    filter="url(#swordLaserGlow)" 
+                  />
+                </g>
+              )}
+            </svg>
+          )}
+
+          {/* Interactive Helper Badge */}
+          <div className="mt-2 text-center pointer-events-none">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-amber-400/40 text-[11px] font-bold text-amber-300 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              <span>Tia thần kiếm khóa mục tiêu theo chuột • Click để chém kiếm</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 2. G-BOT 3D THREE.JS ROBOT MODE                            */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {mode === 'robot' && (
+        <div className="relative w-full flex flex-col items-center">
+          <canvas 
+            ref={robotCanvasRef} 
+            className="w-full h-[290px] block pointer-events-none" 
+            style={{ touchAction: 'none' }}
+          />
+          <div className="mt-1 text-center pointer-events-none">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-cyan-400/40 text-[11px] font-bold text-cyan-300 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>G-Bot 3D Copilot • Cánh tay robot luôn chỉ theo con trỏ chuột</span>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

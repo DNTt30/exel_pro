@@ -14,14 +14,14 @@ const EN_DOW = { CN: 'Sun', T2: 'Mon', T3: 'Tue', T4: 'Wed', T5: 'Thu', T6: 'Fri
 function dayCell(getDayValue, getActualValue, empId, day) {
   const act = getActualValue ? getActualValue(empId, day) : '';
   if (act !== null && act !== undefined && String(act).trim() !== '') {
-    const t = String(act).trim();
+    const t = String(act).trim().replace(',', '.');
     const num = parseFloat(t);
     if (!isNaN(num)) return num;
-    return t.toUpperCase(); // AL / PL / UL / NS...
+    return String(act).trim().toUpperCase(); // AL / PL / UL / NS...
   }
   const sched = getDayValue(empId, day);
   if (!sched || sched === 'OFF' || sched === '-') return 'OFF';
-  const num = parseFloat(sched);
+  const num = parseFloat(String(sched).replace(',', '.'));
   if (!isNaN(num)) return num;
   return String(sched).toUpperCase();
 }

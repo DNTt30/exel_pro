@@ -79,12 +79,12 @@ export default function EmployeeTimesheet() {
     activeDays.forEach(day => {
       const val = getDayValue(user?.id, day);
       if (val && val !== 'OFF') {
-        const num = parseFloat(val);
+        const num = parseFloat(String(val).replace(',', '.'));
         if (!isNaN(num)) total += num;
         else total += 8;
       }
     });
-    return total;
+    return Math.round(total * 100) / 100;
   }, [getDayValue, activeDays, user?.id]);
 
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && user?.role.includes('PT'));

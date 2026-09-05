@@ -211,7 +211,7 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
         let displayVal = val || '-';
 
         if (val && val !== 'OFF' && val !== 'off') {
-          const num = parseFloat(val);
+          const num = parseFloat(String(val).replace(',', '.'));
           let hrs = 0;
           if (!isNaN(num)) {
             hrs = num;
@@ -236,6 +236,10 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
 
         return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${cellStyle}">${displayVal}</td>`;
       }).join('');
+
+      total = Math.round(total * 100) / 100;
+      ptTotal = Math.round(ptTotal * 100) / 100;
+      ftTotal = Math.round(ftTotal * 100) / 100;
 
       const isOver91 = isPT && total > 91;
       const ptStyle = isOver91 ? 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;' : 'background-color: #f8fafc; font-weight: bold;';

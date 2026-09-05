@@ -20,6 +20,7 @@ describe('exportPayroll — mau C&B web-baocaotonghopcongthang', () => {
   const getActualValue = (empId, day) => {
     if (empId === '1' && day === 'd2') return '7.5';
     if (empId === '1' && day === 'd3') return 'AL';
+    if (empId === '1' && day === 'd5') return '7,84'; // định dạng số lẻ ezHR9 có dấu phẩy
     if (empId === '2' && day === 'd4') return '8';
     return '';
   };
@@ -54,9 +55,10 @@ describe('exportPayroll — mau C&B web-baocaotonghopcongthang', () => {
     expect(pt[7 + 1]).toBe('OFF');
     expect(pt[7 + 2]).toBe(7.5);    // cong thuc te ghi de
     expect(pt[7 + 3]).toBe('AL');
-    expect(pt[38]).toBe(2);         // Working day
-    expect(pt[39]).toBe(15.5);      // Cong cho PT: 8 + 7.5
-    expect(pt[39 + 9]).toBe(15.5);  // Tong cong huong luong
+    expect(pt[7 + 5]).toBe(7.84);   // parse dung dau phay 7,84 thanh 7.84
+    expect(pt[38]).toBe(3);         // Working day (d0, d2, d5)
+    expect(pt[39]).toBe(23.34);     // Cong cho PT: 8 + 7.5 + 7.84 = 23.34
+    expect(pt[39 + 9]).toBe(23.34); // Tong cong huong luong
     expect(pt[42]).toBe(1);         // Annual Leave count
     expect(ft[40]).toBe(1);         // Cong FT (ngay) = 8h/8
     expect(ft[48]).toBe(8);         // Tong cong FT = so gio

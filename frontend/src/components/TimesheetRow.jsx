@@ -18,7 +18,7 @@ function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
   }, [initial, focused]);
 
   const has = String(val).trim() !== '';
-  const isZeroOrOff = val === '0' || String(val).toUpperCase() === 'OFF';
+  const isZeroOrOff = val === '0' || String(val).toUpperCase() === 'OFF' || String(val).replace(',', '.') === '0';
 
   const applyQuickValue = (newVal) => {
     setVal(newVal);
@@ -59,7 +59,7 @@ function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
         }`}
         title={has 
           ? `Công thực tế: ${val} (đã ghi đè). Xóa trống để theo lịch.` 
-          : `Mặc định theo lịch: ${placeholderText || 'OFF'}. Gõ số giờ hoặc OFF/AL/PL`}
+          : `Mặc định theo lịch: ${placeholderText || 'OFF'}. Gõ số giờ (vd: 7.84 hoặc 7,84 từ ezHR9) hoặc OFF/AL/PL`}
       />
 
       {/* Quick selection chips popup when focused */}
@@ -128,7 +128,8 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       if (act !== null && act !== undefined && act !== '') val = String(act);
     }
     if (val && val !== 'OFF' && val !== 'off') {
-      const parsed = parseFloat(val);
+      const normalizedVal = String(val).trim().replace(',', '.');
+      const parsed = parseFloat(normalizedVal);
       let num = 0;
       if (!isNaN(parsed)) {
         num = parsed;
@@ -149,8 +150,10 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
     }
   });
 
+  totalPT = Math.round(totalPT * 100) / 100;
+  totalFT = Math.round(totalFT * 100) / 100;
   const isPTOvertimed = isPT && totalPT > SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH;
-  const tongCong = totalPT + totalFT;
+  const tongCong = Math.round((totalPT + totalFT) * 100) / 100;
   
   // Ước tính lương (Ví dụ cơ bản: 25k/h cho PT)
   const estSalary = isPT ? Math.round(totalPT * DEFAULT_PT_HOURLY_RATE).toLocaleString('vi-VN') + 'đ' : '—';
@@ -213,7 +216,8 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
         // UU TIEN HIEN THI: cong thuc te override > lich xep
         const actDisp = getActualValue ? getActualValue(emp.id, day) : '';
         const actStr = String(actDisp ?? '').trim().toUpperCase();
-        const actNum = parseFloat(actStr);
+        const normActStr = actStr.replace(',', '.');
+        const actNum = parseFloat(normActStr);
         const hasActNum = actStr !== '' && !isNaN(actNum);
         return (
           <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center font-semibold">

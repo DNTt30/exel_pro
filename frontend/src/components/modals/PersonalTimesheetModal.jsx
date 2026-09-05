@@ -20,13 +20,13 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
     const rawVal = getDayValue ? getDayValue(user.id, cell.key) : (weekSchedule[user.id]?.[cell.key || cell.dayKey] || '');
     const { shift } = normalizeShift(rawVal);
     const isOff = !shift || shift === 'off' || rawVal === 'OFF';
-    const hours = isOff ? 0 : (getShiftHours(shift) || parseFloat(rawVal) || 0);
+    const hours = isOff ? 0 : (getShiftHours(shift) || parseFloat(String(rawVal).replace(',', '.')) || 0);
 
     if (isOff) {
       offDaysCount++;
     } else {
       totalShifts++;
-      totalHours += hours;
+      totalHours = Math.round((totalHours + hours) * 100) / 100;
       if (String(shift).startsWith('22')) nightShiftsCount++;
     }
 

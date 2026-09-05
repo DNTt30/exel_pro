@@ -76,18 +76,24 @@ export default function Timesheet() {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell || !cell.fullDateStr) return;
     try {
-      const trimmed = String(raw).trim().toUpperCase();
+      const rawStr = String(raw ?? '').trim();
+      const trimmed = rawStr.toUpperCase();
+      const normalized = rawStr.replace(',', '.').toUpperCase();
       if (trimmed === '') {
         // Xóa override -> quay lại theo lịch xếp
         await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id, '');
       } else if (trimmed === 'OFF') {
         // Chấm nghỉ ca: actualHours = 0, note = 'OFF'
         await saveAttendanceCell(empId, cell.fullDateStr, 0, user?.id, 'OFF');
-      } else if (trimmed === '0' || trimmed === '0H') {
+      } else if (trimmed === '0' || trimmed === '0H' || normalized === '0' || normalized === '0H') {
         // Chấm 0 giờ công: actualHours = 0, note = ''
         await saveAttendanceCell(empId, cell.fullDateStr, 0, user?.id, '');
-      } else if (/^[0-9.]+$/.test(trimmed)) {
-        await saveAttendanceCell(empId, cell.fullDateStr, parseFloat(trimmed), user?.id, '');
+      } else if (/^[0-9]+(\.[0-9]+)?(H)?$/i.test(normalized)) {
+        // Hỗ trợ số giờ lẻ thực tế từ ezHR9 (ví dụ: 7,84, 7.84, 8, 4.5, 7.84h...)
+        const cleanNum = normalized.replace(/H$/i, '');
+        const num = parseFloat(cleanNum);
+        const rounded = Math.round(num * 100) / 100;
+        await saveAttendanceCell(empId, cell.fullDateStr, rounded, user?.id, '');
       } else {
         // Mã chữ: AL (phép năm), PL (hưởng lương), UL (không lương), SL (ốm), CL (nghỉ bù)...
         await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id, trimmed);
@@ -206,7 +212,7 @@ export default function Timesheet() {
         <div className="print:hidden mx-3 mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-2 text-amber-900 font-medium">
             <span className="font-bold text-amber-800">💡 Chế độ sửa công thực tế:</span>
-            <span>Nhập số giờ (vd: <strong>8</strong>, <strong>4</strong>, <strong>0</strong>) hoặc chữ <strong>OFF</strong> (nghỉ ca), <strong>AL</strong> (phép năm), <strong>PL</strong> (nghỉ lương). Nhấn <strong>Enter</strong> hoặc bấm ra ngoài để lưu. Xóa trắng ô để quay lại theo lịch xếp.</span>
+            <span>Nhập số giờ thực tế từ ezHR9 (hỗ trợ cả số lẻ như <strong>7,84</strong> hoặc <strong>7.84</strong>, <strong>8</strong>, <strong>0</strong>) hoặc chữ <strong>OFF</strong> (nghỉ ca), <strong>AL</strong> (phép năm), <strong>PL</strong> (nghỉ lương). Nhấn <strong>Enter</strong> hoặc bấm ra ngoài để lưu. Xóa trắng ô để quay lại theo lịch xếp.</span>
           </div>
           <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> Ô vàng: Công thực tế</span>

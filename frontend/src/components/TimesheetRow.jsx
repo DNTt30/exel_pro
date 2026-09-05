@@ -9,7 +9,7 @@ import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
  * - Khi nhập '0' hoặc 'OFF': không bị rơi về placeholder số 8 của lịch
  * - Kèm chip chọn nhanh tiện lợi
  */
-function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
+function AttendanceCell({ empId, day, initial, isScheduledOff, scheduledVal, onCommit }) {
   const [val, setVal] = useState(initial ?? '');
   const [focused, setFocused] = useState(false);
 
@@ -18,12 +18,39 @@ function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
   }, [initial, focused]);
 
   const has = String(val).trim() !== '';
-  const isZeroOrOff = val === '0' || String(val).toUpperCase() === 'OFF' || String(val).replace(',', '.') === '0';
+  const upper = String(val).trim().toUpperCase();
+  const isZero = val === '0' || upper === '0H' || String(val).replace(',', '.') === '0';
+  const isOff = upper === 'OFF';
+  const isLeave = ['AL', 'PL', 'UL', 'SL', 'CL'].includes(upper);
 
   const applyQuickValue = (newVal) => {
     setVal(newVal);
     onCommit(empId, day, newVal);
   };
+
+  let cellBgClass = 'bg-white border-slate-300 text-slate-800';
+  if (focused) {
+    cellBgClass = 'ring-2 ring-blue-500 bg-white border-blue-500 z-10 font-bold';
+  } else if (has) {
+    if (isZero) {
+      cellBgClass = 'bg-slate-200 border-slate-400 text-slate-800 font-black shadow-2xs';
+    } else if (isOff) {
+      cellBgClass = 'bg-rose-100 border-rose-300 text-rose-700 font-black shadow-2xs';
+    } else if (isLeave) {
+      cellBgClass = 'bg-emerald-100 border-emerald-400 text-emerald-800 font-black shadow-2xs';
+    } else {
+      // Số giờ thực tế đã nhập (ví dụ: 8, 4, 7.84...)
+      cellBgClass = 'bg-amber-100 border-amber-400 text-amber-950 font-black shadow-2xs';
+    }
+  } else if (isScheduledOff) {
+    cellBgClass = 'bg-slate-100/70 border-slate-200 text-slate-400';
+  }
+
+  const tooltipText = has
+    ? `Công thực tế: ${val} (đã ghi đè). Xóa ô để quay lại theo lịch.`
+    : isScheduledOff
+      ? 'Lịch xếp: Nghỉ (OFF). Bấm để nhập số giờ nếu đi làm.'
+      : `Lịch xếp: ${scheduledVal || 'Ca 8h'}. Bấm để nhập số giờ thực tế hoặc chọn nhanh.`;
 
   return (
     <div className="relative group/cell w-full">
@@ -31,7 +58,7 @@ function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
         type="text"
         inputMode="decimal"
         value={val}
-        placeholder={has ? '' : (placeholderText === '0' ? '0' : placeholderText)}
+        placeholder=""
         onFocus={() => setFocused(true)}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => { 
@@ -48,18 +75,8 @@ function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
             onCommit(empId, day, trimmed);
           }
         }}
-        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase transition-all ${
-          focused
-            ? 'ring-2 ring-blue-500 bg-white border-blue-400 z-10'
-            : has 
-              ? (isZeroOrOff 
-                  ? 'bg-slate-100 border-slate-400 text-slate-700 shadow-2xs' 
-                  : 'bg-amber-50 border-amber-400 text-amber-900 shadow-2xs font-black') 
-              : 'bg-white border-slate-200 text-slate-400'
-        }`}
-        title={has 
-          ? `Công thực tế: ${val} (đã ghi đè). Xóa trống để theo lịch.` 
-          : `Mặc định theo lịch: ${placeholderText || 'OFF'}. Gõ số giờ (vd: 7.84 hoặc 7,84 từ ezHR9) hoặc OFF/AL/PL`}
+        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase transition-all ${cellBgClass}`}
+        title={tooltipText}
       />
 
       {/* Quick selection chips popup when focused */}
@@ -206,7 +223,8 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
                 empId={emp.id}
                 day={day}
                 initial={initial}
-                placeholderText={isOff ? '' : String(val)}
+                isScheduledOff={isOff}
+                scheduledVal={isOff ? 'OFF' : String(val)}
                 onCommit={onActualChange}
               />
             </td>

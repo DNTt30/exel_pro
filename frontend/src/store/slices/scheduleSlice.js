@@ -61,6 +61,50 @@ export const createScheduleSlice = (set, get) => ({
     }
   },
 
+  applyBulkAttendance: async (records, updatedBy) => {
+    if (!records || !records.length) return 0;
+    const prevMap = { ...get().attendance };
+    const nextMap = { ...prevMap };
+    const payload = [];
+
+    records.forEach(r => {
+      const key = r.empId + '|' + r.workDate;
+      const hours = r.actualHours;
+      const note = String(r.note || '').trim();
+      const hasHours = !(hours === null || hours === undefined || isNaN(hours));
+      const entry = {
+        actualHours: hasHours ? hours : 0,
+        note: note || ''
+      };
+      nextMap[key] = entry;
+      payload.push({
+        empId: r.empId,
+        workDate: r.workDate,
+        actualHours: entry.actualHours,
+        note: entry.note,
+        updatedBy
+      });
+    });
+
+    // Optimistic update
+    set({ attendance: nextMap });
+
+    try {
+      await api.upsertAttendanceRows(payload);
+      void get().appendAdminLog(
+        'NHAP_CONG_EZHR_EXCEL',
+        `${records.length} ô công`,
+        `Đã nạp ${records.length} ô công thực tế từ Excel ezHR9 (bởi ${updatedBy || 'SM'})`,
+        { entityType: 'attendance', count: records.length }
+      ).catch(() => {});
+      return records.length;
+    } catch (e) {
+      // Rollback on error
+      set({ attendance: prevMap });
+      throw e;
+    }
+  },
+
   applyBulkSchedule: async (weekDate, scheduleMap, storeId) => {
     assertCanManageStaff(get());
     const effectiveStoreId = storeId

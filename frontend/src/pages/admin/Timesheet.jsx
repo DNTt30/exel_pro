@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
-import { Download, Printer, Pencil, Check, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Printer, Pencil, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import { toast } from '../../components/ui/toastStore';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
@@ -12,14 +12,17 @@ import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
+const ImportAttendanceModal = React.lazy(() => import('../../components/modals/ImportAttendanceModal'));
+
 export default function Timesheet() {
-  const { user, currentWeek, schedule, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
+  const { user, currentWeek, schedule, employees, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, employees: s.employees, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
   const attendance = useStore((s) => s.attendance);
   const loadAttendanceRange = useStore((s) => s.loadAttendanceRange);
   const saveAttendanceCell = useStore((s) => s.saveAttendanceCell);
 
   // Chế độ sửa CÔNG THỰC TẾ (nhập số giờ từ ezHR)
   const [editMode, setEditMode] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const pickStore = canPickStore(user);
   const [search, setSearch] = useState('');
@@ -168,6 +171,13 @@ export default function Timesheet() {
                 <Download size={14} className="text-emerald-600" /> Xuất Excel
               </button>
               <button
+                onClick={() => setShowImportModal(true)}
+                className="text-xs py-1.5 px-3 rounded-lg font-bold border bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Kéo thả file Excel từ ezHR9 để nạp công thực tế cả tháng trong 2 giây"
+              >
+                <Upload size={14} className="text-indigo-600" /> Nhập từ Excel ezHR9
+              </button>
+              <button
                 onClick={() => setEditMode(v => !v)}
                 className={`text-xs py-1.5 px-3 rounded-lg font-bold border flex items-center gap-1.5 transition-colors cursor-pointer ${
                   editMode
@@ -231,6 +241,19 @@ export default function Timesheet() {
         getActualValue={getActualValue}
         onActualChange={handleActualChange}
       />
+
+      {showImportModal && (
+        <React.Suspense fallback={null}>
+          <ImportAttendanceModal
+            isOpen={showImportModal}
+            onClose={() => setShowImportModal(false)}
+            payrollCycle={payrollCycle}
+            cycleDates={cycleDates}
+            employees={employees}
+            schedule={schedule}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

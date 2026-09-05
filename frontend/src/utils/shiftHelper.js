@@ -31,6 +31,7 @@ export function normalizeShift(val) {
   if (shiftStr === '1') shiftStr = '6-14';
   if (shiftStr === '2') shiftStr = '14-22';
   if (shiftStr === '3') shiftStr = '22-6';
+  if (shiftStr.toUpperCase() === 'HC') shiftStr = '8-17';
   if (shiftStr === '0') shiftStr = 'off';
   if (shiftStr.toLowerCase() === 'off') shiftStr = 'off';
 

@@ -40,7 +40,7 @@ export function bootstrapQueryPlan(user) {
  * - manager: CH cua minh (hoac cac CH co sm_id = user.id)
  * - Nhan vien: CH cua minh + cac CH cung SM (theo sm_id cua CH minh)
  */
-export function visibleDeptIds(user, stores) {
+export function visibleDeptIds(user, stores, employees = []) {
   const list = activeStores(stores);
   if (!user) return list.map(s => s.id);
   
@@ -60,7 +60,23 @@ export function visibleDeptIds(user, stores) {
   const ids = new Set(myDepts);
   const primaryDept = myDepts[0];
   const myStore = list.find(s => s.id === primaryDept);
-  const mySm = myStore?.sm_id || myStore?.smId || '';
+  let mySm = myStore?.sm_id || myStore?.smId || '';
+
+  // Nếu trong store chưa có sm_id, tìm SM quản lý CH từ danh sách employees
+  if (!mySm && Array.isArray(employees) && employees.length > 0) {
+    const smEmp = employees.find(e => {
+      const isSM = isOpsManager(e) || e.role?.includes('Cửa hàng trưởng') || e.role?.includes('SM');
+      if (!isSM) return false;
+      const depts = (e.dept || '').split(',').map(d => d.trim());
+      return depts.includes(primaryDept);
+    });
+    if (smEmp) {
+      mySm = smEmp.id;
+      const smDepts = (smEmp.dept || '').split(',').map(d => d.trim()).filter(Boolean);
+      smDepts.forEach(d => ids.add(d));
+    }
+  }
+
   list.forEach(s => {
     const sSm = s.sm_id || s.smId || '';
     if ((mySm && sSm && sSm === mySm) || (sSm && sSm === user.id)) ids.add(s.id);

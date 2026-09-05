@@ -364,9 +364,17 @@ export function generateAISchedule(employees, storeId, options = {}) {
     employeeShiftsCount[e.id] = 0;
   });
 
-  // CSR_NEW tính như full-time theo quy chuẩn (≥48h & ≥6 ca/tuần)
-  const ftEmployees = storeEmployees.filter(e => e.type === 'STFT' || e.type === 'CSR_NEW' || e.type === 'SM' || e.role?.includes('SM') || e.role?.includes('Full'));
-  const ptEmployees = storeEmployees.filter(e => !ftEmployees.some(ft => ft.id === e.id));
+  const isSMStaff = (emp) => {
+    const r = (emp.role || '').toLowerCase();
+    const jt = (emp.jobTitle || '').toLowerCase();
+    const tp = (emp.type || '').toUpperCase();
+    return r.includes('cửa hàng trưởng') || r.includes('sm') || jt.includes('cửa hàng trưởng') || jt.includes('sm') || tp === 'SM';
+  };
+
+  const smEmployees = storeEmployees.filter(isSMStaff);
+  // CSR_NEW tính như full-time theo quy chuẩn (≥48h & ≥6 ca/tuần), SM tách riêng để xếp giờ hành chính
+  const ftEmployees = storeEmployees.filter(e => !smEmployees.some(sm => sm.id === e.id) && (e.type === 'STFT' || e.type === 'CSR_NEW' || e.role?.includes('Full') || e.role?.includes('STFT')));
+  const ptEmployees = storeEmployees.filter(e => !smEmployees.some(sm => sm.id === e.id) && !ftEmployees.some(ft => ft.id === e.id));
 
   const seniorEmployees = storeEmployees.filter(isSeniorStaff);
   const newEmployees = storeEmployees.filter(isNewStaff);
@@ -432,6 +440,17 @@ export function generateAISchedule(employees, storeId, options = {}) {
       if (existingShift && existingShift !== 'off') {
         if (canTakeShift(emp, dayKey, dayIdx, existingShift)) {
            assignShiftTo(emp, dayKey, existingShift);
+        }
+      }
+    });
+  });
+
+  // GIAI ĐOẠN 0.5: CỬA HÀNG TRƯỞNG (SM) MẶC ĐỊNH LÀM GIỜ HÀNH CHÍNH (8-17), T2 -> T7, CN NGHỈ (OFF)
+  smEmployees.forEach(sm => {
+    WEEK_DAYS.forEach((dayKey) => {
+      if (resultSchedule[sm.id][dayKey] === 'off') {
+        if (dayKey !== 'CN' && employeeShiftsCount[sm.id] < 6) {
+          assignShiftTo(sm, dayKey, '8-17');
         }
       }
     });
@@ -570,14 +589,14 @@ export function generateAISchedule(employees, storeId, options = {}) {
     employeeShiftsCount,
     stats: {
       totalEmployees: storeEmployees.length,
-      totalFT: ftEmployees.length,
+      totalFT: ftEmployees.length + smEmployees.length,
       totalPT: ptEmployees.length,
       totalSenior: seniorEmployees.length,
       totalNew: newEmployees.length,
       totalHours: totalAssignedHours,
       totalShifts: totalAssignedShifts,
       mentorPairsCount,
-      compliantFTPercent: ftEmployees.length > 0 ? Math.round((compliantFTCount / ftEmployees.length) * 100) : 100,
+      compliantFTPercent: (ftEmployees.length + smEmployees.length) > 0 ? Math.round((compliantFTCount / (ftEmployees.length + smEmployees.length)) * 100) : 100,
       compliantPTPercent: ptEmployees.length > 0 ? Math.round((compliantPTCount / ptEmployees.length) * 100) : 100
     },
     warnings,

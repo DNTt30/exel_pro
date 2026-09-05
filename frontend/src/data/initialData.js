@@ -14,5 +14,7 @@ export const SHIFTS = {
   '6-12': { label: '6-12', hours: 6, bg: '#4ade80', text: '#064e3b' },
   '12-18': { label: '12-18', hours: 6, bg: '#60a5fa', text: '#1e3a8a' },
   '8-16': { label: '8-16', hours: 8, bg: '#a855f7', text: '#ffffff' },
+  '8-17': { label: '8-17', hours: 8, bg: '#8b5cf6', text: '#ffffff' }, // Ca hành chính Quản lý (Tím)
+  'HC': { label: 'HC', hours: 8, bg: '#8b5cf6', text: '#ffffff' }, // Ca hành chính (Tím)
   '10-18': { label: '10-18', hours: 8, bg: '#f97316', text: '#ffffff' }
 };

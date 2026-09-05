@@ -22,9 +22,9 @@ export function useGroupedEmployees(search, filterDept, filterRole, weekSchedule
       filtered = filtered.filter(e => (e.role || e.type) === filterRole);
     }
     
-    // SM nhieu cua hang: cho phep chuyen trong pham vi sm_id; mac dinh ve CH cua minh
-    const allowed = new Set(visibleDeptIds(user, stores));
-    const requested = filterDept && allowed.has(filterDept) ? filterDept : user?.dept;
+    // SM nhiều cửa hàng & Nhân viên cùng SM: cho phép chuyển hoặc xem 'ALL' trong phạm vi allowed; mặc định về CH của mình
+    const allowed = new Set(visibleDeptIds(user, stores, employees));
+    const requested = (filterDept === 'ALL' || (filterDept && allowed.has(filterDept))) ? filterDept : (user?.dept || 'ALL');
     const effectiveFilterDept = pickStore ? filterDept : (requested || 'ALL');
     
     const groups = {};

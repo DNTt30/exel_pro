@@ -59,14 +59,17 @@ export default function Timesheet() {
     return hours > 0 ? String(hours) : code;
   }, [cycleDates, schedule]);
 
-  // Đọc công thực tế: ưu tiên MÃ (AL/PL/UL), không thì số giờ; '' khi trống
+  // Đọc công thực tế: ưu tiên MÃ (AL/PL/UL/OFF), không thì số giờ; '' khi chưa có override
   const getActualValue = useCallback((empId, day) => {
     const cell = cycleDates.find(d => d.key === day);
     if (!cell) return '';
     const rec = attendance[cell.fullDateStr ? empId + '|' + cell.fullDateStr : ''];
     if (!rec) return '';
     if (rec.note && rec.note.trim() !== '') return rec.note.trim().toUpperCase();
-    return rec.actualHours > 0 ? String(rec.actualHours) : '';
+    if (rec.actualHours !== null && rec.actualHours !== undefined && !isNaN(rec.actualHours)) {
+      return String(rec.actualHours);
+    }
+    return '';
   }, [cycleDates, attendance]);
 
   const handleActualChange = useCallback(async (empId, day, raw) => {
@@ -75,11 +78,18 @@ export default function Timesheet() {
     try {
       const trimmed = String(raw).trim().toUpperCase();
       if (trimmed === '') {
-        await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id);
+        // Xóa override -> quay lại theo lịch xếp
+        await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id, '');
+      } else if (trimmed === 'OFF') {
+        // Chấm nghỉ ca: actualHours = 0, note = 'OFF'
+        await saveAttendanceCell(empId, cell.fullDateStr, 0, user?.id, 'OFF');
+      } else if (trimmed === '0' || trimmed === '0H') {
+        // Chấm 0 giờ công: actualHours = 0, note = ''
+        await saveAttendanceCell(empId, cell.fullDateStr, 0, user?.id, '');
       } else if (/^[0-9.]+$/.test(trimmed)) {
-        await saveAttendanceCell(empId, cell.fullDateStr, parseFloat(trimmed), user?.id);
+        await saveAttendanceCell(empId, cell.fullDateStr, parseFloat(trimmed), user?.id, '');
       } else {
-        // Mã chữ: AL (phép năm), PL (phép/trả lương), UL (không lương), NS...
+        // Mã chữ: AL (phép năm), PL (hưởng lương), UL (không lương), SL (ốm), CL (nghỉ bù)...
         await saveAttendanceCell(empId, cell.fullDateStr, null, user?.id, trimmed);
       }
     } catch (e) {
@@ -191,6 +201,20 @@ export default function Timesheet() {
           <span>Hệ thống GS25 OFC</span>
         </div>
       </div>
+
+      {editMode && (
+        <div className="print:hidden mx-3 mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2 text-amber-900 font-medium">
+            <span className="font-bold text-amber-800">💡 Chế độ sửa công thực tế:</span>
+            <span>Nhập số giờ (vd: <strong>8</strong>, <strong>4</strong>, <strong>0</strong>) hoặc chữ <strong>OFF</strong> (nghỉ ca), <strong>AL</strong> (phép năm), <strong>PL</strong> (nghỉ lương). Nhấn <strong>Enter</strong> hoặc bấm ra ngoài để lưu. Xóa trắng ô để quay lại theo lịch xếp.</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> Ô vàng: Công thực tế</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-400"></span> Ô xám: Chấm 0h / OFF</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-white border border-slate-300"></span> Ô trắng: Theo lịch</span>
+          </div>
+        </div>
+      )}
 
       <TimesheetTable
         groupedEmps={groupedEmps}

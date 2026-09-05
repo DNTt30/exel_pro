@@ -21,17 +21,16 @@ import { weekRecordKey } from '../../utils/scheduleWeek';
 const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
-  // 'employees' không dùng ở đây — bỏ để tránh đăng ký thừa
-  const { user, schedule, updateShift, updateEmployeeWeeklyShifts, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, updateEmployeeWeeklyShifts: s.updateEmployeeWeeklyShifts, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks })));
+  const { user, schedule, updateShift, updateEmployeeWeeklyShifts, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks, employees } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, updateEmployeeWeeklyShifts: s.updateEmployeeWeeklyShifts, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks, employees: s.employees })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const [search] = useState('');
   const [filterOnlyMe] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving'
   const [displayView, setDisplayView] = useState('card'); // 'card' (Lịch thẻ cá nhân) hoặc 'table' (Bảng tính toàn CH)
-  const visibleDepts = useMemo(() => visibleDeptIds(user, stores), [user, stores]);
-  const [viewDept, setViewDept] = useState(''); // '' = mặc định CH của mình
-  const activeDept = viewDept || user?.dept || '';
+  const visibleDepts = useMemo(() => visibleDeptIds(user, stores, employees), [user, stores, employees]);
+  const [viewDept, setViewDept] = useState(''); // '' = mặc định ALL nếu có nhiều CH cùng SM, hoặc CH của mình
+  const activeDept = viewDept || (visibleDepts.length > 1 ? 'ALL' : (user?.dept || ''));
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSwapListModal, setShowSwapListModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
@@ -40,15 +39,15 @@ export default function EmployeeSchedule() {
     return (shiftSwaps || []).filter(s => s.toEmpId === user?.id && s.status === 'pending_partner').length;
   }, [shiftSwaps, user?.id]);
 
-  const currentWeekStatus = (scheduleWeeks || {})[weekRecordKey(activeDept, currentWeek)]?.status || 'draft';
+  const myDept = user?.dept || '';
+  const currentWeekStatus = (scheduleWeeks || {})[weekRecordKey(activeDept === 'ALL' ? myDept : activeDept, currentWeek)]?.status || 'draft';
   const isDraft = currentWeekStatus !== 'approved';
 
   // 1. Ngày hiển thị cố định theo Tuần (T2 -> CN)
   const activeDays = WEEK_DAYS;
 
-  // 3. Nhóm nhân viên theo CH đang xem (mặc định CH của mình; SM quản lý nhiều CH thì NV chọn được)
-  const myDept = user?.dept || '';
-  const groupedEmps = useGroupedEmployees(search, activeDept || myDept, 'ALL', weekSchedule);
+  // 3. Nhóm nhân viên theo CH đang xem (nếu 'ALL' hiển thị toàn bộ các CH cùng SM)
+  const groupedEmps = useGroupedEmployees(search, activeDept, 'ALL', weekSchedule);
 
   // 4. Lịch của nhân viên đăng nhập
   const mySched = weekSchedule[user?.id] || EMPTY_SCHED;
@@ -821,8 +820,19 @@ export default function EmployeeSchedule() {
 
       {/* VIEW 2: BẢNG TÍNH EXCEL TOÀN CỬA HÀNG (TABLE VIEW) */}
       {displayView === 'table' && visibleDepts.length > 1 && (
-        <div className="print:hidden px-3 pt-2 pb-1 flex flex-wrap items-center gap-1.5 bg-slate-100">
+        <div className="print:hidden px-3 pt-2 pb-1.5 flex flex-wrap items-center gap-1.5 bg-slate-100 border-b border-slate-200">
           <span className="text-[11px] font-bold text-slate-500 mr-1">🏬 Cửa hàng:</span>
+          <button
+            onClick={() => setViewDept('ALL')}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+              activeDept === 'ALL'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+            }`}
+            title="Xem toàn bộ lịch các cửa hàng trong cùng cụm quản lý của SM"
+          >
+            🏢 Tất cả cửa hàng (Cụm SM)
+          </button>
           {visibleDepts.map(id => (
             <button key={id}
               onClick={() => setViewDept(id)}

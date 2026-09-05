@@ -4,34 +4,113 @@ import { getRoleBadgeInfo, SCHEDULE_RULES, NIGHT_SHIFT_MULTIPLIER, DEFAULT_PT_HO
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
 /**
- * Ô nhap cong thuc te: tu giu gia tri khi dang go (khong bi reset boi re-render),
- * chi commit len DB khi roi khoi o hoac nhan Enter. Neu trong = tra ve theo lich.
+ * Ô nhập công thực tế:
+ * - Hỗ trợ cả số (0, 4, 8, 8.5...) và mã chữ (OFF, AL, PL, UL, SL)
+ * - Khi nhập '0' hoặc 'OFF': không bị rơi về placeholder số 8 của lịch
+ * - Kèm chip chọn nhanh tiện lợi
  */
 function AttendanceCell({ empId, day, initial, placeholderText, onCommit }) {
   const [val, setVal] = useState(initial ?? '');
   const [focused, setFocused] = useState(false);
 
-  // Dong bo khi du lieu thay doi tu ngoai (tai lai / xoa override) neu khong focus
   useEffect(() => {
     if (!focused) setVal(initial ?? '');
   }, [initial, focused]);
 
   const has = String(val).trim() !== '';
+  const isZeroOrOff = val === '0' || String(val).toUpperCase() === 'OFF';
+
+  const applyQuickValue = (newVal) => {
+    setVal(newVal);
+    onCommit(empId, day, newVal);
+  };
+
   return (
-    <input
-      type="number" step="0.5" min="0" max="16"
-      value={val}
-      placeholder={has ? '' : placeholderText}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setVal(e.target.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-      onBlur={() => {
-        setFocused(false);
-        if (String(val).trim() !== String(initial ?? '')) onCommit(empId, day, val);
-      }}
-      className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none focus:ring-1 focus:ring-blue-500 ${has ? 'bg-amber-50 border-amber-400 text-amber-800' : 'bg-white border-slate-200 text-slate-700'}`}
-      title={has ? 'Cong thuc te (ezHR) - nen vang = ghi de lich xep' : 'Nhap gio thuc te de ghi de lich xep'}
-    />
+    <div className="relative group/cell w-full">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={val}
+        placeholder={has ? '' : (placeholderText === '0' ? '0' : placeholderText)}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { 
+          if (e.key === 'Enter') e.target.blur();
+          if (e.key === 'Escape') {
+            setVal(initial ?? '');
+            e.target.blur();
+          }
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const trimmed = String(val).trim();
+          if (trimmed !== String(initial ?? '').trim()) {
+            onCommit(empId, day, trimmed);
+          }
+        }}
+        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase transition-all ${
+          focused
+            ? 'ring-2 ring-blue-500 bg-white border-blue-400 z-10'
+            : has 
+              ? (isZeroOrOff 
+                  ? 'bg-slate-100 border-slate-400 text-slate-700 shadow-2xs' 
+                  : 'bg-amber-50 border-amber-400 text-amber-900 shadow-2xs font-black') 
+              : 'bg-white border-slate-200 text-slate-400'
+        }`}
+        title={has 
+          ? `Công thực tế: ${val} (đã ghi đè). Xóa trống để theo lịch.` 
+          : `Mặc định theo lịch: ${placeholderText || 'OFF'}. Gõ số giờ hoặc OFF/AL/PL`}
+      />
+
+      {/* Quick selection chips popup when focused */}
+      {focused && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-slate-900 text-white rounded-lg p-1 shadow-xl flex items-center gap-1 text-[9px] font-bold whitespace-nowrap">
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('8'); }}
+            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-cyan-300"
+          >
+            8h
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('4'); }}
+            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-amber-300"
+          >
+            4h
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('0'); }}
+            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-rose-300"
+          >
+            0h
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('OFF'); }}
+            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-rose-400"
+          >
+            OFF
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('AL'); }}
+            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-emerald-300"
+          >
+            AL
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); applyQuickValue(''); }}
+            className="px-1.5 py-0.5 rounded hover:bg-rose-800 text-slate-400"
+            title="Khôi phục theo lịch"
+          >
+            Xóa
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -133,27 +212,54 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
 
         // UU TIEN HIEN THI: cong thuc te override > lich xep
         const actDisp = getActualValue ? getActualValue(emp.id, day) : '';
-        const actStr = String(actDisp ?? '').trim();
+        const actStr = String(actDisp ?? '').trim().toUpperCase();
         const actNum = parseFloat(actStr);
         const hasActNum = actStr !== '' && !isNaN(actNum);
         return (
           <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center font-semibold">
             {hasActNum ? (
-              <span className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 leading-tight">{actNum}</span>
+              actNum === 0 ? (
+                <span 
+                  className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300 leading-tight" 
+                  title={`Công thực tế: 0h (Lịch xếp: ${val || 'OFF'})`}
+                >
+                  0
+                </span>
+              ) : (
+                <span 
+                  className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 leading-tight" 
+                  title={`Công thực tế: ${actNum}h (Lịch xếp: ${val || 'OFF'})`}
+                >
+                  {actNum}
+                </span>
+              )
+            ) : actStr === 'OFF' ? (
+              <span 
+                className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 leading-tight" 
+                title={`Chấm nghỉ (OFF). Lịch xếp: ${val || 'OFF'}`}
+              >
+                OFF
+              </span>
             ) : actStr !== '' ? (
-              <span className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 leading-tight">{actStr.toUpperCase()}</span>
+              <span 
+                className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 leading-tight" 
+                title={`Mã công: ${actStr} (Lịch xếp: ${val || 'OFF'})`}
+              >
+                {actStr}
+              </span>
             ) : isOff ? (
-              <span className="text-slate-300 text-[11px] block py-1">-</span>
+              <span className="text-slate-300 text-[11px] block py-1" title="Lịch xếp: OFF">-</span>
             ) : (
               <span 
                 className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold truncate leading-tight shadow-2xs"
                 style={badgeStyle}
+                title={`Theo lịch xếp: ${val} (Chưa ghi đè thực tế)`}
               >
                 {val}
               </span>
             )}
             <div className="hidden print:block text-center font-bold text-[10px] text-black py-0.5">
-              {val || '-'}
+              {actStr || val || '-'}
             </div>
           </td>
         );

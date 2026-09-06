@@ -15,11 +15,9 @@ import {
   ArrowRight, 
   Store, 
   Bot, 
-  Sparkles, 
   Clock, 
   Zap,
   Activity,
-  ChevronRight,
   ShieldAlert
 } from 'lucide-react';
 
@@ -99,17 +97,6 @@ export default function Login() {
   };
 
   const greeting = getShiftGreeting();
-
-  const handleQuickFill = (role) => {
-    if (role === 'admin') {
-      setEmpId('admin');
-      setPassword('1');
-    } else {
-      setEmpId('251104004');
-      setPassword('1');
-    }
-    setError('');
-  };
 
   const sendOtp = async (isResend) => {
     setOtpBusy(true);
@@ -477,39 +464,6 @@ export default function Login() {
                     {greeting.desc}
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* ⚡ Quick Fill Role Chips (Đăng nhập 1 chạm tiện lợi) */}
-            <div className="mb-4">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Sparkles size={13} className="text-blue-500" />
-                <span>Gợi ý đăng nhập nhanh:</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('admin')}
-                  className="px-3 py-2 rounded-xl text-left bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group"
-                >
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700 flex items-center justify-between">
-                    <span>Quản Lý / SM</span>
-                    <ChevronRight size={14} className="text-slate-400 group-hover:text-blue-600" />
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">admin • MK: 1</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('employee')}
-                  className="px-3 py-2 rounded-xl text-left bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group"
-                >
-                  <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700 flex items-center justify-between">
-                    <span>Nhân Viên GS25</span>
-                    <ChevronRight size={14} className="text-slate-400 group-hover:text-blue-600" />
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">251104004 • MK: 1</span>
-                </button>
               </div>
             </div>
 

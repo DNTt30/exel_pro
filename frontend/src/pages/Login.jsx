@@ -5,7 +5,6 @@ import heroImg from '../assets/gs25_hero.jpg';
 import { isOpsManager } from '../lib/authSession';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
 import ForgotPasswordModal from '../components/modals/ForgotPasswordModal';
-import GS25Mascot3D from '../components/3d/GS25Mascot3D';
 import { 
   LogIn,
   Eye,
@@ -30,7 +29,6 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
-  const [focusField, setFocusField] = useState(null);
 
   // ── Bước 2FA: nhập mã OTP gửi qua Telegram của admin ──
   const [otpStep, setOtpStep] = useState(false);
@@ -276,12 +274,12 @@ export default function Login() {
             )}
           </div>
 
-          {/* Center Stage: Title + Interactive 3D Mascot */}
-          <div className="relative z-10 my-auto py-2 flex flex-col items-center">
+          {/* Center Stage: Title + Friendly Greeting & Operations Highlights */}
+          <div className="relative z-10 my-auto py-3 flex flex-col items-start gap-4">
             <div className="w-full text-left">
-              <div className="inline-flex items-center gap-2 text-cyan-400 text-xs font-extrabold uppercase tracking-wider mb-1">
-                <Sparkles size={14} className="animate-spin" style={{ animationDuration: '8s' }} />
-                <span>AI Copilot Smart Assistant</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold mb-3">
+                <Sparkles size={14} className="text-cyan-400 animate-spin" style={{ animationDuration: '8s' }} />
+                <span>GS25 Xin Chào • Chúc Bạn Ca Trực Thuận Lợi</span>
               </div>
 
               <h1 className="text-2xl xl:text-3xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
@@ -292,30 +290,65 @@ export default function Login() {
               </h1>
             </div>
 
-            {/* 🌟 Interactive 3D Mascot (Tracks cursor and points finger in real-time) */}
-            <div className="w-full my-1 relative">
-              <GS25Mascot3D height="320px" focusField={focusField} />
+            {/* Friendly Motivational Card */}
+            <div className="w-full p-4 rounded-2xl bg-gradient-to-br from-white/10 to-white/[0.03] backdrop-blur-xl border border-white/15 shadow-xl">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center text-xl shrink-0 shadow-md shadow-cyan-500/30 select-none">
+                  👋
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white flex items-center gap-2">
+                    Chào mừng bạn đến với ca làm việc!
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-semibold">
+                      Sẵn sàng
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    Chúc toàn thể nhân sự GS25 một ca trực tràn đầy năng lượng, phục vụ khách hàng tận tâm với tinh thần <strong className="text-cyan-300 font-semibold">"GS25 Xin Chào"</strong> và nụ cười rạng rỡ! ✨
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Feature Mini Pills */}
+            {/* Feature Mini Highlights (2x2 Grid) */}
             <div className="grid grid-cols-2 gap-2.5 w-full">
-              <div className="p-2.5 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/15 flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                  <Bot size={15} />
+              <div className="p-3 rounded-xl bg-white/[0.06] backdrop-blur-md border border-white/10 flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                  <Bot size={16} />
                 </div>
                 <div className="leading-tight">
                   <span className="text-xs font-bold text-white block">AI Copilot</span>
-                  <span className="text-[10px] text-slate-300">Tự động xếp ca chuẩn SOP</span>
+                  <span className="text-[11px] text-slate-300">Giải đáp SOP & nội quy</span>
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-white/[0.08] backdrop-blur-xl border border-white/15 flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                  <Zap size={15} />
+              <div className="p-3 rounded-xl bg-white/[0.06] backdrop-blur-md border border-white/10 flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                  <Zap size={16} />
                 </div>
                 <div className="leading-tight">
                   <span className="text-xs font-bold text-white block">Chu Kỳ 26 → 25</span>
-                  <span className="text-[10px] text-slate-300">Kiểm soát trần 91h PT</span>
+                  <span className="text-[11px] text-slate-300">Kiểm soát trần 91h PT</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.06] backdrop-blur-md border border-white/10 flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  <Clock size={16} />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-white block">Công ezHR9</span>
+                  <span className="text-[11px] text-slate-300">Đối soát chuẩn xác 2s</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.06] backdrop-blur-md border border-white/10 flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                  <Store size={16} />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-white block">Phân Ca GS25</span>
+                  <span className="text-[11px] text-slate-300">Đổi ca & bù công tiện lợi</span>
                 </div>
               </div>
             </div>
@@ -364,9 +397,27 @@ export default function Login() {
               </span>
             </div>
 
-            {/* Mobile 3D Mascot Banner (Gracefully contracts when virtual keyboard is active) */}
-            <div className={`lg:hidden flex justify-center transition-all duration-300 ${focusField ? 'h-0 opacity-0 overflow-hidden my-0 pointer-events-none' : 'h-[135px] -mt-1 mb-3'}`}>
-              <GS25Mascot3D height="135px" focusField={focusField} />
+            {/* Friendly Greeting Card */}
+            <div className="mb-4 sm:mb-5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-blue-50 via-sky-50/60 to-indigo-50/40 border border-blue-100 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20 text-xl select-none">
+                  👋
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      GS25 Xin Chào!
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    </h3>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                      Chúc bạn ca trực vui vẻ
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 leading-snug">
+                    Chúc bạn một ngày làm việc tràn đầy năng lượng và hiệu quả cùng đồng đội ✨
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Error Banner */}
@@ -456,8 +507,6 @@ export default function Login() {
                       type="text"
                       value={empId}
                       onChange={e => setEmpId(e.target.value)}
-                      onFocus={() => setFocusField('empId')}
-                      onBlur={() => setFocusField(null)}
                       className="block w-full pl-10 pr-4 py-3 text-sm bg-slate-50/80 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
                       placeholder="VD: 251104004 hoặc admin"
                       required
@@ -487,8 +536,6 @@ export default function Login() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      onFocus={() => setFocusField('password')}
-                      onBlur={() => setFocusField(null)}
                       className="block w-full pl-10 pr-11 py-3 text-sm bg-slate-50/80 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
                       placeholder="Nhập mật khẩu..."
                       required
@@ -523,8 +570,6 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  onMouseEnter={() => setFocusField('submit')}
-                  onMouseLeave={() => setFocusField(null)}
                   className="btn-glow-effect relative w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 transition-all transform active:scale-[0.99] mt-2"
                 >
                   {submitting ? (

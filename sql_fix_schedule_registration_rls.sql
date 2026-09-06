@@ -17,11 +17,8 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(
-    (select p.emp_id from public.app_profiles p where p.id = auth.uid()),
-    auth.jwt() -> 'user_metadata' ->> 'emp_id',
-    nullif(current_setting('request.jwt.claims', true)::jsonb -> 'user_metadata' ->> 'emp_id', '')
-  );
+  -- SEC-03: Tuyệt đối không đọc từ user_metadata vì người dùng client có thể tự gán
+  select p.emp_id from public.app_profiles p where p.id = auth.uid();
 $$;
 
 -- 2. Cập nhật RLS policy trên bảng schedules

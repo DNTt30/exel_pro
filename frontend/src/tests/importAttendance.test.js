@@ -99,4 +99,21 @@ describe('ezhrAttendanceParser — Parse file Excel ezHR9', () => {
     expect(res.format).toBe('FLAT_LIST');
     expect(res.records.length).toBe(3);
   });
+
+  it('SEC-12: safely caps parsing at 5000 rows to prevent DoS / memory exhaustion', () => {
+    const hugeRows = [
+      ['Mã NV', 'Họ và tên', 'Ngày công', 'Giờ công'],
+    ];
+    for (let i = 0; i < 6000; i++) {
+      hugeRows.push(['NV001', 'Nguyễn Văn A', '2026-08-26', '8']);
+    }
+    const res = parseEzHRAttendance({
+      rows: hugeRows,
+      cycleDates,
+      employees,
+      schedule: {}
+    });
+    expect(res.success).toBe(true);
+    expect(res.records.length).toBeLessThanOrEqual(5000);
+  });
 });

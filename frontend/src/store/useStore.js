@@ -11,6 +11,7 @@ import { createAdminSlice } from './slices/adminSlice';
 import { createEmployeeSlice } from './slices/employeeSlice';
 import { createScheduleSlice } from './slices/scheduleSlice';
 import { createShelfSlice } from './slices/shelfSlice';
+import { hasCustomAdminPassword } from '../lib/adminCredential';
 
 export const useStore = create(
   persist(
@@ -73,7 +74,7 @@ export const useStore = create(
           const plan = bootstrapQueryPlan(get().user || user);
           const settle = (p, fallback) => {
             const run = Promise.resolve(p).catch((err) => {
-              console.error(err);
+              console.error("Lỗi tải dữ liệu nhánh:", err);
               return fallback;
             });
             return Promise.race([
@@ -81,6 +82,7 @@ export const useStore = create(
               new Promise((resolve) => setTimeout(() => resolve(fallback), 10000))
             ]);
           };
+
           const [emps, fbs, scheds, st, swaps, shelves, weekStatuses] = await Promise.all([
             settle(api.getEmployees(plan.employees), []),
             settle(api.getFeedbacks(plan.feedbacks), []),
@@ -97,16 +99,33 @@ export const useStore = create(
             : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
           const shelfItems = await settle(api.getShelfItems(itemOpts), prev.shelfItems || []);
           let nextUser = prev.user;
-          if (nextUser && nextUser.role !== 'admin') {
-            const fresh = employees.find(e => e.id === nextUser.id);
-            if (fresh) {
-              const synced = sessionUserFromEmp(fresh);
-              const changed = nextUser.jobTitle !== synced.jobTitle
-                || nextUser.isManager !== synced.isManager
-                || nextUser.isAreaManager !== synced.isAreaManager
-                || nextUser.dept !== synced.dept
-                || nextUser.name !== synced.name;
-              nextUser = changed ? synced : nextUser;
+          if (nextUser) {
+            if (nextUser.role === 'admin' || nextUser.id === 'admin') {
+              // SEC-01 & SEC-02: Kiểm tra phiên admin hợp lệ, chặn sửa localStorage
+              const sessionAge = Date.now() - (nextUser.loginAt || 0);
+              const maxSessionMs = 12 * 60 * 60 * 1000;
+              if (nextUser.id !== 'admin' || !nextUser.loginAt || sessionAge > maxSessionMs) {
+                console.warn('[Security] Phiên admin trong storage không hợp lệ hoặc đã hết hạn. Reset phiên.');
+                nextUser = null;
+              } else if (!hasCustomAdminPassword()) {
+                nextUser = { ...nextUser, mustSetupPassword: true };
+              }
+            } else {
+              const fresh = employees.find(e => e.id === nextUser.id);
+              if (fresh) {
+                if (fresh.isActive === false) {
+                  console.warn('[Security] Tài khoản đã bị vô hiệu hóa. Reset user.');
+                  nextUser = null;
+                } else {
+                  const synced = sessionUserFromEmp(fresh);
+                  const changed = nextUser.jobTitle !== synced.jobTitle
+                    || nextUser.isManager !== synced.isManager
+                    || nextUser.isAreaManager !== synced.isAreaManager
+                    || nextUser.dept !== synced.dept
+                    || nextUser.name !== synced.name;
+                  nextUser = changed ? { ...synced, loginAt: nextUser.loginAt } : nextUser;
+                }
+              }
             }
           }
           set({

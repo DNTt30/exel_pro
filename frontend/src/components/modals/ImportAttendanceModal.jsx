@@ -82,6 +82,20 @@ export default function ImportAttendanceModal({
     setParsedResult(null);
     if (!fileObj) return;
 
+    // SEC-12: Giới hạn dung lượng file tối đa 10MB để chống tràn RAM / DoS
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (fileObj.size > MAX_FILE_SIZE) {
+      setErrorMsg('Dung lượng file vượt quá giới hạn cho phép (tối đa 10MB)!');
+      return;
+    }
+
+    const fileName = (fileObj.name || '').toLowerCase();
+    const isValidExt = ['.xlsx', '.xls', '.csv'].some(ext => fileName.endsWith(ext));
+    if (!isValidExt) {
+      setErrorMsg('Định dạng file không được hỗ trợ. Vui lòng chỉ tải lên file .xlsx, .xls hoặc .csv!');
+      return;
+    }
+
     setFile(fileObj);
     setLoading(true);
     const reader = new FileReader();

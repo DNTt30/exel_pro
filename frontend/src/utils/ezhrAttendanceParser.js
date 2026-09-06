@@ -76,6 +76,10 @@ export function parseEzHRAttendance({ rows, cycleDates = [], employees = [], sch
     };
   }
 
+  // SEC-12: Giới hạn tối đa 5000 dòng để chống tràn bộ nhớ / DoS
+  const MAX_ROWS = 5000;
+  const safeRows = rows.length > MAX_ROWS ? rows.slice(0, MAX_ROWS) : rows;
+
   // 1. Quét tìm dòng tiêu đề (Header Row) trong 15 dòng đầu
   let headerRowIdx = -1;
   let idCol = -1;
@@ -87,8 +91,8 @@ export function parseEzHRAttendance({ rows, cycleDates = [], employees = [], sch
   // Bản đồ cột ngày cho dạng Ma trận (cột index -> cellDate)
   let matrixDateMap = {};
 
-  for (let r = 0; r < Math.min(rows.length, 15); r++) {
-    const row = rows[r].map(c => String(c || '').trim());
+  for (let r = 0; r < Math.min(safeRows.length, 15); r++) {
+    const row = safeRows[r].map(c => String(c || '').trim());
     
     // Tìm các cột cơ bản
     const curIdCol = findCol(row, [/mã.*nv/i, /mã.*nhân/i, /mã.*cc/i, /mã.*chấm/i, /^manv$/i, /^id$/i, /^mã$/i]);
@@ -173,8 +177,8 @@ export function parseEzHRAttendance({ rows, cycleDates = [], employees = [], sch
   let leaveCount = 0;
 
   // 2. Phân tích từng dòng dữ liệu
-  for (let r = headerRowIdx + 1; r < rows.length; r++) {
-    const row = rows[r];
+  for (let r = headerRowIdx + 1; r < safeRows.length; r++) {
+    const row = safeRows[r];
     if (!row || row.length === 0) continue;
 
     const rawId = idCol !== -1 ? String(row[idCol] || '').trim() : '';

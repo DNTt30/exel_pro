@@ -71,3 +71,41 @@ export function assertCanManageEmpInDept(state, empDept) {
     throw new Error('Nhân viên không thuộc cửa hàng quản lý');
   }
 }
+
+/**
+ * SEC-08: Chỉ Admin hoặc SM (thuộc cửa hàng) mới được duyệt/từ chối khiếu nại công (feedbacks).
+ * Nhân viên thường tuyệt đối không được tự duyệt công cho mình.
+ */
+export function assertCanResolveFeedback(state, feedbackDept) {
+  assertCanManageStaff(state);
+  const user = state.user;
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+  const myDepts = getUserDepts(user);
+  if (feedbackDept && myDepts.length > 0 && !myDepts.includes(feedbackDept)) {
+    throw new Error('Không có quyền duyệt phản hồi của cửa hàng khác');
+  }
+}
+
+/**
+ * SEC-08: Phân quyền duyệt đổi ca (shift_swaps).
+ * - Trạng thái 'approved' / 'rejected': Chỉ Admin hoặc SM quản lý cửa hàng đó mới được duyệt.
+ * - Trạng thái 'pending_manager': Người được đề nghị đổi (toEmpId) xác nhận đồng ý, hoặc Quản lý.
+ */
+export function assertCanRespondShiftSwap(state, swap, newStatus) {
+  const user = state.user;
+  if (!user) throw new Error('Chưa đăng nhập');
+  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+
+  if (newStatus === 'approved' || newStatus === 'rejected') {
+    assertCanManageStaff(state);
+    const myDepts = getUserDepts(user);
+    if (swap?.store && myDepts.length > 0 && !myDepts.includes(swap.store)) {
+      throw new Error('Không có quyền duyệt đổi ca của cửa hàng khác');
+    }
+  } else if (newStatus === 'pending_manager') {
+    if (swap?.toEmpId && user.id !== swap.toEmpId && !userIsManager(user)) {
+      throw new Error('Chỉ nhân viên được đề nghị đổi ca mới có quyền xác nhận');
+    }
+  }
+}

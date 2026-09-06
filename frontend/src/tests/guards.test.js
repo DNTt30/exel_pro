@@ -3,7 +3,9 @@ import {
   assertWeekEditable,
   assertCanEditShift,
   assertCanManageStaff,
-  userIsManager
+  userIsManager,
+  assertCanResolveFeedback,
+  assertCanRespondShiftSwap
 } from '../store/guards';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -149,5 +151,58 @@ describe('userIsManager', () => {
     expect(userIsManager({ id: 'x', role: 'Cửa hàng trưởng' })).toBe(true);
     expect(userIsManager(null)).toBe(false);
     expect(userIsManager(NV)).toBe(false);
+  });
+});
+
+// ─── SEC-08: assertCanResolveFeedback & assertCanRespondShiftSwap ────────────
+describe('SEC-08: Feedback and Swap Authorization Guards', () => {
+  it('chặn nhân viên thường tự duyệt feedback khiếu nại công', () => {
+    expect(() => assertCanResolveFeedback(stateWith({ user: NV }), 'VN0485'))
+      .toThrow('Không có quyền quản lý nhân sự');
+  });
+
+  it('cho phép SM duyệt feedback của cửa hàng mình', () => {
+    expect(() => assertCanResolveFeedback(stateWith({ user: SM }), 'VN0485')).not.toThrow();
+  });
+
+  it('chặn SM duyệt feedback của cửa hàng khác', () => {
+    expect(() => assertCanResolveFeedback(stateWith({ user: SM }), 'VN0500'))
+      .toThrow('Không có quyền duyệt phản hồi của cửa hàng khác');
+  });
+
+  it('admin toàn quyền duyệt feedback mọi cửa hàng', () => {
+    expect(() => assertCanResolveFeedback(stateWith({ user: ADMIN }), 'VN0500')).not.toThrow();
+  });
+
+  it('chặn nhân viên thường tự duyệt swap sang approved/rejected', () => {
+    const swap = { id: 's1', store: 'VN0485', fromEmpId: 'nv1', toEmpId: 'nv2' };
+    expect(() => assertCanRespondShiftSwap(stateWith({ user: NV }), swap, 'approved'))
+      .toThrow('Không có quyền quản lý nhân sự');
+  });
+
+  it('chặn người ngoài xác nhận pending_manager nếu không phải toEmpId', () => {
+    const swap = { id: 's1', store: 'VN0485', fromEmpId: 'nv1', toEmpId: 'nv2' };
+    // user nv3 cố tình xác nhận đơn đổi ca của nv2
+    const thirdParty = { id: 'nv3', role: 'employee', dept: 'VN0485' };
+    expect(() => assertCanRespondShiftSwap(stateWith({ user: thirdParty }), swap, 'pending_manager'))
+      .toThrow('Chỉ nhân viên được đề nghị đổi ca mới có quyền xác nhận');
+  });
+
+  it('cho phép partner toEmpId xác nhận pending_manager', () => {
+    const swap = { id: 's1', store: 'VN0485', fromEmpId: 'nv1', toEmpId: 'nv2' };
+    const partner = { id: 'nv2', role: 'employee', dept: 'VN0485' };
+    expect(() => assertCanRespondShiftSwap(stateWith({ user: partner }), swap, 'pending_manager'))
+      .not.toThrow();
+  });
+
+  it('cho phép SM duyệt swap của cửa hàng mình', () => {
+    const swap = { id: 's1', store: 'VN0485', fromEmpId: 'nv1', toEmpId: 'nv2' };
+    expect(() => assertCanRespondShiftSwap(stateWith({ user: SM }), swap, 'approved')).not.toThrow();
+  });
+
+  it('chặn SM duyệt swap của cửa hàng khác', () => {
+    const swap = { id: 's1', store: 'VN0500', fromEmpId: 'nv1', toEmpId: 'nv2' };
+    expect(() => assertCanRespondShiftSwap(stateWith({ user: SM }), swap, 'approved'))
+      .toThrow('Không có quyền duyệt đổi ca của cửa hàng khác');
   });
 });

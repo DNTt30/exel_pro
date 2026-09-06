@@ -1,5 +1,12 @@
 import * as api from '../../services/api';
-import { assertCanManageStaff, assertWeekEditable, assertCanEditShift, userIsManager } from '../guards';
+import {
+  assertCanManageStaff,
+  assertWeekEditable,
+  assertCanEditShift,
+  userIsManager,
+  assertCanResolveFeedback,
+  assertCanRespondShiftSwap
+} from '../guards';
 import { canApproveSchedule } from '../../lib/authSession';
 import { weekRecordKey } from '../../utils/scheduleWeek';
 import { describeDiff } from '../../utils/appLogs';
@@ -355,6 +362,7 @@ export const createScheduleSlice = (set, get) => ({
   resolveFeedback: async (feedbackId, status, resolutionNote, newShiftData = null) => {
     const previousFeedbacks = get().feedbacks;
     const prevFb = previousFeedbacks.find(f => f.id === feedbackId) || {};
+    assertCanResolveFeedback(get(), prevFb.dept);
 
     try {
       if (status === 'approved' && newShiftData) {
@@ -386,6 +394,9 @@ export const createScheduleSlice = (set, get) => ({
 
   updateFeedbackStatus: async (id, status) => {
     const previousFeedbacks = get().feedbacks;
+    const prevFb = previousFeedbacks.find(f => f.id === id) || {};
+    assertCanResolveFeedback(get(), prevFb.dept);
+
     set((state) => ({
       feedbacks: state.feedbacks.map(f => f.id === id ? { ...f, status } : f)
     }));
@@ -435,6 +446,7 @@ export const createScheduleSlice = (set, get) => ({
     const currentSwaps = get().shiftSwaps || [];
     const targetSwap = currentSwaps.find(s => s.id === swapId);
     if (!targetSwap) return;
+    assertCanRespondShiftSwap(get(), targetSwap, newStatus);
 
     const previousSwaps = currentSwaps;
     const previousSchedule = get().schedule;

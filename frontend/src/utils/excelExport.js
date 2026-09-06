@@ -2,6 +2,28 @@ import { normalizeShift } from './shiftHelper';
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../data/constants';
 
 /**
+ * Làm sạch ô dữ liệu trước khi chèn vào bảng Excel (.xls HTML table):
+ * 1. Chống CSV/Formula Injection (CWE-1236): Nếu chuỗi bắt đầu bằng =, +, -, @, \t, \r thì chèn dấu nháy đơn ' ở đầu.
+ * 2. Escape ký tự HTML để chống XSS/HTML Injection: &, <, >, ", '
+ */
+export function sanitizeExcelCell(val) {
+  if (val === null || val === undefined) return '';
+  let str = String(val);
+  if (!str) return '';
+
+  const isDangerousPrefix = /^[=+\-@\t\r]/.test(str) || /^[=+\-@]/.test(str.trim());
+
+  const escaped = str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  return isDangerousPrefix ? "'" + escaped : escaped;
+}
+
+/**
  * Xuất lịch làm việc ra file Excel (.xls) có đầy đủ định dạng bảng biểu, màu sắc ca làm việc,
  * header ngày tháng chi tiết và KHÔNG bị lỗi Excel tự động chuyển 6-14 thành ngày tháng.
  */
@@ -89,15 +111,15 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
         
         let style = getShiftStyle(rawVal, emp.type);
         
-        return `<td style="border: 1px solid #000000; text-align: center; mso-number-format: '\\@'; ${style}">${display || ''}</td>`;
+        return `<td style="border: 1px solid #000000; text-align: center; mso-number-format: '\\@'; ${style}">${sanitizeExcelCell(display)}</td>`;
       }).join('');
 
       rowsHtml += `
         <tr>
-          <td style="border: 1px solid #000000; text-align: left; mso-number-format: '\\@';">${emp.id}</td>
-          <td style="border: 1px solid #000000; text-align: left; padding-left: 5px;">${emp.name}</td>
-          <td style="border: 1px solid #000000; text-align: left;">${emp.dept || dept}</td>
-          <td style="border: 1px solid #000000; text-align: left;">${emp.role || emp.type || 'STPT'}</td>
+          <td style="border: 1px solid #000000; text-align: left; mso-number-format: '\\@';">${sanitizeExcelCell(emp.id)}</td>
+          <td style="border: 1px solid #000000; text-align: left; padding-left: 5px;">${sanitizeExcelCell(emp.name)}</td>
+          <td style="border: 1px solid #000000; text-align: left;">${sanitizeExcelCell(emp.dept || dept)}</td>
+          <td style="border: 1px solid #000000; text-align: left;">${sanitizeExcelCell(emp.role || emp.type || 'STPT')}</td>
           ${dayCells}
         </tr>
       `;
@@ -126,7 +148,7 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
       <table>
         <!-- Row 1: Title and Legend (ca 1) -->
         <tr>
-          <td colspan="4" style="font-weight: bold; font-size: 12pt; text-align: left;">Lịch làm việc SM ${userName}</td>
+          <td colspan="4" style="font-weight: bold; font-size: 12pt; text-align: left;">Lịch làm việc SM ${sanitizeExcelCell(userName)}</td>
           <td colspan="7"></td>
           <td style="background-color: #00FF00; color: #000000; font-weight: bold; text-align: left; border: 1px solid #000000;">ca 1</td>
         </tr>
@@ -234,7 +256,7 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
           else cellStyle = 'background-color: #e2e8f0; color: #1e293b; font-weight: bold;';
         }
 
-        return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${cellStyle}">${displayVal}</td>`;
+        return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${cellStyle}">${sanitizeExcelCell(displayVal)}</td>`;
       }).join('');
 
       total = Math.round(total * 100) / 100;
@@ -247,10 +269,10 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
       rowsHtml += `
         <tr>
           <td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@';">${globalIndex++}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; mso-number-format: '\\@';">${emp.id}</td>
-          <td style="border: 1px solid #94a3b8; text-align: left; font-weight: bold; padding-left: 8px;">${emp.name}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; color: #2563eb; font-weight: bold;">${dept}</td>
-          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold;">${emp.role || emp.type || 'STPT'}</td>
+          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold; mso-number-format: '\\@';">${sanitizeExcelCell(emp.id)}</td>
+          <td style="border: 1px solid #94a3b8; text-align: left; font-weight: bold; padding-left: 8px;">${sanitizeExcelCell(emp.name)}</td>
+          <td style="border: 1px solid #94a3b8; text-align: center; color: #2563eb; font-weight: bold;">${sanitizeExcelCell(dept)}</td>
+          <td style="border: 1px solid #94a3b8; text-align: center; font-weight: bold;">${sanitizeExcelCell(emp.role || emp.type || 'STPT')}</td>
           ${dayCells}
           <td style="border: 1px solid #94a3b8; text-align: center; background-color: #f8fafc; font-weight: bold;">${!isPT ? (total / 8).toFixed(1) : '-'}</td>
           <td style="border: 1px solid #94a3b8; text-align: center; ${ptStyle}">${isPT ? (isOver91 ? `⚠️ ${total}h` : `${total}h`) : '-'}</td>
@@ -282,7 +304,7 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
           </tr>
           <tr>
             <th colspan="${activeDays.length + 8}" class="sub-info" style="border: 1px solid #cbd5e1;">
-              Cửa hàng: <strong>${deptName || 'Toàn bộ cửa hàng'}</strong> | Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Đơn vị: Chuỗi Cửa Hàng OFC
+              Cửa hàng: <strong>${sanitizeExcelCell(deptName || 'Toàn bộ cửa hàng')}</strong> | Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Đơn vị: Chuỗi Cửa Hàng OFC
             </th>
           </tr>
           <tr style="background-color: #cbd5e1;">

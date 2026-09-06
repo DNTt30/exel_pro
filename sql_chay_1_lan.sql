@@ -1,12 +1,10 @@
 -- ==============================================================================
--- >>> CHAY FILE NAY DUY NHAT - THAY THE MOI FILE SQL KHAC <<<<
--- Ket qua sau khi chay:
---   * Bang moi: attendance (cong thuc te ezHR)
---   * Cot moi: employees.is_active (khoa ma NV nghi viec), stores.sm_id (gan SM)
---   * admin_otps + 4 bang log: VAN DUOC KHOA (chi he thong doc duoc)
---   * 8 bang nghiep vu + attendance: mo hoan toan de APP CHAY NGAY,
---     het hoan toan loi 'row-level security' khi luu cong / sua NV / doi ca
---   * Sau nay muon bao mat toi da: chay lai sql_rls_authenticated.sql
+-- ⚠️ CẢNH BÁO AN NINH (SEC-05) - FILE NÀY MỞ RLS CHO DEV TEST CỤC BỘ ⚠️
+-- TUYỆT ĐỐI KHÔNG CHẠY FILE NÀY TRÊN PRODUCTION HOẶC SUPABASE CÔNG KHAI!
+-- File này tạo chính sách 'open_all' cho phép anon đọc/sửa mọi bảng.
+-- Môi trường thực tế bắt buộc phải dùng:
+--   * sql_phase1_security.sql
+--   * sql_phase1_security_hardening.sql
 -- ==============================================================================
 
 -- ========== 1) Cot & bang moi ==========

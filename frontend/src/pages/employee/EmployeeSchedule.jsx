@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { Download, Printer, Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, Sparkles, Zap, RotateCcw, LayoutGrid, Table, MapPin, Sun, Moon, Coffee, ArrowRightLeft } from 'lucide-react';
@@ -21,6 +22,7 @@ import { weekRecordKey } from '../../utils/scheduleWeek';
 const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
+  const navigate = useNavigate();
   const { user, schedule, updateShift, updateEmployeeWeeklyShifts, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks, employees } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, updateEmployeeWeeklyShifts: s.updateEmployeeWeeklyShifts, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks, employees: s.employees })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
@@ -787,8 +789,21 @@ export default function EmployeeSchedule() {
                           <RotateCcw size={10} /> Đổi ca
                         </button>
                         <button
-                          onClick={() => toast.info("Vui lòng truy cập thẻ 'Yêu cầu C&B' để báo lỗi chấm công cho ca này!")}
+                          onClick={() => {
+                            navigate('/employee/feedback', {
+                              state: {
+                                prefill: {
+                                  date: card.dateFormatted,
+                                  day: card.dayKey,
+                                  shift: card.shift,
+                                  week: currentWeek,
+                                  autoOpen: true
+                                }
+                              }
+                            });
+                          }}
                           className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg border border-red-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                          title="Báo lỗi hoặc yêu cầu bù công cho ca này"
                         >
                           <AlertTriangle size={10} /> Báo lỗi
                         </button>

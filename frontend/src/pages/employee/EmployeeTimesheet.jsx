@@ -245,6 +245,34 @@ export default function EmployeeTimesheet() {
         </div>
       </div>
 
+      {/* Mobile-First Personal Quick Card */}
+      <div className="md:hidden p-3.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl mx-3 my-2 shadow-md">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <span className="text-[10px] text-blue-200 uppercase font-bold tracking-wider block">Phiếu công cá nhân</span>
+            <span className="text-base font-black">{user?.name}</span>
+          </div>
+          <button
+            onClick={() => setShowPersonalSlip(true)}
+            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-xl text-xs font-bold border border-white/30 cursor-pointer flex items-center gap-1 transition-all"
+          >
+            <FileText size={13} /> Chi tiết 31 ngày
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/20 text-xs">
+          <div className="bg-white/10 p-2 rounded-xl">
+            <span className="text-[10px] text-blue-200 block">Tổng giờ thực tế</span>
+            <span className="text-lg font-black">{myTotalHours}h</span>
+          </div>
+          <div className="bg-white/10 p-2 rounded-xl">
+            <span className="text-[10px] text-blue-200 block">Định mức ({isPT ? 'Part-Time' : 'Full-Time'})</span>
+            <span className="text-xs font-bold mt-1 block">
+              {isPT ? (isOver91 ? `⚠️ Vượt 91h (${myTotalHours}h)` : `✓ ${myTotalHours}/91h`) : `${(myTotalHours / 8).toFixed(1)} công`}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Print Header */}
       <div className="hidden print:block text-center mb-4 pb-2 border-b border-slate-300">
         <h1 className="text-xl font-black uppercase text-slate-900 tracking-wide">

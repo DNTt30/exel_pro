@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Send, Image as ImageIcon, Clock, XCircle, AlertTriangle, FileText, History, Sparkles, Search } from 'lucide-react';
+import { Send, Image as ImageIcon, Clock, XCircle, AlertTriangle, FileText, History, Sparkles, Search, Upload } from 'lucide-react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
@@ -55,6 +56,50 @@ export default function EmployeeFeedback() {
   const [issue, setIssue] = useState('Quên chấm công (In/Out)');
   const [note, setNote] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState('');
+
+  const location = useLocation();
+  const prefill = location.state?.prefill;
+
+  useEffect(() => {
+    if (prefill) {
+      if (prefill.date) {
+        let d = prefill.date;
+        if (d.includes('/')) {
+          const parts = d.split('/');
+          if (parts.length === 3) {
+            d = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+        }
+        setDate(d);
+      }
+      if (prefill.shift) {
+        setIssue('Sai ca / Lệch giờ thực tế');
+        setNote(`Báo lỗi ca ${prefill.shift} ngày ${prefill.date || ''}. Giờ thực tế làm việc: `);
+      }
+      toast.info(`Đã tự động nạp thông tin ca ${prefill.shift || ''} ngày ${prefill.date || ''}!`);
+    }
+  }, [prefill]);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dung lượng ảnh tối đa là 5MB!');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(reader.result);
+      setImageUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImagePreview('');
+    setImageUrl('');
+  };
 
   // Fields dành riêng cho Part-time vượt 91h
   const [overtimeHours, setOvertimeHours] = useState(monthTotalHours > 91 ? `${monthTotalHours}` : '92');
@@ -340,18 +385,59 @@ export default function EmployeeFeedback() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <ImageIcon size={14} className="text-slate-500" />
-                <span>Link ảnh minh chứng (Zalo/Drive/Hình ảnh)</span>
+              <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <ImageIcon size={14} className="text-slate-500" />
+                  <span>Ảnh minh chứng (Chọn ảnh hoặc dán link)</span>
+                </span>
+                {imagePreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <XCircle size={12} /> Xóa ảnh
+                  </button>
+                )}
               </label>
-              <input 
-                type="url" 
-                className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                placeholder="https://drive.google.com/..."
-                value={imageUrl}
-                onChange={e => setImageUrl(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 mt-0.5">Dán link ảnh chụp tin nhắn xin phép hoặc ảnh bảng phân ca của SM.</p>
+
+              {/* Direct file upload from phone or computer */}
+              <div className="flex gap-2 items-center mb-2">
+                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border border-dashed border-blue-300 hover:border-blue-500 rounded-xl bg-blue-50/50 hover:bg-blue-50 cursor-pointer text-blue-700 font-bold text-xs transition-colors">
+                  <Upload size={14} />
+                  <span>{imagePreview ? 'Đổi ảnh khác' : 'Chọn ảnh từ điện thoại / máy tính'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </div>
+
+              {/* Image Preview Thumbnail */}
+              {imagePreview ? (
+                <div className="relative mb-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 max-h-40 flex items-center justify-center">
+                  <img src={imagePreview} alt="Minh chứng" className="max-h-40 w-auto object-contain rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors cursor-pointer"
+                    title="Xóa ảnh"
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </div>
+              ) : (
+                <input 
+                  type="url" 
+                  className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  placeholder="Hoặc dán link Google Drive / Zalo: https://..."
+                  value={imageUrl}
+                  onChange={e => setImageUrl(e.target.value)}
+                />
+              )}
+              <p className="text-[10px] text-slate-400 mt-0.5">Ảnh chụp màn hình máy chấm công, phiếu phân ca hoặc tin nhắn xác nhận của SM.</p>
             </div>
 
             <button 

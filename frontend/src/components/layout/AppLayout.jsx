@@ -123,6 +123,22 @@ export default function AppLayout() {
 
   const sections = isManager ? adminSections : employeeSections;
 
+  const bottomNavItems = isManager
+    ? [
+        { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/admin/schedule', label: 'Lịch ca', icon: CalendarDays, badge: pendingSwapsCount },
+        { to: '/admin/timesheet', label: 'Chấm công', icon: Clock },
+        { to: '/admin/feedback', label: 'Bù công', icon: FileText, badge: pendingFeedbacksCount },
+        { to: '/admin/handbook', label: 'Sổ tay', icon: BookOpen },
+      ]
+    : [
+        { to: '/employee/home', label: 'Trang chủ', icon: Home },
+        { to: '/employee/schedule', label: 'Lịch ca', icon: CalendarDays },
+        { to: '/employee/timesheet', label: 'Chấm công', icon: Clock },
+        { to: '/employee/feedback', label: 'Bù công', icon: FileText },
+        { to: '/employee/handbook', label: 'Sổ tay', icon: BookOpen },
+      ];
+
   const getRoleInfo = () => {
     const role = appRoleOf(user); const label = appRoleLabel(user);
     if (role === 'admin') return { label, side: 'bg-purple-500/20 text-purple-200 border-purple-400/30', top: 'bg-purple-50 text-purple-700 border-purple-200' };
@@ -257,14 +273,45 @@ export default function AppLayout() {
         </aside>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-auto bg-slate-50 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
+        <main className="flex-1 overflow-auto bg-slate-50 pb-16 md:pb-0 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
           {/* Skeleton khi chưa có dữ liệu người dùng — khi đã có user thì Outlet luôn giữ mount */}
           {isInitializing && !user ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
         </main>
 
-        {/* Floating AI Button - blue */}
-        <button onClick={() => setIsAIOpen(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group" title="GS25 AI Copilot">
-          <Sparkles size={22} className="group-hover:animate-pulse" />
+        {/* ── Mobile Bottom Navigation Bar (Thumb Zone Ergonomics) ── */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-30 flex items-center justify-around px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] print:hidden">
+          {bottomNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `relative flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+                  isActive
+                    ? 'text-blue-600 font-extrabold scale-105'
+                    : 'text-slate-500 hover:text-slate-900 font-semibold'
+                }`
+              }
+            >
+              <div className="relative">
+                <item.icon size={19} />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-2 min-w-3.5 h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                    {item.badge > 9 ? '9+' : item.badge}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Floating AI Button - blue (above mobile bottom bar) */}
+        <button 
+          onClick={() => setIsAIOpen(true)} 
+          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group cursor-pointer" 
+          title="GS25 AI Copilot"
+        >
+          <Sparkles size={20} className="md:w-[22px] md:h-[22px] group-hover:animate-pulse" />
         </button>
 
         <Toaster />

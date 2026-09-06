@@ -119,7 +119,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-2 sm:p-6 lg:p-10 relative overflow-hidden bg-[#070b14] select-none">
+    <div className="min-h-screen flex items-center justify-center p-2 sm:p-6 lg:p-10 relative overflow-y-auto lg:overflow-hidden bg-[#070b14] select-none">
       
       {/* ── Advanced Animation Styles ── */}
       <style>{`
@@ -237,7 +237,7 @@ export default function Login() {
       </div>
 
       {/* ── Main Futuristic Glass Card ── */}
-      <div className="relative z-10 w-full max-w-5xl min-h-[640px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] border border-white/15 anim-neon-card grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] bg-slate-900/60 backdrop-blur-2xl transition-all duration-300">
+      <div className="relative z-10 w-full max-w-5xl my-auto min-h-0 lg:min-h-[640px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9)] border border-white/15 anim-neon-card grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] bg-slate-900/60 backdrop-blur-2xl transition-all duration-300">
         
         {/* ── LEFT SHOWCASE PANEL WITH 3D MASCOT ── */}
         <div className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 overflow-hidden border-r border-white/10">
@@ -337,20 +337,20 @@ export default function Login() {
         </div>
 
         {/* ── RIGHT LOGIN FORM PANEL ── */}
-        <div className="bg-white/95 backdrop-blur-2xl p-7 sm:p-9 lg:p-11 flex flex-col justify-between relative">
+        <div className="bg-white/95 backdrop-blur-2xl p-5 sm:p-9 lg:p-11 flex flex-col justify-between relative">
           
           {/* Subtle Corner Glow Accent */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full pointer-events-none blur-2xl" />
 
           <div>
             {/* Header Brand */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 anim-float">
-                  <Store size={24} />
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 anim-float">
+                  <Store size={22} className="sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
                     GS25 Workspace
                   </h2>
                   <p className="text-xs text-slate-500 font-semibold mt-0.5">
@@ -359,14 +359,14 @@ export default function Login() {
                 </div>
               </div>
 
-              <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold shadow-2xs">
+              <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] sm:text-[11px] font-bold shadow-2xs">
                 24/7 Portal
               </span>
             </div>
 
-            {/* Mobile 3D Mascot Banner (Shown only on small screens) */}
-            <div className="lg:hidden flex justify-center -mt-1 mb-4">
-              <GS25Mascot3D height="190px" focusField={focusField} />
+            {/* Mobile 3D Mascot Banner (Gracefully contracts when virtual keyboard is active) */}
+            <div className={`lg:hidden flex justify-center transition-all duration-300 ${focusField ? 'h-0 opacity-0 overflow-hidden my-0 pointer-events-none' : 'h-[135px] -mt-1 mb-3'}`}>
+              <GS25Mascot3D height="135px" focusField={focusField} />
             </div>
 
             {/* Error Banner */}

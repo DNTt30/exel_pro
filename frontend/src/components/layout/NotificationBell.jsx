@@ -253,12 +253,16 @@ export default function NotificationBell() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-1.5 sm:p-2 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-blue-100"
+        className={`relative p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer border ${
+          isOpen
+            ? 'bg-blue-50 text-blue-700 border-blue-200 ring-2 ring-blue-500/20'
+            : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border-transparent hover:border-blue-100'
+        }`}
         title="Thông báo hệ thống"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4">
+          <span className="absolute top-1 right-1 flex h-4 w-4 pointer-events-none">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex items-center justify-center rounded-full h-4 w-4 bg-red-600 text-white font-mono font-black text-[9px]">
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -277,7 +281,7 @@ export default function NotificationBell() {
 
       {/* Floating Dropdown */}
       {isOpen && (
-        <div className="fixed inset-x-3 top-14 max-w-sm mx-auto sm:static sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-w-none bg-white rounded-2xl shadow-2xl sm:shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed inset-x-3 top-14 max-w-sm mx-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:mx-0 sm:w-96 sm:max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl sm:shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
           <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">

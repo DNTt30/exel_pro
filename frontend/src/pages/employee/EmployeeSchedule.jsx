@@ -739,12 +739,9 @@ export default function EmployeeSchedule() {
                         {/* Shift Badge */}
                         <div 
                           className={`p-2.5 rounded-xl font-black text-sm text-center shadow-2xs ${isDraft ? 'border border-slate-300 border-dashed' : ''}`}
-                          style={!isDraft ? {
+                          style={{
                             backgroundColor: card.shiftInfo?.bg || '#bfdbfe',
                             color: card.shiftInfo?.text || '#1e40af'
-                          } : {
-                            backgroundColor: '#ffffff',
-                            color: '#475569'
                           }}
                         >
                           {card.shift}

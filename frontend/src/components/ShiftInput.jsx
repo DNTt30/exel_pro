@@ -9,7 +9,7 @@ export default function ShiftInput({
   rowIndex, 
   colIndex, 
   readOnly = false,
-  isDraft = false
+  _isDraft = false
 }) {
   const selectRef = useRef(null);
 
@@ -38,18 +38,24 @@ export default function ShiftInput({
     cellText = '#64748b'; // Xám đậm
     displayLabel = 'OFF';
   } else if (shiftInfo) {
-    if (isDraft) {
-      // Khi là bản nháp/đăng ký, không hiện màu nền, chỉ hiện viền hoặc chữ
-      cellBg = '#ffffff';
-      cellText = '#475569'; // Chữ xám đậm dễ đọc
-    } else {
-      cellBg = shiftInfo.bg;
-      cellText = shiftInfo.text;
-    }
+    // Luôn hiển thị màu sắc ca trực trực quan chuẩn nhận diện GS25
+    cellBg = shiftInfo.bg;
+    cellText = shiftInfo.text;
     displayLabel = shiftInfo.label || shiftCode;
   } else if (!isUnset) {
-    cellBg = isDraft ? '#ffffff' : '#dbeafe';
-    cellText = isDraft ? '#475569' : '#1e40af';
+    // Ca tùy chỉnh / ngoài danh mục chuẩn: tự động nhận diện màu theo giờ bắt đầu
+    const match = shiftCode.match(/^(\d+)/);
+    const startH = match ? parseInt(match[1], 10) : 12;
+    if (startH >= 5 && startH < 12) {
+      cellBg = '#22c55e'; // Xanh lá ca sáng
+      cellText = '#ffffff';
+    } else if (startH >= 12 && startH < 18) {
+      cellBg = '#3b82f6'; // Xanh biển ca chiều
+      cellText = '#ffffff';
+    } else {
+      cellBg = '#ef4444'; // Đỏ/tím ca đêm
+      cellText = '#ffffff';
+    }
     displayLabel = shiftCode;
   }
 

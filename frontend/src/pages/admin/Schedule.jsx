@@ -546,14 +546,47 @@ export default function Schedule() {
       <div className="bg-blue-50/60 p-3 sm:px-5 sm:py-3 border-y border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900 print:hidden">
         <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY TẮC & TRẠNG THÁI XẾP LỊCH:</div>
         <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
-          <li><strong>Ô lịch nền trắng (không màu):</strong> Ca đăng ký / Lịch nháp. Đang chờ Quản lý duyệt.</li>
-          <li><strong>Ô lịch có màu nền theo ca:</strong> Lịch đã được Quản lý CHỐT & BAN HÀNH chính thức.</li>
+          <li><strong>Nhận diện màu ca trực trực quan:</strong> Ca sáng (Xanh lá), Ca chiều (Xanh biển), Ca đêm (Đỏ), Ca HC (Tím), Ca 4h (Xanh nhạt), OFF (Xám).</li>
           <li><strong>Ưu tiên AI tự động xếp:</strong> Giữ nguyên lịch đăng ký (Lịch rảnh) ➔ Ưu tiên Full-time đạt chuẩn 48h ➔ Part-time lấp ca thiếu. Không ép Part-time dư giờ nếu cửa hàng không cần.</li>
         </ul>
       </div>
 
       {/* 4. Main Schedule Grid Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none">
+        
+        {/* Shift Color Legend Bar */}
+        <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider mr-1">
+              🎨 Bảng màu ca:
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#22c55e] shadow-2xs">
+              6-14 (Sáng)
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#3b82f6] shadow-2xs">
+              14-22 (Chiều)
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#ef4444] shadow-2xs">
+              22-6 (Đêm)
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#8b5cf6] shadow-2xs">
+              8-17 / HC
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#1e3a8a] bg-[#93c5fd] shadow-2xs">
+              Ca 4h
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-slate-600 bg-slate-200 border border-slate-300">
+              OFF
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#eab308] shadow-2xs">
+              Chi viện CH khác
+            </span>
+          </div>
+
+          <div className="text-[11px] text-slate-500 font-medium">
+            💡 Bấm trực tiếp vào ô để đổi ca hoặc dùng mũi tên bàn phím di chuyển
+          </div>
+        </div>
         
         {/* Print Header */}
         <div className="hidden print:block p-4 border-b border-slate-300 text-center">

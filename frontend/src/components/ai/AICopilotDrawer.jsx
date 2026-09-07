@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, User, Trash2 } from 'lucide-react';
+import { Send, X, User, Trash2, Settings, KeyRound } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { askAICopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
+import { askAICopilot, askGeminiCopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { useShallow } from 'zustand/react/shallow';
+import RecipeQuickModal from '../modals/RecipeQuickModal';
+import ConfirmModal from '../modals/ConfirmModal';
 
 export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, stores: s.stores, shiftSwaps: s.shiftSwaps, feedbacks: s.feedbacks, user: s.user })));
@@ -17,18 +19,16 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
 
   const initialWelcome = {
     id: 'welcome',
-    sender: 'ai',
-    text: `Chào ${firstName}! Em là TÚ mini 🥸. Hỏi ca làm, giờ công, bù công C&B hoặc cẩm nang GS25: giờ hủy hàng, nút vi sóng, công thức lẩu chả cá, hóa chất Saraya...`
+    sender: 'bot',
+    text: `Chào ${firstName}! Mình là TÚ mini 🤖 — Trợ lý GS25.\nBạn có thể hỏi mình về ca làm việc, chấm công, hạn sử dụng món ăn, hoặc quy định OFC.`
   };
 
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem(`ai_chat_history_${activeStoreId}`);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Failed to load chat history', e);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Bỏ qua lỗi parsing
     }
     return [initialWelcome];
   });
@@ -38,13 +38,14 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   }, [messages, activeStoreId]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const messagesEndRef = useRef(null);
 
   const handleClearHistory = () => {
-    if (window.confirm('Bạn có chắc muốn xóa toàn bộ lịch sử trò chuyện?')) {
-      setMessages([initialWelcome]);
-      localStorage.removeItem(`ai_chat_history_${activeStoreId}`);
-    }
+    setShowConfirmClear(true);
   };
 
   useEffect(() => {
@@ -108,18 +109,25 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     let aiReply = '';
     let err = '';
     try {
-      const localReply = askAICopilot(query, contextData, chatHistory);
-      if (!isGenericCopilotFallback(localReply)) {
-        aiReply = localReply;
+      if (geminiApiKey && geminiApiKey.trim()) {
+        try {
+          aiReply = await askGeminiCopilot(query, contextData, chatHistory, geminiApiKey.trim());
+          model = 'gemini-1.5-flash';
+        } catch (geminiErr) {
+          console.warn('Gemini API call failed, falling back to local engine:', geminiErr);
+          aiReply = askAICopilot(query, contextData, chatHistory);
+          model = 'local-engine-fallback';
+        }
       } else {
-        aiReply = await askOllamaCopilot(query, contextData, chatHistory);
-        model = isGenericCopilotFallback(aiReply) ? 'local-engine' : 'ollama';
+        const localReply = askAICopilot(query, contextData, chatHistory);
+        aiReply = localReply;
+        model = 'local-engine';
       }
       const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
-      console.warn('Ollama is not running, falling back to local engine', error);
-      err = error.message || 'ollama-error';
+      console.warn('AI error:', error);
+      err = error.message || 'ai-error';
       aiReply = askAICopilot(query, contextData, chatHistory);
       const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
       setMessages(prev => [...prev, aiMsg]);
@@ -163,6 +171,13 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
         </div>
 
         <div className="flex items-center gap-1.5 relative z-10">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
+            title="Cài đặt AI"
+          >
+            <Settings size={18} />
+          </button>
           <button
             onClick={handleClearHistory}
             className="p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
@@ -215,6 +230,13 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
 
       {/* Quick Prompts Chips */}
       <div className="p-3 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setShowRecipeModal(true)}
+          className="whitespace-nowrap px-4 py-2 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 border border-transparent rounded-full font-bold text-white transition-all duration-300 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md cursor-pointer animate-[pulse_3s_ease-in-out_infinite]"
+        >
+          🍳 Sổ tay Công Thức 1-Chạm
+        </button>
         {quickPrompts.map((prompt, idx) => (
           <button
             key={idx}
@@ -252,6 +274,65 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
           </button>
         </form>
       </div>
+
+      {/* Settings Overlay */}
+      {showSettings && (
+        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col p-6 animate-in slide-in-from-bottom-2">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
+              <KeyRound className="text-indigo-600" /> Cấu hình Gemini AI
+            </h3>
+            <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 cursor-pointer">
+              <X size={18} />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Gemini API Key</label>
+              <input 
+                type="password" 
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+              />
+              <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                Key này được lưu an toàn trên trình duyệt của bạn (LocalStorage) và dùng để gọi trực tiếp tới Google Gemini.
+              </p>
+            </div>
+            
+            <button 
+              onClick={() => {
+                localStorage.setItem('gemini_api_key', geminiApiKey);
+                setShowSettings(false);
+              }}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all cursor-pointer"
+            >
+              Lưu cấu hình
+            </button>
+          </div>
+        </div>
+      )}
+
+      <RecipeQuickModal 
+        isOpen={showRecipeModal} 
+        onClose={() => setShowRecipeModal(false)} 
+      />
+
+      <ConfirmModal
+        isOpen={showConfirmClear}
+        onClose={() => setShowConfirmClear(false)}
+        title="Xóa lịch sử hội thoại"
+        message="Bạn có chắc chắn muốn xóa toàn bộ tin nhắn trò chuyện với TÚ mini?"
+        variant="warning"
+        confirmText="Xác nhận xóa"
+        onConfirm={() => {
+          setMessages([initialWelcome]);
+          localStorage.removeItem(`ai_chat_history_${activeStoreId}`);
+          setShowConfirmClear(false);
+        }}
+      />
     </div>
   );
 }

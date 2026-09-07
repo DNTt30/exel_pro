@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { RefreshCw, ArrowRightLeft, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
 import { getUserDepts } from '../../lib/authSession';
-import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap, buildSwappedSchedules } from '../../utils/shiftHelper';
 import { rankSwapPartners } from '../../utils/shiftSuggestionHelper';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
@@ -130,11 +130,35 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
   const selectedPartnerShift = partnerShiftsList.find(s => s.dayKey === toDay) || partnerShiftsList[0];
   const selectedPartnerObj = colleaguesWithShifts.find(c => c.id === toEmpId);
 
+  const [acknowledgedRestWarning, setAcknowledgedRestWarning] = useState(false);
+
+  const restWarningInfo = useMemo(() => {
+    if (!selectedMyShift || !selectedPartnerShift || !user?.id || !toEmpId) return null;
+    // Simulate the swap to check rest gaps accurately
+    const simulated = buildSwappedSchedules(mySched, partnerSched, {
+      fromDay,
+      toDay,
+      fromEmpId: user.id,
+      toEmpId
+    });
+    // Check gap for user taking partner's shift on toDay
+    const pseudoWeekSched = { [user.id]: simulated[user.id] };
+    return checkEmployeeShiftRestGap(pseudoWeekSched, user.id, toDay, selectedPartnerShift.shift);
+  }, [selectedMyShift, selectedPartnerShift, mySched, partnerSched, fromDay, toDay, user, toEmpId]);
+
+  useEffect(() => {
+    // Reset acknowledgment when shifts change
+    setAcknowledgedRestWarning(false);
+  }, [fromDay, toDay, toEmpId]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMyShift) return toast.error('Bạn không có ca làm việc nào để thực hiện đổi ca.');
     if (!toEmpId) return toast.error('Vui lòng chọn đồng nghiệp muốn đổi ca.');
     if (!selectedPartnerShift) return toast.error('Đồng nghiệp được chọn không có ca làm việc nào để đổi sang.');
+    if (restWarningInfo?.hasRestWarning && !acknowledgedRestWarning) {
+      return toast.error('Bạn phải xác nhận đã đọc cảnh báo nghỉ ngơi trước khi gửi yêu cầu.');
+    }
 
     const payload = {
       week: currentWeek,
@@ -149,7 +173,10 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
       toDay: selectedPartnerShift.dayKey,
       toDayLabel: selectedPartnerShift.dayLabel,
       toShift: selectedPartnerShift.shift,
-      reason: reason.trim()
+      reason: reason.trim(),
+      hasRestWarning: restWarningInfo?.hasRestWarning || false,
+      restGapHours: restWarningInfo?.restHours || 24,
+      acknowledgedRestWarning: acknowledgedRestWarning
     };
 
     const validation = shiftSwapSchema.safeParse(payload);
@@ -161,6 +188,7 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
       await addShiftSwap(payload);
       toast.success('Đã gửi yêu cầu đổi ca. Đang chờ đồng nghiệp xác nhận.');
       setReason('');
+      setAcknowledgedRestWarning(false);
       onClose();
     } catch (err) {
       toast.error('Không thể gửi đơn đổi ca: ' + (err.message || 'Lỗi kết nối'));
@@ -307,6 +335,34 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
               <span className="text-[10px] text-slate-500 block uppercase">Bạn nhận ca của {selectedPartnerObj?.name}</span>
               <span className="text-emerald-700">{selectedPartnerShift.dayKey}: {selectedPartnerShift.shift}</span>
             </div>
+          </div>
+        )}
+
+        {/* Rest Gap Warning */}
+        {restWarningInfo?.hasRestWarning && (
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2">
+            <div className="flex items-start gap-2 text-amber-900 text-xs">
+              <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="block mb-1">⚠️ Cảnh báo: Bạn cần nghỉ ngơi đủ 11 tiếng!</strong>
+                <ul className="list-disc pl-4 space-y-0.5 text-amber-800">
+                  {restWarningInfo.issues.map((iss, i) => (
+                    <li key={i}>{iss.message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer mt-2 pt-2 border-t border-amber-200">
+              <input
+                type="checkbox"
+                checked={acknowledgedRestWarning}
+                onChange={e => setAcknowledgedRestWarning(e.target.checked)}
+                className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+              />
+              <span className="text-[11px] font-semibold text-amber-900">
+                Tôi tự nguyện đồng ý đổi ca dù chưa đủ thời gian nghỉ ngơi.
+              </span>
+            </label>
           </div>
         )}
 

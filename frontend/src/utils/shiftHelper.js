@@ -251,6 +251,85 @@ export function isShiftsOverlapping(shiftCodeA, shiftCodeB) {
 }
 
 /**
+ * Tính số giờ nghỉ ngơi giữa 2 ca liền kề (ca hôm trước và ca hôm sau).
+ * Ví dụ: 14-22 hôm trước -> 6-14 hôm sau:
+ * 14-22 kết thúc lúc 22h. 6-14 hôm sau bắt đầu lúc 6h (tương đương 30h).
+ * Khoảng nghỉ = 30 - 22 = 8 tiếng.
+ */
+export function calculateShiftRestGap(shiftPrev, shiftNext) {
+  const rangePrev = parseShiftTimeRange(shiftPrev);
+  const rangeNext = parseShiftTimeRange(shiftNext);
+  if (!rangePrev || !rangeNext) return 24; // Nếu 1 trong 2 ngày nghỉ thì coi như đủ nghỉ ngơi
+
+  const endPrev = rangePrev.end;
+  const startNext = 24 + rangeNext.start;
+  const gap = startNext - endPrev;
+  return Math.max(0, gap);
+}
+
+/**
+ * Kiểm tra xem khi một nhân viên nhận ca mới vào ngày `targetDay`
+ * thì có bị cảnh báo nghỉ ngơi (< 11h) với ngày liền trước hoặc liền sau không.
+ */
+export function checkEmployeeShiftRestGap(weekSched = {}, empId, targetDay, targetShift) {
+  const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  const idx = days.indexOf(targetDay);
+  if (idx === -1 || !targetShift || targetShift === 'off') {
+    return { hasRestWarning: false, restHours: 24, issues: [] };
+  }
+
+  const empSched = weekSched[empId] || {};
+  const issues = [];
+  let minGap = 24;
+
+  // Kiểm tra ngày liền trước
+  if (idx > 0) {
+    const prevDay = days[idx - 1];
+    const prevRaw = empSched[prevDay];
+    const { shift: prevShift } = normalizeShift(prevRaw);
+    if (prevShift && prevShift !== 'off') {
+      const gap = calculateShiftRestGap(prevShift, targetShift);
+      if (gap < 11) {
+        if (gap < minGap) minGap = gap;
+        issues.push({
+          type: 'prev',
+          adjacentDay: prevDay,
+          adjacentShift: prevShift,
+          gap,
+          message: `Nghỉ ${gap}h sau ca ${prevShift} (${prevDay})`
+        });
+      }
+    }
+  }
+
+  // Kiểm tra ngày liền sau
+  if (idx < days.length - 1) {
+    const nextDay = days[idx + 1];
+    const nextRaw = empSched[nextDay];
+    const { shift: nextShift } = normalizeShift(nextRaw);
+    if (nextShift && nextShift !== 'off') {
+      const gap = calculateShiftRestGap(targetShift, nextShift);
+      if (gap < 11) {
+        if (gap < minGap) minGap = gap;
+        issues.push({
+          type: 'next',
+          adjacentDay: nextDay,
+          adjacentShift: nextShift,
+          gap,
+          message: `Nghỉ ${gap}h trước ca ${nextShift} (${nextDay})`
+        });
+      }
+    }
+  }
+
+  return {
+    hasRestWarning: issues.length > 0,
+    restHours: issues.length > 0 ? minGap : 24,
+    issues
+  };
+}
+
+/**
  * Hoán 2 ca đổi ca: giữ nguyên object covering_store.
  * Cùng ngày: đổi ô đó. Khác ngày: mỗi người nhận ca của đối tác ở ngày tương ứng,
  * ô ngày mình nhường lấy giá trị hiện có của đối tác (thường là off).

@@ -37,7 +37,13 @@ export const shiftSwapSchema = z.object({
   fromShift: z.string().min(1, { message: 'Ca làm việc không được để trống' }),
   toEmpId: z.string().min(1, { message: 'Mã đồng nghiệp đổi cùng không được để trống' }),
   toDay: z.enum(WEEK_DAYS, { message: 'Thứ trong tuần không hợp lệ' }),
-  toShift: z.string().min(1, { message: 'Ca làm việc không được để trống' }),
   reason: z.string().optional(),
+  hasRestWarning: z.boolean().optional(),
+  acknowledgedRestWarning: z.boolean().optional(),
+  restGapHours: z.number().optional(),
+  fromEmpName: z.string().optional(),
+  fromDayLabel: z.string().optional(),
+  toEmpName: z.string().optional(),
+  toDayLabel: z.string().optional(),
   status: z.enum(['pending_partner', 'pending_manager', 'approved', 'rejected', 'cancelled']).default('pending_partner')
 });

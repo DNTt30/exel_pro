@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import Modal from './Modal';
+import ConfirmModal from './ConfirmModal';
 import StatusBadge from '../ui/StatusBadge';
 import { useStore } from '../../store/useStore';
 import { ArrowRightLeft, Check, Sparkles } from 'lucide-react';
@@ -14,6 +15,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
   const isManager = isOpsManager(user);
 
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'resolved'
+  const [swapToCancel, setSwapToCancel] = useState(null);
 
   // Lọc danh sách swap liên quan đến user hiện tại
   const mySwaps = useMemo(() => {
@@ -56,9 +58,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
   };
 
   const handleCancel = (swapId) => {
-    if (window.confirm('Bạn có chắc chắn muốn hủy yêu cầu đổi ca này?')) {
-      respondShiftSwap(swapId, 'cancelled', 'Người tạo đã hủy yêu cầu.');
-    }
+    setSwapToCancel(swapId);
   };
 
   return (
@@ -169,6 +169,15 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                     </div>
                   )}
 
+                  {swap.hasRestWarning && (
+                    <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs">
+                      <span className="text-[13px]">⚠️</span>
+                      <span className="font-medium">
+                        Nghỉ giữa ca: <strong className="text-amber-900">{swap.restGapHours}h</strong> (Nhân viên đã tự nguyện đồng ý)
+                      </span>
+                    </div>
+                  )}
+
                   {swap.managerNote && (
                     <div className="text-[11px] text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg">
                       <span className="font-bold">Ghi chú:</span> {swap.managerNote}
@@ -257,6 +266,22 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!swapToCancel}
+        onClose={() => setSwapToCancel(null)}
+        title="Hủy đơn đổi ca"
+        message="Bạn có chắc chắn muốn hủy yêu cầu đổi ca này?"
+        variant="warning"
+        confirmText="Xác nhận hủy đơn"
+        onConfirm={() => {
+          if (swapToCancel) {
+            respondShiftSwap(swapToCancel, 'cancelled', 'Người tạo đã hủy yêu cầu.');
+            toast.info('Đã hủy đơn đổi ca.');
+            setSwapToCancel(null);
+          }
+        }}
+      />
     </Modal>
   );
 }

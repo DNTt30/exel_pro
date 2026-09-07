@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle, Pencil } from 'lucide-react';
+import ConfirmModal from '../../components/modals/ConfirmModal';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
 import { getStoreLabel } from '../../utils/scheduleAnnotations';
@@ -24,72 +25,57 @@ import {
 // ─── Modal Xem Chi Tiết (Read-only) ───────────────────────────────────────────
 function ShelfDetailModal({ shelf, items, empName, onClose }) {
   if (!shelf) return null;
-  const today = new Date();
-
-  const expiryBadge = (item) => {
-    const d1 = item.expiryDate ? new Date(item.expiryDate) : null;
-    const d2 = item.expiryDate2 ? new Date(item.expiryDate2) : null;
-    const earliest = [d1, d2].filter(Boolean).sort((a, b) => a - b)[0];
-    if (!earliest) return null;
-    const diff = Math.ceil((earliest - today) / 86400000);
-    if (diff < 0) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">⚠️ Hết hạn</span>;
-    if (diff <= 3) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">🟠 Còn {diff} ngày</span>;
-    if (diff <= 7) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">🟡 Còn {diff} ngày</span>;
-    return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">✅ Còn {diff} ngày</span>;
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <div className="font-black text-slate-800 text-base">{shelf.name || shelf.code}</div>
-            <div className="text-xs text-slate-500 mt-0.5">
-              👤 NV: <span className="font-semibold text-slate-700">{empName(shelf.assigneeId)}</span>
-              &nbsp;·&nbsp;
-              📅 Hạn nộp: <span className="font-semibold text-slate-700">{shelf.dueDate || '—'}</span>
-              &nbsp;·&nbsp;
-              {items.length} sản phẩm
-            </div>
+            <h3 className="text-base font-bold text-slate-800">
+              Chi tiết kệ: {shelf.name || shelf.code}
+            </h3>
+            <p className="text-xs text-slate-500">
+              Mã kệ: {shelf.code} • Phụ trách: {empName(shelf.assigneeId)}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 ml-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        <div className="p-5 overflow-y-auto space-y-3">
           {items.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <AlertTriangle size={32} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Nhân viên chưa nhập hàng nào vào bảng này.</p>
-            </div>
+            <p className="text-sm text-slate-400 text-center py-6">Chưa có sản phẩm nào trên kệ</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600 text-left sticky top-0">
-                <tr>
-                  <th className="px-3 py-2 rounded-tl-xl">STT</th>
-                  <th className="px-3 py-2">Tên sản phẩm</th>
-                  <th className="px-3 py-2">Mã SP</th>
-                  <th className="px-3 py-2 text-center">SL</th>
-                  <th className="px-3 py-2">HSD 1</th>
-                  <th className="px-3 py-2">HSD 2</th>
-                  <th className="px-3 py-2 rounded-tr-xl">Cảnh báo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, idx) => (
-                  <tr key={item.id || idx} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-3 py-2 text-slate-400 text-xs">{idx + 1}</td>
-                    <td className="px-3 py-2 font-semibold text-slate-800">{item.productName || '—'}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-500">{item.sku || '—'}</td>
-                    <td className="px-3 py-2 text-center font-bold">{item.qty ?? '—'}</td>
-                    <td className="px-3 py-2 text-xs">{item.expiryDate ? String(item.expiryDate).slice(0, 10) : '—'}</td>
-                    <td className="px-3 py-2 text-xs">{item.expiryDate2 ? String(item.expiryDate2).slice(0, 10) : '—'}</td>
-                    <td className="px-3 py-2">{expiryBadge(item)}</td>
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Tên sản phẩm</th>
+                    <th className="px-3 py-2 text-center w-24">Số lượng</th>
+                    <th className="px-3 py-2 text-center w-28">Hạn sử dụng</th>
+                    <th className="px-3 py-2 text-left">Ghi chú</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((it) => (
+                    <tr key={it.id || it.product_name}>
+                      <td className="px-3 py-2 font-medium text-slate-800">{it.product_name}</td>
+                      <td className="px-3 py-2 text-center text-slate-600">{it.qty ?? '—'}</td>
+                      <td className="px-3 py-2 text-center text-slate-600">
+                        {it.expiry_date
+                          ? new Date(it.expiry_date).toLocaleDateString('vi-VN')
+                          : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">{it.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
@@ -113,6 +99,7 @@ export default function ShelfDateBoard() {
   const [search, setSearch] = useState('');
   const [filterEmp, setFilterEmp] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [shelfToDelete, setShelfToDelete] = useState(null);
   const [form, setForm] = useState({
     id: null,
     code: '',
@@ -399,7 +386,7 @@ export default function ShelfDateBoard() {
                         <button type="button" className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors ml-1" onClick={() => editShelf(shelf)} title="Sửa thông tin kệ">
                           <Pencil size={14} />
                         </button>
-                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" onClick={() => { if (confirm('Xóa kệ này? Toàn bộ sản phẩm sẽ bị xóa!')) deleteShelf(shelf.id).then(() => setSelectedId(id => id === shelf.id ? null : id)).catch(e => toast.error('Không thể xóa: ' + (e.message || 'Lỗi không xác định'))); }} title="Xóa kệ">
+                        <button type="button" className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" onClick={() => setShelfToDelete(shelf)} title="Xóa kệ">
                           <Trash2 size={14} />
                         </button>
                       </>
@@ -439,6 +426,27 @@ export default function ShelfDateBoard() {
           onClose={() => setDetailShelf(null)}
         />
       )}
+
+      {/* Modal xác nhận xóa kệ hàng */}
+      <ConfirmModal
+        isOpen={!!shelfToDelete}
+        onClose={() => setShelfToDelete(null)}
+        title="Xóa kệ hàng"
+        message={`Bạn có chắc chắn muốn xóa kệ "${shelfToDelete?.name || shelfToDelete?.code}"?\n\n⚠️ Toàn bộ danh sách sản phẩm và date của kệ này sẽ bị xóa khỏi hệ thống.`}
+        variant="danger"
+        confirmText="Xác nhận xóa"
+        onConfirm={async () => {
+          if (!shelfToDelete) return;
+          try {
+            await deleteShelf(shelfToDelete.id);
+            setSelectedId(id => id === shelfToDelete.id ? null : id);
+            toast.success('Đã xóa kệ hàng thành công');
+            setShelfToDelete(null);
+          } catch (e) {
+            toast.error('Không thể xóa: ' + (e.message || 'Lỗi không xác định'));
+          }
+        }}
+      />
     </div>
   );
 }

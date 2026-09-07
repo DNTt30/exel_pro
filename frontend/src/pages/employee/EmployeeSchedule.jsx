@@ -8,11 +8,12 @@ import ShiftInput from '../../components/ShiftInput';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
-import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import ShiftSuggestionModal from '../../components/modals/ShiftSuggestionModal';
+import RecipeQuickModal from '../../components/modals/RecipeQuickModal';
 import { useShallow } from 'zustand/react/shallow';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { toast } from '../../components/ui/toastStore';
@@ -36,6 +37,7 @@ export default function EmployeeSchedule() {
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSwapListModal, setShowSwapListModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
 
   const pendingMySwapsCount = useMemo(() => {
     return (shiftSwaps || []).filter(s => s.toEmpId === user?.id && s.status === 'pending_partner').length;
@@ -172,6 +174,9 @@ export default function EmployeeSchedule() {
       const hours = isOff ? 0 : getShiftHours(shift);
       const isSupport = isSupportAssignment(rawVal, myDept);
       const swapInfo = getSwapBadgeForDay(mySwapsThisWeek, user?.id, dayKey);
+      
+      const pseudoWeekSched = { [user?.id]: mySched };
+      const restWarning = checkEmployeeShiftRestGap(pseudoWeekSched, user?.id, dayKey, shift);
 
       const dayFullName = DAY_FULL_NAMES[dayKey] || dayKey;
       const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
@@ -189,7 +194,8 @@ export default function EmployeeSchedule() {
         isOff,
         shiftInfo,
         hours,
-        rawVal
+        rawVal,
+        restWarning
       };
     });
   }, [currentWeek, mySched, myDept, mySwapsThisWeek, user?.id]);
@@ -248,6 +254,10 @@ export default function EmployeeSchedule() {
         currentWeek={currentWeek}
         onApply={handleApplySuggestion}
       />
+      <RecipeQuickModal 
+        isOpen={showRecipeModal} 
+        onClose={() => setShowRecipeModal(false)} 
+      />
       
       {/* Top Toolbar */}
       <div className="print:hidden">
@@ -282,6 +292,16 @@ export default function EmployeeSchedule() {
                 <span>Toàn cửa hàng</span>
               </button>
             </div>
+
+            {/* Button: Sổ tay 1 chạm */}
+            <button
+              type="button"
+              onClick={() => setShowRecipeModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white border border-transparent rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap animate-pulse"
+              title="Mở sổ tay công thức nhanh"
+            >
+              <span>🍳 Công Thức Nhanh</span>
+            </button>
 
             {/* Button: Đổi ca */}
             <button
@@ -759,7 +779,7 @@ export default function EmployeeSchedule() {
                       </div>
                     )}
 
-                    {(card.isSupport || card.swapInfo) && (
+                    {(card.isSupport || card.swapInfo || card.restWarning?.hasRestWarning) && (
                       <div className="space-y-1">
                         {card.isSupport && card.isOff && (
                           <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-1">
@@ -771,6 +791,14 @@ export default function EmployeeSchedule() {
                           <div className={`flex items-center gap-1 text-[10px] font-bold border rounded-lg px-1.5 py-1 ${swapBadgeClass(card.swapInfo)}`}>
                             <ArrowRightLeft size={11} className="shrink-0" />
                             <span className="leading-tight">{card.swapInfo.label}</span>
+                          </div>
+                        )}
+                        {card.restWarning?.hasRestWarning && (
+                          <div className="flex flex-col gap-0.5 text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-1.5 py-1" title={card.restWarning.issues.map(i => i.message).join('\n')}>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[12px]">💤</span> 
+                              <span>Cần nghỉ ngơi ({card.restWarning.restHours}h gap)</span>
+                            </div>
                           </div>
                         )}
                       </div>

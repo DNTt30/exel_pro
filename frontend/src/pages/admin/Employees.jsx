@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound } from 'lucide-react';
 import ChangePasswordModal from '../../components/modals/ChangePasswordModal';
+import ConfirmModal from '../../components/modals/ConfirmModal';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore, isManagerFromEmp, isOpsManager, canAssignManager } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
@@ -22,6 +23,7 @@ export default function Employees() {
   const [resetTarget, setResetTarget] = useState(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL'); // ALL | sm | nv
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', variant: 'danger', confirmText: 'Xác nhận', onConfirm: null });
   
   // SM cơ sở chỉ quản lý nhân sự cơ sở (STFT, STPT, CSR); Admin toàn quyền bổ nhiệm CHT/OFC
   const availableRoles = useMemo(() => {
@@ -95,20 +97,29 @@ export default function Employees() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     // Kiểm tra tính toàn vẹn: Không cho xóa nếu nhân viên này đang là SM
     const ownedStores = stores.filter(s => (s.sm_id || s.smId) === id);
     if (ownedStores.length > 0) {
       return toast.error(`Không thể xóa: Nhân sự này đang là SM phụ trách cửa hàng ${ownedStores.map(s => s.id).join(', ')}. Vui lòng gán SM khác cho các cửa hàng này trước khi xóa.`);
     }
 
-    if (confirm('Bạn có chắc chắn muốn xóa nhân sự này (Khuyến nghị dùng nút KHÓA thay vì XÓA)?')) {
-      try {
-        await deleteEmployee(id);
-      } catch (e) {
-        toast.error('Lỗi: ' + e.message);
+    setConfirmState({
+      isOpen: true,
+      title: 'Xóa hồ sơ nhân sự',
+      message: 'Bạn có chắc chắn muốn xóa nhân sự này khỏi danh sách?\n\n💡 Khuyến nghị: Nên dùng nút KHÓA thay vì XÓA để bảo toàn lịch sử chấm công và xếp ca.',
+      variant: 'danger',
+      confirmText: 'Xác nhận xóa',
+      onConfirm: async () => {
+        try {
+          await deleteEmployee(id);
+          toast.success('Đã xóa nhân sự thành công');
+          setConfirmState(prev => ({ ...prev, isOpen: false }));
+        } catch (e) {
+          toast.error('Lỗi: ' + e.message);
+        }
       }
-    }
+    });
   };
 
   // Khóa/mở tài khoản: mã bị khóa không thể đăng nhập (dùng khi nghỉ việc)
@@ -116,13 +127,33 @@ export default function Employees() {
     const next = emp.isActive === false;
     if (!next) {
       const ownedStores = stores.filter(s => (s.sm_id || s.smId) === emp.id);
+      let warningMsg = `Vô hiệu hóa mã ${emp.id}? Người này sẽ không thể đăng nhập vào ứng dụng nữa.`;
       if (isManagerFromEmp(emp) && ownedStores.length > 0) {
-        if (!confirm('⚠️ ' + emp.name + ' (' + emp.id + ') đang là SM phụ trách: ' + ownedStores.map(s => s.id).join(', ') + '.\nKhóa mã này sẽ khiến các cửa hàng trên KHÔNG CÒN NGƯỜI PHỤ TRÁCH.\nHãy gán SM khác trước nếu cần. Vẫn tiếp tục khóa?')) return;
-      } else if (!confirm('Vô hiệu hóa mã ' + emp.id + '? Người này sẽ không đăng nhập được nữa.')) return;
+        warningMsg = `⚠️ ${emp.name} (${emp.id}) đang là SM phụ trách: ${ownedStores.map(s => s.id).join(', ')}.\n\nKhóa mã này sẽ khiến các cửa hàng trên KHÔNG CÒN NGƯỜI PHỤ TRÁCH. Hãy gán SM khác trước nếu cần. Vẫn tiếp tục khóa?`;
+      }
+
+      setConfirmState({
+        isOpen: true,
+        title: 'Khóa tài khoản nhân viên',
+        message: warningMsg,
+        variant: 'warning',
+        confirmText: 'Xác nhận khóa',
+        onConfirm: async () => {
+          try {
+            await updateEmployee(emp.id, { isActive: false });
+            toast.success('Đã vô hiệu hóa mã ' + emp.id);
+            setConfirmState(prev => ({ ...prev, isOpen: false }));
+          } catch (e) {
+            toast.error('Lỗi: ' + e.message + ' (Chạy sql_employee_status.sql nếu chưa có cột is_active)');
+          }
+        }
+      });
+      return;
     }
+
     try {
-      await updateEmployee(emp.id, { isActive: next });
-      toast.success(next ? 'Đã mở lại tài khoản ' + emp.id : 'Đã vô hiệu hóa mã ' + emp.id);
+      await updateEmployee(emp.id, { isActive: true });
+      toast.success('Đã mở lại tài khoản ' + emp.id);
     } catch (e) {
       toast.error('Lỗi: ' + e.message + ' (Chạy sql_employee_status.sql nếu chưa có cột is_active)');
     }
@@ -363,6 +394,17 @@ export default function Employees() {
         </table>
       </div>
     
-      {resetTarget && <ChangePasswordModal isOpen onClose={() => setResetTarget(null)} targetEmp={resetTarget} />}</div>
+      {resetTarget && <ChangePasswordModal isOpen onClose={() => setResetTarget(null)} targetEmp={resetTarget} />}
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
+    </div>
   );
 }

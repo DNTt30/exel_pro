@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Lock, Unlock, Crown, UserPlus } from 'lucide-react';
 import StaffingMatrixFields from '../../components/StaffingMatrixFields';
 import StoreDemandFields from '../../components/StoreDemandFields';
+import ConfirmModal from '../../components/modals/ConfirmModal';
 import { normalizeStaffingConfig, normalizeStoreDemand } from '../../data/constants';
 import { canPickStore, isManagerFromEmp, canAssignManager } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
@@ -23,6 +24,7 @@ export default function Stores() {
   const pickStore = canPickStore(user);
   const canAssignSM = canAssignManager(user);
   const allowedDepts = new Set(visibleDeptIds(user, stores));
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', variant: 'danger', confirmText: 'Xác nhận', onConfirm: null });
   const visibleStores = pickStore ? stores : stores.filter(s => allowedDepts.has(s.id));
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -87,20 +89,29 @@ export default function Stores() {
     }
   };
 
-  const handleRemoveSM = async (storeId, emp) => {
-    if (!confirm(`Gỡ quyền quản lý của ${emp.name} khỏi cửa hàng ${storeId}?`)) return;
-    try {
-      const currentDepts = (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean);
-      const nextDepts = currentDepts.filter(d => d !== storeId).join(', ');
-      const payload = {
-        dept: nextDepts
-      };
-      await updateEmployeeInfo(emp.id, payload);
-      updateEmployee(emp.id, payload);
-      toast.success(`Đã gỡ ${emp.name} khỏi cửa hàng ${storeId}`);
-    } catch (err) {
-      toast.error('Lỗi khi gỡ SM: ' + err.message);
-    }
+  const handleRemoveSM = (storeId, emp) => {
+    setConfirmState({
+      isOpen: true,
+      title: 'Gỡ quyền Cửa hàng trưởng',
+      message: `Bạn có chắc chắn muốn gỡ quyền quản lý của ${emp.name} khỏi cửa hàng ${storeId}?`,
+      variant: 'warning',
+      confirmText: 'Xác nhận gỡ',
+      onConfirm: async () => {
+        try {
+          const currentDepts = (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean);
+          const nextDepts = currentDepts.filter(d => d !== storeId).join(', ');
+          const payload = {
+            dept: nextDepts
+          };
+          await updateEmployeeInfo(emp.id, payload);
+          updateEmployee(emp.id, payload);
+          toast.success(`Đã gỡ ${emp.name} khỏi cửa hàng ${storeId}`);
+          setConfirmState(prev => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          toast.error('Lỗi khi gỡ SM: ' + err.message);
+        }
+      }
+    });
   };
   
   const emptyStoreForm = () => ({
@@ -142,20 +153,60 @@ export default function Stores() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     // Kiểm tra tính toàn vẹn: Không cho xóa nếu vẫn còn nhân viên
     const empsInStore = employees.filter(e => e.dept === id);
     if (empsInStore.length > 0) {
       return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${empsInStore.length} nhân viên trực thuộc. Vui lòng chuyển hoặc xóa nhân viên trước.`);
     }
 
-    if (confirm('Bạn có chắc chắn muốn xóa cửa hàng này?')) {
-      try {
-        await deleteStore(id);
-      } catch (e) {
-        toast.error('Lỗi: ' + e.message);
+    setConfirmState({
+      isOpen: true,
+      title: 'Xóa cửa hàng',
+      message: `Bạn có chắc chắn muốn xóa cửa hàng ${id} khỏi hệ thống?\n\n⚠️ Lưu ý: Thao tác này sẽ xóa vĩnh viễn cấu hình cửa hàng. Nếu cửa hàng chỉ tạm dừng hoạt động, bạn nên dùng chức năng Khóa/Tạm ngừng.`,
+      variant: 'danger',
+      confirmText: 'Xác nhận xóa',
+      onConfirm: async () => {
+        try {
+          await deleteStore(id);
+          toast.success('Đã xóa cửa hàng thành công');
+          setConfirmState(prev => ({ ...prev, isOpen: false }));
+        } catch (e) {
+          toast.error('Lỗi: ' + e.message);
+        }
       }
+    });
+  };
+
+  const handleToggleStoreActive = (st) => {
+    const next = st.is_active === false; // đang khóa -> mở
+    if (!next) {
+      setConfirmState({
+        isOpen: true,
+        title: 'Tạm ngừng hoạt động cửa hàng',
+        message: `Ngừng hoạt động cửa hàng ${st.id} (${st.name})?\n\nCửa hàng sẽ tạm ẩn khỏi bộ chọn lịch và bảng điều khiển. Dữ liệu quá khứ vẫn được bảo toàn nguyên vẹn.`,
+        variant: 'warning',
+        confirmText: 'Xác nhận ngừng',
+        onConfirm: async () => {
+          try {
+            await apiUpdateStore(st.id, { is_active: false });
+            updateStore(st.id, { is_active: false });
+            toast.success(`Đã tạm ngừng hoạt động cửa hàng ${st.id}`);
+            setConfirmState(prev => ({ ...prev, isOpen: false }));
+          } catch (e) {
+            toast.error('Lỗi: ' + e.message + ' (Chạy sql_stores_active.sql nếu chưa có cột is_active)');
+          }
+        }
+      });
+      return;
     }
+
+    apiUpdateStore(st.id, { is_active: true })
+      .then(() => {
+        updateStore(st.id, { is_active: true });
+        toast.success(`Đã mở lại hoạt động cửa hàng ${st.id}`);
+      })
+      .catch(e => toast.error('Lỗi: ' + e.message));
   };
 
   const getRegionBadge = (region) => {
@@ -324,17 +375,8 @@ export default function Stores() {
                       <button onClick={() => { setEditingId(st.id); setFormData({ ...st, staffing: normalizeStaffingConfig(st.staffing), demand: normalizeStoreDemand(st.demand) }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1" title="Sửa"><Edit2 size={15} /></button>
                       {pickStore && (
                         <button
-                          onClick={async () => {
-                            const next = st.is_active === false; // đang khóa -> mở
-                            if (!next && !confirm('Ngừng hoạt động cửa hàng ' + st.id + '? CH sẽ ẩn khỏi bộ chọn lịch/dashboard (dữ liệu giữ nguyên).')) return;
-                            try {
-                              await apiUpdateStore(st.id, { is_active: next });
-                              updateStore(st.id, { is_active: next });
-                            } catch (e) {
-                              toast.error('Lỗi: ' + e.message + ' (Chạy sql_stores_active.sql nếu chưa có cột is_active)');
-                            }
-                          }}
-                          className={`p-1.5 rounded transition-colors mr-1 ${st.is_active === false ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-slate-500 hover:bg-slate-100'}`}
+                          onClick={() => handleToggleStoreActive(st)}
+                          className={`p-1.5 rounded transition-colors mr-1 cursor-pointer ${st.is_active === false ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-slate-500 hover:bg-slate-100'}`}
                           title={st.is_active === false ? 'Mở lại hoạt động' : 'Ngừng hoạt động'}
                         >
                           {st.is_active === false ? <Unlock size={15} /> : <Lock size={15} />}
@@ -536,6 +578,17 @@ export default function Stores() {
           </div>
         </div>
       )}
+
+      {/* Modal Xác nhận dùng chung */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
@@ -20,6 +20,8 @@ import { downloadBackupXlsx } from '../../utils/exportBackup';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { WEEK_DAYS } from '../../data/constants';
+import AutoBackupModal from '../../components/modals/AutoBackupModal';
+import { checkAndRunScheduledBackup } from '../../utils/autoBackupService';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -32,6 +34,11 @@ export default function Dashboard() {
 
   // Chế độ xem: 'month' (Chu kỳ 26-25 / 31 ngày) hoặc 'week' (7 ngày)
   const [viewMode, setViewMode] = useState('month'); 
+  const [showAutoBackupModal, setShowAutoBackupModal] = useState(false);
+
+  useEffect(() => {
+    checkAndRunScheduledBackup(useStore.getState());
+  }, []); 
 
   // Chọn chu kỳ tháng (YYYY-MM)
   const [selectedMonthCycle, setSelectedMonthCycle] = useState(() => {
@@ -639,14 +646,23 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Full-data Backup (.xlsx) — SM/OFC sao lưu toàn bộ dữ liệu đã tải */}
-          <button
-            onClick={handleBackupXlsx}
-            className="btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs py-2 px-3.5 rounded-xl font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
-            title="Tải toàn bộ dữ liệu (nhân viên, lịch mọi tuần đã tải, feedback, đổi ca, kệ) ra file Excel"
-          >
-            <DatabaseBackup size={14} /> Sao lưu .xlsx
-          </button>
+          {/* Full-data Backup (.xlsx) & Auto-Backup */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleBackupXlsx}
+              className="btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs py-2 px-3 rounded-xl font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Tải toàn bộ dữ liệu (nhân viên, lịch mọi tuần đã tải, feedback, đổi ca, kệ) ra file Excel"
+            >
+              <DatabaseBackup size={14} /> Sao lưu .xlsx
+            </button>
+            <button
+              onClick={() => setShowAutoBackupModal(true)}
+              className="btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs p-2 rounded-xl font-bold shadow-xs flex items-center justify-center cursor-pointer transition-all hover:border-emerald-400 hover:text-emerald-700"
+              title="Cài đặt tự động gửi bản sao lưu định kỳ qua Telegram / Webhook"
+            >
+              <Settings size={14} />
+            </button>
+          </div>
 
           {/* Export Button */}
           <button
@@ -951,6 +967,12 @@ export default function Dashboard() {
           currentWeek={currentWeek}
         />
       )}
+
+      {/* Auto Backup Configuration Modal */}
+      <AutoBackupModal
+        isOpen={showAutoBackupModal}
+        onClose={() => setShowAutoBackupModal(false)}
+      />
 
     </div>
   );

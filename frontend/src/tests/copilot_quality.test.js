@@ -90,3 +90,206 @@ describe('AI Copilot — giữ hành vi cũ (không hồi quy)', () => {
     expect(r).toContain('+30%');
   });
 });
+
+describe('AI Copilot — Nhận diện đại từ nhân xưng Việt Nam & Lịch cá nhân', () => {
+  const loggedInCtx = {
+    ...ctx,
+    user: ctx.employees[0] // DƯƠNG NGỌC TÚ
+  };
+
+  it('nhận diện "em": tính lương cá nhân', () => {
+    const r = askAICopilot('Lương tuần này của em bao nhiêu?', loggedInCtx);
+    expect(r).toContain('DƯƠNG NGỌC TÚ');
+    expect(r).toContain('48h');
+  });
+
+  it('nhận diện "chị" + hỏi ca 22-6', () => {
+    const r = askAICopilot('Chị có làm ca 22-6 hôm nào không?', loggedInCtx);
+    expect(r).toContain('DƯƠNG NGỌC TÚ');
+    expect(r).toContain('KHÔNG có ca đêm');
+  });
+
+  it('nhận diện "anh": hỏi lịch làm', () => {
+    const r = askAICopilot('Lịch của anh tuần này', loggedInCtx);
+    expect(r).toContain('DƯƠNG NGỌC TÚ');
+    expect(r).toContain('T3: 6-14');
+  });
+
+  it('nhận diện "tao": hỏi tổng số tiếng', () => {
+    const r = askAICopilot('Tuần này tao làm tổng bao nhiêu tiếng?', loggedInCtx);
+    expect(r).toContain('48h');
+  });
+
+  it('nhận diện "tớ": hỏi giờ làm', () => {
+    const r = askAICopilot('Tuần này tớ làm bao nhiêu tiếng?', loggedInCtx);
+    expect(r).toContain('48h');
+  });
+
+  it('nhận diện "cháu": hỏi lịch tuần', () => {
+    const r = askAICopilot('Lịch của cháu tuần này thế nào?', loggedInCtx);
+    expect(r).toContain('DƯƠNG NGỌC TÚ');
+  });
+
+  it('nhận diện "bản thân": hỏi thông tin tài khoản', () => {
+    const r = askAICopilot('Thông tin của bản thân', loggedInCtx);
+    expect(r).toContain('Thông tin tài khoản');
+    expect(r).toContain('260716009');
+  });
+
+  it('trả lời ngày có ca trực khi hỏi nghỉ: "Thứ 6 em có được nghỉ không?"', () => {
+    const r = askAICopilot('Thứ 6 em có được nghỉ không?', loggedInCtx);
+    expect(r).toContain('T6');
+    expect(r).toContain('6-14');
+    expect(r).toContain('không được nghỉ');
+  });
+
+  it('trả lời ngày OFF khi hỏi nghỉ: "Thứ 2 em có được nghỉ không?"', () => {
+    const r = askAICopilot('Thứ 2 em có được nghỉ không?', loggedInCtx);
+    expect(r).toContain('T2');
+    expect(r).toContain('OFF');
+    expect(r).toContain('được nghỉ');
+  });
+});
+
+describe('AI Copilot — Tra cứu ai làm cùng ca', () => {
+  const loggedInCtx = {
+    ...ctx,
+    user: ctx.employees[0] // DƯƠNG NGỌC TÚ
+  };
+
+  it('trả lời khi đang OFF: không có ai làm cùng ca', () => {
+    const r = askAICopilot('Thứ 2 ai làm cùng ca với em?', loggedInCtx);
+    expect(r).toContain('OFF');
+    expect(r).toContain('không có ai làm cùng ca');
+  });
+
+  it('trả lời đồng nghiệp trực cùng ca nếu có người trùng ca', () => {
+    const r = askAICopilot('Thứ 3 ai làm cùng ca với em?', loggedInCtx);
+    expect(r).toContain('6-14');
+  });
+});
+
+describe('AI Copilot — Giờ hủy từng món cụ thể (ngắn gọn, đúng trọng tâm)', () => {
+  it('Sandwich có rau: 11:00 & 22:00, không tuôn món khác', () => {
+    const r = askAICopilot('Mấy giờ hủy sandwich có rau?', ctx);
+    expect(r).toContain('11:00');
+    expect(r).toContain('22:00');
+    expect(r).toContain('Sandwich có rau');
+    expect(r).not.toContain('Burger');
+  });
+
+  it('Burger: 11:00 & 22:00', () => {
+    const r = askAICopilot('Burger hủy lúc mấy giờ?', ctx);
+    expect(r).toContain('11:00');
+    expect(r).toContain('22:00');
+    expect(r).toContain('Burger');
+  });
+
+  it('Gimbap: 11:00 & 22:00', () => {
+    const r = askAICopilot('Gimbap hủy lúc nào?', ctx);
+    expect(r).toContain('11:00');
+    expect(r).toContain('22:00');
+    expect(r).toContain('Gimbap');
+  });
+
+  it('Cơm nắm Onigiri: 19:00', () => {
+    const r = askAICopilot('Onigiri hủy mấy giờ?', ctx);
+    expect(r).toContain('19:00');
+    expect(r).toContain('Onigiri');
+  });
+
+  it('Sushi: 19:00', () => {
+    const r = askAICopilot('Khi nào hủy sushi?', ctx);
+    expect(r).toContain('19:00');
+    expect(r).toContain('Sushi');
+  });
+
+  it('Bento: 19:00', () => {
+    const r = askAICopilot('Bento hủy lúc mấy giờ?', ctx);
+    expect(r).toContain('19:00');
+    expect(r).toContain('Bento');
+  });
+
+  it('Sandwich không rau: 19:00', () => {
+    const r = askAICopilot('Sandwich không rau hủy lúc nào?', ctx);
+    expect(r).toContain('19:00');
+    expect(r).toContain('Sandwich không rau');
+  });
+
+  it('Mì hộp: 19:00', () => {
+    const r = askAICopilot('Mì hộp hủy lúc mấy giờ?', ctx);
+    expect(r).toContain('19:00');
+    expect(r).toContain('Mì hộp');
+  });
+
+  it('Hàng tươi / FF rau: 11:00 & 22:00', () => {
+    const r = askAICopilot('Khi nào hủy hàng tươi?', ctx);
+    expect(r).toContain('11:00');
+    expect(r).toContain('22:00');
+  });
+
+  it('Hàng GM: quy định HSD', () => {
+    const r = askAICopilot('Hàng GM hủy khi nào?', ctx);
+    expect(r).toContain('HSD ≤ 7 ngày');
+  });
+});
+
+describe('AI Copilot — Công thức & SOP Thiết bị & Lẩu chả cá', () => {
+  it('Công thức mì tương đen GS25', () => {
+    const r = askAICopilot('Công thức mì tương đen', ctx);
+    expect(r).toContain('Koreno');
+    expect(r).toContain('tương đen');
+  });
+
+  it('Nấu lẩu chả cá bao nhiêu nước: 2000ml (2 lít)', () => {
+    const r = askAICopilot('Nấu lẩu chả cá bao nhiêu nước?', ctx);
+    expect(r).toContain('2000ml');
+    expect(r).toContain('120g');
+  });
+
+  it('Lò vi sóng ly chả cá: bấm số 3', () => {
+    const r = askAICopilot('Lò vi sóng ly chả cá bấm số mấy?', ctx);
+    expect(r).toContain('SỐ 3');
+  });
+
+  it('Lò vi sóng tô mì chả cá: bấm số 5', () => {
+    const r = askAICopilot('Lò vi sóng tô mì chả cá bấm số mấy?', ctx);
+    expect(r).toContain('SỐ 5');
+  });
+
+  it('Công thức nấu súp lẩu', () => {
+    const r = askAICopilot('Công thức nấu súp', ctx);
+    expect(r).toContain('2000ml');
+    expect(r).toContain('bột súp cay');
+  });
+});
+
+describe('AI Copilot — Bẫy từ khóa & Anti-collision chuyên sâu', () => {
+  const loggedInCtx = {
+    ...ctx,
+    user: ctx.employees[0]
+  };
+
+  it('"tổng cộng" trong câu hỏi giờ không kích hoạt audit lỗi lịch', () => {
+    const r = askAICopilot('Tuần này em làm tổng cộng mấy tiếng?', loggedInCtx);
+    expect(r).toContain('48h');
+    expect(r).not.toContain('vấn đề:');
+  });
+
+  it('"ổn định" trong trò chuyện không kích hoạt audit quét lỗi', () => {
+    const r = askAICopilot('Công việc dạo này ổn định không Tú?', loggedInCtx);
+    expect(r).not.toContain('vấn đề:');
+    expect(r).not.toContain('0 lỗi');
+  });
+
+  it('"lịch tuần này có ổn không" kích hoạt audit kiểm tra lỗi', () => {
+    const r = askAICopilot('Kiểm tra xem lịch tuần này có ổn không?', loggedInCtx);
+    expect(r).toContain('vấn đề:');
+  });
+
+  it('Làm thêm ngày lễ tết được bao nhiêu phần trăm lương: 300%', () => {
+    const r = askAICopilot('Làm thêm ngày lễ tết được bao nhiêu phần trăm lương?', ctx);
+    expect(r).toContain('300%');
+  });
+});
+

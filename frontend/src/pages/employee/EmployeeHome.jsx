@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, Clock, MapPin, ArrowRightLeft, ChevronRight, ShoppingBasket, Send, Coffee } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -8,6 +8,7 @@ import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay
 import { collectExpiryAlerts } from '../../utils/shelfExpiry';
 import { useShallow } from 'zustand/react/shallow';
 import MonthConfirmCard from '../../components/employee/MonthConfirmCard';
+import RecipeQuickModal from '../../components/modals/RecipeQuickModal';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
@@ -23,6 +24,7 @@ export default function EmployeeHome() {
   const mySched = schedule[currentWeek]?.[user?.id] || EMPTY_SCHED;
   const myDept = user?.dept || '';
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && String(user.role).includes('PT'));
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
 
   const now = new Date();
   const todayKey = WEEK_DAYS[now.getDay() === 0 ? 6 : now.getDay() - 1];
@@ -219,6 +221,33 @@ export default function EmployeeHome() {
           <ShoppingBasket size={15} /> Kệ hàng
         </Link>
       </div>
+
+      {/* ── Nút tắt tra cứu công thức FF Onsite 1-Chạm ── */}
+      <button
+        type="button"
+        onClick={() => setShowRecipeModal(true)}
+        className="w-full p-3 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white rounded-2xl shadow-sm flex items-center justify-between transition-all cursor-pointer group text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shadow-inner">
+            🍳
+          </span>
+          <div>
+            <div className="font-extrabold text-xs flex items-center gap-1.5">
+              <span>Sổ Tay Công Thức Chế Biến & Pha Chế (FF Onsite)</span>
+              <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">1-Chạm</span>
+            </div>
+            <p className="text-[10px] text-white/80 mt-0.5">Tra nhanh mì tương đen, mì trộn, trà tắc, xúc xích, đồ chiên, xốt tok...</p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-white/70 group-hover:translate-x-0.5 transition-transform shrink-0" />
+      </button>
+
+      {/* Modal Công Thức FF */}
+      <RecipeQuickModal
+        isOpen={showRecipeModal}
+        onClose={() => setShowRecipeModal(false)}
+      />
     </div>
   );
 }

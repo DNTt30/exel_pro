@@ -8,7 +8,9 @@ import {
   buildSwappedSchedules,
   mergeAiSchedule,
   parseShiftForCell,
-  calculateEmployeeWeeklyHours
+  calculateEmployeeWeeklyHours,
+  calculateShiftRestGap,
+  checkEmployeeShiftRestGap
 } from '../utils/shiftHelper';
 import { getCurrentMondayWeek, getWeekAndDayKey, getPayrollCycleDates, getStaffingMatrix, normalizeStaffingConfig, suggestStaffingFromDemand } from '../data/constants';
 
@@ -293,6 +295,38 @@ describe('Shift Helper Logic & Business Rules', () => {
       const merged = mergeAiSchedule(existing, ai, 'VN0485');
       expect(merged.A.T2).toEqual({ shift: '6-14', covering_store: 'VN0497' });
       expect(merged.A.T3).toBe('6-14');
+    });
+  });
+
+  describe('calculateShiftRestGap & checkEmployeeShiftRestGap', () => {
+    it('calculates rest hours correctly across adjacent days', () => {
+      // 14-22 yesterday -> 6-14 today: 22h to 06h = 8h rest (<11h warning)
+      expect(calculateShiftRestGap('14-22', '6-14')).toBe(8);
+      // 22-6 night yesterday (ends at 6am today) -> 14-22 afternoon today: 6am to 14pm = 8h rest (<11h warning)
+      expect(calculateShiftRestGap('22-6', '14-22')).toBe(8);
+      // 6-14 yesterday -> 6-14 today: 14pm to 6am = 16h rest (well-rested)
+      expect(calculateShiftRestGap('6-14', '6-14')).toBe(16);
+      // off yesterday -> 6-14 today: returns 24
+      expect(calculateShiftRestGap('off', '6-14')).toBe(24);
+    });
+
+    it('detects rest warning when employee receives a shift tight to adjacent days', () => {
+      const weekSched = {
+        emp1: {
+          T2: '14-22',
+          T3: 'off',
+          T4: '14-22'
+        }
+      };
+      // If emp1 takes 6-14 on T3, gap from T2 (14-22) to T3 (6-14) is 8h
+      const res = checkEmployeeShiftRestGap(weekSched, 'emp1', 'T3', '6-14');
+      expect(res.hasRestWarning).toBe(true);
+      expect(res.restHours).toBe(8);
+      expect(res.issues.length).toBeGreaterThanOrEqual(1);
+
+      // If emp1 takes 14-22 on T3, gap from T2 (14-22) is 16h, gap to T4 (14-22) is 16h -> no warning
+      const okRes = checkEmployeeShiftRestGap(weekSched, 'emp1', 'T3', '14-22');
+      expect(okRes.hasRestWarning).toBe(false);
     });
   });
 });

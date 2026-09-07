@@ -18,9 +18,11 @@ import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
 import { useShallow } from 'zustand/react/shallow';
+import { isOpsManager, isManagerFromEmp } from '../../lib/authSession';
 
 export default function EmployeeTimesheet() {
   const { user, schedule, currentWeek, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
+  const canViewAll = useMemo(() => isOpsManager(user) || isManagerFromEmp(user), [user]);
   const weekSchedule = schedule[currentWeek] || {};
   const myDept = user?.dept || '';
 
@@ -51,18 +53,19 @@ export default function EmployeeTimesheet() {
     ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
   }, [cycleDates, ensureWeeksLoaded]);
 
+  const effectiveFilterOnlyMe = canViewAll ? filterOnlyMe : true;
   const rawGroupedEmps = useGroupedEmployees(search, myDept, 'ALL', weekSchedule);
 
-  // Lọc chỉ xem của tôi hoặc toàn bộ cửa hàng
+  // Lọc chỉ xem của tôi hoặc toàn bộ cửa hàng (chỉ Quản lý / SM / AM mới xem được toàn bộ)
   const groupedEmps = useMemo(() => {
-    if (!filterOnlyMe) return rawGroupedEmps;
+    if (!effectiveFilterOnlyMe) return rawGroupedEmps;
     const result = {};
     Object.entries(rawGroupedEmps).forEach(([dept, emps]) => {
       const mine = emps.filter(e => e.id === user?.id);
       if (mine.length) result[dept] = mine;
     });
     return result;
-  }, [rawGroupedEmps, filterOnlyMe, user?.id]);
+  }, [rawGroupedEmps, effectiveFilterOnlyMe, user?.id]);
 
   const getDayValue = useCallback((empId, day) => {
     const cell = cycleDates.find(d => d.key === day);
@@ -97,7 +100,7 @@ export default function EmployeeTimesheet() {
       groupedEmps,
       getDayValue,
       activeDays,
-      filterOnlyMe,
+      filterOnlyMe: effectiveFilterOnlyMe,
       currentUserId: user?.id,
       cycleDates
     });
@@ -126,7 +129,7 @@ export default function EmployeeTimesheet() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
               <input
                 type="text"
-                placeholder="Tìm nhân viên trong CH..."
+                placeholder={canViewAll ? "Tìm nhân viên trong CH..." : "Tìm kiếm..."}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-44 sm:w-56"
@@ -138,17 +141,25 @@ export default function EmployeeTimesheet() {
               )}
             </div>
 
-            {/* Toggle Only Me */}
-            <button
-              onClick={() => setFilterOnlyMe(!filterOnlyMe)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                filterOnlyMe 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {filterOnlyMe ? '✓ Đang xem công của tôi' : '👁️ Chỉ xem công của tôi'}
-            </button>
+            {/* Toggle Only Me (Staff always restricted to personal timesheet) */}
+            {canViewAll ? (
+              <button
+                type="button"
+                onClick={() => setFilterOnlyMe(!filterOnlyMe)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  effectiveFilterOnlyMe 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {effectiveFilterOnlyMe ? '✓ Đang xem công của tôi' : '👁️ Xem toàn bộ cửa hàng'}
+              </button>
+            ) : (
+              <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                Bảng công cá nhân
+              </span>
+            )}
           </div>
 
           {/* Right Actions */}

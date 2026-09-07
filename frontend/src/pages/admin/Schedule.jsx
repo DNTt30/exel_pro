@@ -6,6 +6,7 @@ import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock, UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
+import ConfirmModal from '../../components/modals/ConfirmModal';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { exportScheduleToPDF } from '../../utils/pdfExport';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
@@ -63,6 +64,7 @@ export default function Schedule() {
   const [showAICopilot, setShowAICopilot] = useState(false);
   const [showRadarModal, setShowRadarModal] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [copyPlan, setCopyPlan] = useState(null);
 
   // Tính toán lỗ hổng ca trực & định biên thời gian thực (Vulnerability Radar)
   const currentStoreInfo = useMemo(() => {
@@ -152,7 +154,7 @@ export default function Schedule() {
   };
 
   // Sao chép nhanh lịch làm việc từ tuần trước sang tuần này
-  const handleCopyPreviousWeek = async () => {
+  const handleCopyPreviousWeek = () => {
     const parts = currentWeek.split('-').map(Number);
     const prevMon = new Date(parts[0], parts[1] - 1, parts[2]);
     prevMon.setDate(prevMon.getDate() - 7);
@@ -167,8 +169,18 @@ export default function Schedule() {
     const curRange = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')} → ${String(curSun.getDate()).padStart(2, '0')}/${String(curSun.getMonth() + 1).padStart(2, '0')}`;
 
     if (weekLocked) return toast.error('Tuần đang chờ duyệt hoặc đã duyệt — không copy đè.');
-    const confirmed = window.confirm(`Sao chép toàn bộ ca làm việc từ tuần trước (${prevRange}) sang tuần này (${curRange})?`);
-    if (!confirmed) return;
+    
+    setCopyPlan({
+      prevWeekKey,
+      prevRange,
+      curRange
+    });
+  };
+
+  const executeCopyPreviousWeek = async () => {
+    if (!copyPlan) return;
+    const { prevWeekKey, prevRange, curRange } = copyPlan;
+    setCopyPlan(null);
 
     setIsCopying(true);
     try {
@@ -716,6 +728,17 @@ export default function Schedule() {
           </table>
         </div>
       </div>
+
+      {/* Modal xác nhận sao chép lịch tuần */}
+      <ConfirmModal
+        isOpen={!!copyPlan}
+        onClose={() => setCopyPlan(null)}
+        title="Sao chép lịch tuần trước"
+        message={`Sao chép toàn bộ ca làm việc từ tuần trước (${copyPlan?.prevRange}) sang tuần này (${copyPlan?.curRange})?\n\n💡 Các ca làm việc hiện tại của tuần này sẽ được cập nhật đồng bộ.`}
+        variant="info"
+        confirmText="Sao chép ngay"
+        onConfirm={executeCopyPreviousWeek}
+      />
     </div>
   );
 }

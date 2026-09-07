@@ -66,6 +66,14 @@ describe('FF Onsite recipes from giấy quầy counter', () => {
     expect(r).toContain('5 tok');
   });
 
+  it('returns mì tương đen GS25 recipe', () => {
+    const r = lookupFfOnsiteRecipe('công thức mì tương đen');
+    expect(r).toContain('Mì tương đen GS25');
+    expect(r).toContain('Koreno');
+    expect(r).toContain('4 phút');
+    expect(r).toContain('xốt tương đen GS25');
+  });
+
   it('returns both chicken recipes for công thức gà, not the catalog', () => {
     const r = lookupFfOnsiteRecipe('công thức gà');
     expect(r).toContain('nugget');

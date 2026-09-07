@@ -448,6 +448,17 @@ export const FF_RECIPE_GROUPS = [
         body: '🍜 **Mì trộn**\nTrụng **1 vắt mì Hảo Hảo** + **1/3 gói rau cải** + gói gia vị của gói mì'
       },
       {
+        id: 'mi-tuong-den',
+        name: 'Mì tương đen GS25 (Jajangmyeon)',
+        aliases: ['mi tuong den', 'tuong den', 'jajangmyeon', 'mi jajangmyeon', 'mi tron tuong den', 'black bean noodle'],
+        body:
+          '🍜 **Mì tương đen GS25 (Jajangmyeon)**\n' +
+          '• **Bước 1 (Trụng mì):** Trụng **1 vắt mì Koreno** trong nước sôi **4 phút** (máy nấu mì hoặc ấm đun)\n' +
+          '• **Bước 2 (Chắt ráo):** Đổ ráo nước, giữ lại khoảng 1 thìa nước ấm trong tô\n' +
+          '• **Bước 3 (Trộn xốt):** Cho **1 gói xốt tương đen GS25** vào trộn đều tay khi mì còn nóng\n' +
+          '• **Bước 4 (Topping):** Thêm dưa leo thái sợi + rắc hạt mè rang lên mặt'
+      },
+      {
         id: 'raboki',
         name: 'Raboki',
         aliases: ['raboki', 'ra boki'],

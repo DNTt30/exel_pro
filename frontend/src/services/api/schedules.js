@@ -48,18 +48,25 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
   return result;
 }
 
-// Lưu/Cập nhật toàn bộ lịch của 1 nhân viên trong 1 tuần
-export async function saveEmployeeSchedule(weekDate, empId, shifts) {
-  // 1. Thử gọi RPC save_employee_schedule (Security Definer - an toàn, bảo đảm ghi thành công trên cả auth & anon)
+// Lưu/Cập nhật toàn bộ lịch của 1 nhân viên trong 1 tuần (có optimistic versioning)
+export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
+  // 1. Thử gọi RPC save_employee_schedule (Security Definer - an toàn, tăng version, bảo đảm ghi thành công trên cả auth & anon)
   try {
-    const { error: rpcErr } = await db().rpc('save_employee_schedule', {
+    const { data: rpcVer, error: rpcErr } = await db().rpc('save_employee_schedule', {
       p_week_date: weekDate,
       p_emp_id: empId,
-      p_shifts: shifts
+      p_shifts: shifts,
+      p_expect_version: opts.expectVersion ?? null
     });
-    if (!rpcErr) return;
+    if (!rpcErr) return rpcVer;
+    if (rpcErr.message?.includes('40001') || rpcErr.message?.includes('CONFLICT')) {
+      const err = new Error(rpcErr.message);
+      err.code = 'CONFLICT';
+      throw err;
+    }
     console.warn('RPC save_employee_schedule báo lỗi, chuyển sang direct upsert:', rpcErr);
   } catch (rpcEx) {
+    if (rpcEx.code === 'CONFLICT') throw rpcEx;
     console.warn('Không thể gọi RPC save_employee_schedule, thử direct upsert:', rpcEx);
   }
 

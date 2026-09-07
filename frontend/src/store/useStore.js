@@ -34,28 +34,37 @@ export const useStore = create(
           supabase.removeChannel(currentChannel);
         }
         
+        let schedTimer = null;
+        let shelfTimer = null;
+
         const channel = supabase.channel('store-sync')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
             console.log('Realtime schedules changed:', payload);
-            const week = get().currentWeek;
-            if (week) {
-               api.getSchedulesByWeek(week).then(scheds => {
-                  set(state => ({
-                    schedule: { ...state.schedule, [week]: scheds }
-                  }));
-               }).catch(console.error);
-            }
+            if (schedTimer) clearTimeout(schedTimer);
+            schedTimer = setTimeout(() => {
+              const week = get().currentWeek;
+              if (week) {
+                 api.getSchedulesByWeek(week).then(scheds => {
+                    set(state => ({
+                      schedule: { ...state.schedule, [week]: scheds }
+                    }));
+                 }).catch(console.error);
+              }
+            }, 300);
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'shelf_items' }, (payload) => {
             console.log('Realtime shelf_items changed:', payload);
-            const plan = bootstrapQueryPlan(get().user);
-            const shelves = get().shelves;
-            const itemOpts = plan.shelfItems.storeId
-              ? { storeId: plan.shelfItems.storeId }
-              : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
-            api.getShelfItems(itemOpts).then(items => {
-              set({ shelfItems: items });
-            }).catch(console.error);
+            if (shelfTimer) clearTimeout(shelfTimer);
+            shelfTimer = setTimeout(() => {
+              const plan = bootstrapQueryPlan(get().user);
+              const shelves = get().shelves;
+              const itemOpts = plan.shelfItems.storeId
+                ? { storeId: plan.shelfItems.storeId }
+                : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
+              api.getShelfItems(itemOpts).then(items => {
+                set({ shelfItems: items });
+              }).catch(console.error);
+            }, 300);
           })
           .subscribe();
           

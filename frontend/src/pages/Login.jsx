@@ -115,7 +115,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-3 sm:p-6 lg:p-10 relative overflow-y-auto lg:overflow-hidden bg-[#050811] text-slate-100 select-none">
+    <div className="min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 lg:p-10 relative overflow-y-auto lg:overflow-hidden overscroll-contain bg-[#050811] text-slate-100 select-none">
       
       {/* ── Advanced Futuristic Animations ── */}
       <style>{`

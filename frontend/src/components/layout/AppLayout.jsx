@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager, canManageStoreList } from '../../lib/authSession';
-import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen } from 'lucide-react';
+import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen, Smartphone } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ChangePasswordModal from '../modals/ChangePasswordModal';
+import PWAInstallModal from '../modals/PWAInstallModal';
 import Toaster from '../ui/toast';
 import { toast } from '../ui/toastStore';
 import { AdminPageSkeleton, EmployeePageSkeleton } from '../ui/Skeleton';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
+import { usePWAInstall } from '../../utils/pwaHelper';
 
 export default function AppLayout() {
   const user = useStore(state => state.user);
@@ -31,6 +33,8 @@ export default function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const { isInstallable } = usePWAInstall();
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
   const isManager = isOpsManager(user);
@@ -159,10 +163,10 @@ export default function AppLayout() {
           </button>
           <div className="flex items-center gap-2.5">
             {/* GS25 logo */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">GS25</div>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">DNTgs25</div>
             <div className="hidden sm:block">
-              <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">OFC Schedule</h1>
-              <p className="text-[10px] text-slate-400 font-medium">Quản lý Lịch & C&B</p>
+              <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">DNTgs25</h1>
+              <p className="text-[10px] text-slate-400 font-medium">Hệ thống Xếp lịch & Vận hành</p>
             </div>
           </div>
           
@@ -177,6 +181,18 @@ export default function AppLayout() {
 
         <div className="flex items-center gap-1 sm:gap-1.5">
           <CloudSyncBadge />
+          {isInstallable && (
+            <button 
+              type="button"
+              onClick={() => setShowInstallModal(true)} 
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer animate-[pulse_3s_ease-in-out_infinite]"
+              title="Cài đặt App DNTgs25 về điện thoại"
+            >
+              <Smartphone size={13} className="text-amber-300" />
+              <span className="hidden sm:inline">Cài App</span>
+              <span className="sm:hidden">App</span>
+            </button>
+          )}
           <button onClick={() => setIsHelpOpen(true)} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell />
           <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1.5 sm:pl-2 pr-2 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1">
@@ -251,6 +267,15 @@ export default function AppLayout() {
 
           {/* Footer */}
           <div className="px-3 py-3 border-t border-white/10 space-y-1">
+            {isInstallable && (
+              <button 
+                type="button" 
+                onClick={() => { setMobileMenuOpen(false); setShowInstallModal(true); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-all text-xs font-bold cursor-pointer mb-1 shadow-2xs"
+              >
+                <Smartphone size={14} className="text-amber-300" /> Cài đặt App DNTgs25
+              </button>
+            )}
             <button 
               type="button" 
               onClick={() => { setMobileMenuOpen(false); setShowPw(true); }}
@@ -268,7 +293,7 @@ export default function AppLayout() {
             <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/50 hover:text-red-300 hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer">
               <LogOut size={14} /> Đăng xuất
             </button>
-            <p className="text-white/20 text-[10px] text-center mt-2">© 2026 GS25 OFC System</p>
+            <p className="text-white/20 text-[10px] text-center mt-2">© 2026 DNTgs25 System</p>
           </div>
         </aside>
 
@@ -319,6 +344,8 @@ export default function AppLayout() {
         <AICopilotDrawer isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} currentWeek={currentWeek} storeId={user?.dept || 'ALL'} />
       </div>
     
-      <ChangePasswordModal isOpen={showPw} onClose={() => setShowPw(false)} /></div>
+      <ChangePasswordModal isOpen={showPw} onClose={() => setShowPw(false)} />
+      <PWAInstallModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} />
+    </div>
   );
 }

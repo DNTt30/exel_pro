@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, User, Trash2, Settings, KeyRound } from 'lucide-react';
+import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { askAICopilot, askGeminiCopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
@@ -147,133 +147,190 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     }
   };
 
+  const touchStartY = useRef(0);
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    if (touchEndY - touchStartY.current > 50) {
+      // Swiped down at least 50px
+      onClose();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[380px] h-[520px] sm:h-[540px] bg-white shadow-2xl shadow-slate-900/20 rounded-2xl overflow-hidden z-50 flex flex-col border border-slate-200 print:hidden">
-      {/* Header */}
-      <div className="p-5 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 text-white flex items-center justify-between shadow-md relative overflow-hidden">
-        {/* Lớp phủ trang trí (Glass effect) */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/20 overflow-hidden">
-            <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <div className="font-extrabold text-base flex items-center gap-2">
-              <span className="tracking-tight">TÚ mini</span>
-              <span className="px-2 py-0.5 bg-emerald-400 text-slate-950 text-[10px] font-black rounded-full uppercase tracking-wider shadow-[0_0_10px_rgba(52,211,153,0.5)]">
-                Trực chiến
-              </span>
-            </div>
-            <div className="text-xs text-indigo-100 font-medium mt-0.5">Đệ tử ruột - Cửa hàng {activeStoreId}</div>
-          </div>
+    <>
+      {/* Backdrop overlay - tap outside to close */}
+      <div 
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-50 transition-opacity animate-in fade-in print:hidden"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Responsive Bottom Sheet / Drawer Container */}
+      <div className="fixed inset-x-0 bottom-0 sm:bottom-6 sm:right-6 sm:inset-x-auto w-full sm:w-[400px] h-[82dvh] sm:h-[560px] max-h-[85dvh] sm:max-h-[600px] bg-white shadow-2xl shadow-slate-900/30 rounded-t-3xl sm:rounded-2xl overflow-hidden z-50 flex flex-col border border-slate-200/80 print:hidden animate-in slide-in-from-bottom-6 duration-200">
+        
+        {/* Mobile Pull Handle Bar */}
+        <div 
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onClick={onClose}
+          className="sm:hidden pt-2.5 pb-1 flex justify-center cursor-pointer bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 active:opacity-75 transition-opacity"
+          title="Nhấn hoặc vuốt xuống để đóng"
+        >
+          <div className="w-10 h-1 bg-white/40 rounded-full" />
         </div>
 
-        <div className="flex items-center gap-1.5 relative z-10">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
-            title="Cài đặt AI"
-          >
-            <Settings size={18} />
-          </button>
-          <button
-            onClick={handleClearHistory}
-            className="p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
-            title="Xóa lịch sử"
-          >
-            <Trash2 size={18} />
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/50">
-        {messages.map((m) => {
-          const isAI = m.sender === 'ai';
-          return (
-            <div key={m.id} className={`flex gap-3 ${isAI ? 'items-start' : 'items-end flex-row-reverse'}`}>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm overflow-hidden ${
-                isAI ? 'bg-indigo-50 border border-indigo-200 shadow-sm' : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-sm'
-              }`}>
-                {isAI ? <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" /> : <User size={16} />}
-              </div>
-
-              <div className={`p-3.5 rounded-2xl text-[13px] max-w-[82%] leading-relaxed ${
-                isAI 
-                  ? 'bg-white border border-slate-100 text-slate-800 shadow-[0_2px_10px_rgba(0,0,0,0.04)] rounded-tl-sm' 
-                  : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md rounded-tr-sm'
-              }`}>
-                <div className="whitespace-pre-line font-normal">{m.text}</div>
-              </div>
-            </div>
-          );
-        })}
-
-        {isTyping && (
-          <div className="flex items-center gap-3 text-xs text-slate-500 italic">
-            <div className="w-8 h-8 rounded-full overflow-hidden shadow-sm animate-bounce border border-indigo-100">
+        {/* Header */}
+        <div 
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="px-4 py-3 sm:p-5 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 text-white flex items-center justify-between shadow-md relative overflow-hidden flex-shrink-0"
+        >
+          {/* Glass effect */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl pointer-events-none" />
+          
+          <div className="flex items-center gap-2.5 sm:gap-3 relative z-10">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/20 overflow-hidden flex-shrink-0">
               <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" />
             </div>
-            <span className="bg-slate-200/50 px-3 py-1.5 rounded-full">TÚ mini đang lục lọi dữ liệu...</span>
+            <div>
+              <div className="font-extrabold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                <span className="tracking-tight">TÚ mini</span>
+                <span className="px-1.5 sm:px-2 py-0.5 bg-emerald-400 text-slate-950 text-[9px] sm:text-[10px] font-black rounded-full uppercase tracking-wider shadow-[0_0_10px_rgba(52,211,153,0.5)]">
+                  Trực chiến
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-indigo-100 font-medium mt-0.5">
+                Đệ tử ruột - Cửa hàng {activeStoreId || '—'}
+              </div>
+            </div>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Quick Prompts Chips */}
-      <div className="p-3 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-        <button
-          type="button"
-          onClick={() => setShowRecipeModal(true)}
-          className="whitespace-nowrap px-4 py-2 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 border border-transparent rounded-full font-bold text-white transition-all duration-300 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md cursor-pointer animate-[pulse_3s_ease-in-out_infinite]"
-        >
-          🍳 Sổ tay Công Thức 1-Chạm
-        </button>
-        {quickPrompts.map((prompt, idx) => (
+          <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
+            <button
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
+              title="Cài đặt AI"
+            >
+              <Settings size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
+              title="Xóa lịch sử"
+            >
+              <Trash2 size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white hover:text-white cursor-pointer flex items-center gap-1"
+              title="Đóng trợ lý"
+            >
+              <ChevronDown size={22} className="sm:hidden" />
+              <X size={19} className="hidden sm:block" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages Scroll Area */}
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5 sm:space-y-4 bg-slate-50/50">
+          {messages.map((m) => {
+            const isAI = m.sender === 'ai';
+            return (
+              <div key={m.id} className={`flex gap-2 sm:gap-3 ${isAI ? 'items-start' : 'items-end flex-row-reverse'}`}>
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm overflow-hidden ${
+                  isAI ? 'bg-indigo-50 border border-indigo-200 shadow-xs' : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-xs'
+                }`}>
+                  {isAI ? <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" /> : <User size={15} />}
+                </div>
+
+                <div className={`p-2.5 sm:p-3.5 rounded-2xl text-xs sm:text-[13px] max-w-[85%] sm:max-w-[82%] leading-relaxed ${
+                  isAI 
+                    ? 'bg-white border border-slate-100 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] rounded-tl-xs' 
+                    : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm rounded-tr-xs'
+                }`}>
+                  <div className="whitespace-pre-line font-normal">{m.text}</div>
+                </div>
+              </div>
+            );
+          })}
+
+          {isTyping && (
+            <div className="flex items-center gap-2.5 text-xs text-slate-500 italic">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden shadow-xs animate-bounce border border-indigo-100">
+                <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" />
+              </div>
+              <span className="bg-slate-200/50 px-2.5 py-1 rounded-full text-[11px] sm:text-xs">TÚ mini đang lục lọi dữ liệu...</span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Quick Prompts Chips */}
+        <div className="p-2 sm:p-3 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center gap-1.5 sm:gap-2 overflow-x-auto text-[11px] sm:text-xs no-scrollbar flex-shrink-0">
           <button
-            key={idx}
             type="button"
-            onClick={() => handleSend(prompt)}
-            className="whitespace-nowrap px-4 py-2 bg-white hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-full font-medium text-slate-600 hover:text-indigo-700 transition-all duration-300 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md cursor-pointer"
+            onClick={() => setShowRecipeModal(true)}
+            className="whitespace-nowrap px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 border border-transparent rounded-full font-bold text-white transition-all duration-200 shadow-2xs hover:shadow-xs cursor-pointer flex-shrink-0"
           >
-            {prompt}
+            🍳 Sổ tay Công Thức
           </button>
-        ))}
-      </div>
+          {quickPrompts.map((prompt, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleSend(prompt)}
+              className="whitespace-nowrap px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-full font-medium text-slate-700 hover:text-indigo-700 transition-all duration-200 shadow-2xs cursor-pointer flex-shrink-0"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
 
-      {/* Input Box */}
-      <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] relative z-10">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="flex items-center gap-3"
-        >
-          <input
-            type="text"
-            placeholder={isAdmin ? "Hỏi lịch, định biên, công thức FF..." : "Hỏi công thức, ca hôm nay, đổi ca..."}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            className="flex-1 px-4 py-3 text-[13px] border border-slate-200 rounded-full bg-slate-50 hover:bg-white focus:bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-inner"
-          />
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className="p-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-full disabled:opacity-40 transition-all cursor-pointer shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 group"
+        {/* Input Box with Ergonomic Mobile Close Button */}
+        <div className="p-2.5 sm:p-3.5 bg-white border-t border-slate-100 shadow-[0_-4px_16px_rgba(0,0,0,0.03)] relative z-10 flex-shrink-0">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex items-center gap-1.5 sm:gap-2.5"
           >
-            <Send size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-        </form>
-      </div>
+            {/* Quick-close button next to input - user NEVER has to scroll up to close! */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 sm:p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:bg-slate-200 rounded-full transition-colors cursor-pointer flex-shrink-0"
+              title="Đóng / Thu nhỏ trợ lý"
+            >
+              <ChevronDown size={20} />
+            </button>
+
+            <input
+              type="text"
+              placeholder={isAdmin ? "Hỏi lịch, định biên, công thức FF..." : "Hỏi công thức, ca hôm nay, đổi ca..."}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              className="flex-1 min-w-0 px-3.5 py-2 sm:py-2.5 text-sm sm:text-[13px] border border-slate-200 rounded-full bg-slate-50 hover:bg-white focus:bg-white focus:ring-3 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-inner"
+            />
+
+            <button
+              type="submit"
+              disabled={!inputText.trim()}
+              className="p-2.5 sm:p-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-full disabled:opacity-40 transition-all cursor-pointer shadow-md hover:shadow-lg transform active:scale-95 group flex-shrink-0"
+              title="Gửi câu hỏi"
+            >
+              <Send size={16} className="sm:w-[17px] sm:h-[17px] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </button>
+          </form>
+        </div>
 
       {/* Settings Overlay */}
       {showSettings && (
@@ -334,5 +391,6 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
         }}
       />
     </div>
+    </>
   );
 }

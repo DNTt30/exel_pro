@@ -21,6 +21,14 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
+/* Mobile responsive scaling: optimizes density so cards, tables, and dialogs look balanced and sleek */
+@media screen and (max-width: 640px) {
+  html {
+    font-size: 14.5px;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
 body {
   background-color: var(--bg);
   color: var(--text);

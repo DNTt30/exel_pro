@@ -308,10 +308,10 @@ export default function AppLayout() {
         {/* Floating AI Button - blue (above mobile bottom bar) */}
         <button 
           onClick={() => setIsAIOpen(true)} 
-          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-all z-40 print:hidden focus:ring-4 focus:ring-blue-300 group cursor-pointer" 
+          className="fixed bottom-20 md:bottom-6 right-3.5 md:right-6 w-11 h-11 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-40 print:hidden focus:ring-3 focus:ring-blue-300 group cursor-pointer" 
           title="GS25 AI Copilot"
         >
-          <Sparkles size={20} className="md:w-[22px] md:h-[22px] group-hover:animate-pulse" />
+          <Sparkles size={18} className="md:w-[22px] md:h-[22px] group-hover:animate-pulse" />
         </button>
 
         <Toaster />

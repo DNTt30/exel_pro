@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { askAICopilot, askGeminiCopilot, askOllamaCopilot, isGenericCopilotFallback } from '../../utils/aiSchedulerEngine';
+import { askAICopilot, askGeminiCopilot } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';

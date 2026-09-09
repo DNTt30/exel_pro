@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Trash2, Search, CalendarClock, Save, Eye, X, AlertTriangle, Pencil } from 'lucide-react';
+import { Trash2, Search, CalendarClock, Save, Eye, X, Pencil } from 'lucide-react';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';

@@ -1488,8 +1488,6 @@ SỔ TAY GS25:
 Phong cách:
 - Trả lời bằng tiếng Việt tự nhiên, thân thiện, súc tích, chuẩn xác theo dữ liệu. Dùng Markdown. Xưng hô sếp/anh/chị - em hoặc Tú - bạn.`;
 
-  const q = question.toLowerCase();
-  
   let formattedPrompt = '';
   // Ghép lịch sử chat vào prompt
   const recentHistory = chatHistory.slice(-5); // Lấy 5 câu gần nhất
@@ -1502,9 +1500,5 @@ Phong cách:
   }
   formattedPrompt += question;
 
-  try {
-    return await generateGeminiContent(formattedPrompt, systemPrompt, geminiApiKey);
-  } catch (error) {
-    throw error;
-  }
+  return await generateGeminiContent(formattedPrompt, systemPrompt, geminiApiKey);
 }

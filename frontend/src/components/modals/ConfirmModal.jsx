@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from './Modal';
-import { AlertTriangle, Info, Trash2, ShieldAlert, Check } from 'lucide-react';
+import { AlertTriangle, Info, Trash2, Check } from 'lucide-react';
 
 export default function ConfirmModal({
   isOpen,

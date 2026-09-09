@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Download, Share2, PlusSquare, Smartphone, CheckCircle } from 'lucide-react';
+import { Download, Share2, PlusSquare, Smartphone } from 'lucide-react';
 import Modal from './Modal';
 import { usePWAInstall } from '../../utils/pwaHelper';
 

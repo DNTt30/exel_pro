@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, ShieldCheck, Send, Clock, Bot, Webhook, CheckCircle2, 
+  X, Send, Clock, Bot, Webhook, CheckCircle2, 
   AlertCircle, Play, History, Loader2, Sparkles, DatabaseBackup 
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';

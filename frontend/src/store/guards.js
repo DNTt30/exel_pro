@@ -107,5 +107,9 @@ export function assertCanRespondShiftSwap(state, swap, newStatus) {
     if (swap?.toEmpId && user.id !== swap.toEmpId && !userIsManager(user)) {
       throw new Error('Chỉ nhân viên được đề nghị đổi ca mới có quyền xác nhận');
     }
+  } else if (newStatus === 'cancelled') {
+    if (swap?.fromEmpId && user.id !== swap.fromEmpId && !userIsManager(user)) {
+      throw new Error('Chỉ người tạo yêu cầu hoặc Quản lý mới có quyền hủy đơn đổi ca');
+    }
   }
 }

@@ -409,6 +409,33 @@ export const createScheduleSlice = (set, get) => ({
     }
   },
 
+  deleteFeedback: async (id) => {
+    const previousFeedbacks = get().feedbacks;
+    const prevFb = previousFeedbacks.find(f => f.id === id) || {};
+    assertCanResolveFeedback(get(), prevFb.dept);
+
+    set((state) => ({
+      feedbacks: state.feedbacks.filter(f => f.id !== id)
+    }));
+
+    try {
+      await api.deleteFeedback(id);
+      get().appendAdminLog('DELETE_FEEDBACK', id, `Xóa phản hồi ${prevFb.empName || prevFb.empId || id}`, {
+        resourceType: 'feedback',
+        resourceId: id,
+        storeId: prevFb.dept || get().user?.dept || '',
+        oldData: { id: prevFb.id, empId: prevFb.empId, date: prevFb.date, reason: prevFb.reason, status: prevFb.status },
+        newData: null,
+        description: `Xóa khiếu nại bù công ${prevFb.empName || prevFb.empId} ngày ${prevFb.date || '—'}`
+      });
+    } catch (err) {
+      console.error("Lỗi khi xóa phản hồi:", err);
+      set({ feedbacks: previousFeedbacks });
+      toast.error(`Không thể xóa phản hồi: ${err.message || 'Lỗi kết nối'}`);
+      throw err;
+    }
+  },
+
   addShiftSwap: async (swapData) => {
     const optimistic = {
       id: 'swap_' + Date.now().toString(),
@@ -511,6 +538,34 @@ export const createScheduleSlice = (set, get) => ({
       console.error('Lỗi khi cập nhật đơn đổi ca:', err);
       set({ shiftSwaps: previousSwaps, schedule: previousSchedule });
       toast.error(`Không thể cập nhật đơn đổi ca: ${err.message || 'Lỗi kết nối'}`);
+    }
+  },
+
+  deleteShiftSwap: async (swapId) => {
+    const currentSwaps = get().shiftSwaps || [];
+    const targetSwap = currentSwaps.find(s => s.id === swapId);
+    if (!targetSwap) return;
+    assertCanRespondShiftSwap(get(), targetSwap, 'cancelled');
+
+    set(state => ({
+      shiftSwaps: (state.shiftSwaps || []).filter(s => s.id !== swapId)
+    }));
+
+    try {
+      await api.deleteShiftSwap(swapId);
+      get().appendAdminLog('DELETE_SHIFT_SWAP', swapId, `Xóa đơn đổi ca`, {
+        resourceType: 'shift_swap',
+        resourceId: swapId,
+        storeId: targetSwap.store || get().user?.dept || '',
+        oldData: { id: targetSwap.id, fromEmpId: targetSwap.fromEmpId, toEmpId: targetSwap.toEmpId, status: targetSwap.status },
+        newData: null,
+        description: `Xóa đơn đổi ca ${targetSwap.fromEmpName || targetSwap.fromEmpId} ⇄ ${targetSwap.toEmpName || targetSwap.toEmpId}`
+      });
+    } catch (err) {
+      console.error('Lỗi khi xóa đơn đổi ca:', err);
+      set({ shiftSwaps: currentSwaps });
+      toast.error(`Không thể xóa đơn đổi ca: ${err.message || 'Lỗi kết nối'}`);
+      throw err;
     }
   }
 });

@@ -71,3 +71,8 @@ export async function updateShiftSwap(id, updates) {
   return mapShiftSwap(data);
 }
 
+export async function deleteShiftSwap(id) {
+  const { error } = await db().from('shift_swaps').delete().eq('id', id);
+  if (error) throw error;
+}
+

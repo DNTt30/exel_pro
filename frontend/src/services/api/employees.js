@@ -43,14 +43,18 @@ export async function getEmployees(opts = {}) {
 }
 
 export async function addEmployee(emp) {
-  const { error } = await db().from('employees').insert([{
-    id: emp.id,
-    name: emp.name,
+  const row = {
+    id: String(emp.id).trim(),
+    name: String(emp.name).trim(),
     dept: emp.dept,
-    type: emp.type,
-    role: emp.role,
-    max_h: emp.maxH
-  }]);
+    type: emp.type || 'STFT',
+    role: emp.role || emp.type || 'STFT',
+    max_h: emp.maxH == null || isNaN(Number(emp.maxH)) ? 48 : Number(emp.maxH)
+  };
+  if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
+  if (emp.isActive !== undefined) row.is_active = emp.isActive;
+
+  const { error } = await db().from('employees').insert([row]);
   if (error) throw error;
 }
 

@@ -12,9 +12,10 @@ import { toast } from '../../components/ui/toastStore';
 import { updateStore as apiUpdateStore, updateEmployeeInfo } from '../../services/api';
 
 export default function Stores() {
-  const { stores, employees, addStore, updateStore, deleteStore, updateEmployee, user } = useStore(useShallow((s) => ({
+  const { stores, employees, shelves, addStore, updateStore, deleteStore, updateEmployee, user } = useStore(useShallow((s) => ({
     stores: s.stores,
     employees: s.employees,
+    shelves: s.shelves,
     addStore: s.addStore,
     updateStore: s.updateStore,
     deleteStore: s.deleteStore,
@@ -125,10 +126,14 @@ export default function Stores() {
   const [formData, setFormData] = useState(emptyStoreForm());
 
   const handleSaveAdd = async () => {
-    if (!formData.id || !formData.name) return toast.error('Vui lòng nhập đủ Mã và Tên');
+    const trimmedId = formData.id.trim().toUpperCase();
+    const trimmedName = formData.name.trim();
+    if (!trimmedId || !trimmedName) return toast.error('Vui lòng nhập đủ Mã và Tên cửa hàng');
     try {
       await addStore({
         ...formData,
+        id: trimmedId,
+        name: trimmedName,
         staffing: normalizeStaffingConfig(formData.staffing),
         demand: normalizeStoreDemand(formData.demand)
       });
@@ -158,6 +163,12 @@ export default function Stores() {
     const empsInStore = employees.filter(e => e.dept === id);
     if (empsInStore.length > 0) {
       return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${empsInStore.length} nhân viên trực thuộc. Vui lòng chuyển hoặc xóa nhân viên trước.`);
+    }
+
+    // Kiểm tra tính toàn vẹn: Không cho xóa nếu vẫn còn kệ hàng
+    const shelvesInStore = (shelves || []).filter(s => s.storeId === id);
+    if (shelvesInStore.length > 0) {
+      return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${shelvesInStore.length} kệ hàng đang theo dõi hạn sử dụng. Vui lòng xóa kệ hàng trước.`);
     }
 
     setConfirmState({

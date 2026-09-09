@@ -83,3 +83,9 @@ export async function updateFeedback(id, status, resolutionNote = '') {
   if (error) throw error;
 }
 
+// Xóa Feedback
+export async function deleteFeedback(id) {
+  const { error } = await db().from('feedbacks').delete().eq('id', id);
+  if (error) throw error;
+}
+

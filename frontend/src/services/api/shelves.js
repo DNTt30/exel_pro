@@ -120,7 +120,7 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
       store_id: storeId,
       product_name: String(r.productName).trim(),
       sku: String(r.sku || '').trim() || null,
-      qty: r.qty === '' || r.qty == null ? null : Number(r.qty),
+      qty: r.qty === '' || r.qty == null || isNaN(Number(r.qty)) ? null : Number(r.qty),
       expiry_date: r.expiryDate || null,
       expiry_date_2: r.expiryDate2 || null,
       note: r.note || '',

@@ -22,7 +22,7 @@ export async function upsertAttendanceRows(rows) {
   const payload = rows.map(r => ({
     emp_id: r.empId,
     work_date: r.workDate,
-    actual_hours: r.actualHours ?? 0,
+    actual_hours: (r.actualHours == null || isNaN(Number(r.actualHours))) ? 0 : Number(r.actualHours),
     note: r.note || null,
     updated_by: r.updatedBy || null,
     updated_at: new Date().toISOString()

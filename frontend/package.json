@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:gh": "cross-env VITE_BASE_PATH=/exel_pro/ vite build",
+    "postbuild:gh": "node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "deploy": "npm run build:gh && npx gh-pages -d dist --branch gh-pages --dotfiles",
     "postbuild": "node -e \"require('fs').copyFileSync('dist/index.html','dist/404.html')\"",
     "test": "vitest run",

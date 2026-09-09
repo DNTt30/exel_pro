@@ -28,7 +28,7 @@ export default function ShiftInput({
   let displayLabel = '-';
 
   if (isBorrowed) {
-    cellBg = '#eab308'; // Vàng cho ca chi viện
+    cellBg = '#f59e0b'; // Màu hổ phách nổi bật cho ca chi viện
     cellText = '#ffffff';
     displayLabel = shiftCode === 'off'
       ? `off ${normalized.covering_store}`
@@ -100,12 +100,12 @@ export default function ShiftInput({
           backgroundColor: cellBg,
           color: cellText,
         }}
-        title={isBorrowed ? `Hỗ trợ ${normalized.covering_store}` : undefined}
-        className={`w-full h-full font-bold text-center appearance-none cursor-pointer outline-none border-0 transition-colors select-none px-0.5 py-0 ${
-          isBorrowed ? 'text-[9px] leading-tight pb-2' : 'text-xs'
+        title={isBorrowed ? `Chi viện ${normalized.covering_store}` : undefined}
+        className={`w-full h-full text-center appearance-none cursor-pointer outline-none border-0 transition-colors select-none px-0.5 py-0 ${
+          isBorrowed ? 'text-[11px] font-black pb-3 tracking-tight' : 'text-xs font-bold'
         } ${
           readOnly ? 'cursor-default' : 'hover:brightness-95 focus:ring-2 focus:ring-blue-500 focus:z-20'
-        } ${isUnset ? 'font-normal italic' : 'font-extrabold'}`}
+        } ${isUnset ? 'font-normal italic' : ''}`}
       >
         {/* Option: Chưa xếp ca */}
         <option value="" className="bg-white text-slate-400 font-normal">
@@ -130,8 +130,8 @@ export default function ShiftInput({
 
       {isBorrowed && (
         <span
-          className="pointer-events-none absolute left-0 right-0 bottom-0 text-[8px] font-black text-center bg-amber-800/75 text-white truncate print:hidden"
-          title={`Hỗ trợ ${normalized.covering_store}`}
+          className="pointer-events-none absolute left-0 right-0 bottom-0 text-[8.5px] leading-[11px] font-black text-center bg-amber-900/90 text-white tracking-wider truncate py-[0.5px] print:hidden shadow-xs uppercase"
+          title={`Chi viện ${normalized.covering_store}`}
         >
           {normalized.covering_store}
         </span>

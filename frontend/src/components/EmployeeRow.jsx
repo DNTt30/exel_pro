@@ -1,7 +1,7 @@
 import React, { memo, useState } from 'react';
 import ShiftInput from './ShiftInput';
 import { useStore } from '../store/useStore';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Copy, Check } from 'lucide-react';
 import { STANDARD_ROLES, getRoleBadgeInfo } from '../data/constants';
 import { parseShiftForCell, calculateEmployeeWeeklyHours, validateEmployeeSchedule } from '../utils/shiftHelper';
 
@@ -34,6 +34,35 @@ const EmployeeRow = memo(({
   
   const [isEditingRole, setIsEditingRole] = useState(false);
   const [editRole, setEditRole] = useState(emp.role || emp.type);
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyId = (e) => {
+    e.stopPropagation();
+    if (!emp.id) return;
+    const textToCopy = emp.id;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedId(true);
+        setTimeout(() => setCopiedId(false), 1500);
+      }).catch(() => fallbackCopy(textToCopy));
+    } else {
+      fallbackCopy(textToCopy);
+    }
+  };
+
+  const fallbackCopy = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  };
 
   const handleNameBlur = () => {
     setIsEditingName(false);
@@ -64,22 +93,40 @@ const EmployeeRow = memo(({
 
   const isMonthView = days.length > 7;
 
-  // Tính toán trực tiếp tổng giờ & tổng số ca từ lịch thực tế
-  const { totalHours, totalShifts } = calculateEmployeeWeeklyHours(emp, empSched, days);
+  // Tính toán trực tiếp tổng giờ & tổng số ca từ lịch thực tế (bao gồm ca chi viện nếu là dòng CH gốc)
+  const { totalHours, totalShifts, homeHours, coveringHours } = calculateEmployeeWeeklyHours(
+    emp, 
+    empSched, 
+    days, 
+    { includeCovering: !emp.isBorrowedTo }
+  );
 
   // Validate theo rules (PT min/max, FT min hours/shifts)
   const validation = validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthView);
 
   return (
-    <tr className="hover:bg-slate-50 group/row h-8">
+    <tr className="hover:bg-slate-50 group/row h-[38px]">
       {/* STT */}
       <td className="text-center text-slate-400 font-mono text-xs min-w-[48px] w-[48px] max-w-[48px] sticky left-0 z-10 group-hover/row:bg-slate-50 bg-white border-r border-b border-slate-300 p-0">
         {idx + 1}
       </td>
 
-      {/* Mã Nhân Viên */}
-      <td className="hidden md:table-cell text-center font-mono text-slate-600 text-xs min-w-[96px] w-[96px] max-w-[96px] sticky left-[48px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0 align-middle">
-        {emp.id}
+      {/* Mã Nhân Viên - Click to Copy & Selectable */}
+      <td 
+        onClick={handleCopyId}
+        title={copiedId ? "Đã copy mã NV!" : "Bấm để sao chép mã NV"}
+        className="hidden md:table-cell text-center font-mono text-slate-700 text-xs min-w-[96px] w-[96px] max-w-[96px] sticky left-[48px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0 align-middle select-all select-text cursor-pointer hover:bg-blue-50/80 hover:text-blue-700 transition-colors"
+      >
+        <div className="flex items-center justify-center gap-1 w-full px-1 group/copy">
+          <span className="font-semibold">{emp.id}</span>
+          {copiedId ? (
+            <span className="text-emerald-600 text-[10px] font-bold flex items-center animate-in zoom-in">
+              <Check size={12} className="text-emerald-600" />
+            </span>
+          ) : (
+            <Copy size={11} className="opacity-0 group-hover/copy:opacity-70 group-hover/row:opacity-40 text-slate-400 hover:text-blue-600 flex-shrink-0 transition-opacity" />
+          )}
+        </div>
       </td>
 
       {/* Họ và Tên */}
@@ -187,12 +234,19 @@ const EmployeeRow = memo(({
               ? 'text-slate-400 bg-slate-50' 
               : 'text-emerald-700 bg-emerald-50/50'
       }`}>
-        <div className="flex items-center justify-center gap-1">
-          {validation.hasErrors && <span className="text-[11px] text-red-600 animate-pulse">⚠️</span>}
-          {!validation.hasErrors && validation.hasWarnings && <span className="text-[11px] text-amber-500">⚡</span>}
-          <span>{totalHours}h</span>
-          {validation.isFT && !isMonthView && (
-            <span className="text-[10px] font-normal text-slate-500">({totalShifts}ca)</span>
+        <div className="flex flex-col items-center justify-center leading-tight py-0.5">
+          <div className="flex items-center justify-center gap-1">
+            {validation.hasErrors && <span className="text-[11px] text-red-600 animate-pulse">⚠️</span>}
+            {!validation.hasErrors && validation.hasWarnings && <span className="text-[11px] text-amber-500">⚡</span>}
+            <span>{totalHours}h</span>
+            {validation.isFT && !isMonthView && (
+              <span className="text-[10px] font-normal text-slate-500">({totalShifts}ca)</span>
+            )}
+          </div>
+          {coveringHours > 0 && !isMonthView && (
+            <span className="text-[9px] font-medium text-amber-700 tracking-tight leading-none mt-0.5">
+              ({homeHours}h + {coveringHours}h CV)
+            </span>
           )}
         </div>
 

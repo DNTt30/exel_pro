@@ -134,9 +134,13 @@ export function parseShiftForCell(emp, val) {
 /**
  * Tính tổng giờ và số ca của một nhân viên trong tuần / chu kỳ tháng
  */
-export function calculateEmployeeWeeklyHours(emp, empSched, days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']) {
+export function calculateEmployeeWeeklyHours(emp, empSched, days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'], options = {}) {
   let totalHours = 0;
   let totalShifts = 0;
+  let homeHours = 0;
+  let coveringHours = 0;
+  let allHours = 0;
+  let allShifts = 0;
 
   days.forEach(day => {
     const rawVal = empSched?.[day];
@@ -144,15 +148,25 @@ export function calculateEmployeeWeeklyHours(emp, empSched, days = ['T2', 'T3', 
     const { shift, covering_store } = normalizeShift(rawVal);
     if (!shift || shift === 'off') return;
 
+    const h = getShiftHours(shift);
+    allShifts++;
+    allHours += h;
+
+    if (covering_store && covering_store !== emp.dept) {
+      coveringHours += h;
+    } else {
+      homeHours += h;
+    }
+
     // Lọc theo ngữ cảnh chi viện
     if (emp.isBorrowedTo && covering_store !== emp.isBorrowedTo) return;
-    if (!emp.isBorrowedTo && covering_store) return; // Nếu đi chi viện thì không cộng vào tổng của cửa hàng gốc
+    if (!emp.isBorrowedTo && covering_store && options.includeCovering !== true) return;
 
     totalShifts++;
-    totalHours += getShiftHours(shift);
+    totalHours += h;
   });
 
-  return { totalHours, totalShifts };
+  return { totalHours, totalShifts, homeHours, coveringHours, allHours, allShifts };
 }
 
 /**

@@ -609,7 +609,7 @@ export default function Schedule() {
         </div>
 
         <div className="overflow-x-auto excel-table-container">
-          <table className="w-full text-left border-collapse select-none">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 h-9">
                 <th className="min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-600 text-xs sticky left-0 z-20 bg-slate-100 border-r border-slate-300">STT</th>
@@ -683,9 +683,16 @@ export default function Schedule() {
                   return Object.entries(groupedEmps).map(([dept, emps]) => (
                     <React.Fragment key={dept}>
                       {/* Department Header Row */}
-                      <tr className="bg-blue-50 border-b border-slate-300">
-                        <td colSpan={5 + activeDays.length} className="font-bold text-blue-800 sticky left-0 z-10 border-r-0 py-1 px-3">
-                          🏬 Cửa hàng: {dept} ({emps.length} nhân sự)
+                      <tr className="bg-slate-100/90 border-y border-slate-300">
+                        <td colSpan={5 + activeDays.length} className="sticky left-0 z-10 border-r-0 py-1.5 px-3">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-700 text-white shadow-xs">
+                              🏪 Cửa hàng: {dept}
+                            </span>
+                            <span className="text-xs text-slate-600 font-semibold">
+                              ({emps.length} nhân sự)
+                            </span>
+                          </div>
                         </td>
                       </tr>
                       

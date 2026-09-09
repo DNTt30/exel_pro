@@ -166,7 +166,7 @@ const EmployeeRow = memo(({
           <td key={day} className={`p-0 border-r border-b border-slate-300 ${colorClass}`}>
             <ShiftInput 
               value={display}
-              rawValue={rawVal}
+              rawValue={display === '' ? '' : rawVal}
               onChange={(newVal) => handleShiftChange(emp, day, newVal)}
               rowIndex={absoluteRowIdx}
               colIndex={dIdx}

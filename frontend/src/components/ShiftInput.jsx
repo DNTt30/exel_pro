@@ -23,7 +23,7 @@ export default function ShiftInput({
   const shiftInfo = SHIFTS[shiftCode];
 
   // Determine appearance based on exact status
-  let cellBg = '#ffffff';
+  let cellBg = 'transparent';
   let cellText = '#cbd5e1';
   let displayLabel = '-';
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import heroImg from '../assets/gs25_hero.jpg';
@@ -13,9 +13,10 @@ import {
   UserCheck, 
   KeyRound, 
   ArrowRight, 
-  Store, 
+  Home, 
   Clock, 
-  ShieldAlert
+  ShieldAlert,
+  Leaf
 } from 'lucide-react';
 
 export default function Login() {
@@ -27,8 +28,13 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+  const [particles, setParticles] = useState([]);
+  
+  // Parallax Tilt state
+  const [tiltStyle, setTiltStyle] = useState({});
+  const containerRef = useRef(null);
 
-  // ── Bước 2FA: nhập mã OTP gửi qua Telegram của admin ──
+  // ── Bước 2FA ──
   const [otpStep, setOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
@@ -114,63 +120,72 @@ export default function Login() {
     }
   };
 
+  // Parallax Tilt effect on mouse move
+  const handleMouseMove = useCallback((e) => {
+    if (!containerRef.current) return;
+    const { left, top, width, height } = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - left) / width;
+    const y = (e.clientY - top) / height;
+    
+    const rotateX = (y - 0.5) * -15; // Max 15deg
+    const rotateY = (x - 0.5) * 15;
+
+    setTiltStyle({
+      transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+      transition: 'transform 0.1s ease-out'
+    });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setTiltStyle({
+      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+      transition: 'transform 0.5s ease-out'
+    });
+  }, []);
+
+  // Click creates warm sparkles
+  const handleBackgroundClick = useCallback((e) => {
+    const newParticle = {
+      id: Date.now(),
+      x: e.clientX,
+      y: e.clientY,
+      color: ['#fbbf24', '#f59e0b', '#fcd34d'][Math.floor(Math.random() * 3)]
+    };
+    setParticles(prev => [...prev, newParticle]);
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => p.id !== newParticle.id));
+    }, 1000);
+  }, []);
+
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 lg:p-10 relative overflow-y-auto lg:overflow-hidden overscroll-contain bg-[#050811] text-slate-100 select-none">
+    <div 
+      className="min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 lg:p-10 relative overflow-hidden select-none"
+      onClick={handleBackgroundClick}
+    >
       
-      {/* ── Advanced Futuristic Animations ── */}
+      {/* ── Animations ── */}
       <style>{`
-        @keyframes aurora-orbit-1 {
-          0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); opacity: 0.45; }
-          33% { transform: translate(60px, -60px) scale(1.2) rotate(120deg); opacity: 0.65; }
-          66% { transform: translate(-50px, 40px) scale(0.9) rotate(240deg); opacity: 0.4; }
-        }
-        @keyframes aurora-orbit-2 {
-          0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); opacity: 0.4; }
-          33% { transform: translate(-60px, 50px) scale(1.15) rotate(-100deg); opacity: 0.6; }
-          66% { transform: translate(40px, -40px) scale(0.95) rotate(-200deg); opacity: 0.35; }
-        }
-        @keyframes wave-wiggle {
-          0%, 100% { transform: rotate(0deg); }
-          20%, 60% { transform: rotate(14deg); }
-          40%, 80% { transform: rotate(-10deg); }
-        }
         @keyframes shimmer-ray {
-          0% { transform: translateX(-120%); }
-          100% { transform: translateX(250%); }
+          0% { transform: translateX(-120%) skewX(-20deg); }
+          100% { transform: translateX(250%) skewX(-20deg); }
         }
-        @keyframes border-glow-cycle {
-          0%, 100% { border-color: rgba(56, 189, 248, 0.45); box-shadow: 0 0 35px rgba(56, 189, 248, 0.2); }
-          50% { border-color: rgba(99, 102, 241, 0.55); box-shadow: 0 0 45px rgba(99, 102, 241, 0.25); }
+        @keyframes coffee-steam {
+          0% { transform: translateY(0) scaleX(1); opacity: 0; }
+          20% { opacity: 0.6; }
+          50% { transform: translateY(-30px) scaleX(1.2); opacity: 0.8; }
+          100% { transform: translateY(-60px) scaleX(1.5); opacity: 0; }
         }
-        @keyframes meteor-pass {
-          0% { transform: rotate(215deg) translateX(0); opacity: 1; }
-          70% { opacity: 1; }
-          100% { transform: rotate(215deg) translateX(-650px); opacity: 0; }
+        @keyframes leaf-sway {
+          0%, 100% { transform: rotate(-5deg) translateX(0); }
+          50% { transform: rotate(5deg) translateX(10px); }
         }
         @keyframes float-gentle {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-7px); }
+          50% { transform: translateY(-5px); }
         }
-        @keyframes spin-slow {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes spin-reverse-slow {
-          0% { transform: rotate(360deg); }
-          100% { transform: rotate(0deg); }
-        }
-
-        .anim-aurora-1 { animation: aurora-orbit-1 20s ease-in-out infinite; }
-        .anim-aurora-2 { animation: aurora-orbit-2 25s ease-in-out infinite; }
-        .anim-border-glow { animation: border-glow-cycle 8s ease-in-out infinite; }
-        .anim-float { animation: float-gentle 5s ease-in-out infinite; }
-        .anim-spin-slow { animation: spin-slow 30s linear infinite; }
-        .anim-spin-reverse { animation: spin-reverse-slow 22s linear infinite; }
-        
-        .anim-wave {
-          display: inline-block;
-          transform-origin: 75% 75%;
-          animation: wave-wiggle 2.2s infinite ease-in-out;
+        @keyframes sparkle-burst {
+          0% { transform: scale(0) rotate(0deg); opacity: 1; }
+          100% { transform: scale(2) rotate(90deg); opacity: 0; }
         }
 
         .btn-shimmer-effect {
@@ -182,189 +197,182 @@ export default function Login() {
           position: absolute;
           top: 0;
           left: 0;
-          width: 65%;
+          width: 50%;
           height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-          transform: translateX(-120%);
-          animation: shimmer-ray 3.5s infinite ease-in-out;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+          transform: translateX(-120%) skewX(-20deg);
+          animation: shimmer-ray 3s infinite ease-in-out;
+        }
+        .bg-coffee-shop {
+          background-image: url('${heroImg}');
+          background-size: cover;
+          background-position: center;
+          filter: blur(8px) brightness(1.1) sepia(0.3);
+          transform: scale(1.05);
         }
       `}</style>
 
-      {/* ── Ambient Background Lighting & Cyber Grid ── */}
+      {/* ── Ambient Background (Coffee Shop) ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Glowing Aurora Spheres */}
-        <div className="absolute -top-32 -left-32 w-[650px] h-[650px] bg-gradient-to-br from-blue-600/45 via-cyan-500/30 to-transparent rounded-full blur-[140px] anim-aurora-1" />
-        <div className="absolute -bottom-40 -right-40 w-[700px] h-[700px] bg-gradient-to-tl from-indigo-600/40 via-sky-500/25 to-transparent rounded-full blur-[150px] anim-aurora-2" />
-        <div className="absolute top-1/2 left-1/3 w-[450px] h-[450px] bg-gradient-to-r from-purple-600/25 via-blue-500/20 to-transparent rounded-full blur-[130px] opacity-70" />
-
-        {/* Cyberpunk Subtle Perspective Grid */}
-        <div 
-          className="absolute inset-0 opacity-[0.05]" 
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)
-            `,
-            backgroundSize: '48px 48px'
-          }}
-        />
-
-        {/* Ambient Shooting Meteors */}
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-0.5 bg-gradient-to-l from-cyan-400 via-sky-300 to-transparent rounded-full pointer-events-none hidden md:block"
-            style={{
-              top: `${18 + i * 28}%`,
-              right: `${8 + i * 25}%`,
-              width: `${140 + i * 50}px`,
-              animation: `meteor-pass ${7 + i * 3}s linear infinite`,
-              animationDelay: `${i * 2.8}s`
-            }}
-          />
-        ))}
-
-        {/* Cyber Particles */}
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-cyan-300/80 shadow-[0_0_8px_#38bdf8] pointer-events-none hidden sm:block"
-            style={{
-              left: `${(i * 8 + 4)}%`,
-              bottom: `${(i * 7 + 6)}%`,
-              width: i % 2 === 0 ? '4px' : '3px',
-              height: i % 2 === 0 ? '4px' : '3px',
-              opacity: 0.25 + (i % 3) * 0.2,
-              animation: `float-gentle ${4 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${-(i * 0.7)}s`
-            }}
-          />
-        ))}
+        <div className="absolute inset-0 bg-coffee-shop" />
+        <div className="absolute inset-0 bg-amber-900/10" />
       </div>
 
-      {/* ── Main Neo-Glass Container ── */}
-      <div className="relative z-10 w-full max-w-4xl my-auto min-h-0 lg:min-h-[580px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_30px_100px_-15px_rgba(0,0,0,0.95)] border border-white/20 anim-border-glow grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] bg-slate-900/75 backdrop-blur-3xl transition-all duration-300">
-        
-        {/* ── LEFT SHOWCASE PANEL (Minimalist Animation Focus) ── */}
-        <div className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 overflow-hidden border-r border-white/10">
-          
-          {/* Subtle Ambient Background Layer */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <img 
-              src={heroImg} 
-              alt="GS25 Atmosphere" 
-              className="w-full h-full object-cover opacity-30 scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#060a14] via-[#070e1e]/90 to-[#060a14]/75" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#060a14] via-transparent to-[#060a14]/90" />
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-60" />
-          </div>
+      {/* Animated Leaves */}
+      <div 
+        className="absolute top-[-50px] left-[-50px] w-64 h-64 pointer-events-none opacity-80"
+        style={{ animation: 'leaf-sway 6s ease-in-out infinite', transformOrigin: 'top left' }}
+      >
+        <svg viewBox="0 0 100 100" fill="rgba(34, 197, 94, 0.4)">
+           <path d="M50 0 C 20 20, 0 50, 20 80 C 40 100, 80 80, 100 50 C 80 20, 60 0, 50 0 Z" />
+        </svg>
+      </div>
 
+      {/* Animated Coffee Steam */}
+      <div className="absolute bottom-10 right-20 pointer-events-none flex flex-col items-center">
+        <div className="relative w-8 h-20 mb-2">
+          <div className="absolute bottom-0 left-1 w-2 h-10 bg-white/40 blur-md rounded-full" style={{ animation: 'coffee-steam 3s ease-in-out infinite' }} />
+          <div className="absolute bottom-0 right-1 w-2 h-12 bg-white/30 blur-md rounded-full" style={{ animation: 'coffee-steam 4s ease-in-out infinite 1s' }} />
+        </div>
+        <div className="w-16 h-10 bg-white/20 backdrop-blur-md rounded-b-3xl border border-white/40 shadow-lg relative">
+          <div className="absolute top-0 right-[-10px] w-6 h-6 border-4 border-white/30 rounded-full" />
+        </div>
+      </div>
+
+      {/* Warm Sparkles on Click */}
+      {particles.map(p => (
+        <div 
+          key={p.id}
+          className="absolute pointer-events-none rounded-full"
+          style={{
+            left: p.x - 10,
+            top: p.y - 10,
+            width: 20,
+            height: 20,
+            background: `radial-gradient(circle, ${p.color} 0%, transparent 70%)`,
+            animation: 'sparkle-burst 1s ease-out forwards'
+          }}
+        />
+      ))}
+
+      {/* ── Main Glass Container ── */}
+      <div 
+        ref={containerRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={tiltStyle}
+        className="relative z-10 w-full max-w-[900px] my-auto min-h-[500px] rounded-3xl overflow-hidden shadow-[0_25px_60px_-10px_rgba(0,0,0,0.4)] grid grid-cols-1 lg:grid-cols-[1fr_1fr] bg-white backdrop-blur-xl border border-white/60"
+      >
+        
+        {/* ── LEFT SHOWCASE PANEL (Blue Gradient & Illustration) ── */}
+        <div className="relative hidden lg:flex flex-col justify-between p-8 bg-gradient-to-br from-[#e0f2fe] via-[#f0f9ff] to-[#e0f2fe] overflow-hidden border-r border-blue-100/50">
+          
           {/* Top Status Bar */}
           <div className="relative z-10 flex items-center justify-between">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-lg">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm border border-blue-100">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <span className="text-[11px] font-black tracking-widest text-cyan-300 uppercase">
+              <span className="text-[11px] font-black tracking-widest text-blue-800 uppercase">
                 GS25 PORTAL
               </span>
             </div>
 
             {currentTime && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/70 backdrop-blur-md border border-white/15 text-slate-300 font-mono text-xs font-bold shadow-inner">
-                <Clock size={13} className="text-cyan-400" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white shadow-sm border border-blue-100 text-slate-700 font-mono text-xs font-bold">
+                <Clock size={13} className="text-blue-500" />
                 <span>{currentTime}</span>
               </div>
             )}
           </div>
 
-          {/* Center Stage: Futuristic Animated Core & Minimal Title */}
+          {/* Center Stage: GS25 Illustration & Titles */}
           <div className="relative z-10 my-auto py-6 flex flex-col items-center text-center">
             
-            {/* Animated Concentric Cyber Rings */}
-            <div className="relative w-44 h-44 flex items-center justify-center anim-float mb-6">
-              {/* Outer Ring */}
-              <div className="absolute inset-0 rounded-full border border-dashed border-cyan-400/30 anim-spin-slow" />
-              {/* Middle Glowing Ring */}
-              <div className="absolute inset-3 rounded-full border border-indigo-400/40 anim-spin-reverse shadow-[0_0_20px_rgba(99,102,241,0.2)]" />
-              {/* Inner Ambient Glow Core */}
-              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500/20 via-blue-600/30 to-indigo-600/20 backdrop-blur-xl border border-white/25 flex items-center justify-center shadow-inner">
-                <Store size={38} className="text-cyan-300 drop-shadow-[0_0_12px_rgba(56,189,248,0.6)]" />
+            {/* Store Illustration Mockup */}
+            <div className="relative w-56 h-40 mb-8 mt-4" style={{ animation: 'float-gentle 5s ease-in-out infinite' }}>
+              <div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden flex flex-col">
+                <div className="h-6 w-full bg-gradient-to-r from-blue-500 via-sky-400 to-cyan-400 flex items-center justify-center">
+                  <span className="text-white font-black text-xs">GS25</span>
+                </div>
+                <div className="flex-1 bg-slate-50 relative">
+                   <div className="absolute bottom-0 left-4 w-12 h-16 bg-blue-100/50 border border-blue-200 rounded-t-lg" />
+                   <div className="absolute bottom-0 right-4 w-12 h-16 bg-blue-100/50 border border-blue-200 rounded-t-lg" />
+                   <div className="absolute top-4 left-1/2 -translate-x-1/2 w-16 h-8 bg-sky-100 rounded" />
+                </div>
+              </div>
+              <div className="absolute -bottom-4 z-20 flex items-end justify-center w-full">
+                <span className="text-6xl drop-shadow-md pb-2">👨‍💼</span>
+                <span className="text-5xl absolute -right-2 top-0 drop-shadow-md" style={{ animation: 'leaf-sway 2s infinite' }}>👋</span>
+                <span className="text-4xl drop-shadow-md absolute -left-4 bottom-0">👩‍🌾</span>
               </div>
             </div>
 
-            <h1 className="text-2xl xl:text-3xl font-black text-white tracking-tight leading-tight">
-              GS25 Workspace
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">
+              Quản lý Cửa hàng Của Bạn
             </h1>
-            
-            <p className="text-xs text-slate-400 mt-2 font-medium max-w-xs leading-relaxed">
-              Cổng quản trị điều hành & phân ca nhân sự tập trung
+            <p className="text-[13px] text-slate-500 mt-2 font-medium max-w-[240px] leading-relaxed">
+              Đơn giản hóa công việc, kiến tạo thành công
             </p>
 
-            {/* Minimal Status Pills */}
-            <div className="flex items-center gap-2 mt-5">
-              <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-cyan-300">
-                ⚡ Tốc độ cao
+            {/* Badges */}
+            <div className="flex items-center gap-2 mt-6">
+              <span className="px-3 py-1.5 rounded-full bg-white shadow-sm border border-blue-100 text-[11px] font-bold text-sky-600 flex items-center gap-1">
+                <span className="text-sm">⚡</span> Dễ sử dụng
               </span>
-              <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-indigo-300">
-                🛡️ Bảo mật
+              <span className="px-3 py-1.5 rounded-full bg-white shadow-sm border border-emerald-100 text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                <span className="text-sm">🛡️</span> An toàn
               </span>
-              <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-emerald-300">
-                🤖 AI Copilot
+              <span className="px-3 py-1.5 rounded-full bg-white shadow-sm border border-purple-100 text-[11px] font-bold text-purple-600 flex items-center gap-1">
+                <span className="text-sm">✨</span> Hỗ trợ Thân thiện
               </span>
             </div>
-
           </div>
 
           {/* Bottom Footer Status */}
-          <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 border-t border-white/10 pt-3 font-medium">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-slate-300 text-xs font-semibold">Hệ thống trực tuyến</span>
+          <div className="relative z-10 flex items-center justify-between text-xs pt-3 font-medium mt-auto">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="text-slate-600 text-xs font-bold">Hệ thống sẵn sàng</span>
             </div>
-            <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-400/30 text-[11px]">
-              v2.5 Pro
-            </span>
+            <div className="flex items-center gap-1.5 text-slate-600 font-bold bg-white px-2.5 py-1 rounded-md shadow-sm border border-slate-200">
+              <span className="border border-slate-400 rounded-sm px-1 text-[9px] uppercase tracking-wider">File</span>
+              <span>Phiên bản Cũ bản</span>
+            </div>
           </div>
 
         </div>
 
-        {/* ── RIGHT LOGIN FORM PANEL (Clean Minimalist Glass) ── */}
-        <div className="bg-white/95 backdrop-blur-3xl p-6 sm:p-9 lg:p-10 flex flex-col justify-between relative text-slate-900">
+        {/* ── RIGHT LOGIN FORM PANEL (Clean White) ── */}
+        <div className="bg-white p-8 sm:p-10 flex flex-col justify-center relative text-slate-900 rounded-r-3xl">
           
-          {/* Subtle Ambient Accent */}
-          <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/10 rounded-bl-full pointer-events-none blur-3xl" />
-
           <div>
-            
             {/* Header Brand */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 anim-float">
-                  <Store size={24} />
+            <div className="flex items-start justify-between mb-8">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 text-amber-500 flex items-center justify-center shadow-inner">
+                  <Home size={26} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                    Đăng Nhập
-                    <span className="anim-wave inline-block text-lg">👋</span>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
+                    Chào mừng bạn về nhà!
                   </h2>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Chào mừng bạn trở lại hệ thống
+                  <p className="text-[13px] text-blue-600 font-semibold mt-0.5">
+                    Vui lòng đăng nhập để bắt đầu.
                   </p>
                 </div>
               </div>
 
-              <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] sm:text-[11px] font-bold shadow-2xs">
-                Portal 24/7
+              <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold whitespace-nowrap">
+                PORTAL 24/7
               </span>
             </div>
 
             {/* Error Banner */}
             {error && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in duration-200 shadow-2xs">
-                <ShieldAlert size={16} className="shrink-0 text-rose-600" />
+              <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in duration-200">
+                <ShieldAlert size={16} className="shrink-0 text-rose-500" />
                 <span>{error}</span>
               </div>
             )}
@@ -376,12 +384,8 @@ export default function Login() {
                   <div className="w-11 h-11 mx-auto rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-2 shadow-md shadow-blue-500/20">
                     <ShieldCheck size={22} />
                   </div>
-                  <p className="text-xs font-bold text-slate-800 mb-1">
-                    Xác Thực Bảo Mật 2FA
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Mã xác nhận 6 số đã được gửi qua Telegram của Admin.
-                  </p>
+                  <p className="text-xs font-bold text-slate-800 mb-1">Xác Thực Bảo Mật 2FA</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">Mã xác nhận 6 số đã được gửi qua Telegram của Admin.</p>
                 </div>
 
                 <div>
@@ -391,7 +395,7 @@ export default function Login() {
                     autoComplete="one-time-code"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="block w-full px-4 py-3 text-center text-2xl font-black tracking-[0.4em] border border-blue-300 rounded-2xl focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white text-slate-900 outline-none shadow-xs"
+                    className="block w-full px-4 py-3 text-center text-2xl font-black tracking-[0.4em] border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50 text-slate-900 outline-none transition-all"
                     placeholder="······"
                     autoFocus
                     required
@@ -403,7 +407,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={otpBusy || otpCode.length !== 6}
-                  className="btn-shimmer-effect w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm shadow-md shadow-blue-500/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+                  className="btn-shimmer-effect w-full py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm shadow-md shadow-sky-500/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
                 >
                   {otpBusy ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -433,7 +437,7 @@ export default function Login() {
               </form>
             ) : (
               /* ── Form Step 2: Standard Login Form ── */
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4 relative z-20">
                 
                 {/* Employee ID Field */}
                 <div>
@@ -441,15 +445,15 @@ export default function Login() {
                     Mã nhân viên / Tài khoản
                   </label>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
                       <UserCheck size={18} />
                     </div>
                     <input
                       type="text"
                       value={empId}
                       onChange={e => setEmpId(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 text-sm bg-slate-50/90 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
-                      placeholder="VD: 251104004 hoặc admin"
+                      className="block w-full pl-10 pr-4 py-3 text-sm bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-semibold text-slate-900 transition-all placeholder:text-slate-300 shadow-sm"
+                      placeholder="Nhập mã nhân viên (VD: 2511004004)"
                       required
                     />
                   </div>
@@ -464,21 +468,21 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setShowForgotModal(true)}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      className="text-xs font-bold text-sky-600 hover:text-sky-700 cursor-pointer"
                     >
                       Quên mật khẩu?
                     </button>
                   </div>
                   <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-500 transition-colors">
                       <KeyRound size={18} />
                     </div>
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-11 py-3 text-sm bg-slate-50/90 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none font-semibold text-slate-900 transition-all shadow-2xs placeholder:text-slate-400"
-                      placeholder="Nhập mật khẩu..."
+                      className="block w-full pl-10 pr-11 py-3 text-sm bg-white border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none font-semibold text-slate-900 transition-all placeholder:text-slate-300 shadow-sm"
+                      placeholder="Nhập mật khẩu"
                       required
                     />
                     <button
@@ -492,45 +496,49 @@ export default function Login() {
                 </div>
 
                 {/* Remember Me */}
-                <div className="flex items-center justify-between text-xs pt-0.5">
-                  <label className="flex items-center gap-2 text-slate-600 font-semibold cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={e => setRememberMe(e.target.checked)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
-                    />
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <label className="flex items-center gap-2 text-sky-700 font-bold cursor-pointer select-none">
+                    <div className="relative flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={e => setRememberMe(e.target.checked)}
+                        className="peer appearance-none w-4 h-4 border-2 border-sky-500 rounded bg-white checked:bg-sky-500 cursor-pointer transition-all"
+                      />
+                      <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
                     <span>Ghi nhớ đăng nhập</span>
                   </label>
-                  <span className="text-[11px] text-slate-400">Mặc định: <strong className="font-mono text-slate-600">1</strong></span>
                 </div>
 
                 {/* Submit Login Button with Shimmer Ray */}
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-shimmer-effect relative w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-blue-500/35 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 transition-all transform active:scale-[0.99] mt-3"
+                  className="btn-shimmer-effect relative w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white font-black text-sm shadow-lg shadow-sky-500/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all mt-4"
                 >
                   {submitting ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <LogIn size={18} />
+                    <span>ĐĂNG NHẬP</span>
                   )}
-                  <span>{submitting ? 'Đang xác thực...' : 'Đăng Nhập'}</span>
-                  {!submitting && <ArrowRight size={16} className="ml-0.5 opacity-90" />}
+                  {!submitting && <ArrowRight size={18} className="ml-1" />}
                 </button>
               </form>
             )}
 
           </div>
 
-          {/* Footer Security Footnote */}
-          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <ShieldCheck size={14} className="text-emerald-600" />
-              <span>Bảo mật SSL 256-bit</span>
+          {/* Footer Versions */}
+          <div className="mt-10 pt-5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-bold">
+            <div className="flex items-center gap-1.5">
+              <KeyRound size={14} className="text-sky-500" />
+              <span>v4.2.3</span>
             </div>
-            <span>GS25 Workspace</span>
+            <div className="flex items-center gap-1.5">
+              <Leaf size={14} className="text-emerald-500" />
+              <span>GS25 Workspace</span>
+            </div>
           </div>
 
         </div>

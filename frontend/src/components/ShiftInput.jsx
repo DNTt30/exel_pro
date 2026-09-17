@@ -9,7 +9,7 @@ export default function ShiftInput({
   rowIndex, 
   colIndex, 
   readOnly = false,
-  _isDraft = false
+  isDraft: _isDraft = false
 }) {
   const selectRef = useRef(null);
 

@@ -2,7 +2,8 @@ import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/cons
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
-import { generateGeminiContent, streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
+import { streamGeminiMultiTurn } from '../services/geminiService';
+
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OLLAMA_TIMEOUT_MS = 800;

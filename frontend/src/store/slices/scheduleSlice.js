@@ -12,8 +12,19 @@ import { weekRecordKey } from '../../utils/scheduleWeek';
 import { describeDiff } from '../../utils/appLogs';
 import { notifyTelegram } from '../../utils/telegram';
 import { buildSwappedSchedules, mergeAiSchedule } from '../../utils/shiftHelper';
-import { toast } from '../../components/ui/toastStore';
+import { toast } from '../../utils/toast'; // utils layer — tránh store → components/ui dependency
 import { getCurrentMondayWeek } from '../../data/constants';
+
+// --- Helper functions ---
+
+/** Cập nhật attendance map: set hoặc xóa một key tùy theo giá trị next. */
+function updateAttendanceMap(map, key, next) {
+  const updated = { ...map };
+  if (next) updated[key] = next;
+  else delete updated[key];
+  return updated;
+}
+
 
 export const createScheduleSlice = (set, get) => ({
   attendance: {},
@@ -43,7 +54,10 @@ export const createScheduleSlice = (set, get) => ({
       const map = {};
       rows.forEach(r => { map[r.empId + '|' + r.workDate] = { actualHours: r.actualHours, note: r.note }; });
       set({ attendance: map });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error('[loadAttendanceRange] Không tải được dữ liệu chấm công:', e);
+      toast.error('Không tải được dữ liệu chấm công. Vui lòng tải lại trang.');
+    }
   },
 
   saveAttendanceCell: async (empId, workDate, hours, updatedBy, note) => {
@@ -52,18 +66,20 @@ export const createScheduleSlice = (set, get) => ({
     const code = String(note || '').trim();
     const hasHours = !(hours === null || isNaN(hours));
     const next = (!hasHours && !code) ? null : { actualHours: hasHours ? hours : 0, note: code || prev?.note || '' };
-    set(s => ({
-      attendance: (() => { const m2 = { ...s.attendance }; if (next) m2[key] = next; else delete m2[key]; return m2; })()
-    }));
+    set(s => ({ attendance: updateAttendanceMap(s.attendance, key, next) }));
     try {
-      await api.upsertAttendanceRows(next ? [{ ...next, empId, workDate, updatedBy }] : []);
-      if (!next) await api.upsertAttendanceRows([{ empId, workDate, actualHours: 0, updatedBy }]);
+      // Upsert 1 call duy nhất: ghi giá trị mới nếu có, hoặc reset về actualHours=0/note='' nếu xóa
+      // (Không hard-delete để giữ audit trail; actualHours=0 tương đương "trống")
+      const rowToSave = next
+        ? { ...next, empId, workDate, updatedBy }
+        : { empId, workDate, actualHours: 0, note: '', updatedBy };
+      await api.upsertAttendanceRows([rowToSave]);
       const fmt = r => r ? ((r.actualHours || 0) + 'h' + (r.note ? '/' + r.note : '')) : 'trống';
       void get().appendAdminLog('SUA_CONG_THUC_TE', empId + ' · ' + workDate,
         fmt(prev) + ' → ' + fmt(next) + (updatedBy ? ' (bởi ' + updatedBy + ')' : ''),
         { entityType: 'attendance', entityId: empId }).catch(() => {});
     } catch (e) {
-      set(s => ({ attendance: (() => { const m2 = { ...s.attendance }; if (prev) m2[key] = prev; else delete m2[key]; return m2; })() }));
+      set(s => ({ attendance: updateAttendanceMap(s.attendance, key, prev) })); // rollback
       throw e;
     }
   },
@@ -171,6 +187,7 @@ export const createScheduleSlice = (set, get) => ({
   },
 
   setCurrentWeek: async (week) => {
+    const prevWeek = get().currentWeek;
     set({ currentWeek: week });
     try {
       const scheds = await api.getSchedulesByWeek(week);
@@ -181,7 +198,9 @@ export const createScheduleSlice = (set, get) => ({
         }
       }));
     } catch (err) {
-      console.error("Lỗi khi tải lịch của tuần:", err);
+      console.error('[setCurrentWeek] Lỗi khi tải lịch của tuần:', err);
+      set({ currentWeek: prevWeek }); // rollback về tuần cũ nếu load thất bại
+      toast.error(`Không thể tải lịch tuần ${week}. Vui lòng thử lại.`);
     }
   },
 
@@ -364,11 +383,24 @@ export const createScheduleSlice = (set, get) => ({
     const prevFb = previousFeedbacks.find(f => f.id === feedbackId) || {};
     assertCanResolveFeedback(get(), prevFb.dept);
 
+    // Snapshot lịch trước khi thay đổi để rollback nếu cần
+    const previousSchedule = newShiftData ? get().schedule : null;
+
     try {
       if (status === 'approved' && newShiftData) {
         await get().updateShift(newShiftData.week, newShiftData.empId, newShiftData.day, newShiftData.shiftCode);
       }
-      await api.updateFeedback(feedbackId, status, resolutionNote);
+
+      // Nếu updateFeedback fail sau khi updateShift thành công → rollback lịch
+      try {
+        await api.updateFeedback(feedbackId, status, resolutionNote);
+      } catch (fbErr) {
+        // Rollback lịch về trước nếu đã cập nhật
+        if (previousSchedule) {
+          set({ schedule: previousSchedule });
+        }
+        throw fbErr;
+      }
 
       set(state => ({
         feedbacks: state.feedbacks.map(fb =>

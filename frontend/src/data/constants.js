@@ -5,6 +5,15 @@
 // Regex xác thực Mã Nhân Viên đúng 9 chữ số (Ví dụ: 260512008)
 export const MA_RE = /^\d{9}$/;
 
+// Thời gian phiên & realtime
+/** Thời gian tối đa phiên admin tính từ lúc đăng nhập (ms). */
+export const ADMIN_SESSION_MAX_MS = 12 * 60 * 60 * 1000; // 12 giờ
+/** Debounce cho realtime Supabase trước khi tải lại dữ liệu (ms). */
+export const REALTIME_DEBOUNCE_MS = 300;
+/** Timeout tối đa mỗi nhánh tải dữ liệu bootstrap (ms). */
+export const BOOTSTRAP_BRANCH_TIMEOUT_MS = 10_000; // 10 giây
+
+
 // Chuẩn hóa loại nhân viên (Employee Types)
 export const EMPLOYEE_TYPES = {
   STPT: 'STPT',       // Nhân viên Part-time

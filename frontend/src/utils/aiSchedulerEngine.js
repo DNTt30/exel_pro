@@ -2,7 +2,7 @@ import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/cons
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
-import { generateGeminiContent } from '../services/geminiService';
+import { generateGeminiContent, streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OLLAMA_TIMEOUT_MS = 800;
@@ -36,8 +36,14 @@ function formatEmpWeek(emp, weekSchedule) {
 
   const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME';
   const statusNote = isPT
-    ? (totalH > 23 ? '⚠️ Vượt 23h/tuần!' : (totalH < 16 && totalH > 0 ? '⚠️ Chưa đủ 16h/tuần' : '✓ Định mức đạt'))
-    : (totalH === 48 ? '✓ Đạt chuẩn 48h (6 ca)' : `Tổng: ${totalH}h / 48h`);
+    ? (totalH > SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK
+        ? `⚠️ Vượt ${SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK}h/tuần!`
+        : (totalH < SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK && totalH > 0
+            ? `⚠️ Chưa đủ ${SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK}h/tuần`
+            : '✓ Định mức đạt'))
+    : (totalH === SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK
+        ? `✓ Đạt chuẩn ${SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK}h (6 ca)`
+        : `Tổng: ${totalH}h / ${SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK}h`);
 
   return { totalH, totalShifts, shiftDetails, statusNote, empSched };
 }
@@ -1180,14 +1186,73 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   if (isAuditAsk) {
     const audit = auditSchedule(employees, weekSchedule, storeId);
     if (audit.totalIssues === 0) {
-      return `Tuần ${currentWeek}: 0 lỗi.`;
-    } else {
-      const topIssues = audit.issues.slice(0, 3).map(i => `- ${i.title}`).join('\n');
-      return `${audit.totalIssues} vấn đề:\n${topIssues}`;
+      return `✅ Tuần ${currentWeek}: Lịch đạt chuẩn 100%, không có vi phạm nào.`;
     }
+    const errors = audit.issues.filter(i => i.severity === 'error');
+    const warnings = audit.issues.filter(i => i.severity === 'warning');
+    const lines = [];
+    if (errors.length > 0) {
+      lines.push(`🔴 ${errors.length} lỗi nghiêm trọng:`);
+      errors.forEach((i, idx) => lines.push(`  ${idx + 1}. ${i.title}`));
+    }
+    if (warnings.length > 0) {
+      lines.push(`⚠️ ${warnings.length} cảnh báo:`);
+      warnings.forEach((i, idx) => lines.push(`  ${idx + 1}. ${i.title}`));
+    }
+    return lines.join('\n');
+  }
+
+  // 2.8 AI CHƯA ĐỦ GIỜ / VƯỢT GIỜ
+  const isUnderHoursAsk = q.includes('chưa đủ') || q.includes('thiếu giờ') || q.includes('thiếu công') || q.includes('ít giờ');
+  const isOverHoursAsk = q.includes('vượt giờ') || q.includes('quá giờ') || q.includes('quá định mức') || q.includes('nhiều hơn định mức');
+  if (isUnderHoursAsk || isOverHoursAsk) {
+    const result = [];
+    storeEmps.forEach(e => {
+      let totalH = 0;
+      WEEK_DAYS.forEach(d => {
+        const { shift } = normalizeShift(weekSchedule[e.id]?.[d]);
+        if (shift && shift !== 'off') totalH += getShiftHours(shift);
+      });
+      const isPT = e.type === 'STPT' || e.type === 'PARTTIME' || e.role?.includes('PT');
+      if (isUnderHoursAsk) {
+        const minH = isPT ? SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK : 48;
+        if (totalH > 0 && totalH < minH) {
+          result.push(`${e.name}: ${totalH}h (cần ${minH}h${isPT ? ' PT' : ' FT'})`);
+        }
+      } else {
+        const maxH = isPT ? SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK : 48;
+        if (totalH > maxH) {
+          result.push(`${e.name}: ${totalH}h (vượt ${totalH - maxH}h)`);
+        }
+      }
+    });
+    if (result.length === 0) {
+      return isUnderHoursAsk ? `Tất cả nhân viên đã đủ giờ định mức tuần này.` : `Không có ai vượt giờ định mức tuần này.`;
+    }
+    const label = isUnderHoursAsk ? 'Chưa đủ giờ' : 'Vượt định mức';
+    return `${label} (${result.length} người):\n${result.join('\n')}`;
+  }
+
+  // 2.9 ĐỊNH BIÊN THEO NGÀY (VD: "Thứ 3 có đủ người không?")
+  const isStaffingAsk = (q.includes('đủ người') || q.includes('đủ nhân sự') || q.includes('thiếu người')) && targetDayKey;
+  if (isStaffingAsk) {
+    const working = storeEmps.filter(e => {
+      const { shift } = normalizeShift(weekSchedule[e.id]?.[targetDayKey]);
+      return shift && shift !== 'off';
+    });
+    const offCount = storeEmps.length - working.length;
+    const byShift = {};
+    working.forEach(e => {
+      const { shift } = normalizeShift(weekSchedule[e.id]?.[targetDayKey]);
+      if (!byShift[shift]) byShift[shift] = [];
+      byShift[shift].push(e.name);
+    });
+    const shiftSummary = Object.entries(byShift).map(([s, names]) => `  Ca ${s}: ${names.join(', ')}`).join('\n');
+    return `${targetDayKey}: ${working.length}/${storeEmps.length} người làm việc (${offCount} OFF)\n${shiftSummary || '  (Chưa xếp ca)'}`;
   }
 
   return `Hỏi ca, giờ, lương, công thức món.\nVd: hôm nay tôi làm ca mấy · tuần này bao nhiêu h · trà tắc`;
+
 }
 
 /**
@@ -1406,12 +1471,15 @@ export async function askGS25HFModel(question, systemPrompt, chatHistory = [], f
 }
 
 
-export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '') {
+export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '', onChunk = null) {
   const { 
     employees = [], 
     weekSchedule = {}, 
     storeId = '',
-    user = null
+    currentWeek = '',
+    user = null,
+    feedbacks = [],
+    shiftSwaps = []
   } = context;
 
   // Tối giản dữ liệu gửi đi (RAG)
@@ -1422,13 +1490,13 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
   
   let textSchedule = '';
   const dailySummary = {};
-  const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  const GEMINI_WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   
-  WEEK_DAYS.forEach(day => { dailySummary[day] = {}; });
+  GEMINI_WEEK_DAYS.forEach(day => { dailySummary[day] = {}; });
 
   storeEmps.forEach(e => {
     if (weekSchedule[e.id]) {
-      const daysStr = WEEK_DAYS.map(day => {
+      const daysStr = GEMINI_WEEK_DAYS.map(day => {
         const rawShift = weekSchedule[e.id][day];
         const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
         return `${day}(${shiftStr})`;
@@ -1436,7 +1504,7 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
       
       textSchedule += `- [${e.id}] ${e.name}: ${daysStr}\n`;
       
-      WEEK_DAYS.forEach(day => {
+      GEMINI_WEEK_DAYS.forEach(day => {
         const rawShift = weekSchedule[e.id][day];
         const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
         const cleanShift = shiftStr.toUpperCase();
@@ -1448,6 +1516,10 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
     }
   });
 
+  // Context bổ sung: đơn bù công + đơn đổi ca
+  const pendingFeedbacks = feedbacks.filter(f => f.status === 'pending');
+  const pendingSwaps = (shiftSwaps || []).filter(s => ['pending', 'pending_partner', 'pending_manager', 'approved_by_partner'].includes(s.status));
+
   const now = new Date();
   const timeStr = new Intl.DateTimeFormat('vi-VN', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -1456,49 +1528,68 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
 
   const systemPrompt = `Bạn là TÚ mini, trợ lý AI thông minh tại chuỗi cửa hàng GS25 (Chi nhánh ${storeId}).
 THỜI GIAN HIỆN TẠI: ${timeStr}
-NGƯỜI ĐANG TRÒ CHUYỆN VỚI BẠN: ${user ? `${user.name} (ID: ${user.id}, Bộ phận: ${user.dept || storeId})` : 'Chưa đăng nhập'}
+TUẦN ĐANG XEM: ${currentWeek}
+NGƯỜI ĐANG TRÒ CHUYỆN: ${user ? `${user.name} (ID: ${user.id}, Bộ phận: ${user.dept || storeId})` : 'Chưa đăng nhập'}
 
 DỮ LIỆU NHÂN SỰ & LỊCH LÀM VIỆC TUẦN:
 1. Danh sách nhân sự: ${JSON.stringify(compactEmployees)}
 2. Lịch cá nhân từng người (T2 đến CN):
 ${textSchedule}
 3. Phân bổ ca trực theo ngày: ${JSON.stringify(dailySummary)}
+${pendingFeedbacks.length > 0 ? `4. Đơn bù công đang chờ duyệt (${pendingFeedbacks.length} đơn): ${pendingFeedbacks.slice(0, 5).map(f => `${f.empId || f.emp_id} - ${f.date} - ${f.reason || 'Quên chấm công'}`).join('; ')}` : ''}
+${pendingSwaps.length > 0 ? `5. Đơn đổi ca đang chờ (${pendingSwaps.length} đơn): ${pendingSwaps.slice(0, 5).map(s => `${s.fromEmpName || s.fromEmpId} ⇄ ${s.toEmpName || s.toEmpId} (${s.fromDay || s.date})`).join('; ')}` : ''}
 
 HƯỚNG DẪN QUAN TRỌNG:
-- Khi người dùng dùng các đại từ ngôi thứ nhất như "em", "chị", "anh", "tôi", "tao", "mình", "tớ", "bản thân", "cháu" (VD: "Mai em làm mấy giờ?", "Tuần này em làm tổng cộng mấy tiếng?", "Chị có phải làm ca đêm hôm nào không?", "Thứ 6 em có được nghỉ không?", "Hôm nay ai làm cùng ca với em?"): BẮT BUỘC hiểu là đang hỏi về chính người đang trò chuyện (${user ? user.name : 'người dùng hiện tại'}).
-- Khi hỏi "ai làm cùng ca với em" hoặc "ai trực cùng ca": tìm ca làm của người đó trong ngày (dựa vào [Danh sách ca trực theo ngày]), rồi liệt kê chính xác những đồng nghiệp có cùng ca. Nếu người đó đang OFF thì báo bạn đang nghỉ.
-- Khi hỏi về số giờ / tổng tiếng làm việc: hãy cộng tổng số giờ các ca trong tuần của người đó (ca 8h: 6-14, 14-22, 22-6, 10-18 là 8 tiếng; ca 4h là 4 tiếng). Trả lời số giờ cụ thể và liệt kê ngắn gọn các ca.
-- Khi hỏi về ca đêm (22-6): kiểm tra xem người đó có ca 22-6 nào trong tuần không và trả lời rõ ràng.
-- Khi hỏi về giờ hủy từng món cụ thể (VD: "Mấy giờ hủy sandwich có rau?", "Burger hủy lúc mấy giờ?", "Gimbap hủy lúc nào?", "Onigiri hủy mấy giờ?", "Ca chiều mấy giờ hủy sushi?"): hãy trả lời NGAY VÀO TRỌNG TÂM của món đó, TUYỆT ĐỐI KHÔNG tuôn ra toàn bộ danh sách quy định nếu người dùng chỉ hỏi về 1 món.
-- Luật Lương & Chế độ:
-  • Ca đêm (22:00 - 06:00): phụ cấp thêm ít nhất +30% lương so với ban ngày.
-  • Ngày Lễ/Tết: lương ít nhất 300% (chưa kể lương ngày nghỉ lễ theo quy định).
-  • Part-time (STPT): 16-23h/tuần, tối đa 91h/tháng.
-  • Full-time (STFT): 48h/tuần (6 ca) + 1 ngày OFF, nghỉ giữa 2 ca tối thiểu 11-12 tiếng.
+- Khi người dùng dùng đại từ ngôi thứ nhất "em", "chị", "anh", "tôi", "tao", "mình", "tớ": BẮT BUỘC hiểu là đang hỏi về chính người đang trò chuyện (${user ? user.name : 'người dùng hiện tại'}).
+- Khi hỏi "ai làm cùng ca với em": tìm ca của người đó trong ngày, liệt kê đồng nghiệp cùng ca chính xác.
+- Khi hỏi số giờ: cộng tổng (ca 8h = 8 tiếng; ca 4h = 4 tiếng). Trả lời cụ thể và liệt kê ngắn gọn.
+- Khi hỏi về giờ hủy 1 món cụ thể: chỉ trả lời trọng tâm món đó, không liệt kê toàn bộ danh sách.
+- Luật Lương: ca đêm (22-6) +30%; Lễ/Tết 300%; STPT 16-23h/tuần, tối đa 91h/tháng; STFT 48h/tuần (6 ca) + 1 OFF, nghỉ giữa 2 ca ≥ 11 tiếng.
 
 SỔ TAY GS25:
-- Hủy FF rau & tươi (Sandwich có rau, burger, gimbap, soup): 11:00 (trưa) & 22:00 (đêm).
-- Hủy Cơm, mì, sushi (Cơm nắm Onigiri, bento, sandwich không rau, mì hộp, sushi): 19:00 (tối).
-- Hủy GM (bách hóa): HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.
-- Lẩu chả cá cay (SOP-FFONSITE-CB-LAU-HN V.06): 2000ml nước + 1 bột súp 120g, nấu 2000W 15p. 10 xiên chả cá nấu 1200W 10p. Trụng mì 2p30s. Ly lẩu: bấm số 3 (30s). Tô mì: bấm số 5 (2p).
+- Hủy FF rau & tươi (Sandwich có rau, burger, gimbap, soup): 11:00 & 22:00.
+- Hủy Cơm, mì, sushi (Onigiri, bento, sandwich không rau, mì hộp, sushi): 19:00.
+- Hủy GM (bách hóa): HSD ≤7 ngày hủy trước 2h; 7 ngày–1 tháng trước 1 ngày; 1–6 tháng trước 3 ngày; 6 tháng–1 năm trước 5 ngày.
+- Lẩu chả cá cay (SOP V.06): 2000ml nước + 1 bột súp 120g, nấu 2000W 15p. 10 xiên chả cá nấu 1200W 10p. Trụng mì 2p30s. Ly lẩu bấm số 3; tô mì bấm số 5.
 - Hóa chất Saraya: Trắng (rửa tay), Đỏ đô (cồn), Xanh lá (rửa CCDC), Nâu (tẩy mỡ), Đỏ tươi (toilet), Xanh/Vàng (lau kính).
-- Thay dầu bếp chiên: Đêm Thứ 3 (Ca 3: 22h-6h).
-- Nghỉ giữa ca: Ca 8h nghỉ 30p; ca đêm nghỉ 45p. Nghỉ chuyển ca >= 11 tiếng.
+- Thay dầu bếp chiên: Đêm Thứ 3 (Ca 3: 22h–6h).
+- Nghỉ giữa ca: Ca 8h nghỉ 30p; ca đêm nghỉ 45p. Chuyển ca ≥ 11 tiếng.
 
-Phong cách:
-- Trả lời bằng tiếng Việt tự nhiên, thân thiện, súc tích, chuẩn xác theo dữ liệu. Dùng Markdown. Xưng hô sếp/anh/chị - em hoặc Tú - bạn.`;
+Phong cách: Tiếng Việt tự nhiên, thân thiện, súc tích. Dùng Markdown (in đậm **text**, danh sách gạch đầu dòng). Xưng hô sếp/anh/chị–em hoặc Tú–bạn.`;
 
-  let formattedPrompt = '';
-  // Ghép lịch sử chat vào prompt
-  const recentHistory = chatHistory.slice(-5); // Lấy 5 câu gần nhất
-  if (recentHistory.length > 0) {
-    formattedPrompt += "LỊCH SỬ CHAT TRƯỚC ĐÓ:\n";
-    recentHistory.forEach(m => {
-      formattedPrompt += `${m.sender === 'ai' ? 'TÚ mini' : 'User'}: ${m.text}\n`;
-    });
-    formattedPrompt += "\nCÂU HỎI HIỆN TẠI CỦA USER:\n";
+  // Xây dựng contents[] multi-turn chuẩn Gemini API
+  // Token-aware: tối đa 10 tin nhắn, cắt nếu tổng > 8000 ký tự
+  const MAX_HISTORY_MSGS = 10;
+  const MAX_HISTORY_CHARS = 8000;
+  
+  const historyFiltered = chatHistory.filter(m => m.id !== 'welcome');
+  const recentHistory = historyFiltered.slice(-MAX_HISTORY_MSGS);
+  
+  let charCount = 0;
+  const trimmedHistory = [];
+  for (let i = recentHistory.length - 1; i >= 0; i--) {
+    const msgLen = (recentHistory[i].text || '').length;
+    if (charCount + msgLen > MAX_HISTORY_CHARS) break;
+    charCount += msgLen;
+    trimmedHistory.unshift(recentHistory[i]);
   }
-  formattedPrompt += question;
 
-  return await generateGeminiContent(formattedPrompt, systemPrompt, geminiApiKey);
+  // Chuyển sang format contents[] của Gemini API
+  const contents = trimmedHistory.map(m => ({
+    role: m.sender === 'ai' ? 'model' : 'user',
+    parts: [{ text: m.text }]
+  }));
+
+  // Thêm câu hỏi hiện tại
+  contents.push({ role: 'user', parts: [{ text: question }] });
+
+  // Gọi streaming nếu có onChunk, ngược lại dùng blocking
+  if (onChunk) {
+    return await streamGeminiMultiTurn(contents, systemPrompt, geminiApiKey, onChunk);
+  }
+
+  // Fallback blocking (tương thích ngược với code cũ)
+  const { generateGeminiMultiTurn: multiTurn } = await import('../services/geminiService');
+  return await multiTurn(contents, systemPrompt, geminiApiKey);
 }
+

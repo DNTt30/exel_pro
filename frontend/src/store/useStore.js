@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import * as api from '../services/api';
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { weekRecordKey } from '../utils/scheduleWeek';
-import { getCurrentMondayWeek } from '../data/constants';
+import { getCurrentMondayWeek, ADMIN_SESSION_MAX_MS, REALTIME_DEBOUNCE_MS, BOOTSTRAP_BRANCH_TIMEOUT_MS } from '../data/constants';
 import { supabase } from '../lib/supabase';
 
 import { createAuthSlice, bindAuthSession, sessionUserFromEmp } from './slices/authSlice';
@@ -27,15 +27,26 @@ export const useStore = create(
       lastSyncedAt: null,
       _bootstrapping: false,
       _realtimeChannel: null,
+      _cleanupRealtimeTimers: null,
 
       initRealtime: () => {
         const currentChannel = get()._realtimeChannel;
         if (currentChannel) {
           supabase.removeChannel(currentChannel);
         }
-        
+        // Dọn dẹp timer từ lần gọi trước để tránh zombie timers
+        get()._cleanupRealtimeTimers?.();
+
         let schedTimer = null;
         let shelfTimer = null;
+
+        // Lưu cleanup function vào store để initRealtime có thể gọi lại an toàn
+        set({
+          _cleanupRealtimeTimers: () => {
+            clearTimeout(schedTimer);
+            clearTimeout(shelfTimer);
+          }
+        });
 
         const channel = supabase.channel('store-sync')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
@@ -50,7 +61,7 @@ export const useStore = create(
                     }));
                  }).catch(console.error);
               }
-            }, 300);
+            }, REALTIME_DEBOUNCE_MS);
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'shelf_items' }, (payload) => {
             console.log('Realtime shelf_items changed:', payload);
@@ -64,7 +75,7 @@ export const useStore = create(
               api.getShelfItems(itemOpts).then(items => {
                 set({ shelfItems: items });
               }).catch(console.error);
-            }, 300);
+            }, REALTIME_DEBOUNCE_MS);
           })
           .subscribe();
           
@@ -81,39 +92,39 @@ export const useStore = create(
             await bindAuthSession(user).catch(() => {});
           }
           const plan = bootstrapQueryPlan(get().user || user);
-          const settle = (p, fallback) => {
+          // safeLoad: thử promise, fallback về giá trị mặc định nếu lỗi hoặc timeout
+          const safeLoad = (p, fallback) => {
             const run = Promise.resolve(p).catch((err) => {
               console.error("Lỗi tải dữ liệu nhánh:", err);
               return fallback;
             });
             return Promise.race([
               run,
-              new Promise((resolve) => setTimeout(() => resolve(fallback), 10000))
+              new Promise((resolve) => setTimeout(() => resolve(fallback), BOOTSTRAP_BRANCH_TIMEOUT_MS))
             ]);
           };
 
           const [emps, fbs, scheds, st, swaps, shelves, weekStatuses] = await Promise.all([
-            settle(api.getEmployees(plan.employees), []),
-            settle(api.getFeedbacks(plan.feedbacks), []),
-            settle(api.getSchedulesByWeek(week), {}),
-            settle(api.getStores(), []),
-            settle(api.getShiftSwaps(plan.swaps), []),
-            settle(api.getShelves(plan.shelves), []),
-            settle(api.getScheduleWeeks(), [])
+            safeLoad(api.getEmployees(plan.employees), []),
+            safeLoad(api.getFeedbacks(plan.feedbacks), []),
+            safeLoad(api.getSchedulesByWeek(week), {}),
+            safeLoad(api.getStores(), []),
+            safeLoad(api.getShiftSwaps(plan.swaps), []),
+            safeLoad(api.getShelves(plan.shelves), []),
+            safeLoad(api.getScheduleWeeks(), [])
           ]);
           const prev = get();
           const employees = emps.length ? emps : prev.employees;
           const itemOpts = plan.shelfItems.storeId
             ? { storeId: plan.shelfItems.storeId }
             : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
-          const shelfItems = await settle(api.getShelfItems(itemOpts), prev.shelfItems || []);
+          const shelfItems = await safeLoad(api.getShelfItems(itemOpts), prev.shelfItems || []);
           let nextUser = prev.user;
           if (nextUser) {
             if (nextUser.role === 'admin' || nextUser.id === 'admin') {
               // SEC-01 & SEC-02: Kiểm tra phiên admin hợp lệ, chặn sửa localStorage
               const sessionAge = Date.now() - (nextUser.loginAt || 0);
-              const maxSessionMs = 12 * 60 * 60 * 1000;
-              if (nextUser.id !== 'admin' || !nextUser.loginAt || sessionAge > maxSessionMs) {
+              if (nextUser.id !== 'admin' || !nextUser.loginAt || sessionAge > ADMIN_SESSION_MAX_MS) {
                 console.warn('[Security] Phiên admin trong storage không hợp lệ hoặc đã hết hạn. Reset phiên.');
                 nextUser = null;
               } else if (!hasCustomAdminPassword()) {

@@ -3,9 +3,10 @@ import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp,
 import { hasCustomAdminPassword, verifyAdminPassword } from '../../lib/adminCredential';
 import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
-import { rememberClientIp, clientMeta } from '../../utils/appLogs';
+import { rememberClientIp, clientMeta, redact } from '../../utils/appLogs';
 import { notifyTelegram, telegramConfigured } from '../../utils/telegram';
 import { supabase } from '../../lib/supabase';
+
 
 export function sessionUserFromEmp(emp) {
   return {
@@ -86,9 +87,11 @@ export const createAuthSlice = (set, get) => ({
           });
           if (pwCheck.error || !pwCheck.data?.session) {
             recordFailure(userId);
+            console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck.error));
             throw new Error('Mật khẩu không chính xác');
           }
-          nextUser = { ...sessionUserFromEmp(emp), authPassword: password, mustChangePassword: false, loginAt: Date.now() };
+          // Không lưu authPassword vào store/localStorage — Supabase auth token tự quản lý session
+          nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: false, loginAt: Date.now() };
         }
       }
 
@@ -138,6 +141,12 @@ export const createAuthSlice = (set, get) => ({
         entityId: user.id,
         storeId: user.dept || ''
       });
+    }
+    // Dọn dẹp Realtime subscription trước khi đăng xuất
+    const channel = get()._realtimeChannel;
+    if (channel) {
+      supabase.removeChannel(channel);
+      set({ _realtimeChannel: null });
     }
     await signOutAuth();
     set({ user: null, authWarning: null });

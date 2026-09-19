@@ -58,9 +58,15 @@ export async function buildBackupData(state) {
   Object.values(state.scheduleWeeks || {}).forEach(w => { if (w && w.weekDate) weekSet.add(w.weekDate); });
   if (state.currentWeek) weekSet.add(state.currentWeek);
   const weeks = [...weekSet].filter(Boolean).sort();
-  const results = await Promise.all(weeks.map(wk => safe(api.getSchedulesByWeek(wk), null)));
-  const schedule = {};
-  weeks.forEach((wk, i) => { if (results[i]) schedule[wk] = results[i]; });
+  // Khử N+1 query: lấy toàn bộ các tuần trong 1 query duy nhất qua getSchedulesByWeeks
+  let schedule = {};
+  if (weeks.length > 0) {
+    try {
+      schedule = await api.getSchedulesByWeeks(weeks);
+    } catch {
+      schedule = state.schedule || {};
+    }
+  }
   return { employees: emps, feedbacks: fbs, shiftSwaps: swaps, shelves, shelfItems: items, stores, schedule };
 }
 

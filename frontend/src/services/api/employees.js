@@ -58,6 +58,27 @@ export async function addEmployee(emp) {
   if (error) throw error;
 }
 
+/** Thêm danh sách nhân viên hàng loạt (bulk insert) để chống query trong vòng lặp */
+export async function addEmployeesBulk(emps = []) {
+  if (!emps || !emps.length) return;
+  const rows = emps.map(emp => {
+    const row = {
+      id: String(emp.id).trim(),
+      name: String(emp.name).trim(),
+      dept: emp.dept,
+      type: emp.type || 'STFT',
+      role: emp.role || emp.type || 'STFT',
+      max_h: emp.maxH == null || isNaN(Number(emp.maxH)) ? 48 : Number(emp.maxH)
+    };
+    if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
+    if (emp.isActive !== undefined) row.is_active = emp.isActive;
+    return row;
+  });
+
+  const { error } = await db().from('employees').upsert(rows, { onConflict: 'id' });
+  if (error) throw error;
+}
+
 export async function updateEmployeeInfo(id, updates) {
   const payload = {};
   if (updates.name !== undefined) payload.name = updates.name;

@@ -271,36 +271,45 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
       const currentEmps = [...employees];
       const existingEmpIds = new Set(currentEmps.map(e => e.id));
       const bulkUpdates = {};
-
       let addedEmpCount = 0;
       let updatedShiftCount = 0;
 
-      for (const item of parsedData) {
-        // 1. Nếu nhân viên chưa có trong hệ thống và bật autoCreate
-        if (!existingEmpIds.has(item.id) && autoCreateEmps) {
-          try {
-            const newEmp = {
+      // 1. Gom danh sách nhân viên mới để thêm hàng loạt (chống query trong vòng lặp)
+      if (autoCreateEmps) {
+        const newEmpsToCreate = [];
+        const seenNewIds = new Set();
+        for (const item of parsedData) {
+          if (!existingEmpIds.has(item.id) && !seenNewIds.has(item.id)) {
+            seenNewIds.add(item.id);
+            newEmpsToCreate.push({
               id: item.id,
               name: item.name,
               dept: item.dept,
               role: item.role,
               type: item.type,
               maxH: item.type === 'STPT' ? 23 : 48
-            };
-            await api.addEmployee(newEmp);
-            const provisioned = await provisionAuthUser(newEmp);
-            if (!provisioned.ok) {
-              console.warn(`NV ${item.id} đã lưu nhưng chưa tạo user Auth:`, provisioned.reason);
-            }
-            currentEmps.push(newEmp);
-            existingEmpIds.add(item.id);
-            addedEmpCount++;
-          } catch (e) {
-            console.warn(`Không thể thêm nhân viên ${item.id}:`, e);
+            });
           }
         }
 
-        // 2. Gán ca làm việc
+        if (newEmpsToCreate.length > 0) {
+          try {
+            await api.addEmployeesBulk(newEmpsToCreate);
+            newEmpsToCreate.forEach(emp => {
+              currentEmps.push(emp);
+              existingEmpIds.add(emp.id);
+            });
+            addedEmpCount = newEmpsToCreate.length;
+            // Tạo tài khoản Auth song song không chặn giao dịch chính
+            Promise.allSettled(newEmpsToCreate.map(e => provisionAuthUser(e))).catch(() => {});
+          } catch (e) {
+            console.warn('Lỗi khi thêm danh sách nhân viên hàng loạt:', e);
+          }
+        }
+      }
+
+      // 2. Gán ca làm việc (xử lý trên bộ nhớ)
+      for (const item of parsedData) {
         const currentShifts = destSched[item.id] || {};
         const newShifts = { ...currentShifts };
 

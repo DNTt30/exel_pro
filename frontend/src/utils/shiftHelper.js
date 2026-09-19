@@ -9,20 +9,37 @@ import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
  * }
  */
 export function normalizeShift(val) {
-  if (!val) return { shift: '', covering_store: null };
+  if (!val) return { shift: '', covering_store: null, confirmed: false, isConfirmed: false, registered: false, isRegistered: false };
   
   let shiftStr = '';
   let covering_store = null;
+  let confirmed = true;
+  let isRegistered = false;
   
   if (typeof val === 'object') {
     shiftStr = val.shift || '';
     covering_store = val.covering_store || null;
+    if (val.confirmed !== undefined) {
+      confirmed = Boolean(val.confirmed);
+    } else if (val.isConfirmed !== undefined) {
+      confirmed = Boolean(val.isConfirmed);
+    } else if (val.registered || val.isRegistered || val.status === 'registered') {
+      confirmed = false;
+    } else {
+      confirmed = true;
+    }
+    isRegistered = Boolean(val.registered ?? val.isRegistered ?? !confirmed);
   } else if (typeof val === 'string') {
     shiftStr = val;
     if (shiftStr.includes('_')) {
       const parts = shiftStr.split('_');
       covering_store = parts.pop();
       shiftStr = parts.join('_');
+    }
+    if (shiftStr.endsWith(':reg') || shiftStr.endsWith(':draft') || shiftStr.startsWith('?')) {
+      shiftStr = shiftStr.replace(/:reg$|:draft$/, '').replace(/^\?/, '');
+      confirmed = false;
+      isRegistered = true;
     }
   }
 
@@ -35,7 +52,14 @@ export function normalizeShift(val) {
   if (shiftStr === '0') shiftStr = 'off';
   if (shiftStr.toLowerCase() === 'off') shiftStr = 'off';
 
-  return { shift: shiftStr, covering_store };
+  return { 
+    shift: shiftStr, 
+    covering_store,
+    confirmed,
+    isConfirmed: confirmed,
+    registered: isRegistered,
+    isRegistered
+  };
 }
 
 /**
@@ -145,12 +169,17 @@ export function calculateEmployeeWeeklyHours(emp, empSched, days = ['T2', 'T3', 
   days.forEach(day => {
     const rawVal = empSched?.[day];
     if (!rawVal) return;
-    const { shift, covering_store } = normalizeShift(rawVal);
+    const { shift, covering_store, confirmed } = normalizeShift(rawVal);
     if (!shift || shift === 'off') return;
 
     const h = getShiftHours(shift);
     allShifts++;
     allHours += h;
+
+    // Bỏ qua ca đăng ký chưa chốt (chỉ tính ca đã chốt vào giờ làm chính thức)
+    if (options.includeUnconfirmed !== true && confirmed === false) {
+      return;
+    }
 
     if (covering_store && covering_store !== emp.dept) {
       coveringHours += h;
@@ -418,7 +447,8 @@ export function calculateStaffingGap(employees, weekSched, dayKey, storeId, requ
     employees.forEach(emp => {
       const raw = weekSched[emp.id]?.[dayKey];
       if (!raw) return;
-      const { shift, covering_store } = normalizeShift(raw);
+      const { shift, covering_store, confirmed } = normalizeShift(raw);
+      if (confirmed === false) return;
       if (shift !== shiftCode) return;
 
       if (emp.dept === storeId && !covering_store) {

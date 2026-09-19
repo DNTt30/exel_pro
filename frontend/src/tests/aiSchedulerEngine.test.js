@@ -289,5 +289,36 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
       // Chỉ 1 người được xếp ca 14-22, không xếp dư 2 người
       expect(assignedOnT2.length).toBe(1);
     });
+
+    it('tôn trọng ca ngắn 6-10 nhân viên đăng ký, không tự đổi thành 6-14 hay 14-22, giữ ca chưa chốt không màu', () => {
+      // NV pt_1 đăng ký 6-10, NV pt_2 đăng ký 6-10 vào Thứ 2
+      const registeredSchedule = {
+        'pt_1': { T2: '6-10' },
+        'pt_2': { T2: '6-10' }
+      };
+
+      const result = generateAISchedule(testEmps, 'VN0485', {
+        requiredMatrix: { '6-14': 1, '14-22': 1 },
+        existingSchedule: registeredSchedule,
+        respectAvailability: true
+      });
+
+      const s1 = result.schedule['pt_1']?.T2;
+      const s2 = result.schedule['pt_2']?.T2;
+
+      // Tuyệt đối không ai bị xếp sang ca chiều 14-22 hoặc bị ép thành 6-14
+      expect(s1).not.toBe('14-22');
+      expect(s2).not.toBe('14-22');
+      expect(s1).not.toBe('6-14');
+      expect(s2).not.toBe('6-14');
+
+      // 1 người được chốt đúng ca 6-10
+      const oneIsConfirmed = (s1 === '6-10') || (s2 === '6-10');
+      expect(oneIsConfirmed).toBe(true);
+
+      // Người còn lại giữ nguyên ca đăng ký 6-10 nhưng chưa chốt (confirmed: false / không màu)
+      const unconfirmed = s1 === '6-10' ? s2 : s1;
+      expect(unconfirmed).toEqual({ shift: '6-10', confirmed: false, registered: true });
+    });
   });
 });

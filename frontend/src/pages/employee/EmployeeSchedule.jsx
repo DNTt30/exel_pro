@@ -92,7 +92,8 @@ export default function EmployeeSchedule() {
       return;
     }
     setSaveStatus('saving');
-    await updateShift(currentWeek, user.id, day, value);
+    const valToSave = value === 'off' ? 'off' : { shift: value, confirmed: false, registered: true };
+    await updateShift(currentWeek, user.id, day, valToSave);
     setTimeout(() => setSaveStatus('saved'), 400);
   }, [currentWeek, updateShift, user?.id, isFutureWeek]);
 
@@ -106,7 +107,13 @@ export default function EmployeeSchedule() {
     const shiftsMap = {};
     for (let i = 0; i < WEEK_DAYS.length; i++) {
       const day = WEEK_DAYS[i];
-      shiftsMap[day] = (day === 'CN' && shiftCode !== 'off') ? 'off' : shiftCode;
+      if (day === 'CN' && shiftCode !== 'off') {
+        shiftsMap[day] = 'off';
+      } else if (shiftCode === 'off') {
+        shiftsMap[day] = 'off';
+      } else {
+        shiftsMap[day] = { shift: shiftCode, confirmed: false, registered: true };
+      }
     }
     await updateEmployeeWeeklyShifts(currentWeek, user.id, shiftsMap);
     setTimeout(() => setSaveStatus('saved'), 400);
@@ -119,7 +126,11 @@ export default function EmployeeSchedule() {
       return;
     }
     setSaveStatus('saving');
-    await updateEmployeeWeeklyShifts(currentWeek, user.id, suggestedShifts);
+    const formatted = {};
+    Object.entries(suggestedShifts || {}).forEach(([d, code]) => {
+      formatted[d] = (code === 'off' || !code) ? 'off' : { shift: code, confirmed: false, registered: true };
+    });
+    await updateEmployeeWeeklyShifts(currentWeek, user.id, formatted);
     setTimeout(() => setSaveStatus('saved'), 400);
     toast.success('Đã áp dụng lịch gợi ý thành công!');
   };
@@ -168,7 +179,7 @@ export default function EmployeeSchedule() {
       
       const isToday = today.toDateString() === dateObj.toDateString();
       const rawVal = mySched[dayKey] || '';
-      const { shift, covering_store } = normalizeShift(rawVal);
+      const { shift, covering_store, confirmed, isConfirmed } = normalizeShift(rawVal);
       const isOff = !shift || shift === 'off';
       const shiftInfo = SHIFTS[shift] || null;
       const hours = isOff ? 0 : getShiftHours(shift);
@@ -195,7 +206,8 @@ export default function EmployeeSchedule() {
         shiftInfo,
         hours,
         rawVal,
-        restWarning
+        restWarning,
+        isConfirmed: confirmed ?? isConfirmed ?? true
       };
     });
   }, [currentWeek, mySched, myDept, mySwapsThisWeek, user?.id]);
@@ -428,6 +440,14 @@ export default function EmployeeSchedule() {
                 >
                   <Sparkles size={11} className="text-amber-300" />
                   <span>✨ Gợi ý ca cho tôi</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickRegister('6-10')}
+                  className="px-2.5 py-1 bg-white hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
+                  title="Đăng ký ca 6-10 (4 tiếng) từ T2 đến T7, CN nghỉ"
+                >
+                  + Ca 6-10
                 </button>
                 <button
                   type="button"
@@ -766,13 +786,27 @@ export default function EmployeeSchedule() {
 
                         {/* Shift Badge */}
                         <div 
-                          className={`p-2.5 rounded-xl font-black text-sm text-center shadow-2xs ${isDraft ? 'border border-slate-300 border-dashed' : ''}`}
-                          style={{
-                            backgroundColor: card.shiftInfo?.bg || '#bfdbfe',
-                            color: card.shiftInfo?.text || '#1e40af'
-                          }}
+                          className={`p-2.5 rounded-xl font-black text-sm text-center shadow-2xs ${
+                            !card.isConfirmed
+                              ? 'border-2 border-dashed border-slate-300 bg-white text-slate-700'
+                              : (isDraft ? 'border border-slate-300 border-dashed' : '')
+                          }`}
+                          style={
+                            card.isConfirmed ? {
+                              backgroundColor: card.shiftInfo?.bg || '#bfdbfe',
+                              color: card.shiftInfo?.text || '#1e40af'
+                            } : {
+                              backgroundColor: '#ffffff',
+                              color: '#334155'
+                            }
+                          }
                         >
-                          {card.shift}
+                          <div>{card.shift}</div>
+                          {!card.isConfirmed && (
+                            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                              (Lịch rảnh đăng ký - Chưa chốt)
+                            </div>
+                          )}
                         </div>
 
                         {/* Store Location */}

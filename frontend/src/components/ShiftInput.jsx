@@ -29,6 +29,7 @@ export default function ShiftInput({
   let cellBg = 'transparent';
   let cellText = '#cbd5e1';
   let displayLabel = '-';
+  let isUnconfirmedReg = false;
 
   if (isBorrowed) {
     cellBg = '#f59e0b'; // Màu hổ phách nổi bật cho ca chi viện
@@ -40,8 +41,15 @@ export default function ShiftInput({
     cellBg = '#f1f5f9'; // Xám nhạt cho OFF
     cellText = '#64748b'; // Xám đậm
     displayLabel = 'OFF';
+  } else if (!normalized.confirmed && !isUnset) {
+    // CA ĐĂNG KÝ CHƯA CHỐT (B1 NV đăng ký ca rảnh, hoặc ca đăng ký không được chốt):
+    // KHÔNG CÓ MÀU! Nền trắng / trong suốt, chữ xám slate đậm, viền nét đứt
+    cellBg = '#ffffff';
+    cellText = '#334155';
+    displayLabel = shiftInfo?.label || shiftCode;
+    isUnconfirmedReg = true;
   } else if (shiftInfo) {
-    // Luôn hiển thị màu sắc ca trực trực quan chuẩn nhận diện GS25
+    // CA ĐÃ CHỐT: Luôn hiển thị màu sắc ca trực trực quan chuẩn nhận diện GS25
     cellBg = shiftInfo.bg;
     cellText = shiftInfo.text;
     displayLabel = shiftInfo.label || shiftCode;
@@ -261,14 +269,25 @@ export default function ShiftInput({
             backgroundColor: cellBg,
             color: cellText,
           }}
-          title={isBorrowed ? `Chi viện ${normalized.covering_store} (Click đúp để sửa)` : '(Chạm để chọn ca, click đúp hoặc gõ để sửa)'}
-          className={`w-full h-full min-h-[38px] flex items-center justify-center select-none px-0.5 py-0 ${
+          title={isBorrowed 
+            ? `Chi viện ${normalized.covering_store} (Click đúp để sửa)` 
+            : isUnconfirmedReg 
+              ? `Lịch rảnh đăng ký: ${shiftCode} (Chưa chốt / Không màu)` 
+              : '(Chạm để chọn ca, click đúp hoặc gõ để sửa)'}
+          className={`w-full h-full min-h-[38px] flex items-center justify-center select-none px-0.5 py-0 relative ${
             isBorrowed ? 'text-[11px] font-black tracking-tight pb-2' : 'text-xs font-bold'
+          } ${
+            isUnconfirmedReg ? 'border-2 border-dashed border-slate-300 bg-white font-semibold' : ''
           } ${
             readOnly ? 'cursor-default' : 'cursor-pointer sm:cursor-cell focus:ring-2 focus:ring-inset focus:ring-blue-600 focus:z-20'
           } ${isUnset ? 'font-normal italic' : ''}`}
         >
           {isUnset ? '-' : displayLabel}
+          {isUnconfirmedReg && !isEditing && (
+            <span className="pointer-events-none absolute right-0.5 top-0.5 text-[8px] font-extrabold text-slate-400 leading-none">
+              ĐK
+            </span>
+          )}
         </div>
       )}
 
@@ -331,6 +350,24 @@ export default function ShiftInput({
                 <X size={15} />
               </button>
             </div>
+
+            {/* Quick Chốt Ca nếu là ca đăng ký chưa chốt */}
+            {isUnconfirmedReg && (
+              <div className="mb-2 p-1.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-amber-700 font-semibold">Đăng ký rảnh:</div>
+                  <div className="text-xs font-extrabold text-slate-800">{shiftCode}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectShiftFromPicker(shiftCode)}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black cursor-pointer shadow-2xs active:scale-95"
+                  title="Chốt ca này cho nhân viên (bật màu chính thức)"
+                >
+                  ✓ Chốt ca
+                </button>
+              </div>
+            )}
 
             {/* Ca chính 8 tiếng & OFF */}
             <div className="grid grid-cols-3 gap-1.5 mb-2">

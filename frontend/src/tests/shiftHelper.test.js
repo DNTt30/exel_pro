@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { 
+  normalizeShift,
   getShiftHours, 
   getShiftCode,
   isShiftsOverlapping, 
@@ -421,6 +422,43 @@ describe('Shift Helper Logic & Business Rules', () => {
       expect(result.e1.T3).toBe('14-22'); // e1 nhận T3 của e2
       expect(result.e2.T3).toBe('off');   // e2 nhận T3 trước của e1
       expect(result.e2.T2).toBe('6-14'); // e2 nhận T2 của e1
+    });
+  });
+
+  describe('normalizeShift - confirmed & registered status', () => {
+    it('treats standard string as confirmed: true', () => {
+      const res = normalizeShift('6-14');
+      expect(res.shift).toBe('6-14');
+      expect(res.confirmed).toBe(true);
+      expect(res.registered).toBe(false);
+    });
+
+    it('treats registered object with confirmed: false properly', () => {
+      const res = normalizeShift({ shift: '6-10', confirmed: false, registered: true });
+      expect(res.shift).toBe('6-10');
+      expect(res.confirmed).toBe(false);
+      expect(res.registered).toBe(true);
+    });
+
+    it('treats :reg suffix string as confirmed: false, registered: true', () => {
+      const res = normalizeShift('6-10:reg');
+      expect(res.shift).toBe('6-10');
+      expect(res.confirmed).toBe(false);
+      expect(res.registered).toBe(true);
+    });
+  });
+
+  describe('calculateStaffingGap with unconfirmed shifts', () => {
+    it('ignores unconfirmed shifts from staffing gap totals', () => {
+      const emps = [{ id: 'e1', dept: 'VN0485' }, { id: 'e2', dept: 'VN0485' }];
+      const sched = {
+        e1: { T2: '6-14' }, // confirmed
+        e2: { T2: { shift: '6-14', confirmed: false } } // unconfirmed registered
+      };
+      const gap = calculateStaffingGap(emps, sched, 'T2', 'VN0485', { '6-14': 2 });
+      // e1 counts (1), e2 is ignored because confirmed: false
+      expect(gap['6-14'].actual).toBe(1);
+      expect(gap['6-14'].gap).toBe(-1); // deficit of 1
     });
   });
 });

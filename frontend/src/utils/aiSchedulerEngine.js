@@ -526,10 +526,19 @@ export function generateAISchedule(employees, storeId, options = {}) {
   const matrixCodes = new Set();
   if (requiredMatrix) Object.keys(requiredMatrix).forEach(c => { if ((requiredMatrix[c] || 0) > 0) matrixCodes.add(c); });
   Object.values(effectiveMatrixByDay).forEach(m => Object.keys(m || {}).forEach(c => { if ((m[c] || 0) > 0) matrixCodes.add(c); }));
+  // Thêm tất cả ca nhân viên thực tế đã đăng ký vào danh sách xem xét
+  Object.values(employeeRegisteredShifts).forEach(shifts => {
+    Object.values(shifts).forEach(c => { if (c && c !== 'off') matrixCodes.add(c); });
+  });
   const shiftPriorities = CANON_ORDER.filter(c => c === '22-6' || matrixCodes.has(c));
+  matrixCodes.forEach(c => {
+    if (!shiftPriorities.includes(c) && c !== 'off') shiftPriorities.push(c);
+  });
 
+  const confirmedAssignments = new Set();
   const assignShiftTo = (emp, dayKey, shiftCode) => {
     resultSchedule[emp.id][dayKey] = shiftCode;
+    confirmedAssignments.add(`${emp.id}|${dayKey}`);
     employeeHours[emp.id] += getShiftHours(shiftCode);
     employeeShiftsCount[emp.id]++;
   };
@@ -542,6 +551,15 @@ export function generateAISchedule(employees, storeId, options = {}) {
     const hasSmForce = employeeOverrides[emp.id]?.[dayKey] && employeeOverrides[emp.id]?.[dayKey] !== 'off';
     if (respectOffRequests && employeeOffDays[emp.id]?.has(dayKey) && !hasSmForce) {
       return false;
+    }
+
+    // TÔN TRỌNG CA ĐĂNG KÝ: Nếu nhân viên đã đăng ký ca cụ thể trong ngày (ví dụ 6-10),
+    // họ CHỈ ĐƯỢC PHÉP làm đúng ca đã đăng ký! Tuyệt đối không tự ý đổi sang 6-14 hay 14-22.
+    if (respectAvailability && !hasSmForce) {
+      const regShift = employeeRegisteredShifts[emp.id]?.[dayKey];
+      if (regShift && regShift !== shiftCode) {
+        return false;
+      }
     }
 
     const isFT = ftEmployees.some(ft => ft.id === emp.id);
@@ -611,7 +629,32 @@ export function generateAISchedule(employees, storeId, options = {}) {
     WEEK_DAYS.forEach((dayKey, dayIdx) => {
       shiftPriorities.forEach(shiftCode => {
         const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-        const neededCount = dayMatrix[shiftCode] || 0;
+        let neededCount = dayMatrix[shiftCode] || 0;
+
+        // Nếu ca 4h (6-10, 10-14, 14-18, 18-22) chưa có định biên riêng trong matrix,
+        // nhưng ca lớn tương ứng (6-14 hoặc 14-22) đang cần người:
+        if (neededCount === 0) {
+          if (shiftCode === '6-10' || shiftCode === '10-14') {
+            const morningNeeded = dayMatrix['6-14'] || 0;
+            const morningAssigned = storeEmployees.filter(e => {
+              const s = resultSchedule[e.id][dayKey];
+              return s === '6-14' || s === '6-10' || s === '10-14';
+            }).length;
+            if (morningAssigned < morningNeeded) {
+              neededCount = Math.min(1, morningNeeded - morningAssigned);
+            }
+          } else if (shiftCode === '14-18' || shiftCode === '18-22') {
+            const afternoonNeeded = dayMatrix['14-22'] || 0;
+            const afternoonAssigned = storeEmployees.filter(e => {
+              const s = resultSchedule[e.id][dayKey];
+              return s === '14-22' || s === '14-18' || s === '18-22';
+            }).length;
+            if (afternoonAssigned < afternoonNeeded) {
+              neededCount = Math.min(1, afternoonNeeded - afternoonAssigned);
+            }
+          }
+        }
+
         let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
         if (assignedCount < neededCount) {
@@ -770,6 +813,22 @@ export function generateAISchedule(employees, storeId, options = {}) {
       const actualCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
       if (actualCount < neededCount) {
         warnings.push(`Thiếu ${neededCount - actualCount} người ca ${shiftCode} ngày ${dayKey} (cần ${neededCount}, có ${actualCount}).`);
+      }
+    });
+  });
+
+  // CHUẨN HÓA TRẠNG THÁI HIỂN THỊ:
+  // - Ca chốt chính thức (được Quản lý / AI xếp): giữ mã ca chốt ('6-14', '6-10', '14-22'...) để có màu sắc GS25.
+  // - Ca nhân viên đã đăng ký nhưng không được chốt (thừa định biên): VẪN GIỮ TRÊN BẢNG LỊCH nhưng ở trạng thái CHƯA CHỐT / KHÔNG MÀU ({ shift: reg, confirmed: false, registered: true }).
+  // - Ca không làm / xin nghỉ: 'off'.
+  storeEmployees.forEach(emp => {
+    WEEK_DAYS.forEach(dayKey => {
+      const isConfirmed = confirmedAssignments.has(`${emp.id}|${dayKey}`);
+      if (!isConfirmed) {
+        const reg = employeeRegisteredShifts[emp.id]?.[dayKey];
+        if (reg && reg !== 'off') {
+          resultSchedule[emp.id][dayKey] = { shift: reg, confirmed: false, registered: true };
+        }
       }
     });
   });

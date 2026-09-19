@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart3, AlertTriangle } from 'lucide-react';
+import { BarChart3, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { WEEK_DAYS, DAY_FULL_NAMES, getStaffingMatrix, STAFFING_SHIFT_CODES } from '../../data/constants';
-import { calculateStaffingGap } from '../../utils/shiftHelper';
+import { calculateStaffingGap, normalizeShift } from '../../utils/shiftHelper';
 
 // Nhãn tiếng Việt cho từng ca
 const SHIFT_LABELS = { '6-14': 'Ca sáng', '14-22': 'Ca chiều', '22-6': 'Ca đêm' };
@@ -12,6 +12,7 @@ const SHIFT_LABELS = { '6-14': 'Ca sáng', '14-22': 'Ca chiều', '22-6': 'Ca đ
  */
 export default function StaffingGapChart({ employees, weekSchedule = {}, stores = [], scopeStoreId = 'ALL', currentWeek }) {
   const [hoverKey, setHoverKey] = useState(null);
+  const [onlyScheduledStores, setOnlyScheduledStores] = useState(false);
 
   const scopedStores = useMemo(() => {
     if (scopeStoreId && scopeStoreId !== 'ALL') {
@@ -22,13 +23,60 @@ export default function StaffingGapChart({ employees, weekSchedule = {}, stores 
     return stores;
   }, [stores, scopeStoreId]);
 
+  // Phân tích tiến độ nhập lịch của từng cửa hàng trong tuần hiện tại
+  const storeProgress = useMemo(() => {
+    if (!stores.length) return { total: 0, scheduledCount: 0, unscheduledStores: [], storeDetails: [] };
+    const details = stores.map((store) => {
+      let shiftCount = 0;
+      employees.forEach((emp) => {
+        if (emp.dept !== store.id) return;
+        WEEK_DAYS.forEach((day) => {
+          const raw = weekSchedule[emp.id]?.[day];
+          if (!raw) return;
+          const { shift, confirmed } = normalizeShift(raw);
+          if (shift && shift !== 'off' && confirmed !== false) {
+            shiftCount++;
+          }
+        });
+      });
+      return {
+        id: store.id,
+        name: store.name || store.id,
+        shiftCount,
+        hasSchedule: shiftCount > 0
+      };
+    });
+
+    const scheduled = details.filter((d) => d.hasSchedule);
+    const unscheduled = details.filter((d) => !d.hasSchedule);
+    return {
+      total: details.length,
+      scheduledCount: scheduled.length,
+      unscheduledStores: unscheduled,
+      storeDetails: details
+    };
+  }, [stores, employees, weekSchedule]);
+
+  // Bộ danh sách cửa hàng thực tế dùng để vẽ biểu đồ
+  const activeStores = useMemo(() => {
+    if (scopeStoreId && scopeStoreId !== 'ALL') {
+      return scopedStores;
+    }
+    if (onlyScheduledStores) {
+      const scheduledIds = new Set(storeProgress.storeDetails.filter((s) => s.hasSchedule).map((s) => s.id));
+      const filtered = scopedStores.filter((s) => scheduledIds.has(s.id));
+      return filtered.length ? filtered : scopedStores;
+    }
+    return scopedStores;
+  }, [scopeStoreId, scopedStores, onlyScheduledStores, storeProgress]);
+
   // Gom dữ liệu: với mỗi ngày, cộng dồn required/total từ từng cửa hàng trong phạm vi xem
   const dayData = useMemo(() => {
-    if (!scopedStores.length) return [];
+    if (!activeStores.length) return [];
     return WEEK_DAYS.map((day) => {
       const perShift = {};
       STAFFING_SHIFT_CODES.forEach((code) => { perShift[code] = { required: 0, actual: 0, support: 0 }; });
-      scopedStores.forEach((store) => {
+      activeStores.forEach((store) => {
         const matrix = getStaffingMatrix(store, day);
         const gap = calculateStaffingGap(employees, weekSchedule, day, store.id, matrix);
         STAFFING_SHIFT_CODES.forEach((code) => {
@@ -41,7 +89,7 @@ export default function StaffingGapChart({ employees, weekSchedule = {}, stores 
       });
       return { day, perShift };
     });
-  }, [employees, weekSchedule, scopedStores]);
+  }, [employees, weekSchedule, activeStores]);
 
   const deficitCount = dayData.reduce((sum, d) => sum + STAFFING_SHIFT_CODES.filter(
     (c) => d.perShift[c].actual + d.perShift[c].support < d.perShift[c].required
@@ -60,18 +108,64 @@ export default function StaffingGapChart({ employees, weekSchedule = {}, stores 
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 print:hidden">
+      {/* Thanh cảnh báo Tiến độ chốt lịch cửa hàng */}
+      {scopeStoreId === 'ALL' && storeProgress.total > 1 && (
+        <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <Info size={15} className="text-amber-600 flex-shrink-0" />
+            <div className="leading-tight">
+              <span className="font-bold text-amber-900">
+                Tiến độ lập lịch ({currentWeek}):
+              </span>{' '}
+              <span className="font-extrabold text-amber-800">
+                {storeProgress.scheduledCount}/{storeProgress.total} cửa hàng đã xếp lịch
+              </span>
+              {storeProgress.unscheduledStores.length > 0 && (
+                <span className="text-amber-700 text-[11px] block sm:inline sm:ml-1">
+                  — Chưa nộp lịch:{' '}
+                  <strong className="font-bold underline underline-offset-2">
+                    {storeProgress.unscheduledStores.map((s) => s.name || s.id).join(', ')}
+                  </strong>
+                </span>
+              )}
+            </div>
+          </div>
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 cursor-pointer select-none bg-white/90 px-2.5 py-1 rounded-lg border border-amber-300 hover:bg-white transition-colors shadow-2xs">
+            <input
+              type="checkbox"
+              checked={onlyScheduledStores}
+              onChange={(e) => setOnlyScheduledStores(e.target.checked)}
+              className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+            />
+            <span>Chỉ xem các CH đã nộp lịch</span>
+          </label>
+        </div>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
           <BarChart3 size={15} className="text-blue-600" />
           <span>Định biên vs Thực tế theo ca — Tuần {currentWeek}</span>
-          <span className="text-[10px] font-semibold text-slate-400">({scopeStoreId === 'ALL' ? 'Toàn bộ cửa hàng' : 'Cửa hàng ' + scopeStoreId})</span>
+          <span className="text-[10px] font-semibold text-slate-400">
+            ({scopeStoreId === 'ALL' 
+              ? (onlyScheduledStores ? `Đã lọc ${activeStores.length} CH có lịch` : 'Toàn bộ cửa hàng') 
+              : 'Cửa hàng ' + scopeStoreId})
+          </span>
         </div>
         {deficitCount > 0 ? (
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
             <AlertTriangle size={11} /> {deficitCount} ca thiếu người trong tuần
+            {scopeStoreId === 'ALL' && !onlyScheduledStores && storeProgress.unscheduledStores.length > 0 && (
+              <span className="opacity-80 font-normal ml-0.5">({storeProgress.unscheduledStores.length} CH chưa nộp)</span>
+            )}
           </span>
         ) : (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Đủ định biên cả tuần</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+            <CheckCircle2 size={11} /> Đủ định biên cả tuần
+            {onlyScheduledStores && (
+              <span className="opacity-80 font-normal ml-0.5">({activeStores.length} CH đã nộp)</span>
+            )}
+          </span>
         )}
       </div>
 

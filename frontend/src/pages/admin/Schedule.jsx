@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 
-import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
+import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek, getStaffingMatrix } from '../../data/constants';
 import { 
   Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock, 
   UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck, 
@@ -14,7 +14,7 @@ import Toolbar from '../../components/Toolbar';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { exportScheduleToPDF } from '../../utils/pdfExport';
-import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
+import { normalizeShift, getShiftHours, calculateStaffingGap } from '../../utils/shiftHelper';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import WeekFlowBar from '../../components/WeekFlowBar';
@@ -306,6 +306,25 @@ export default function Schedule() {
       return [];
     }
   }, [employees, schedule, currentWeek]);
+
+  // Phase 4.5: Tính toán thiếu ca định biên theo từng ngày để hiển thị trực tiếp trên tiêu đề cột
+  const dailyStaffingDeficits = useMemo(() => {
+    if (viewMode !== 'week') return {};
+    const targetStoreId = filterDept && filterDept !== 'ALL' ? filterDept : (user?.dept || stores[0]?.id || 'VN0485');
+    const store = stores.find(s => s.id === targetStoreId) || { id: targetStoreId, staffing: null };
+    const map = {};
+    WEEK_DAYS.forEach(dayKey => {
+      const matrix = getStaffingMatrix(store, dayKey);
+      const gap = calculateStaffingGap(employees, weekSchedule, dayKey, targetStoreId, matrix);
+      const deficitShifts = Object.entries(gap)
+        .filter(([_, data]) => data.gap < 0)
+        .map(([code, data]) => ({ code, gap: data.gap, required: data.required, actual: data.total }));
+      if (deficitShifts.length > 0) {
+        map[dayKey] = deficitShifts;
+      }
+    });
+    return map;
+  }, [viewMode, filterDept, user?.dept, stores, employees, weekSchedule]);
 
   // Tổng hợp chỉ số KPI
   const summaryMetrics = useMemo(() => {
@@ -835,16 +854,18 @@ export default function Schedule() {
 
                   const dayLabel = viewMode === 'month' ? (cell?.dayKey || day) : day;
                   const isSunday = dayLabel === 'CN';
+                  const dayDeficits = viewMode === 'week' ? dailyStaffingDeficits[day] : null;
+                  const hasDeficit = dayDeficits && dayDeficits.length > 0;
 
                   return (
                     <th 
                       key={day} 
-                      className={`min-w-[70px] max-w-[80px] text-center font-bold border-r border-slate-300 py-1 px-0.5 transition-colors ${
+                      className={`min-w-[72px] max-w-[85px] text-center font-bold border-r border-slate-300 py-1 px-0.5 transition-colors ${
                         isToday 
                           ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500' 
                           : (isSunday ? 'bg-orange-50/80 text-orange-950' : 'bg-slate-200 text-slate-700')
                       }`}
-                      title={`${dayLabel} ngày ${dateStr}`}
+                      title={`${dayLabel} ngày ${dateStr}${hasDeficit ? ` · Đang thiếu ${dayDeficits.length} ca: ${dayDeficits.map(d => `Ca ${d.code} (cần ${d.required}, có ${d.actual})`).join(', ')}` : ''}`}
                     >
                       <div className="flex flex-col items-center justify-center leading-tight">
                         <span className={`text-xs font-black ${isSunday ? 'text-rose-600' : ''}`}>
@@ -854,6 +875,15 @@ export default function Schedule() {
                         {isToday && (
                           <span className="text-[8px] uppercase tracking-tighter bg-blue-600 text-white px-1 rounded font-black mt-0.5 shadow-2xs">
                             Hôm nay
+                          </span>
+                        )}
+                        {hasDeficit && (
+                          <span 
+                            className="mt-1 px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs flex items-center gap-0.5"
+                            title={`Thiếu ${dayDeficits.length} ca: ${dayDeficits.map(d => `${d.code} (-${Math.abs(d.gap)})`).join(', ')}`}
+                          >
+                            <AlertTriangle size={8.5} className="text-rose-600 flex-shrink-0" />
+                            <span>Thiếu {dayDeficits.length} ca</span>
                           </span>
                         )}
                       </div>

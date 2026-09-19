@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://plitfdjzuealjxbylwxy.supabase.co';
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_NSojsCWhOgiUvZIrMpoXEg_So_tE3O_';
+// Bắt buộc cấu hình trong .env — không hardcode fallback key vào source code
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Thiếu VITE_SUPABASE_URL hoặc VITE_SUPABASE_ANON_KEY trong file .env. Xem .env.example.');
+}
 
 // Khởi tạo Supabase Client
 export const supabase = (supabaseUrl && supabaseAnonKey)
@@ -14,7 +19,3 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
       }
     })
   : null;
-
-if (!supabase) {
-  console.warn("Chưa cấu hình Supabase URL và Anon Key trong file .env!");
-}

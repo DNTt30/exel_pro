@@ -12,6 +12,7 @@ import { createEmployeeSlice } from './slices/employeeSlice';
 import { createScheduleSlice } from './slices/scheduleSlice';
 import { createShelfSlice } from './slices/shelfSlice';
 import { hasCustomAdminPassword } from '../lib/adminCredential';
+import { toast } from '../utils/toast';
 
 export const useStore = create(
   persist(
@@ -24,6 +25,7 @@ export const useStore = create(
       
       isInitializing: false,
       syncStatus: 'idle',
+      realtimeStatus: 'connecting', // 'connecting' | 'connected' | 'disconnected' | 'error'
       lastSyncedAt: null,
       _bootstrapping: false,
       _realtimeChannel: null,
@@ -39,32 +41,41 @@ export const useStore = create(
 
         let schedTimer = null;
         let shelfTimer = null;
+        let swapsTimer = null;
+        let feedbacksTimer = null;
 
         // Lưu cleanup function vào store để initRealtime có thể gọi lại an toàn
         set({
+          realtimeStatus: 'connecting',
           _cleanupRealtimeTimers: () => {
             clearTimeout(schedTimer);
             clearTimeout(shelfTimer);
+            clearTimeout(swapsTimer);
+            clearTimeout(feedbacksTimer);
           }
         });
 
         const channel = supabase.channel('store-sync')
+          // 1. Bảng lịch làm việc (schedules)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
-            console.log('Realtime schedules changed:', payload);
+            console.log('[Realtime] schedules changed:', payload);
             if (schedTimer) clearTimeout(schedTimer);
             schedTimer = setTimeout(() => {
               const week = get().currentWeek;
               if (week) {
                  api.getSchedulesByWeek(week).then(scheds => {
                     set(state => ({
-                      schedule: { ...state.schedule, [week]: scheds }
+                      schedule: { ...state.schedule, [week]: scheds },
+                      lastSyncedAt: Date.now()
                     }));
+                    toast.info('Lịch làm việc vừa được cập nhật thời gian thực');
                  }).catch(console.error);
               }
             }, REALTIME_DEBOUNCE_MS);
           })
+          // 2. Bảng kệ hàng & date (shelf_items)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'shelf_items' }, (payload) => {
-            console.log('Realtime shelf_items changed:', payload);
+            console.log('[Realtime] shelf_items changed:', payload);
             if (shelfTimer) clearTimeout(shelfTimer);
             shelfTimer = setTimeout(() => {
               const plan = bootstrapQueryPlan(get().user);
@@ -73,11 +84,50 @@ export const useStore = create(
                 ? { storeId: plan.shelfItems.storeId }
                 : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
               api.getShelfItems(itemOpts).then(items => {
-                set({ shelfItems: items });
+                set({ shelfItems: items, lastSyncedAt: Date.now() });
               }).catch(console.error);
             }, REALTIME_DEBOUNCE_MS);
           })
-          .subscribe();
+          // 3. Bảng đơn đổi ca (shift_swaps)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_swaps' }, (payload) => {
+            console.log('[Realtime] shift_swaps changed:', payload);
+            if (swapsTimer) clearTimeout(swapsTimer);
+            swapsTimer = setTimeout(() => {
+              const plan = bootstrapQueryPlan(get().user);
+              api.getShiftSwaps(plan.swaps).then(swaps => {
+                set({ shiftSwaps: swaps || [], lastSyncedAt: Date.now() });
+                if (payload.eventType === 'INSERT') {
+                  toast.info('Có đơn đổi ca mới vừa gửi!');
+                } else if (payload.eventType === 'UPDATE') {
+                  toast.info('Trạng thái đơn đổi ca vừa được cập nhật');
+                }
+              }).catch(console.error);
+            }, REALTIME_DEBOUNCE_MS);
+          })
+          // 4. Bảng phản hồi / đơn bù công (employee_feedbacks)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_feedbacks' }, (payload) => {
+            console.log('[Realtime] employee_feedbacks changed:', payload);
+            if (feedbacksTimer) clearTimeout(feedbacksTimer);
+            feedbacksTimer = setTimeout(() => {
+              const plan = bootstrapQueryPlan(get().user);
+              api.getFeedbacks(plan.feedbacks).then(fbs => {
+                set({ feedbacks: fbs || [], lastSyncedAt: Date.now() });
+                if (payload.eventType === 'INSERT') {
+                  toast.info('Có đơn bù công / phản hồi mới!');
+                }
+              }).catch(console.error);
+            }, REALTIME_DEBOUNCE_MS);
+          })
+          .subscribe((status) => {
+            console.log('[Supabase Realtime Status]:', status);
+            if (status === 'SUBSCRIBED') {
+              set({ realtimeStatus: 'connected' });
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              set({ realtimeStatus: 'error' });
+            } else if (status === 'CLOSED') {
+              set({ realtimeStatus: 'disconnected' });
+            }
+          });
           
         set({ _realtimeChannel: channel });
       },

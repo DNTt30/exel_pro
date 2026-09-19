@@ -196,21 +196,32 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
 
                   {/* Actions Footer */}
                   {(canPartnerAct || canManagerAct || canCancel) && (
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 flex-wrap">
+                    <div className="pt-2 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2">
+                      {/* Creator Cancel Action */}
+                      {canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(swap.id)}
+                          className="w-full sm:w-auto text-xs text-slate-400 hover:text-red-600 font-semibold px-2 py-1.5 transition-colors cursor-pointer text-center"
+                        >
+                          Hủy yêu cầu
+                        </button>
+                      )}
+
                       {/* Partner Action */}
                       {canPartnerAct && (
                         <>
                           <button
                             type="button"
                             onClick={() => handlePartnerResponse(swap.id, false)}
-                            className="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                            className="w-full sm:w-auto px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
                           >
                             Từ chối
                           </button>
                           <button
                             type="button"
                             onClick={() => handlePartnerResponse(swap.id, true)}
-                            className="px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                            className="w-full sm:w-auto px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <Check size={13} /> Đồng ý đổi ca
                           </button>
@@ -223,29 +234,18 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                           <button
                             type="button"
                             onClick={() => handleManagerResponse(swap.id, false)}
-                            className="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                            className="w-full sm:w-auto px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
                           >
                             Từ chối
                           </button>
                           <button
                             type="button"
                             onClick={() => handleManagerResponse(swap.id, true)}
-                            className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                            className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <Check size={13} /> Duyệt đổi ca (Tự động cập nhật)
                           </button>
                         </>
-                      )}
-
-                      {/* Creator Cancel Action */}
-                      {canCancel && (
-                        <button
-                          type="button"
-                          onClick={() => handleCancel(swap.id)}
-                          className="text-xs text-slate-400 hover:text-red-600 font-semibold px-2 py-1 transition-colors cursor-pointer"
-                        >
-                          Hủy yêu cầu
-                        </button>
                       )}
                     </div>
                   )}
@@ -256,11 +256,11 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-2 border-t border-slate-200 flex justify-end">
+        <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline text-xs px-4 py-2 cursor-pointer"
+            className="btn btn-outline text-xs px-4 py-2 cursor-pointer w-full sm:w-auto justify-center"
           >
             Đóng
           </button>

@@ -83,12 +83,27 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
           <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
             className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập lại chính xác mật khẩu mới" />
         </label>
-        <button type="button" disabled={busy}
-          onClick={submit}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
-          <KeyRound size={15} />
-          {busy ? 'Đang lưu...' : (isAdminReset ? 'Đặt lại mật khẩu' : (isForced ? 'Lưu mật khẩu mới & Bắt đầu' : 'Đổi mật khẩu'))}
-        </button>
+        <div className="pt-2 flex flex-col-reverse sm:flex-row items-center gap-2">
+          {!isForced && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="w-full sm:w-1/3 py-2.5 px-4 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition-colors cursor-pointer text-xs"
+            >
+              Hủy bỏ
+            </button>
+          )}
+          <button 
+            type="button" 
+            disabled={busy}
+            onClick={submit}
+            className={`w-full ${!isForced ? 'sm:w-2/3' : ''} flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold disabled:opacity-50 transition-all shadow-md shadow-blue-500/20 cursor-pointer text-xs sm:text-sm`}
+          >
+            <KeyRound size={15} />
+            {busy ? 'Đang lưu...' : (isAdminReset ? 'Đặt lại mật khẩu' : (isForced ? 'Lưu mật khẩu mới & Bắt đầu' : 'Cập nhật mật khẩu'))}
+          </button>
+        </div>
         {user?.mustChangePassword && !isAdminReset && !isForced && (
           <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
             Bạn đang dùng mật khẩu mặc định — hãy đổi để bảo vệ tài khoản.
@@ -104,13 +119,21 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
           >
             <LogOut size={13} /> Đăng xuất tài khoản
           </button>
-          {isForced && (
+          {isForced ? (
             <button
               type="button"
               onClick={onClose}
               className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
             >
               Để sau, vào xem lịch →
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
+            >
+              Đóng cửa sổ
             </button>
           )}
         </div>

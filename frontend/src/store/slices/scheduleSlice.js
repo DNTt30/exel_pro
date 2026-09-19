@@ -1,4 +1,4 @@
-import * as api from '../../services/api';
+﻿import * as api from '../../services/api';
 import {
   assertCanManageStaff,
   assertWeekEditable,
@@ -14,6 +14,11 @@ import { notifyTelegram } from '../../utils/telegram';
 import { buildSwappedSchedules, mergeAiSchedule } from '../../utils/shiftHelper';
 import { toast } from '../../utils/toast'; // utils layer — tránh store → components/ui dependency
 import { getCurrentMondayWeek } from '../../data/constants';
+
+// --- Constants ---
+
+/** Default ca trống cho 1 tuần — dùng làm fallback thay vì lặp object literal nhiều lần. */
+const EMPTY_WEEK_SHIFTS = Object.freeze({ T2: '', T3: '', T4: '', T5: '', T6: '', T7: '', CN: '' });
 
 // --- Helper functions ---
 
@@ -247,13 +252,13 @@ export const createScheduleSlice = (set, get) => ({
   updateShift: async (weekDate, empId, day, shiftCode) => {
     assertCanEditShift(get(), empId, weekDate);
     const weekSched = get().schedule[weekDate] || {};
-    const empSched = weekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+    const empSched = weekSched[empId] || EMPTY_WEEK_SHIFTS;
     const previousShifts = { ...empSched };
     const updatedShifts = { ...empSched, [day]: shiftCode };
     
     set((state) => {
       const latestWeekSched = state.schedule[weekDate] || {};
-      const latestEmpSched = latestWeekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+      const latestEmpSched = latestWeekSched[empId] || EMPTY_WEEK_SHIFTS;
       const latestUpdated = { ...latestEmpSched, [day]: shiftCode };
       return {
         schedule: {
@@ -298,14 +303,14 @@ export const createScheduleSlice = (set, get) => ({
   updateEmployeeWeeklyShifts: async (weekDate, empId, newShiftsMap) => {
     assertCanEditShift(get(), empId, weekDate);
     const weekSched = get().schedule[weekDate] || {};
-    const empSched = weekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+    const empSched = weekSched[empId] || EMPTY_WEEK_SHIFTS;
     const previousShifts = { ...empSched };
     const mergedShifts = { ...empSched, ...newShiftsMap };
 
     // Optimistic UI update — cập nhật ngay lập tức 0ms
     set((state) => {
       const latestWeekSched = state.schedule[weekDate] || {};
-      const latestEmpSched = latestWeekSched[empId] || { T2:'', T3:'', T4:'', T5:'', T6:'', T7:'', CN:'' };
+      const latestEmpSched = latestWeekSched[empId] || EMPTY_WEEK_SHIFTS;
       return {
         schedule: {
           ...state.schedule,

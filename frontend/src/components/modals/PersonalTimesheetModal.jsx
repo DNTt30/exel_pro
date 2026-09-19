@@ -176,22 +176,22 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-          <span className="text-[11px] text-slate-400">
+        <div className="pt-2 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+          <span className="text-[11px] text-slate-400 order-2 sm:order-1 text-center sm:text-left">
             Ngày in: {new Date().toLocaleDateString('vi-VN')}
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse sm:flex-row items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-outline text-xs px-4 py-2 cursor-pointer"
+              className="btn btn-outline text-xs px-4 py-2 cursor-pointer w-full sm:w-auto justify-center"
             >
               Đóng
             </button>
             <button
               type="button"
               onClick={handlePrint}
-              className="btn btn-primary text-xs px-4 py-2 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
+              className="btn btn-primary text-xs px-4 py-2 flex items-center justify-center gap-1.5 font-bold shadow-xs cursor-pointer w-full sm:w-auto"
             >
               <Printer size={13} />
               <span>In Phiếu (PDF)</span>

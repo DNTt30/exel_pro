@@ -328,5 +328,99 @@ describe('Shift Helper Logic & Business Rules', () => {
       const okRes = checkEmployeeShiftRestGap(weekSched, 'emp1', 'T3', '14-22');
       expect(okRes.hasRestWarning).toBe(false);
     });
+
+    // [SUG-3 fix] Edge case: ca 14-22 → 22-6 liền đêm (gap ngày hôm sau)
+    it('14-22 → 22-6 hôm sau: gap = 24h (ca 22-6 bắt đầu lúc 22h ngày hôm sau)', () => {
+      // endPrev = 22, startNext = 24 + 22 = 46, gap = 24h → đủ nghỉ ngơi (bình thường)
+      const gap = calculateShiftRestGap('14-22', '22-6');
+      expect(gap).toBe(24);
+    });
+
+    it('22-6 → 22-6 hôm sau: gap = 16h (ca đêm liên tiếp ngày hôm sau)', () => {
+      // endPrev = 30 (6am), startNext = 24 + 22 = 46, gap = 16h
+      const gap = calculateShiftRestGap('22-6', '22-6');
+      expect(gap).toBe(16);
+    });
+  });
+
+  // ─── Edge cases từ review: validateEmployeeSchedule ─────────────────────
+  describe('[MAJ-4 fix] validateEmployeeSchedule — SM/OFC/type rỗng không bị áp rule FT', () => {
+    it('type SM không có warning FT dù dưới 48h/tuần', () => {
+      const smEmp = { id: 'sm1', type: 'SM', role: 'Cửa hàng trưởng', maxH: 48 };
+      const result = validateEmployeeSchedule(smEmp, 30, 4);
+      // SM không phải PT cũng không phải FT (whitelist) → không có warning nào
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('type OFC không có warning FT', () => {
+      const ofc = { id: 'ofc1', type: 'OFC', role: 'OFC', maxH: 48 };
+      const result = validateEmployeeSchedule(ofc, 20, 3);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("type '' (rỗng) không có warning FT", () => {
+      const emp = { id: 'x', type: '', role: '', maxH: 48 };
+      const result = validateEmployeeSchedule(emp, 0, 0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('STFT dưới 48h/tuần VẪN có warning', () => {
+      const ft = { id: 'ft1', type: 'STFT', role: 'STFT', maxH: 48 };
+      const result = validateEmployeeSchedule(ft, 32, 4);
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.badge?.includes('48h'))).toBe(true);
+    });
+
+    it('CSR_NEW dưới 6 ca/tuần có warning', () => {
+      const csr = { id: 'csr1', type: 'CSR_NEW', role: 'CSR_NEW', maxH: 48 };
+      const result = validateEmployeeSchedule(csr, 48, 4);
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.badge?.includes('6 ca'))).toBe(true);
+    });
+  });
+
+  // ─── Edge cases: covering_store + 'off' ─────────────────────────────────
+  describe('parseShiftForCell — covering_store + off state', () => {
+    it("ô chi viện 'off' tại cửa hàng GỐC hiển thị 'off STOREID'", () => {
+      const emp = { id: 'e1', dept: 'VN0470' }; // không có isBorrowedTo → đang ở bảng gốc
+      const val = { shift: 'off', covering_store: 'VN0485' };
+      const { display, isBorrowedSlot } = parseShiftForCell(emp, val);
+      expect(isBorrowedSlot).toBe(true);
+      expect(display).toBe('off VN0485');
+    });
+
+    it("ô chi viện 'off' tại cửa hàng ĐÍCH không hiển thị ca (NV nghỉ ngày đó)", () => {
+      const emp = { id: 'e1', dept: 'VN0470', isBorrowedTo: 'VN0485' };
+      const val = { shift: 'off', covering_store: 'VN0485' };
+      const { display, isBorrowedSlot } = parseShiftForCell(emp, val);
+      // off tại cửa hàng đích → display rỗng (NV nghỉ)
+      expect(isBorrowedSlot).toBe(true);
+      expect(display).toBe('');
+    });
+  });
+
+  // ─── Edge cases: buildSwappedSchedules ──────────────────────────────────
+  describe('[SUG-2 fix] buildSwappedSchedules — self-swap guard', () => {
+    it('swap cùng ngày đổi đúng ca', () => {
+      const a = { T2: '6-14', T3: '14-22' };
+      const b = { T2: '14-22', T3: '6-14' };
+      const result = buildSwappedSchedules(a, b, {
+        fromEmpId: 'e1', toEmpId: 'e2', fromDay: 'T2', toDay: 'T2'
+      });
+      expect(result.e1.T2).toBe('14-22'); // nhận ca của e2
+      expect(result.e2.T2).toBe('6-14');  // nhận ca của e1
+    });
+
+    it('swap khác ngày đổi chéo đúng', () => {
+      const a = { T2: '6-14', T3: 'off' };
+      const b = { T2: 'off', T3: '14-22' };
+      const result = buildSwappedSchedules(a, b, {
+        fromEmpId: 'e1', toEmpId: 'e2', fromDay: 'T2', toDay: 'T3'
+      });
+      expect(result.e1.T2).toBe('off');   // e1 nhường T2, lấy ca off của e2
+      expect(result.e1.T3).toBe('14-22'); // e1 nhận T3 của e2
+      expect(result.e2.T3).toBe('off');   // e2 nhận T3 trước của e1
+      expect(result.e2.T2).toBe('6-14'); // e2 nhận T2 của e1
+    });
   });
 });

@@ -2,7 +2,8 @@ import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/cons
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
-import { streamGeminiMultiTurn } from '../services/geminiService';
+import { streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
+import { sanitizeAiInput, sanitizeEmployeesForAi, sanitizeAiOutput } from './aiGuard';
 
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -421,8 +422,39 @@ export function generateAISchedule(employees, storeId, options = {}) {
     requiredMatrix = DEFAULT_STAFFING_MATRIX.weekday,
     requiredMatrixByDay = {},
     existingSchedule = {},
-    nightShiftVolunteers = []
+    nightShiftVolunteers = [],
+    smOverrides = {},      // { "T5": { "22-6": { min:2, max:2, reason:"hàng về nhiều" } } }
+    employeeOverrides = {}, // { [empId]: { [dayKey]: shiftCode } }
+    demandFactor = 1.0,   // 0.8 = giảm 20% nhân sự toàn tuần, 1.2 = tăng 20%
+    smNotes = '',          // ghi log lý do vào insights
+    respectAvailability = true,
+    respectOffRequests = true
   } = options;
+
+  // Áp dụng demandFactor lên requiredMatrixByDay (scale staffing requirement)
+  const effectiveMatrixByDay = {};
+  const allDayKeys = [...new Set([...Object.keys(requiredMatrixByDay), ...WEEK_DAYS])];
+  allDayKeys.forEach(dayKey => {
+    const base = requiredMatrixByDay[dayKey] || requiredMatrix;
+    if (demandFactor === 1.0) {
+      effectiveMatrixByDay[dayKey] = base;
+    } else {
+      const scaled = {};
+      Object.entries(base).forEach(([shift, count]) => {
+        // Scale nhưng giữ tối thiểu 1 người cho ca bắt buộc (đặc biệt ca đêm)
+        const minCount = shift === '22-6' ? 1 : 0;
+        scaled[shift] = Math.max(minCount, Math.round((count || 0) * demandFactor));
+      });
+      effectiveMatrixByDay[dayKey] = scaled;
+    }
+    // SM override có priority cao nhất — ghi đè lên cả demand scaling
+    if (smOverrides[dayKey]) {
+      Object.entries(smOverrides[dayKey]).forEach(([shift, constraint]) => {
+        effectiveMatrixByDay[dayKey] = effectiveMatrixByDay[dayKey] || {};
+        effectiveMatrixByDay[dayKey][shift] = constraint.min ?? effectiveMatrixByDay[dayKey][shift] ?? 1;
+      });
+    }
+  });
 
   const resultSchedule = {};
   storeEmployees.forEach(e => {
@@ -434,6 +466,33 @@ export function generateAISchedule(employees, storeId, options = {}) {
   storeEmployees.forEach(e => {
     employeeHours[e.id] = 0;
     employeeShiftsCount[e.id] = 0;
+  });
+
+  // Phân tích lịch đăng ký rảnh và ngày xin nghỉ (OFF) do nhân sự tự đăng ký
+  const employeeOffDays = {}; // empId -> Set(dayKey)
+  const employeeRegisteredShifts = {}; // empId -> { dayKey: shiftCode }
+  let totalRegisteredShiftsCount = 0;
+  let totalOffRequestsCount = 0;
+  let fulfilledRegisteredCount = 0;
+
+  storeEmployees.forEach(emp => {
+    employeeOffDays[emp.id] = new Set();
+    employeeRegisteredShifts[emp.id] = {};
+    const empSched = existingSchedule[emp.id] || {};
+
+    WEEK_DAYS.forEach(dayKey => {
+      const raw = empSched[dayKey];
+      if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+        const { shift } = normalizeShift(raw);
+        if (shift === 'off') {
+          employeeOffDays[emp.id].add(dayKey);
+          totalOffRequestsCount++;
+        } else if (shift) {
+          employeeRegisteredShifts[emp.id][dayKey] = shift;
+          totalRegisteredShiftsCount++;
+        }
+      }
+    });
   });
 
   const isSMStaff = (emp) => {
@@ -453,14 +512,20 @@ export function generateAISchedule(employees, storeId, options = {}) {
 
   const ftMandatoryOffDays = {};
   ftEmployees.forEach((emp, index) => {
-    ftMandatoryOffDays[emp.id] = WEEK_DAYS[index % WEEK_DAYS.length];
+    // Tôn trọng ngày OFF nếu FT đã chủ động đăng ký
+    const requestedOff = [...(employeeOffDays[emp.id] || [])];
+    if (requestedOff.length > 0) {
+      ftMandatoryOffDays[emp.id] = requestedOff[0];
+    } else {
+      ftMandatoryOffDays[emp.id] = WEEK_DAYS[index % WEEK_DAYS.length];
+    }
   });
 
   // Thu tu XU LY trong ngay: dem -> ca ngan gio vang (PT) -> khung xuong ca dai
   const CANON_ORDER = ['22-6', '10-14', '14-18', '18-22', '6-10', '6-14', '14-22', '10-18', '6-12'];
   const matrixCodes = new Set();
   if (requiredMatrix) Object.keys(requiredMatrix).forEach(c => { if ((requiredMatrix[c] || 0) > 0) matrixCodes.add(c); });
-  Object.values(requiredMatrixByDay).forEach(m => Object.keys(m || {}).forEach(c => { if ((m[c] || 0) > 0) matrixCodes.add(c); }));
+  Object.values(effectiveMatrixByDay).forEach(m => Object.keys(m || {}).forEach(c => { if ((m[c] || 0) > 0) matrixCodes.add(c); }));
   const shiftPriorities = CANON_ORDER.filter(c => c === '22-6' || matrixCodes.has(c));
 
   const assignShiftTo = (emp, dayKey, shiftCode) => {
@@ -471,6 +536,13 @@ export function generateAISchedule(employees, storeId, options = {}) {
 
   const canTakeShift = (emp, dayKey, dayIdx, shiftCode, isFTBackfill = false) => {
     if (resultSchedule[emp.id][dayKey] !== 'off') return false;
+
+    // BẢO VỆ NGÀY XIN NGHỈ (OFF): Tuyệt đối không gán ca vào ngày nhân viên đã báo bận/xin nghỉ
+    // Trừ trường hợp Quản lý có lệnh ép đích danh nhân viên đó làm ca này
+    const hasSmForce = employeeOverrides[emp.id]?.[dayKey] && employeeOverrides[emp.id]?.[dayKey] !== 'off';
+    if (respectOffRequests && employeeOffDays[emp.id]?.has(dayKey) && !hasSmForce) {
+      return false;
+    }
 
     const isFT = ftEmployees.some(ft => ft.id === emp.id);
 
@@ -505,13 +577,19 @@ export function generateAISchedule(employees, storeId, options = {}) {
     return true;
   };
 
-  // GIAI ĐOẠN 0: GHI NHẬN LỊCH ĐÃ XẾP TAY / LỊCH RẢNH (NẾU CÓ)
-  WEEK_DAYS.forEach((dayKey, dayIdx) => {
-    storeEmployees.forEach(emp => {
-      const existingShift = normalizeShift(existingSchedule[emp.id]?.[dayKey]).shift;
-      if (existingShift && existingShift !== 'off') {
-        if (canTakeShift(emp, dayKey, dayIdx, existingShift)) {
-           assignShiftTo(emp, dayKey, existingShift);
+  // GIAI ĐOẠN 0: ÁP DỤNG CHỈ ĐẠO ĐÍCH DANH NHÂN VIÊN TỪ CỬA HÀNG TRƯỞNG (SM OVERRIDES)
+  let smDirectAssignedCount = 0;
+  storeEmployees.forEach(emp => {
+    const overrides = employeeOverrides[emp.id] || {};
+    WEEK_DAYS.forEach((dayKey, dayIdx) => {
+      const overrideShift = overrides[dayKey];
+      if (overrideShift) {
+        if (overrideShift === 'off') {
+          resultSchedule[emp.id][dayKey] = 'off';
+          employeeOffDays[emp.id].add(dayKey);
+        } else if (canTakeShift(emp, dayKey, dayIdx, overrideShift, true)) {
+          assignShiftTo(emp, dayKey, overrideShift);
+          smDirectAssignedCount++;
         }
       }
     });
@@ -528,10 +606,45 @@ export function generateAISchedule(employees, storeId, options = {}) {
     });
   });
 
-  // GIAI ĐOẠN 1: ƯU TIÊN FULL-TIME ĐẠT ĐỦ 48H VÀ ĐÚNG 1 NGÀY OFF
+  // GIAI ĐOẠN 1: KHỚP LỊCH ĐĂNG KÝ RẢNH THEO NHU CẦU ĐỊNH BIÊN / DOANH THU
+  if (respectAvailability) {
+    WEEK_DAYS.forEach((dayKey, dayIdx) => {
+      shiftPriorities.forEach(shiftCode => {
+        const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
+        const neededCount = dayMatrix[shiftCode] || 0;
+        let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
+
+        if (assignedCount < neededCount) {
+          // Lấy tất cả nhân sự ĐÃ ĐĂNG KÝ ca này vào ngày này
+          const registeredCandidates = storeEmployees.filter(emp => {
+            return employeeRegisteredShifts[emp.id]?.[dayKey] === shiftCode &&
+                   canTakeShift(emp, dayKey, dayIdx, shiftCode, true);
+          });
+
+          // Ưu tiên: Full-time trước (cần đủ 48h), sau đó đến Part-time có số giờ tích lũy ít hơn để công bằng
+          registeredCandidates.sort((a, b) => {
+            const aIsFT = ftEmployees.some(ft => ft.id === a.id);
+            const bIsFT = ftEmployees.some(ft => ft.id === b.id);
+            if (aIsFT && !bIsFT) return -1;
+            if (!aIsFT && bIsFT) return 1;
+            return employeeHours[a.id] - employeeHours[b.id];
+          });
+
+          for (const cand of registeredCandidates) {
+            if (assignedCount >= neededCount) break;
+            assignShiftTo(cand, dayKey, shiftCode);
+            assignedCount++;
+            fulfilledRegisteredCount++;
+          }
+        }
+      });
+    });
+  }
+
+  // GIAI ĐOẠN 2: ƯU TIÊN FULL-TIME ĐẠT ĐỦ 48H VÀ ĐÚNG 1 NGÀY OFF
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
     shiftPriorities.forEach(shiftCode => {
-      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+      const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
       const neededCount = dayMatrix[shiftCode] || 0;
       let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
@@ -551,17 +664,17 @@ export function generateAISchedule(employees, storeId, options = {}) {
     });
   });
 
-  // GIAI ĐOẠN 2: ÉP FULL-TIME ĐẠT ĐỦ ĐỊNH MỨC NẾU CÒN THIẾU
+  // GIAI ĐOẠN 2.5: ÉP FULL-TIME ĐẠT ĐỦ ĐỊNH MỨC NẾU CÒN THIẾU (TÔN TRỌNG NGÀY NGHỈ OFF)
   ftEmployees.forEach(ft => {
     if (employeeShiftsCount[ft.id] < 6) {
       for (let dayIdx = 0; dayIdx < WEEK_DAYS.length; dayIdx++) {
         if (employeeShiftsCount[ft.id] >= 6) break;
         const dayKey = WEEK_DAYS[dayIdx];
 
-        if (resultSchedule[ft.id][dayKey] === 'off' && ftMandatoryOffDays[ft.id] !== dayKey) {
+        if (resultSchedule[ft.id][dayKey] === 'off' && ftMandatoryOffDays[ft.id] !== dayKey && !employeeOffDays[ft.id]?.has(dayKey)) {
           let pickedShift = null;
           for(const sCode of shiftPriorities) {
-             const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+             const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
              const needed = dayMatrix[sCode] || 0;
              const actual = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === sCode).length;
              if (actual < needed && canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
@@ -587,15 +700,23 @@ export function generateAISchedule(employees, storeId, options = {}) {
     }
   });
 
-  // GIAI ĐOẠN 3: LẤP ĐẦY MATRIX BẰNG PART-TIME
+  // GIAI ĐOẠN 3: LẤP ĐẦY MATRIX BẰNG PART-TIME CÒN GIỜ (TUYỆT ĐỐI KHÔNG ÉP VÀO NGÀY XIN NGHỈ OFF)
   WEEK_DAYS.forEach((dayKey, dayIdx) => {
     shiftPriorities.forEach(shiftCode => {
-      const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+      const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
       const neededCount = dayMatrix[shiftCode] || 0;
       let assignedCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
 
       if (assignedCount < neededCount) {
-        const candidatePT = [...ptEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
+        // Lấy ứng viên Part-time: ưu tiên ai có đăng ký rảnh trước, rồi đến ai chưa có lịch và không xin OFF
+        const candidatePT = [...ptEmployees].sort((a, b) => {
+          const aHasReg = !!employeeRegisteredShifts[a.id]?.[dayKey];
+          const bHasReg = !!employeeRegisteredShifts[b.id]?.[dayKey];
+          if (aHasReg && !bHasReg) return -1;
+          if (!aHasReg && bHasReg) return 1;
+          return employeeHours[a.id] - employeeHours[b.id];
+        });
+
         for (const pt of candidatePT) {
           if (assignedCount >= neededCount) break;
           // ưu tiên nguyện vọng ca đêm
@@ -609,8 +730,6 @@ export function generateAISchedule(employees, storeId, options = {}) {
       }
     });
   });
-
-  // GIAI ĐOẠN 4: Đã xóa (không ép PT đủ 16h nếu phá vỡ định biên)
 
   // Thống kê
   let totalAssignedHours = 0;
@@ -645,7 +764,7 @@ export function generateAISchedule(employees, storeId, options = {}) {
   // CẢNH BÁO: các ca vẫn thiếu người so với định biên sau khi đã tối ưu
   const warnings = [];
   WEEK_DAYS.forEach(dayKey => {
-    const dayMatrix = requiredMatrixByDay[dayKey] || requiredMatrix;
+    const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
     shiftPriorities.forEach(shiftCode => {
       const neededCount = dayMatrix[shiftCode] || 0;
       const actualCount = storeEmployees.filter(e => resultSchedule[e.id][dayKey] === shiftCode).length;
@@ -673,6 +792,20 @@ export function generateAISchedule(employees, storeId, options = {}) {
     },
     warnings,
     insights: [
+      ...(smNotes ? [`💬 Lệnh SM: "${smNotes}"`] : []),
+      ...(totalRegisteredShiftsCount > 0 ? [
+        `📋 Lịch rảnh nhân viên: Đã tiếp nhận ${totalRegisteredShiftsCount} ca đăng ký rảnh từ ${storeEmployees.filter(e => Object.keys(employeeRegisteredShifts[e.id]).length > 0).length} nhân sự. Đã đáp ứng khớp ${fulfilledRegisteredCount} ca theo định biên.`
+      ] : []),
+      ...(totalOffRequestsCount > 0 ? [
+        `🛡️ Ngày xin nghỉ (OFF): Đã bảo lưu trọn vẹn ${totalOffRequestsCount} lượt xin nghỉ của nhân viên (tuyệt đối không bị xếp đè ca).`
+      ] : []),
+      ...(demandFactor !== 1.0 ? [`📊 Định biên đã scale ${demandFactor < 1 ? `↓${Math.round((1 - demandFactor) * 100)}%` : `↑${Math.round((demandFactor - 1) * 100)}%`} theo nhu cầu SM.`] : []),
+      ...(Object.keys(smOverrides).length > 0 ? [
+        `📌 Override theo lệnh SM: ${Object.entries(smOverrides).map(([day, shifts]) =>
+          Object.entries(shifts).map(([sh, c]) => `${day} ca ${sh}→${c.min}NV${c.reason ? ` (${c.reason})` : ''}`).join(', ')
+        ).join(' | ')}`
+      ] : []),
+      ...(smDirectAssignedCount > 0 ? [`👤 Đã áp dụng ${smDirectAssignedCount} chỉ đạo xếp/nghỉ đích danh nhân viên từ Cửa hàng trưởng.`] : []),
       `🤖 Đã phân bổ tối ưu ${totalAssignedShifts} ca làm việc (${totalAssignedHours} giờ) cho ${storeEmployees.length} nhân sự cửa hàng ${storeId}.`,
       `🛡️ Full-Time bù ca thiếu, tuân thủ Luật Nghỉ Tuần (mỗi bạn >=1 ngày OFF trọn vẹn, tối đa 6 ca = 48h).`,
       `⏱️ Luật nghỉ giữa ca (>= 11 tiếng): không xếp ca gối đầu quá sức (hết ca 22h không dính ca sáng 6h hôm sau).`,
@@ -814,7 +947,11 @@ export function auditSchedule(employees, weekSchedule, storeId) {
  * AI COPILOT QUERY ENGINE (ĐỌC CHI TIẾT TOÀN BỘ CÁC TRƯỜNG & TẤT CẢ CÁC BẢNG DỮ LIỆU)
  */
 export function askAICopilot(question, context = {}, chatHistory = []) {
-  return compactText(answerCopilot(question, context, chatHistory));
+  const guard = sanitizeAiInput(question);
+  if (!guard.safe) {
+    return guard.reason;
+  }
+  return sanitizeAiOutput(compactText(answerCopilot(guard.text, context, chatHistory)));
 }
 
 function answerCopilot(question, context = {}, chatHistory = []) {
@@ -1473,6 +1610,14 @@ export async function askGS25HFModel(question, systemPrompt, chatHistory = [], f
 
 
 export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '', onChunk = null) {
+  // 1. Màng lọc đầu vào: Kiểm tra an toàn, chống prompt injection & che giấu secret
+  const guard = sanitizeAiInput(question);
+  if (!guard.safe) {
+    if (onChunk) onChunk(guard.reason);
+    return guard.reason;
+  }
+  const cleanQuestion = guard.text;
+
   const { 
     employees = [], 
     weekSchedule = {}, 
@@ -1483,8 +1628,9 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
     shiftSwaps = []
   } = context;
 
-  // Tối giản dữ liệu gửi đi (RAG)
-  const storeEmps = employees.filter(e => e.dept === storeId);
+  // 2. Tường lửa dữ liệu: Chỉ trích xuất thông tin nghiệp vụ an toàn (Data Minimization)
+  const safeEmployees = sanitizeEmployeesForAi(employees);
+  const storeEmps = safeEmployees.filter(e => e.dept === storeId);
   const compactEmployees = storeEmps.map(e => ({
     id: e.id, name: e.name, type: e.type, role: e.role
   }));
@@ -1544,8 +1690,8 @@ HƯỚNG DẪN QUAN TRỌNG:
 - Khi người dùng dùng đại từ ngôi thứ nhất "em", "chị", "anh", "tôi", "tao", "mình", "tớ": BẮT BUỘC hiểu là đang hỏi về chính người đang trò chuyện (${user ? user.name : 'người dùng hiện tại'}).
 - Khi hỏi "ai làm cùng ca với em": tìm ca của người đó trong ngày, liệt kê đồng nghiệp cùng ca chính xác.
 - Khi hỏi số giờ: cộng tổng (ca 8h = 8 tiếng; ca 4h = 4 tiếng). Trả lời cụ thể và liệt kê ngắn gọn.
-- Khi hỏi về giờ hủy 1 món cụ thể: chỉ trả lời trọng tâm món đó, không liệt kê toàn bộ danh sách.
 - Luật Lương: ca đêm (22-6) +30%; Lễ/Tết 300%; STPT 16-23h/tuần, tối đa 91h/tháng; STFT 48h/tuần (6 ca) + 1 OFF, nghỉ giữa 2 ca ≥ 11 tiếng.
+- CHIẾN THUẬT XẾP LỊCH (Học từ dữ liệu thực tế): Với doanh thu ~18tr, ưu tiên dùng "ca gãy" (10-14, 18-22) ghép với ca chính để tối ưu quỹ lương. Part-time (STPT) lý tưởng nhất là xếp 2 ca 8h + 1 ca 4h (=20h/tuần), giúp đạt chuẩn 16-23h mà không cần tuyển quá nhiều người. Cửa hàng chỉ cần ~32h công/ngày (Sáng: 6-14 & 10-14, Chiều: 14-22 & 18-22, Đêm: 22-6).
 
 SỔ TAY GS25:
 - Hủy FF rau & tươi (Sandwich có rau, burger, gimbap, soup): 11:00 & 22:00.
@@ -1581,16 +1727,19 @@ Phong cách: Tiếng Việt tự nhiên, thân thiện, súc tích. Dùng Markdo
     parts: [{ text: m.text }]
   }));
 
-  // Thêm câu hỏi hiện tại
-  contents.push({ role: 'user', parts: [{ text: question }] });
+  // Thêm câu hỏi an toàn hiện tại
+  contents.push({ role: 'user', parts: [{ text: cleanQuestion }] });
 
-  // Gọi streaming nếu có onChunk, ngược lại dùng blocking
+  // 3. Màng lọc đầu ra: Quét sạch thông tin nhạy cảm trước khi trả về
+  let rawResponse = '';
   if (onChunk) {
-    return await streamGeminiMultiTurn(contents, systemPrompt, geminiApiKey, onChunk);
+    rawResponse = await streamGeminiMultiTurn(contents, systemPrompt, geminiApiKey, (delta) => {
+      onChunk(sanitizeAiOutput(delta));
+    });
+  } else {
+    rawResponse = await generateGeminiMultiTurn(contents, systemPrompt, geminiApiKey);
   }
 
-  // Fallback blocking (tương thích ngược với code cũ)
-  const { generateGeminiMultiTurn: multiTurn } = await import('../services/geminiService');
-  return await multiTurn(contents, systemPrompt, geminiApiKey);
+  return sanitizeAiOutput(rawResponse);
 }
 

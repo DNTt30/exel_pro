@@ -521,16 +521,16 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         )}
 
         {/* Modal Footer Actions */}
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
+        <div className="pt-3 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+          <div className="text-xs text-slate-500 order-2 sm:order-1 text-center sm:text-left">
             Tuần đích: <strong className="text-blue-700">{currentWeek}</strong>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse sm:flex-row items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="btn btn-outline text-xs px-4 py-2 cursor-pointer"
+              className="btn btn-outline text-xs px-4 py-2 cursor-pointer w-full sm:w-auto justify-center"
             >
               Đóng
             </button>
@@ -538,7 +538,7 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
               type="button"
               onClick={handleApply}
               disabled={loading || parsedData.length === 0 || (importReport && importReport.errors.length > 0)}
-              className="btn btn-primary text-xs px-4 py-2 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary text-xs px-4 py-2 flex items-center justify-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               <Upload size={14} />
               <span>{loading ? 'Đang lưu lịch...' : `Áp dụng ${parsedData.length} NV${importReport?.warnings?.length ? ' · ' + importReport.warnings.length + ' cảnh báo' : ''}${importReport?.errors?.length ? ' · CHẶN ' + importReport.errors.length + ' lỗi' : ''}`}</span>

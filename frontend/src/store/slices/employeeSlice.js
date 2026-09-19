@@ -8,8 +8,10 @@ export const createEmployeeSlice = (set, get) => ({
   employees: [],
   addEmployee: async (emp) => {
     assertCanManageEmpInDept(get(), emp.dept);
-    await api.addEmployee(emp);
-    const provisioned = await provisionAuthUser(emp);
+    const [, provisioned] = await Promise.all([
+      api.addEmployee(emp),
+      provisionAuthUser(emp),
+    ]);
     set((state) => ({ employees: [...state.employees, emp] }));
     get().appendAdminLog('CREATE_EMPLOYEE', emp.id, `${emp.name} · ${emp.dept} · ${emp.role || emp.type}`, {
       resourceType: 'employee',

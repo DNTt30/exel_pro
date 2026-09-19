@@ -153,17 +153,17 @@ export default function AppLayout() {
   const ri = getRoleInfo();
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 print:bg-white print:h-auto print:block overflow-hidden">
+    <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full bg-slate-50 print:bg-white print:h-auto print:block overflow-x-hidden overflow-y-hidden">
 
       {/* ── Header ── */}
-      <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs z-30 px-4 md:px-6 py-2.5 flex items-center justify-between print:hidden">
-        <div className="flex items-center gap-3">
+      <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs z-30 px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-safe flex items-center justify-between print:hidden">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {/* GS25 logo */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-sm tracking-tight select-none">DNTgs25</div>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2.5 sm:px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-xs sm:text-sm tracking-tight select-none">DNTgs25</div>
             <div className="hidden sm:block">
               <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">DNTgs25</h1>
               <p className="text-[10px] text-slate-400 font-medium">Hệ thống Xếp lịch & Vận hành</p>
@@ -183,7 +183,7 @@ export default function AppLayout() {
           <CloudSyncBadge />
           {isInstallable && (
             <button 
-              type="button"
+              type="button" 
               onClick={() => setShowInstallModal(true)} 
               className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer animate-[pulse_3s_ease-in-out_infinite]"
               title="Cài đặt App DNTgs25 về điện thoại"
@@ -195,11 +195,11 @@ export default function AppLayout() {
           )}
           <button onClick={() => setIsHelpOpen(true)} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell />
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1.5 sm:pl-2 pr-2 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={12} />}
             </div>
-            <span className="text-xs font-bold text-slate-700 max-w-[65px] sm:max-w-[150px] truncate">{user?.name}</span>
+            <span className="text-xs font-bold text-slate-700 hidden min-[390px]:inline max-w-[65px] sm:max-w-[150px] truncate">{user?.name}</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border hidden sm:inline ${ri.top}`}>{ri.label}</span>
           </div>
           <button type="button" onClick={() => setShowPw(true)} title="Đổi mật khẩu" className="hidden sm:flex p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><KeyRound size={15} /></button>
@@ -298,13 +298,13 @@ export default function AppLayout() {
         </aside>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-auto bg-slate-50 pb-16 md:pb-0 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full bg-slate-50 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
           {/* Skeleton khi chưa có dữ liệu người dùng — khi đã có user thì Outlet luôn giữ mount */}
           {isInitializing && !user ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
         </main>
 
-        {/* ── Mobile Bottom Navigation Bar (Thumb Zone Ergonomics) ── */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-30 flex items-center justify-around px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] print:hidden">
+        {/* ── Mobile Bottom Navigation Bar (Thumb Zone Ergonomics + iOS Safe Area) ── */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-30 flex items-center justify-around px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] print:hidden">
           {bottomNavItems.map((item) => (
             <NavLink
               key={item.to}
@@ -330,10 +330,10 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* Floating AI Button - blue (above mobile bottom bar) */}
+        {/* Floating AI Button - blue (above mobile bottom bar with safe-area spacing) */}
         <button 
           onClick={() => setIsAIOpen(true)} 
-          className="fixed bottom-20 md:bottom-6 right-3.5 md:right-6 w-11 h-11 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-40 print:hidden focus:ring-3 focus:ring-blue-300 group cursor-pointer" 
+          className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3.5 md:right-6 w-11 h-11 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-40 print:hidden focus:ring-3 focus:ring-blue-300 group cursor-pointer" 
           title="GS25 AI Copilot"
         >
           <Sparkles size={18} className="md:w-[22px] md:h-[22px] group-hover:animate-pulse" />

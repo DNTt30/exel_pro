@@ -229,12 +229,12 @@ test('5. Bẫy từ khóa & Anti-collision', () => {
 
   // "Công việc dạo này ổn định không Tú?" -> KHÔNG kích hoạt audit quét lỗi
   const rOnDinh = askAICopilot('Công việc dạo này ổn định không Tú?', loggedInContext);
-  expect(rOnDinh).not.toContain('vấn đề:');
+  expect(rOnDinh).not.toMatch(/lỗi nghiêm trọng:|cảnh báo:/);
   expect(rOnDinh).not.toContain('0 lỗi');
 
   // "Kiểm tra xem lịch tuần này có ổn không?" -> KÍCH HOẠT audit quét lỗi
   const rAuditOn = askAICopilot('Kiểm tra xem lịch tuần này có ổn không?', loggedInContext);
-  expect(rAuditOn).toContain('vấn đề:');
+  expect(rAuditOn).toMatch(/lỗi nghiêm trọng:|cảnh báo:/);
 });
 
 

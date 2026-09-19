@@ -88,11 +88,11 @@ export default function PWAInstallModal({ isOpen, onClose }) {
           </div>
         )}
 
-        <div className="mt-4 pt-3 border-t border-slate-100">
+        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-center">
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
+            className="text-xs text-slate-400 hover:text-slate-600 font-semibold cursor-pointer py-1 px-4"
           >
             Để sau
           </button>

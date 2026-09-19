@@ -22,7 +22,7 @@ export async function getEmployeeById(id) {
   try {
     const { data: rpcRow, error: rpcErr } = await db().rpc('login_lookup', { p_ma: id }).maybeSingle();
     if (!rpcErr && rpcRow) return mapEmployee(rpcRow);
-  } catch { /* bỏ qua, thử đường cũ */ }
+  } catch (err) { console.warn('[employees] login_lookup RPC failed, fallback to direct query:', err?.message); }
   const { data, error } = await db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active').eq('id', id).maybeSingle();
   if (error) {
     console.error('Lỗi lấy nhân viên:', error);

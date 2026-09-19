@@ -178,7 +178,9 @@ export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthVi
   const empType = (emp.type || '').toUpperCase();
   const empRole = (emp.role || '').toUpperCase();
   const isPT = empType === 'STPT' || empType === 'PARTTIME' || empRole.includes('PT');
-  const isFT = empType === 'STFT' || empType === 'FULLTIME' || empType === 'CSR_NEW' || (!isPT);
+  // Whitelist rõ ràng — không dùng !isPT để tránh áp rule FT cho SM/OFC/type rỗng
+  const KNOWN_FT_TYPES = new Set(['STFT', 'FULLTIME', 'CSR_NEW']);
+  const isFT = KNOWN_FT_TYPES.has(empType);
 
   const warnings = [];
 
@@ -349,6 +351,13 @@ export function checkEmployeeShiftRestGap(weekSched = {}, empId, targetDay, targ
  * ô ngày mình nhường lấy giá trị hiện có của đối tác (thường là off).
  */
 export function buildSwappedSchedules(fromSched = {}, toSched = {}, swap) {
+  if (!swap.fromEmpId || !swap.toEmpId) {
+    throw new Error('[buildSwappedSchedules] Thiếu fromEmpId hoặc toEmpId');
+  }
+  if (swap.fromEmpId === swap.toEmpId) {
+    throw new Error('[buildSwappedSchedules] Không thể đổi ca với chính mình (fromEmpId === toEmpId)');
+  }
+
   const fromDay = swap.fromDay;
   const toDay = swap.toDay;
   const aFromRaw = fromSched[fromDay] ?? 'off';

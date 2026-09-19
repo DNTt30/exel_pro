@@ -284,7 +284,7 @@ describe('AI Copilot — Bẫy từ khóa & Anti-collision chuyên sâu', () => 
 
   it('"lịch tuần này có ổn không" kích hoạt audit kiểm tra lỗi', () => {
     const r = askAICopilot('Kiểm tra xem lịch tuần này có ổn không?', loggedInCtx);
-    expect(r).toContain('vấn đề:');
+    expect(r).toMatch(/lỗi nghiêm trọng:|cảnh báo:/);
   });
 
   it('Làm thêm ngày lễ tết được bao nhiêu phần trăm lương: 300%', () => {

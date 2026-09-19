@@ -210,14 +210,14 @@ export default function RecipeQuickModal({ isOpen, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-          <span className="flex items-center gap-1">
+        <div className="pt-2 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span className="flex items-center gap-1 text-center sm:text-left">
             <Sparkles size={12} className="text-amber-500" /> Nguồn: Tiêu chuẩn FF Onsite GS25
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline text-xs px-3 py-1.5 cursor-pointer font-bold"
+            className="btn btn-outline text-xs px-3 py-1.5 cursor-pointer font-bold w-full sm:w-auto justify-center"
           >
             Đóng
           </button>

@@ -244,14 +244,14 @@ export default function ImportAttendanceModal({
             )}
 
             {/* Hàng nút phụ: Mẫu tải về */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <span className="text-xs text-slate-500">
                 Chưa có file mẫu? Tải file mẫu ezHR9 chuẩn chu kỳ Tháng {payrollCycle?.month}/{payrollCycle?.year}:
               </span>
               <button
                 type="button"
                 onClick={handleDownloadSample}
-                className="btn btn-outline text-xs py-1 px-2.5 rounded-xl flex items-center gap-1.5 text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                className="btn btn-outline text-xs py-1.5 px-2.5 rounded-xl flex items-center justify-center gap-1.5 text-indigo-700 border-indigo-200 hover:bg-indigo-50 w-full sm:w-auto"
               >
                 <Download size={13} /> Tải file mẫu ezHR9
               </button>
@@ -443,16 +443,16 @@ export default function ImportAttendanceModal({
             )}
 
             {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-              <span className="text-xs text-slate-600">
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5 pt-2 border-t border-slate-200">
+              <span className="text-xs text-slate-600 order-2 sm:order-1 text-center sm:text-left">
                 File: <strong>{file?.name}</strong> • Định dạng: <strong>{parsedResult.format === 'MATRIX' ? 'Ma trận bảng ngày' : 'Danh sách dòng'}</strong>
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col-reverse sm:flex-row items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="btn btn-outline text-xs py-1.5 px-3 rounded-xl"
+                  className="btn btn-outline text-xs py-1.5 px-3 rounded-xl w-full sm:w-auto justify-center"
                   disabled={applying}
                 >
                   Hủy bỏ
@@ -461,7 +461,7 @@ export default function ImportAttendanceModal({
                   type="button"
                   onClick={handleApply}
                   disabled={applying}
-                  className="btn btn-primary text-xs py-1.5 px-4 rounded-xl flex items-center gap-1.5 shadow-md font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="btn btn-primary text-xs py-1.5 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-md font-bold bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
                 >
                   {applying ? (
                     <>

@@ -367,18 +367,18 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
         )}
 
         {/* Actions */}
-        <div className="pt-2 border-t border-slate-200 flex justify-end gap-2">
+        <div className="pt-2 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2 sm:gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline text-xs px-4 py-2 cursor-pointer"
+            className="btn btn-outline text-xs px-4 py-2.5 cursor-pointer w-full sm:w-auto"
           >
             Đóng
           </button>
           <button
             type="submit"
             disabled={hasNoMyShifts || hasNoColleagues || !selectedMyShift || !selectedPartnerShift}
-            className="btn btn-primary text-xs px-4 py-2 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary text-xs px-4 py-2.5 flex items-center justify-center gap-1.5 font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           >
             <RefreshCw size={13} />
             <span>Gửi yêu cầu đổi ca</span>

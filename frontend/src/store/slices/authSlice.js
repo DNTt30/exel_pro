@@ -1,5 +1,5 @@
 import * as api from '../../services/api';
-import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail } from '../../lib/authSession';
+import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
 import { hasCustomAdminPassword, verifyAdminPassword } from '../../lib/adminCredential';
 import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
@@ -22,7 +22,7 @@ export function sessionUserFromEmp(emp) {
 export async function bindAuthSession(user) {
   const result = await ensureAuthSession(user, { allowSignUp: true, password: user.authPassword });
   if (result.ok) {
-    try { await api.ensureAppProfile(); } catch { /* bỏ qua */ }
+    try { await api.ensureAppProfile(); } catch (err) { console.warn('[auth] ensureAppProfile failed (non-critical):', err?.message); }
     return null;
   }
   if (result.reason === 'no-client' || result.reason === 'no-user') return null;
@@ -79,6 +79,16 @@ export const createAuthSlice = (set, get) => ({
           throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
         }
         if (password === '1') {
+          // Lần đầu đăng nhập: thử dùng default Supabase password (không bypass Auth)
+          const defaultPw = toAuthPassword(emp.id);
+          const pwCheck = await supabase.auth.signInWithPassword({
+            email: toAuthEmail(emp.id),
+            password: defaultPw,
+          });
+          if (pwCheck.error || !pwCheck.data?.session) {
+            recordFailure(userId);
+            throw new Error('Tài khoản chưa được kích hoạt hoặc mật khẩu sai. Liên hệ quản lý.');
+          }
           nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: true, loginAt: Date.now() };
         } else {
           const pwCheck = await supabase.auth.signInWithPassword({
@@ -109,9 +119,10 @@ export const createAuthSlice = (set, get) => ({
       try {
         if (telegramConfigured()) {
           const when = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-          notifyTelegram('🔑 ' + (nextUser.name || nextUser.id) + ' (' + nextUser.id + ') đăng nhập · ' + roleLabel + ' · ' + when).catch(() => {});
+          notifyTelegram('🔑 ' + (nextUser.name || nextUser.id) + ' (' + nextUser.id + ') đăng nhập · ' + roleLabel + ' · ' + when)
+            .catch((err) => { console.warn('[auth] Telegram notify failed:', err?.message); });
         }
-      } catch { /* ignore */ }
+      } catch (err) { console.warn('[auth] Telegram setup error:', err?.message); }
       bindAuthSession(nextUser).then((authWarning) => {
         if (get().user?.id === nextUser.id && authWarning !== get().authWarning) {
           set({ authWarning });
@@ -143,10 +154,11 @@ export const createAuthSlice = (set, get) => ({
       });
     }
     // Dọn dẹp Realtime subscription trước khi đăng xuất
+    get()._cleanupRealtimeTimers?.();
     const channel = get()._realtimeChannel;
     if (channel) {
       supabase.removeChannel(channel);
-      set({ _realtimeChannel: null });
+      set({ _realtimeChannel: null, realtimeStatus: 'disconnected' });
     }
     await signOutAuth();
     set({ user: null, authWarning: null });

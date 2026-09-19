@@ -138,9 +138,9 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
           />
         </div>
         
-        <div className="pt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-outline cursor-pointer">Hủy</button>
-          <button onClick={handleSave} disabled={loading} className="btn btn-primary cursor-pointer">
+        <div className="pt-4 flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2 sm:gap-2.5">
+          <button onClick={onClose} className="btn btn-outline w-full sm:w-auto cursor-pointer">Hủy</button>
+          <button onClick={handleSave} disabled={loading} className="btn btn-primary w-full sm:w-auto cursor-pointer">
             {loading ? 'Đang lưu...' : 'Lưu nhân sự'}
           </button>
         </div>

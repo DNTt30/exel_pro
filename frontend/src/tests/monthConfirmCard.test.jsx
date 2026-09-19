@@ -1,4 +1,4 @@
-﻿// @vitest-environment happy-dom
+// @vitest-environment happy-dom
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { createRoot } from 'react-dom/client';
@@ -29,9 +29,16 @@ describe('MonthConfirmCard stability test', () => {
       await act(async () => {
         root.render(<MonthConfirmCard />);
       });
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 50));
     } catch (e) {
       error = e;
+    } finally {
+      try {
+        await act(async () => {
+          root.unmount();
+        });
+      } catch {}
+      container.remove();
     }
 
     expect(error).toBeNull();

@@ -26,19 +26,19 @@ export default function Toolbar({
       <div className="flex flex-wrap gap-2 md:gap-3 items-center">
         {/* Search Box with Clear Button */}
         {setSearch && (
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-initial min-w-[140px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
             <input 
               type="text" 
               placeholder="Tìm nhân viên / Mã NV..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-40 sm:w-52 transition-all outline-none"
+              className="pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-52 transition-all outline-none"
             />
             {search && (
               <button 
                 onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition-colors cursor-pointer"
                 title="Xóa tìm kiếm"
               >
                 <X size={12} />

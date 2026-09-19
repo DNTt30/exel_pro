@@ -225,4 +225,69 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
       expect(reply).toContain('Nguyễn Văn A');
     });
   });
+
+  describe('Employee Availability & Revenue Demand Matching', () => {
+    const testEmps = [
+      { id: 'ft_1', name: 'Nguyễn Văn FT', dept: 'VN0485', type: 'STFT', role: 'STFT', maxH: 48 },
+      { id: 'pt_1', name: 'Lê PartTime 1', dept: 'VN0485', type: 'STPT', role: 'STPT', maxH: 23 },
+      { id: 'pt_2', name: 'Trần PartTime 2', dept: 'VN0485', type: 'STPT', role: 'STPT', maxH: 23 }
+    ];
+
+    it('tuyệt đối không xếp ca vào ngày nhân viên đã đăng ký xin nghỉ (OFF)', () => {
+      const registeredSchedule = {
+        'pt_1': { T2: '14-22', T3: 'off', T4: '14-22', T5: 'off', T6: 'off', T7: 'off', CN: 'off' },
+        'pt_2': { T2: 'off', T3: '14-22', T4: 'off', T5: '14-22', T6: 'off', T7: 'off', CN: 'off' }
+      };
+
+      const result = generateAISchedule(testEmps, 'VN0485', {
+        requiredMatrix: { '14-22': 1 },
+        existingSchedule: registeredSchedule,
+        respectOffRequests: true
+      });
+
+      // pt_1 đăng ký off ngày T3 -> AI tuyệt đối không xếp ca ngày T3
+      expect(result.schedule['pt_1'].T3).toBe('off');
+      // pt_2 đăng ký off ngày T2 -> AI tuyệt đối không xếp ca ngày T2
+      expect(result.schedule['pt_2'].T2).toBe('off');
+    });
+
+    it('ưu tiên gán đúng ca nhân viên đã đăng ký rảnh khi khớp định biên doanh thu', () => {
+      const registeredSchedule = {
+        'pt_1': { T2: '14-22', T4: '14-22' },
+        'pt_2': { T3: '14-22', T5: '14-22' }
+      };
+
+      const result = generateAISchedule(testEmps, 'VN0485', {
+        requiredMatrix: { '14-22': 1 },
+        existingSchedule: registeredSchedule,
+        respectAvailability: true
+      });
+
+      // pt_1 đăng ký rảnh T2, T4 ca 14-22 -> được phân đúng ca 14-22
+      expect(result.schedule['pt_1'].T2).toBe('14-22');
+      expect(result.schedule['pt_1'].T4).toBe('14-22');
+
+      // pt_2 đăng ký rảnh T3, T5 ca 14-22 -> được phân đúng ca 14-22
+      expect(result.schedule['pt_2'].T3).toBe('14-22');
+      expect(result.schedule['pt_2'].T5).toBe('14-22');
+    });
+
+    it('chỉ chọn đủ số người theo doanh thu khi nhiều người cùng đăng ký rảnh, không gây dư thừa', () => {
+      // Cả 2 PT cùng đăng ký rảnh T2 ca 14-22, nhưng định biên chỉ cần 1 người
+      const registeredSchedule = {
+        'pt_1': { T2: '14-22' },
+        'pt_2': { T2: '14-22' }
+      };
+
+      const result = generateAISchedule(testEmps, 'VN0485', {
+        requiredMatrix: { '14-22': 1 },
+        existingSchedule: registeredSchedule,
+        respectAvailability: true
+      });
+
+      const assignedOnT2 = testEmps.filter(e => result.schedule[e.id]?.T2 === '14-22');
+      // Chỉ 1 người được xếp ca 14-22, không xếp dư 2 người
+      expect(assignedOnT2.length).toBe(1);
+    });
+  });
 });

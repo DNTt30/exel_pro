@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ImagePlus, Sparkles, X, Loader2, Check, AlertTriangle, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { ImagePlus, Sparkles, X, Loader2, Check, AlertTriangle, Trash2, MessageSquare, Users } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { WEEK_DAYS, buildStaffingByDay, suggestStaffingFromDemand, normalizeStoreDemand } from '../../data/constants';
 import { generateAISchedule, auditSchedule } from '../../utils/aiSchedulerEngine';
+import { parseSmInstructions } from '../../utils/smInstructionParser';
 import { demandToMatrices } from '../../utils/revenueDemand';
 import { analyzeSalesImages } from '../../utils/salesImageAnalyzer';
+import { normalizeShift } from '../../utils/shiftHelper';
 import { useShallow } from 'zustand/react/shallow';
 
 function fmtVnd(n) {
@@ -64,11 +66,64 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
   const [aiResult, setAiResult] = useState(null);
   const [showAudit, setShowAudit] = useState(false);
   const [error, setError] = useState('');
+  const [smText, setSmText] = useState('');
+  const [smConstraints, setSmConstraints] = useState(null);
+  const [respectAvailability, setRespectAvailability] = useState(true);
+  const [respectOffRequests, setRespectOffRequests] = useState(true);
+  const smDebounceRef = useRef(null);
 
   const storeEmps = useMemo(
     () => employees.filter(e => e.dept === activeStoreId),
     [employees, activeStoreId]
   );
+
+  // Auto-parse SM instructions sau 700ms debounce
+  const handleSmTextChange = useCallback((text) => {
+    setSmText(text);
+    setAiResult(null);
+    if (smDebounceRef.current) clearTimeout(smDebounceRef.current);
+    if (!text.trim()) { setSmConstraints(null); return; }
+    smDebounceRef.current = setTimeout(() => {
+      const parsed = parseSmInstructions(text, currentWeek, storeEmps);
+      setSmConstraints(parsed.appliedRules.length > 0 ? parsed : null);
+    }, 700);
+  }, [currentWeek, storeEmps]);
+
+  // Thống kê tình trạng đăng ký lịch rảnh của nhân sự trong tuần
+  const availabilityStats = useMemo(() => {
+    let registeredEmpCount = 0;
+    let totalShifts = 0;
+    let totalOff = 0;
+    const details = [];
+
+    storeEmps.forEach(emp => {
+      const empSched = weekSched[emp.id] || {};
+      let shiftsCount = 0;
+      let offCount = 0;
+      WEEK_DAYS.forEach(d => {
+        const raw = empSched[d];
+        if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+          const { shift } = normalizeShift(raw);
+          if (shift === 'off') offCount++;
+          else if (shift) shiftsCount++;
+        }
+      });
+      if (shiftsCount > 0 || offCount > 0) {
+        registeredEmpCount++;
+        totalShifts += shiftsCount;
+        totalOff += offCount;
+        details.push({ emp, shiftsCount, offCount });
+      }
+    });
+
+    return {
+      registeredEmpCount,
+      totalStoreEmps: storeEmps.length,
+      totalShifts,
+      totalOff,
+      details
+    };
+  }, [storeEmps, weekSched]);
 
   const auditResult = useMemo(
     () => auditSchedule(employees, weekSched, activeStoreId),
@@ -101,6 +156,8 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
     setAiResult(null);
     setError('');
     setShowAudit(false);
+    setSmText('');
+    setSmConstraints(null);
   }, [isOpen, defaultStoreId, stores]);
 
   // Khi đổi cửa hàng → reset demand
@@ -154,6 +211,22 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
       } else {
         opts = { requiredMatrixByDay: buildStaffingByDay(activeStore) };
       }
+
+      // Tích hợp Lịch rảnh đã đăng ký của nhân viên
+      opts.existingSchedule = weekSched;
+      opts.respectAvailability = respectAvailability;
+      opts.respectOffRequests = respectOffRequests;
+
+      // Áp dụng ràng buộc từ lệnh / ghi chú của Cửa hàng trưởng (SM)
+      const effectiveSm = smConstraints || (smText.trim() ? parseSmInstructions(smText, currentWeek, storeEmps) : null);
+      if (effectiveSm) {
+        opts.smOverrides = effectiveSm.dayOverrides || {};
+        opts.employeeOverrides = effectiveSm.employeeOverrides || {};
+        opts.nightShiftVolunteers = effectiveSm.nightVolunteers || [];
+        opts.demandFactor = effectiveSm.demandFactor ?? 1.0;
+        opts.smNotes = smText.trim();
+      }
+
       const result = generateAISchedule(employees, activeStoreId, opts);
       if (hasDemand) {
         const wdM = demandToMatrices(demand).weekday;
@@ -189,9 +262,9 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3.5 sm:p-4 animate-in fade-in duration-150 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-xl max-h-[92vh] flex flex-col"
+        className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col border border-slate-200 animate-in zoom-in-95 duration-150 my-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
@@ -277,6 +350,105 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
             onSales={v => patchDemand('weekend', 'sales', v)}
           />
 
+          {/* Lịch đăng ký rảnh của nhân sự (Employee Availability) */}
+          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-emerald-950 inline-flex items-center gap-1.5">
+                <Users size={13} className="text-emerald-600" />
+                Lịch rảnh nhân viên tự đăng ký tuần này
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                availabilityStats.registeredEmpCount > 0
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  : 'bg-slate-100 text-slate-500'
+              }`}>
+                {availabilityStats.registeredEmpCount} / {availabilityStats.totalStoreEmps} nhân sự đã đăng ký
+              </span>
+            </div>
+
+            {availabilityStats.registeredEmpCount > 0 ? (
+              <div className="space-y-1.5 text-xs text-slate-700">
+                <div className="flex items-center gap-2 text-[11px] text-slate-600">
+                  <span className="font-semibold text-emerald-800">✓ {availabilityStats.totalShifts} ca rảnh</span>
+                  <span>•</span>
+                  <span className="font-semibold text-slate-600">🛡️ {availabilityStats.totalOff} lượt xin nghỉ (OFF)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-0.5 max-h-24 overflow-y-auto">
+                  {availabilityStats.details.map(({ emp, shiftsCount, offCount }) => (
+                    <span key={emp.id} className="inline-flex items-center gap-1 text-[10px] bg-white px-2 py-0.5 rounded-md border border-emerald-200 font-medium text-slate-700 shadow-2xs">
+                      <strong>{emp.name}</strong>
+                      <span className="text-emerald-700 font-bold">{shiftsCount} ca</span>
+                      {offCount > 0 && <span className="text-slate-400">({offCount} off)</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500 italic">
+                Chưa có nhân viên nào gửi lịch rảnh trước cho tuần này. AI sẽ tự động phân ca tối ưu theo định biên & doanh thu.
+              </p>
+            )}
+
+            {/* Checkboxes cho SM điều khiển */}
+            <div className="pt-1.5 border-t border-emerald-100 flex flex-col gap-1.5 text-[11px] text-slate-700 font-medium">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={respectAvailability}
+                  onChange={e => setRespectAvailability(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span>Ưu tiên xếp theo <strong>lịch rảnh & ca mong muốn</strong> của nhân viên</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={respectOffRequests}
+                  onChange={e => setRespectOffRequests(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span>Bảo vệ <strong>ngày xin nghỉ (OFF)</strong> của nhân sự (không xếp đè)</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Lệnh / Ghi chú của Cửa hàng trưởng (SM) */}
+          <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-900 inline-flex items-center gap-1.5">
+                <MessageSquare size={13} className="text-indigo-600" />
+                Lệnh / Ghi chú xếp ca của SM (tự nhiên)
+              </span>
+              {smConstraints?.appliedRules?.length > 0 && (
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-md">
+                  ✓ Nhận diện {smConstraints.appliedRules.length} yêu cầu
+                </span>
+              )}
+            </div>
+
+            <textarea
+              rows={2}
+              placeholder="VD: Ca đêm ngày 15 18 19 xếp 2 người vì hàng về nhiều. Trời mưa nên giảm nhân sự..."
+              value={smText}
+              onChange={e => handleSmTextChange(e.target.value)}
+              className="w-full text-xs border border-indigo-200/80 rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white placeholder:text-slate-400"
+            />
+
+            {smConstraints?.appliedRules?.length > 0 && (
+              <div className="bg-white/90 border border-indigo-100 rounded-lg p-2 space-y-1">
+                <div className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">
+                  🔍 AI đã phân tích:
+                </div>
+                {smConstraints.appliedRules.map((rule, idx) => (
+                  <div key={idx} className="text-[11px] text-slate-700 flex items-start gap-1">
+                    <span className="text-indigo-500 font-bold">•</span>
+                    <span>{rule.replace(/\*\*(.*?)\*\*/g, '$1')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="text-[11px] text-slate-500">
             Định biên {hasDemand ? 'theo ảnh/số liệu' : 'theo cửa hàng'}:
             {' '}sáng {staffing.weekday['6-14']} · chiều {staffing.weekday['14-22']} · đêm {staffing.weekday['22-6']}
@@ -303,7 +475,13 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
                 <span>FT {aiResult.stats.compliantFTPercent}%</span>
                 <span>PT {aiResult.stats.compliantPTPercent}%</span>
               </div>
-              <p className="text-[11px] text-slate-500">{aiResult.insights[0]}</p>
+              {Array.isArray(aiResult.insights) && aiResult.insights.length > 0 && (
+                <div className="space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                  {aiResult.insights.slice(0, 4).map((ins, i) => (
+                    <p key={i} className="text-[11px] text-slate-600 leading-snug">{ins}</p>
+                  ))}
+                </div>
+              )}
               {Array.isArray(aiResult.warnings) && aiResult.warnings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 space-y-0.5">
                   <p className="text-[11px] font-bold text-amber-800">⚠️ Cần SM bổ sung tay ({aiResult.warnings.length}):</p>
@@ -351,8 +529,8 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 text-xs font-bold text-slate-600">Hủy</button>
+        <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Hủy</button>
           <button
             type="button"
             onClick={handleRun}

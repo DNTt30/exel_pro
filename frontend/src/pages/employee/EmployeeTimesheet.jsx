@@ -107,7 +107,7 @@ export default function EmployeeTimesheet() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">
+    <div className="flex flex-col h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block overflow-x-hidden">
       {/* Modal Phiếu Chấm Công Cá Nhân */}
       <PersonalTimesheetModal
         isOpen={showPersonalSlip}

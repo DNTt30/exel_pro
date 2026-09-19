@@ -73,9 +73,9 @@ export default function AddStoreModal({ isOpen, onClose }) {
           />
         </div>
         
-        <div className="pt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-outline">Hủy</button>
-          <button onClick={handleSave} disabled={loading} className="btn btn-primary">{loading ? 'Đang lưu...' : 'Lưu cửa hàng'}</button>
+        <div className="pt-4 flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2 sm:gap-2.5">
+          <button onClick={onClose} className="btn btn-outline w-full sm:w-auto cursor-pointer">Hủy</button>
+          <button onClick={handleSave} disabled={loading} className="btn btn-primary w-full sm:w-auto cursor-pointer">{loading ? 'Đang lưu...' : 'Lưu cửa hàng'}</button>
         </div>
       </div>
     </Modal>

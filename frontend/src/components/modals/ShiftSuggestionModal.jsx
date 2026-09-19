@@ -199,11 +199,11 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply, cu
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+        <div className="flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2 pt-2 border-t border-slate-200">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-center"
           >
             Đóng
           </button>
@@ -211,7 +211,7 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply, cu
             type="button"
             onClick={handleConfirm}
             disabled={isApplying}
-            className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <Sparkles size={13} className="text-amber-300" />
             <span>{isApplying ? 'Đang áp dụng...' : 'Áp Dụng Lịch Này'}</span>

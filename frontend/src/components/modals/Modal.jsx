@@ -30,14 +30,14 @@ export default function Modal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3.5 sm:p-4 animate-in fade-in duration-150 overflow-y-auto"
       onClick={(e) => {
         if (!preventBackdropClose && e.target === e.currentTarget && onClose) {
           onClose();
         }
       }}
     >
-      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} mx-auto max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150`}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} mx-auto max-h-[90dvh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150 my-auto`}>
         {!hideHeader && (
           <div className={`flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/80 flex-shrink-0 ${headerClassName}`}>
             {typeof title === 'string' ? (

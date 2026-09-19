@@ -107,7 +107,7 @@ const EmployeeRow = memo(({
   return (
     <tr className="hover:bg-slate-50 group/row h-[38px]">
       {/* STT */}
-      <td className="text-center text-slate-400 font-mono text-xs min-w-[48px] w-[48px] max-w-[48px] sticky left-0 z-10 group-hover/row:bg-slate-50 bg-white border-r border-b border-slate-300 p-0">
+      <td className="hidden sm:table-cell text-center text-slate-400 font-mono text-xs min-w-[48px] w-[48px] max-w-[48px] sticky left-0 z-10 group-hover/row:bg-slate-50 bg-white border-r border-b border-slate-300 p-0">
         {idx + 1}
       </td>
 
@@ -130,7 +130,7 @@ const EmployeeRow = memo(({
       </td>
 
       {/* Họ và Tên */}
-      <td className="min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] sticky left-[48px] md:left-[144px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] p-0">
+      <td className="min-w-[125px] sm:min-w-[150px] md:min-w-[192px] w-[125px] sm:w-[150px] md:w-[192px] max-w-[125px] sm:max-w-[150px] md:max-w-[192px] sticky left-0 sm:left-[48px] md:left-[144px] z-10 group-hover/row:bg-slate-50 border-r border-b border-slate-300 bg-white shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] p-0">
         <div className="flex flex-col justify-center h-full">
           <div className="flex items-center gap-1 w-full overflow-hidden px-1">
             {isEditingName ? (
@@ -206,7 +206,7 @@ const EmployeeRow = memo(({
       
       {/* Dynamic Day Shift Cells */}
       {days.map((day, dIdx) => {
-        const rawVal = empSched[day] || '';
+        const rawVal = empSched[day] ?? '';
         const { display, colorClass } = parseShiftForCell(emp, rawVal);
         
         return (
@@ -219,6 +219,8 @@ const EmployeeRow = memo(({
               colIndex={dIdx}
               readOnly={!canEditShifts}
               isDraft={isDraft}
+              empName={emp.name}
+              dayLabel={day}
             />
           </td>
         );

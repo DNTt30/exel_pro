@@ -162,12 +162,12 @@ export default function TransferModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        <div className="pt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-outline cursor-pointer">Hủy</button>
+        <div className="pt-4 flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2 sm:gap-2.5">
+          <button onClick={onClose} className="btn btn-outline w-full sm:w-auto cursor-pointer">Hủy</button>
           <button 
             onClick={handleTransfer} 
             disabled={!selectedEmpId || !targetStore || loading} 
-            className="btn bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="btn bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer w-full sm:w-auto"
           >
             {loading ? 'Đang xử lý...' : 'Xác nhận Điều chuyển'}
           </button>

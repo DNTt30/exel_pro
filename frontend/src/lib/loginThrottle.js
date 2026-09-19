@@ -24,11 +24,18 @@ export function evaluateAttempt(rec, now) {
 function readAll() {
   try {
     return JSON.parse(globalThis.localStorage.getItem(KEY)) || {};
-  } catch { return {}; }
+  } catch (err) {
+    console.warn('[loginThrottle] Không đọc được throttle data — throttle tạm vô hiệu:', err?.message);
+    return {};
+  }
 }
 
 function writeAll(all) {
-  try { globalThis.localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  try {
+    globalThis.localStorage.setItem(KEY, JSON.stringify(all));
+  } catch (err) {
+    console.warn('[loginThrottle] Không ghi được throttle data — counter sẽ reset khi tải lại trang:', err?.message);
+  }
 }
 
 export function checkLocked(userId) {

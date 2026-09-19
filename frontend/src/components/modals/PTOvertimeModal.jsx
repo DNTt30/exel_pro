@@ -124,8 +124,8 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
       </div>
 
       {/* Action Bar */}
-      <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 border border-red-200 rounded-full font-bold text-xs">
             <Users size={14} /> Có {ptOvertimeList.length} nhân sự PT vượt 91h
           </span>
@@ -134,19 +134,19 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => handleExportOFC_CSV(ptOvertimeList, 'DS_Vuot_91h')}
             disabled={ptOvertimeList.length === 0}
-            className="btn bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs py-1.5 px-3 rounded-lg font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="btn bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs py-1.5 px-3 rounded-lg font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
           >
             <Download size={14} /> Xuất File OFC ({ptOvertimeList.length} NV vượt 91h)
           </button>
           <button
             type="button"
             onClick={() => handleExportOFC_CSV(allPTList, 'TatCa_PartTime')}
-            className="btn btn-outline text-xs py-1.5 px-3 rounded-lg font-semibold flex items-center gap-1.5 hover:text-blue-700 cursor-pointer"
+            className="btn btn-outline text-xs py-1.5 px-3 rounded-lg font-semibold flex items-center justify-center gap-1.5 hover:text-blue-700 cursor-pointer w-full sm:w-auto"
           >
             <FileSpreadsheet size={14} /> Xuất Toàn Bộ PT
           </button>
@@ -232,9 +232,9 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
       </div>
 
       {/* Footer */}
-      <div className="p-3.5 bg-white border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 flex-shrink-0">
-        <span>* Định dạng file xuất khẩu tuân thủ mẫu bảng tính OFC dành cho nhân viên Part-time vượt giờ.</span>
-        <button type="button" onClick={onClose} className="btn btn-outline text-xs py-1.5 px-4 rounded-lg font-bold cursor-pointer">
+      <div className="p-3.5 bg-white border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-between items-center gap-2.5 text-xs text-slate-500 flex-shrink-0">
+        <span className="text-center sm:text-left">* Định dạng file xuất khẩu tuân thủ mẫu bảng tính OFC dành cho nhân viên Part-time vượt giờ.</span>
+        <button type="button" onClick={onClose} className="btn btn-outline text-xs py-1.5 px-4 rounded-lg font-bold cursor-pointer w-full sm:w-auto justify-center">
           Đóng
         </button>
       </div>

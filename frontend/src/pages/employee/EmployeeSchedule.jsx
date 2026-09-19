@@ -235,7 +235,7 @@ export default function EmployeeSchedule() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">
+    <div className="flex flex-col h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block overflow-x-hidden">
       {/* Modals */}
       <ShiftSwapModal
         isOpen={showSwapModal}
@@ -447,6 +447,14 @@ export default function EmployeeSchedule() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleQuickRegister('22-6')}
+                  className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
+                  title="Đăng ký ca đêm 22-6 từ T2 đến T7, CN nghỉ"
+                >
+                  + Ca 22-6
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleQuickRegister('10-18')}
                   className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
                   title="Đăng ký ca 10-18 từ T2 đến T7, CN nghỉ"
@@ -503,7 +511,7 @@ export default function EmployeeSchedule() {
         <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
           <li><strong>Nền trắng (không màu):</strong> Ca đăng ký / Lịch nháp. Đang chờ Quản lý duyệt.</li>
           <li><strong>Có màu nền theo ca:</strong> Lịch đã được Quản lý CHỐT & BAN HÀNH chính thức.</li>
-          <li><strong>Ưu tiên AI tự động xếp:</strong> Giữ nguyên lịch đăng ký ➔ Ưu tiên Full-time đạt chuẩn 48h ➔ Part-time lấp ca thiếu. Không ép Part-time dư giờ nếu cửa hàng không cần.</li>
+          <li><strong>AI xếp ca thông minh:</strong> AI sẽ dựa vào lịch rảnh bạn đã đăng ký kết hợp dự báo doanh thu cửa hàng và chỉ đạo của Quản lý để phân ca công bằng, tuyệt đối tôn trọng ngày bạn đã xin nghỉ (OFF).</li>
         </ul>
       </div>
 
@@ -909,9 +917,9 @@ export default function EmployeeSchedule() {
             <table className="excel-table print:w-full">
               <thead>
                 <tr className="bg-slate-200 border-b border-slate-300">
-                  <th className="hidden md:table-cell min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-700 text-xs md:sticky left-0 z-20 bg-slate-200 border-r border-slate-300">STT</th>
-                  <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-700 text-xs md:sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '48px' }}>Mã NV</th>
-                  <th className="min-w-[150px] md:min-w-[200px] w-[150px] md:w-[200px] max-w-[150px] md:max-w-[200px] text-left font-bold text-slate-700 text-xs sticky z-30 bg-slate-200 border-r border-slate-300 px-3 left-0 md:left-[144px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                  <th className="hidden sm:table-cell min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-700 text-xs sticky left-0 z-20 bg-slate-200 border-r border-slate-300">STT</th>
+                  <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-700 text-xs sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '48px' }}>Mã NV</th>
+                  <th className="min-w-[125px] sm:min-w-[150px] md:min-w-[200px] w-[125px] sm:w-[150px] md:w-[200px] max-w-[125px] sm:max-w-[150px] md:max-w-[200px] text-left font-bold text-slate-700 text-xs sticky z-30 bg-slate-200 border-r border-slate-300 px-2 sm:px-3 left-0 sm:left-[48px] md:left-[144px] shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)]">
                     Họ và Tên
                   </th>
                   <th className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Vị trí</th>
@@ -999,13 +1007,13 @@ export default function EmployeeSchedule() {
                               isMe ? 'bg-blue-50/70 font-bold ring-2 ring-blue-500/40' : ''
                             }`}
                           >
-                            <td className={`text-center font-mono text-xs md:sticky left-0 z-10 border-r border-slate-300 ${isMe ? 'bg-blue-100 text-blue-900 font-black' : 'bg-white text-slate-400'}`}>
+                            <td className={`hidden sm:table-cell text-center font-mono text-xs sticky left-0 z-10 border-r border-slate-300 ${isMe ? 'bg-blue-100 text-blue-900 font-black' : 'bg-white text-slate-400'}`}>
                               {idx + 1}
                             </td>
-                            <td className={`hidden md:table-cell text-center font-mono text-xs md:sticky z-10 border-r border-slate-300 ${isMe ? 'bg-blue-100 text-blue-900 font-black' : 'bg-white text-slate-600'}`} style={{ left: '48px' }}>
+                            <td className={`hidden md:table-cell text-center font-mono text-xs sticky z-10 border-r border-slate-300 ${isMe ? 'bg-blue-100 text-blue-900 font-black' : 'bg-white text-slate-600'}`} style={{ left: '48px' }}>
                               {emp.id}
                             </td>
-                            <td className={`font-bold text-xs sticky z-20 border-r border-slate-300 px-3 left-0 md:left-[144px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] truncate ${
+                            <td className={`min-w-[125px] sm:min-w-[150px] md:min-w-[200px] w-[125px] sm:w-[150px] md:w-[200px] max-w-[125px] sm:max-w-[150px] md:max-w-[200px] font-bold text-xs sticky z-20 border-r border-slate-300 px-2 sm:px-3 left-0 sm:left-[48px] md:left-[144px] shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] truncate ${
                               isMe ? 'bg-blue-100 text-blue-900 font-black' : 'bg-white text-slate-800'
                             }`}>
                               <div className="flex items-center gap-1.5">
@@ -1041,6 +1049,8 @@ export default function EmployeeSchedule() {
                                     rowIndex={idx}
                                     colIndex={dIdx}
                                     onChange={(newVal) => handleShiftChange(emp, day, newVal)}
+                                    empName={emp.name}
+                                    dayLabel={day}
                                   />
                                   {swapInfo && (
                                     <span

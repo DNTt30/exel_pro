@@ -20,15 +20,32 @@ export function telegramConfigured() {
 export async function notifyTelegram(text) {
   if (!text) return { ok: false, skipped: true };
 
-  // Ưu tiên chế độ proxy an toàn
+  // Ưu tiên chế độ proxy an toàn (sử dụng Supabase JWT hoặc Proxy)
   if (PROXY_URL) {
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (PROXY_SECRET) {
+        headers['x-ofc-secret'] = PROXY_SECRET;
+      }
+
+      // Đính kèm JWT phiên người dùng hiện tại để xác thực an toàn không cần shared secret
+      try {
+        const { supabase } = await import('../lib/supabase');
+        if (supabase) {
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.access_token) {
+            headers['Authorization'] = `Bearer ${data.session.access_token}`;
+          }
+        }
+      } catch {
+        // bỏ qua nếu chạy ở môi trường không có supabase client
+      }
+
       const res = await fetch(PROXY_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(PROXY_SECRET ? { 'x-ofc-secret': PROXY_SECRET } : {}),
-        },
+        headers,
         body: JSON.stringify({ text: String(text).slice(0, 3500) }),
         signal: AbortSignal.timeout(8000),
       });

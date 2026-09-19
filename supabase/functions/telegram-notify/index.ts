@@ -20,7 +20,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405, headers: cors });
   if (!BOT_TOKEN || !CHAT_ID) return new Response('function not configured', { status: 500, headers: cors });
-  if (SECRET && req.headers.get('x-ofc-secret') !== SECRET) {
+  // Xác thực: Hỗ trợ Supabase JWT Bearer token (khuyên dùng) hoặc NOTIFY_SECRET
+  const authHeader = req.headers.get('authorization') || '';
+  const ofcSecret = req.headers.get('x-ofc-secret');
+  const hasValidSecret = SECRET && ofcSecret === SECRET;
+  const hasBearerToken = authHeader.startsWith('Bearer ');
+
+  if (SECRET && !hasValidSecret && !hasBearerToken) {
     return new Response('forbidden', { status: 403, headers: cors });
   }
   try {

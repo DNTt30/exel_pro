@@ -56,9 +56,27 @@ export const useStore = create(
         });
 
         const channel = supabase.channel('store-sync')
-          // 1. Bảng lịch làm việc (schedules)
+          // 1. Bảng lịch làm việc (schedules): Patch trực tiếp từ row mới, tránh re-fetch cả tuần gây nghẽn DB
           .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
             console.log('[Realtime] schedules changed:', payload);
+            const newRow = payload.new;
+            if (newRow && newRow.week_date && newRow.emp_id) {
+              const targetWeek = newRow.week_date;
+              set(state => ({
+                schedule: {
+                  ...state.schedule,
+                  [targetWeek]: {
+                    ...(state.schedule[targetWeek] || {}),
+                    [newRow.emp_id]: newRow.shifts || {}
+                  }
+                },
+                lastSyncedAt: Date.now()
+              }));
+              toast.info('Lịch làm việc vừa được cập nhật thời gian thực');
+              return;
+            }
+
+            // Fallback re-fetch an toàn chỉ khi DELETE hoặc payload rỗng
             if (schedTimer) clearTimeout(schedTimer);
             schedTimer = setTimeout(() => {
               const week = get().currentWeek;

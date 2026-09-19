@@ -38,14 +38,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ADMIN_OTP_URL: ${{ secrets.VITE_ADMIN_OTP_URL }}
-          VITE_TELEGRAM_PROXY_SECRET: ${{ secrets.VITE_TELEGRAM_PROXY_SECRET }}
+          VITE_TELEGRAM_PROXY_URL: ${{ secrets.VITE_TELEGRAM_PROXY_URL }}
         run: |
-          if [ -z "$VITE_SUPABASE_URL" ]; then
-            export VITE_SUPABASE_URL="https://plitfdjzuealjxbylwxy.supabase.co"
-          fi
-          if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            export VITE_SUPABASE_ANON_KEY="sb_publishable_NSojsCWhOgiUvZIrMpoXEg_So_tE3O_"
-          fi
           npm run build
       - name: Publish gh-pages
         uses: peaceiris/actions-gh-pages@v4

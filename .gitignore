@@ -3,9 +3,13 @@ node_modules
 .env.*
 !.env.example
 dist
+frontend/dist/
+ghpages-tmp/
+dist_latest_pro/
+schedule-app/
+*.csv
 .DS_Store
 /generated/prisma
 k6.zip
 k6_bin/
-
 .vercel

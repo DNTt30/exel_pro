@@ -50,27 +50,32 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
 
 // Lưu/Cập nhật toàn bộ lịch của 1 nhân viên trong 1 tuần (có optimistic versioning)
 export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
-  // 1. Thử gọi RPC save_employee_schedule (Security Definer - an toàn, tăng version, bảo đảm ghi thành công trên cả auth & anon)
-  try {
-    const { data: rpcVer, error: rpcErr } = await db().rpc('save_employee_schedule', {
-      p_week_date: weekDate,
-      p_emp_id: empId,
-      p_shifts: shifts,
-      p_expect_version: opts.expectVersion ?? null
-    });
-    if (!rpcErr) return rpcVer;
-    if (rpcErr.message?.includes('40001') || rpcErr.message?.includes('CONFLICT')) {
-      const err = new Error(rpcErr.message);
-      err.code = 'CONFLICT';
-      throw err;
-    }
-    console.warn('RPC save_employee_schedule báo lỗi, chuyển sang direct upsert:', rpcErr);
-  } catch (rpcEx) {
-    if (rpcEx.code === 'CONFLICT') throw rpcEx;
-    console.warn('Không thể gọi RPC save_employee_schedule, thử direct upsert:', rpcEx);
+  // 1. Gọi RPC save_employee_schedule (Row Lock + Optimistic Versioning)
+  const { data: rpcVer, error: rpcErr } = await db().rpc('save_employee_schedule', {
+    p_week_date: weekDate,
+    p_emp_id: empId,
+    p_shifts: shifts,
+    p_expect_version: opts.expectVersion ?? null
+  });
+
+  if (!rpcErr) return rpcVer;
+
+  const msg = String(rpcErr.message || '');
+  if (/40001|CONFLICT/i.test(msg)) {
+    const err = new Error(msg);
+    err.code = 'CONFLICT';
+    throw err;
   }
 
-  // 2. Fallback sang direct upsert theo chính sách RLS
+  // CHỈ fallback sang direct upsert khi hàm RPC thực sự chưa được cài đặt trong CSDL
+  if (!/schema cache|could not find the function|function.*does not exist|404/i.test(msg)) {
+    console.error('Lỗi lưu lịch làm việc (RPC):', rpcErr);
+    const err = new Error(msg);
+    err.code = 'DATABASE_ERROR';
+    throw err;
+  }
+
+  console.warn('RPC save_employee_schedule chưa tồn tại trong CSDL, fallback sang direct upsert.');
   const { error } = await db().from('schedules').upsert({
     week_date: weekDate,
     emp_id: empId,

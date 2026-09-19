@@ -31,6 +31,7 @@ const ImportScheduleModal = React.lazy(() => import('../../components/modals/Imp
 const ShiftSwapListModal = React.lazy(() => import('../../components/modals/ShiftSwapListModal'));
 const AISchedulerModal = React.lazy(() => import('../../components/modals/AISchedulerModal'));
 const VulnerabilityRadarModal = React.lazy(() => import('../../components/modals/VulnerabilityRadarModal'));
+import RegistrationDeadlineModal from '../../components/modals/RegistrationDeadlineModal';
 import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
@@ -68,6 +69,7 @@ export default function Schedule() {
   const [showAIScheduler, setShowAIScheduler] = useState(false);
   const [showAICopilot, setShowAICopilot] = useState(false);
   const [showRadarModal, setShowRadarModal] = useState(false);
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [copyPlan, setCopyPlan] = useState(null);
 
@@ -398,6 +400,12 @@ export default function Schedule() {
           storeName={currentStoreInfo?.name || filterDept}
           currentWeek={currentWeek}
         />
+        <RegistrationDeadlineModal
+          isOpen={showDeadlineModal}
+          onClose={() => setShowDeadlineModal(false)}
+          storeId={flowStore === 'ALL' ? (user?.dept || stores[0]?.id) : flowStore}
+          weekDate={currentWeek}
+        />
       </Suspense>
       <AICopilotDrawer
         isOpen={showAICopilot}
@@ -555,28 +563,37 @@ export default function Schedule() {
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Users size={13} className="text-blue-600" />
-                Nhân sự & Chi viện
+                Nhân sự & Điều phối
               </span>
-              <span className="text-[10px] font-semibold text-slate-400">2 thao tác</span>
+              <span className="text-[10px] font-semibold text-slate-400">3 thao tác</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setShowAddEmp(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Thêm nhân viên mới"
               >
-                <UserPlus size={14} className="text-blue-600" />
+                <UserPlus size={14} className="text-blue-600 flex-shrink-0" />
                 <span>Thêm NV</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowTransfer(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-700 border border-slate-200/80 hover:border-orange-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-700 border border-slate-200/80 hover:border-orange-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Điều chuyển / Mượn nhân sự giữa các cửa hàng"
               >
-                <ArrowRightLeft size={14} className="text-orange-600" />
+                <ArrowRightLeft size={14} className="text-orange-600 flex-shrink-0" />
                 <span>Chi viện</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeadlineModal(true)}
+                className="flex items-center justify-center gap-1 px-2 py-2 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 hover:border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                title="Thiết lập hạn nộp lịch tuần cho nhân viên"
+              >
+                <Clock size={14} className="text-indigo-600 flex-shrink-0" />
+                <span>Hạn nộp</span>
               </button>
             </div>
           </div>

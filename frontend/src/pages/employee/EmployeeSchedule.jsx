@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
-import { Download, Printer, Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, Sparkles, Zap, RotateCcw, LayoutGrid, Table, MapPin, Sun, Moon, Coffee, ArrowRightLeft } from 'lucide-react';
+import { Download, Printer, Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, Sparkles, Zap, RotateCcw, LayoutGrid, Table, MapPin, Sun, Moon, Coffee, ArrowRightLeft, Lock } from 'lucide-react';
 
 import ShiftInput from '../../components/ShiftInput';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
@@ -10,6 +10,7 @@ import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
 import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
+import { getStoreDeadlineConfig, calculateWeekDeadline } from '../../utils/deadlineHelper';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import ShiftSuggestionModal from '../../components/modals/ShiftSuggestionModal';
@@ -47,6 +48,28 @@ export default function EmployeeSchedule() {
   const currentWeekStatus = (scheduleWeeks || {})[weekRecordKey(activeDept === 'ALL' ? myDept : activeDept, currentWeek)]?.status || 'draft';
   const isDraft = currentWeekStatus !== 'approved';
 
+  // Lắng nghe sự kiện đổi hạn nộp để đồng bộ giao diện
+  const [deadlineVersion, setDeadlineVersion] = useState(0);
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.detail || e.detail.storeId === myDept) {
+        setDeadlineVersion(v => v + 1);
+      }
+    };
+    window.addEventListener('gs25_deadline_changed', handler);
+    return () => window.removeEventListener('gs25_deadline_changed', handler);
+  }, [myDept]);
+
+  // Thông tin hạn nộp lịch tuần
+  const deadlineInfo = useMemo(() => {
+    const targetStore = activeDept === 'ALL' ? myDept : activeDept;
+    const cfg = getStoreDeadlineConfig(targetStore, currentWeek, stores);
+    return calculateWeekDeadline(currentWeek, cfg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDept, myDept, currentWeek, stores, deadlineVersion]);
+
+  const isDeadlineExpired = deadlineInfo?.enabled && deadlineInfo?.isExpired;
+
   // 1. Ngày hiển thị cố định theo Tuần (T2 -> CN)
   const activeDays = WEEK_DAYS;
 
@@ -74,6 +97,9 @@ export default function EmployeeSchedule() {
     return selectedMonday.getTime() > currentMonday.getTime();
   }, [currentWeek]);
 
+  // Điều kiện được phép đăng ký / chỉnh sửa ca
+  const canRegister = isFutureWeek && !isDeadlineExpired && isDraft;
+
   // 6. Tính tuần sau
   const nextWeekDateStr = useMemo(() => {
     const today = new Date();
@@ -84,23 +110,39 @@ export default function EmployeeSchedule() {
     return `${currentMonday.getFullYear()}-${String(currentMonday.getMonth() + 1).padStart(2, '0')}-${String(currentMonday.getDate()).padStart(2, '0')}`;
   }, []);
 
-  // 7. Xử lý chỉnh sửa / đăng ký ca làm việc (Chỉ tuần tương lai mới được sửa)
+  // 7. Xử lý chỉnh sửa / đăng ký ca làm việc (Chỉ tuần tương lai chưa hết hạn mới được sửa)
   const handleShiftChange = useCallback(async (emp, day, value) => {
     if (emp.id !== user?.id) return;
     if (!isFutureWeek) {
       toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
+    if (isDeadlineExpired) {
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
+      return;
+    }
+    if (!isDraft) {
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
+      return;
+    }
     setSaveStatus('saving');
     const valToSave = value === 'off' ? 'off' : { shift: value, confirmed: false, registered: true };
     await updateShift(currentWeek, user.id, day, valToSave);
     setTimeout(() => setSaveStatus('saved'), 400);
-  }, [currentWeek, updateShift, user?.id, isFutureWeek]);
+  }, [currentWeek, updateShift, user?.id, isFutureWeek, isDeadlineExpired, isDraft, deadlineInfo?.formattedDeadline]);
 
   // 8. Đăng ký nhanh cả tuần mẫu (Gom thành 1 request duy nhất)
   const handleQuickRegister = async (shiftCode) => {
     if (!isFutureWeek) {
       toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
+      return;
+    }
+    if (isDeadlineExpired) {
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
+      return;
+    }
+    if (!isDraft) {
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
       return;
     }
     setSaveStatus('saving');
@@ -123,6 +165,14 @@ export default function EmployeeSchedule() {
   const handleApplySuggestion = async (suggestedShifts) => {
     if (!isFutureWeek) {
       toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
+      return;
+    }
+    if (isDeadlineExpired) {
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
+      return;
+    }
+    if (!isDraft) {
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
       return;
     }
     setSaveStatus('saving');
@@ -417,14 +467,25 @@ export default function EmployeeSchedule() {
           </div>
         </div>
 
-        {/* Quick Shift Registration Bar (When future week) */}
-        {isFutureWeek && (
+        {/* Quick Shift Registration Bar (When future week and open) */}
+        {isFutureWeek && canRegister && (
           <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 px-3 sm:px-4 py-2 border-b border-emerald-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">
                   <Sparkles size={12} /> ĐANG MỞ ĐĂNG KÝ CA LÀM
                 </span>
+                {deadlineInfo?.enabled && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] border shadow-2xs flex-shrink-0 ${
+                    deadlineInfo.isNearDeadline
+                      ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse'
+                      : 'bg-white text-blue-800 border-blue-200'
+                  }`}>
+                    <Clock size={11} className={deadlineInfo.isNearDeadline ? 'text-amber-700' : 'text-blue-600'} />
+                    <span>Hạn: {deadlineInfo.formattedDeadline}</span>
+                    <span className="opacity-80 font-normal">({deadlineInfo.remainingText})</span>
+                  </span>
+                )}
                 <span className="text-slate-700 font-semibold hidden md:inline">
                   Chọn ca làm việc cho tuần sau hoặc bấm chọn nhanh mẫu:
                 </span>
@@ -524,6 +585,40 @@ export default function EmployeeSchedule() {
             </div>
           </div>
         )}
+
+        {/* Banner khi ĐÃ HẾT HẠN ĐĂNG KÝ (Expired Bar) */}
+        {isFutureWeek && isDeadlineExpired && (
+          <div className="bg-gradient-to-r from-rose-50 via-red-50 to-amber-50 px-3 sm:px-4 py-2.5 border-b border-rose-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">
+                <Lock size={13} /> ĐÃ HẾT HẠN ĐĂNG KÝ LỊCH TUẦN
+              </span>
+              <span className="text-rose-900 font-bold">
+                Hạn chót: {deadlineInfo?.formattedDeadline} ({deadlineInfo?.remainingText}).
+              </span>
+              <span className="text-slate-600 font-medium hidden sm:inline">
+                Hệ thống đã khóa các ô đăng ký ca. Nếu cần bổ sung hoặc đổi ca đột xuất, vui lòng liên hệ Cửa hàng trưởng.
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="px-2.5 py-1 bg-white border border-rose-300 rounded-md text-[10px] font-black text-rose-700 shadow-2xs">
+                🔒 Đã khóa đăng ký
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Banner khi TUẦN ĐÃ ĐƯỢC DUYỆT (Approved Bar) */}
+        {isFutureWeek && !isDraft && (
+          <div className="bg-emerald-50 px-3 sm:px-4 py-2 border-b border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px]">
+                ✓ LỊCH ĐÃ ĐƯỢC DUYỆT CHÍNH THỨC
+              </span>
+              <span className="font-semibold">Quản lý đã chốt phân ca. Mọi thay đổi cần thông qua tính năng Đổi ca.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-blue-50/50 p-3 sm:px-5 sm:py-3 border-b border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900">
@@ -591,8 +686,12 @@ export default function EmployeeSchedule() {
             <div className="lg:col-span-2 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-slate-800 flex items-center gap-1.5"><Clock size={16} className="text-slate-500"/> Tiến độ tuần này</h3>
-                <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 rounded-md text-slate-600 border border-slate-200">
-                  {isFutureWeek ? 'Đang mở đăng ký ✍️' : 'Đã chốt lịch 🔒'}
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${
+                  canRegister 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : (isDeadlineExpired ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200')
+                }`}>
+                  {canRegister ? 'Đang mở đăng ký ✍️' : (isDeadlineExpired ? 'Đã hết hạn nộp 🔒' : 'Đã chốt lịch 🔒')}
                 </span>
               </div>
               
@@ -710,7 +809,7 @@ export default function EmployeeSchedule() {
           {/* 7 Daily Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {weekDaysCardData.map((card) => {
-              const canEdit = isFutureWeek;
+              const canEdit = canRegister;
 
               return (
                 <div 
@@ -1069,7 +1168,7 @@ export default function EmployeeSchedule() {
                             {/* Ô Ca Làm Việc */}
                             {activeDays.map((day, dIdx) => {
                               const val = empSched[day] || '';
-                              const canEdit = isMe && isFutureWeek;
+                              const canEdit = isMe && canRegister;
                               const swapInfo = isMe ? swapBadgeForDay(day) : null;
 
                               return (

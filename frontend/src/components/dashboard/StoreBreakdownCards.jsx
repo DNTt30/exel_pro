@@ -34,9 +34,17 @@ export default function StoreBreakdownCards({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-black text-blue-700 text-sm">🏬 {s.dept}</span>
-                  {s.ptOver91 > 0 ? (
+                  {s.totalHours === 0 ? (
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-md text-[10px] font-bold">
+                      Chưa có công (0h)
+                    </span>
+                  ) : s.ptOver91 > 0 ? (
                     <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-[10px] font-extrabold">
                       ⚠️ {s.ptOver91} PT vượt {viewMode === 'month' ? '91h' : '23h'}
+                    </span>
+                  ) : s.ptUnderMin > 0 ? (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-[10px] font-extrabold">
+                      ⚠️ {s.ptUnderMin} PT thiếu giờ ({viewMode === 'month' ? '<64h' : '<16h'})
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-bold">

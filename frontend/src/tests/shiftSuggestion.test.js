@@ -78,4 +78,39 @@ describe('Smart Shift Suggestions for Employees', () => {
       expect(ranked[2].badgeType).toBe('busy');
     });
   });
+
+  describe('findAvailableStaffForDeficit', () => {
+    it('ranks staff who registered this exact shift at top and filters out busy/overtime staff', async () => {
+      const { findAvailableStaffForDeficit } = await import('../utils/shiftSuggestionHelper');
+      const employees = [
+        { id: 'e1', name: 'Nguyễn Văn Bận', dept: 'VN0485', type: 'STPT' },
+        { id: 'e2', name: 'Trần Văn Rảnh ĐK', dept: 'VN0485', type: 'STPT' },
+        { id: 'e3', name: 'Lê Văn Vượt Giờ', dept: 'VN0485', type: 'STPT' },
+        { id: 'e4', name: 'Phạm Chi Viện', dept: 'VN0002', type: 'STPT' }
+      ];
+
+      const weekSched = {
+        e1: { T2: '14-22' }, // Đã có ca 14-22 T2
+        e2: { T2: { shift: '6-14', confirmed: false, registered: true } }, // ĐK rảnh 6-14 T2, 0h
+        e3: { T3: '6-14', T4: '6-14', T5: '6-14', T2: 'off' }, // 24h > 23h
+        e4: { T3: '6-14' } // Chưa xếp T2 (rảnh), 8h, chi viện từ VN0002
+      };
+
+      const candidates = findAvailableStaffForDeficit({
+        dayKey: 'T2',
+        shiftCode: '6-14',
+        storeId: 'VN0485',
+        employees,
+        weekSched
+      });
+
+      expect(candidates.length).toBe(2);
+      expect(candidates[0].emp.id).toBe('e2');
+      expect(candidates[0].hasRegisteredThisShift).toBe(true);
+      expect(candidates[0].badge).toContain('Đã đăng ký rảnh');
+      expect(candidates[1].emp.id).toBe('e4');
+      expect(candidates[1].isLocal).toBe(false);
+      expect(candidates[1].badge).toContain('Chi viện');
+    });
+  });
 });

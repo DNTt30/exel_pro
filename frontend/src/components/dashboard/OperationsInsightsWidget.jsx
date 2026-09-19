@@ -3,7 +3,19 @@ import { UserX, RefreshCcw, ArrowRight, ArrowLeft } from 'lucide-react';
 import { getShiftCode, getCoveringStore } from '../../utils/shiftHelper';
 import { WEEK_DAYS } from '../../data/constants';
 
-export default function OperationsInsightsWidget({ employees, weekSchedule, filterDept }) {
+export default function OperationsInsightsWidget({ 
+  employees, 
+  weekSchedule, 
+  filterDept,
+  viewMode = 'week',
+  schedule = {},
+  cycleDates = [],
+  selectedMonthCycle = ''
+}) {
+  const isMonth = viewMode === 'month';
+  const timePeriodLabel = isMonth && selectedMonthCycle 
+    ? `Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}` 
+    : 'Tuần này';
 
   // 1. Phân tích Tỷ lệ Vắng mặt / Phép (Leaves & Attendance)
   const leaveStats = useMemo(() => {
@@ -18,21 +30,40 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
 
     filteredEmps.forEach(emp => {
       const mySched = weekSchedule[emp.id] || {};
-      WEEK_DAYS.forEach(day => {
-        const raw = mySched[day];
-        if (!raw) return;
-        
-        const code = getShiftCode(raw).toUpperCase();
-        if (code === 'OFF' || code === '-') {
-          off++;
-        } else if (['AL', 'AL_H', 'PL', 'PL_H'].includes(code)) {
-          paidLeave++;
-        } else if (['UL', 'UL_H', 'KL', 'KL_H'].includes(code)) {
-          unpaidLeave++;
-        } else {
-          worked++;
-        }
-      });
+
+      if (isMonth && cycleDates.length > 0) {
+        cycleDates.forEach(({ weekKey, dayKey }) => {
+          const raw = schedule[weekKey]?.[emp.id]?.[dayKey];
+          if (!raw) return;
+
+          const code = getShiftCode(raw).toUpperCase();
+          if (code === 'OFF' || code === '-') {
+            off++;
+          } else if (['AL', 'AL_H', 'PL', 'PL_H'].includes(code)) {
+            paidLeave++;
+          } else if (['UL', 'UL_H', 'KL', 'KL_H'].includes(code)) {
+            unpaidLeave++;
+          } else {
+            worked++;
+          }
+        });
+      } else {
+        WEEK_DAYS.forEach(day => {
+          const raw = mySched[day];
+          if (!raw) return;
+          
+          const code = getShiftCode(raw).toUpperCase();
+          if (code === 'OFF' || code === '-') {
+            off++;
+          } else if (['AL', 'AL_H', 'PL', 'PL_H'].includes(code)) {
+            paidLeave++;
+          } else if (['UL', 'UL_H', 'KL', 'KL_H'].includes(code)) {
+            unpaidLeave++;
+          } else {
+            worked++;
+          }
+        });
+      }
     });
 
     const total = worked + off + paidLeave + unpaidLeave;
@@ -43,7 +74,7 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
       paidPct: total ? (paidLeave / total) * 100 : 0,
       unpaidPct: total ? (unpaidLeave / total) * 100 : 0,
     };
-  }, [employees, weekSchedule, filterDept]);
+  }, [employees, weekSchedule, filterDept, isMonth, cycleDates, schedule]);
 
   // 2. Phân tích Chi viện (Cross-store Support)
   const supportStats = useMemo(() => {
@@ -54,18 +85,33 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
       const mySched = weekSchedule[emp.id] || {};
       const empDept = emp.dept;
 
-      WEEK_DAYS.forEach(day => {
-        const raw = mySched[day];
-        if (!raw) return;
+      if (isMonth && cycleDates.length > 0) {
+        cycleDates.forEach(({ weekKey, dayKey }) => {
+          const raw = schedule[weekKey]?.[emp.id]?.[dayKey];
+          if (!raw) return;
 
-        const cover = getCoveringStore(raw);
-        if (cover && cover !== empDept) {
-          borrowing[cover] = (borrowing[cover] || 0) + 1;
-          if (empDept) {
-            lending[empDept] = (lending[empDept] || 0) + 1;
+          const cover = getCoveringStore(raw);
+          if (cover && cover !== empDept) {
+            borrowing[cover] = (borrowing[cover] || 0) + 1;
+            if (empDept) {
+              lending[empDept] = (lending[empDept] || 0) + 1;
+            }
           }
-        }
-      });
+        });
+      } else {
+        WEEK_DAYS.forEach(day => {
+          const raw = mySched[day];
+          if (!raw) return;
+
+          const cover = getCoveringStore(raw);
+          if (cover && cover !== empDept) {
+            borrowing[cover] = (borrowing[cover] || 0) + 1;
+            if (empDept) {
+              lending[empDept] = (lending[empDept] || 0) + 1;
+            }
+          }
+        });
+      }
     });
 
     const topBorrowers = Object.entries(borrowing).sort((a, b) => b[1] - a[1]).slice(0, 3);
@@ -73,7 +119,7 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
     const totalTransfers = Object.values(borrowing).reduce((a, b) => a + b, 0);
 
     return { topBorrowers, topLenders, totalTransfers };
-  }, [employees, weekSchedule]);
+  }, [employees, weekSchedule, isMonth, cycleDates, schedule]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
@@ -86,7 +132,7 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800">Tình Trạng Đi Làm & Nghỉ Phép</h3>
-            <p className="text-[11px] text-slate-500 font-medium">Theo dõi vắng mặt tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `CH ${filterDept}`} (Tuần này)</p>
+            <p className="text-[11px] text-slate-500 font-medium">Theo dõi vắng mặt tại {filterDept === 'ALL' ? 'Toàn hệ thống' : `CH ${filterDept}`} ({timePeriodLabel})</p>
           </div>
         </div>
 
@@ -155,7 +201,7 @@ export default function OperationsInsightsWidget({ employees, weekSchedule, filt
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800">Hoạt Động Chi Viện (Cross-Store)</h3>
-            <p className="text-[11px] text-slate-500 font-medium">Toàn hệ thống ghi nhận <strong className="text-amber-600">{supportStats.totalTransfers} ca</strong> chi viện (Tuần này)</p>
+            <p className="text-[11px] text-slate-500 font-medium">Toàn hệ thống ghi nhận <strong className="text-amber-600">{supportStats.totalTransfers} ca</strong> chi viện ({timePeriodLabel})</p>
           </div>
         </div>
 

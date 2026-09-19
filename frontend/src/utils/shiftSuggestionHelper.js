@@ -151,3 +151,85 @@ export function rankSwapPartners({ myDayKey, myShiftHours = 8, colleagues = [], 
   // Sắp xếp người có điểm cao nhất lên đầu
   return ranked.sort((a, b) => b.swapScore - a.swapScore);
 }
+
+/**
+ * Tìm và xếp hạng các nhân sự rảnh có thể lấp ca thiếu
+ * @param {Object} params
+ * @param {string} params.dayKey - Ngày thiếu ca ('T2' ... 'CN')
+ * @param {string} params.shiftCode - Ca thiếu ('6-14', '14-22', '22-6'...)
+ * @param {string} params.storeId - Mã cửa hàng thiếu
+ * @param {Array} params.employees - Danh sách nhân viên
+ * @param {Object} params.weekSched - Lịch tuần hiện tại
+ * @returns {Array} Danh sách ứng viên rảnh được xếp hạng từ tốt nhất
+ */
+export function findAvailableStaffForDeficit({ dayKey, shiftCode, storeId, employees = [], weekSched = {} }) {
+  const shiftHours = getShiftHours(shiftCode);
+  const candidates = [];
+
+  employees.forEach(emp => {
+    // Không nhận nhân viên đã nghỉ việc
+    if (emp.status === 'inactive' || emp.status === 'resigned') return;
+
+    const empSched = weekSched[emp.id] || {};
+    const dayVal = empSched[dayKey];
+    const { shift: curShift, confirmed } = normalizeShift(dayVal);
+
+    // Nếu đã có ca chính thức trong ngày thì không rảnh
+    const hasActiveConfirmedShift = curShift && curShift !== 'off' && confirmed !== false;
+    if (hasActiveConfirmedShift) return;
+
+    // Nếu nhân viên xin nghỉ OFF đích danh ngày này
+    const isExplicitOff = curShift === 'off' && confirmed !== false;
+    if (isExplicitOff) return;
+
+    // Tính tổng giờ tuần này của nhân viên (chỉ tính ca đã chốt)
+    let currentWeeklyHours = 0;
+    WEEK_DAYS.forEach(d => {
+      const { shift, confirmed: conf } = normalizeShift(empSched[d]);
+      if (shift && shift !== 'off' && conf !== false) {
+        currentWeeklyHours += getShiftHours(shift);
+      }
+    });
+
+    const isPT = String(emp.type || emp.role || '').toUpperCase().includes('PT');
+    const isFT = !isPT;
+    const isLocal = emp.dept === storeId;
+    const hoursAfterAssign = currentWeeklyHours + shiftHours;
+
+    // Kiểm tra trần giờ: PT <= 23h, FT <= 48h
+    const maxCap = isPT ? SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK : SCHEDULE_RULES.STFT_MAX_HOURS_PER_WEEK;
+    if (hoursAfterAssign > maxCap) return;
+
+    // Nếu nhân viên đã đăng ký rảnh đúng ca này (nhưng chưa chốt)
+    const hasRegisteredThisShift = curShift === shiftCode && confirmed === false;
+
+    // Chấm điểm ưu tiên
+    let score = 50;
+    let badge = isLocal ? '🏠 Nhân sự cơ hữu' : `🚗 Chi viện từ ${emp.dept}`;
+
+    if (hasRegisteredThisShift) {
+      score += 50;
+      badge = '⭐ Đã đăng ký rảnh ca này';
+    } else if (isLocal) {
+      score += 30;
+    }
+
+    // Ưu tiên người có số giờ lũy kế thấp hơn (để chia đều quỹ giờ)
+    score += Math.max(0, 30 - currentWeeklyHours);
+
+    candidates.push({
+      emp,
+      currentWeeklyHours,
+      hoursAfterAssign,
+      isLocal,
+      isPT,
+      isFT,
+      hasRegisteredThisShift,
+      score,
+      badge
+    });
+  });
+
+  return candidates.sort((a, b) => b.score - a.score);
+}
+

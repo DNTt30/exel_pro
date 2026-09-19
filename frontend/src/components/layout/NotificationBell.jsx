@@ -13,14 +13,14 @@ import {
   CheckCheck,
   ArrowRightLeft
 } from 'lucide-react';
-import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
-import { WEEK_DAYS } from '../../data/constants';
+import { normalizeShift, getShiftHours, calculateStaffingGap } from '../../utils/shiftHelper';
+import { WEEK_DAYS, getStaffingMatrix } from '../../data/constants';
 import { collectExpiryAlerts } from '../../utils/shelfExpiry';
 import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function NotificationBell() {
-  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, schedule: s.schedule, currentWeek: s.currentWeek, employees: s.employees, shiftSwaps: s.shiftSwaps, shelves: s.shelves, shelfItems: s.shelfItems })));
+  const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems, stores } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, schedule: s.schedule, currentWeek: s.currentWeek, employees: s.employees, shiftSwaps: s.shiftSwaps, shelves: s.shelves, shelfItems: s.shelfItems, stores: s.stores })));
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [readIds, setReadIds] = useState(() => {
@@ -118,6 +118,36 @@ export default function NotificationBell() {
           link: '/admin/schedule',
           time: 'Cảnh báo'
         });
+      }
+
+      // 3.5. Cảnh báo ca thiếu nhân sự so với định biên (Staffing Deficits)
+      const targetStoreId = pickStore ? (user?.dept || 'VN0485') : user?.dept;
+      if (targetStoreId) {
+        let deficitShiftsCount = 0;
+        const deficitDays = [];
+        const storeObj = (stores || []).find(s => s.id === targetStoreId) || { id: targetStoreId, staffing: null };
+        WEEK_DAYS.forEach(dayKey => {
+          const matrix = getStaffingMatrix(storeObj, dayKey);
+          const gap = calculateStaffingGap(employees, weekSched, dayKey, targetStoreId, matrix);
+          const missing = Object.entries(gap).filter(([_, d]) => d.gap < 0);
+          if (missing.length > 0) {
+            deficitShiftsCount += missing.length;
+            deficitDays.push(dayKey);
+          }
+        });
+
+        if (deficitShiftsCount > 0) {
+          list.push({
+            id: `deficit_staffing_${targetStoreId}_${currentWeek}`,
+            type: 'staffing_deficit',
+            title: `Cảnh báo: ${deficitShiftsCount} ca thiếu người tại ${targetStoreId} ⚠️`,
+            desc: `Tuần ${currentWeek} đang hụt định biên vào các ngày (${deficitDays.join(', ')}). Bấm để gán hỗ trợ.`,
+            icon: <AlertTriangle size={16} className="text-rose-600" />,
+            bgColor: 'bg-rose-50 border-rose-200',
+            link: '/admin/schedule',
+            time: 'Cần bổ sung'
+          });
+        }
       }
     }
 

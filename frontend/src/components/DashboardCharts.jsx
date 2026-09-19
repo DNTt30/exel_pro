@@ -952,9 +952,17 @@ export default function DashboardCharts({
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-black font-mono text-slate-800">{s.totalHours.toLocaleString()}h ({storePct}%)</span>
-                      {s.ptOver91 > 0 ? (
+                      {s.totalHours === 0 ? (
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[10px] font-bold">
+                          Chưa có công (0h)
+                        </span>
+                      ) : s.ptOver91 > 0 ? (
                         <span className="px-2 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10px] font-extrabold">
                           ⚠️ {s.ptOver91} PT vượt {viewMode === 'month' ? '91h' : '23h'}
+                        </span>
+                      ) : s.ptUnderMin > 0 ? (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-extrabold">
+                          ⚠️ {s.ptUnderMin} PT thiếu giờ ({viewMode === 'month' ? '<64h' : '<16h'})
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Users, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { WEEK_DAYS, getStaffingMatrix, normalizeStaffingConfig } from '../data/constants';
 import { calculateStaffingGap } from '../utils/shiftHelper';
+import { findAvailableStaffForDeficit } from '../utils/shiftSuggestionHelper';
 import { useStore } from '../store/useStore';
 import StaffingMatrixFields from './StaffingMatrixFields';
 import { isOpsManager } from '../lib/authSession';
@@ -9,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../components/ui/toastStore';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
-  const { stores, user, updateStore, currentWeek } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore, currentWeek: s.currentWeek })));
+  const { stores, user, updateStore, updateShift, currentWeek } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore, updateShift: s.updateShift, currentWeek: s.currentWeek })));
   const isAdmin = isOpsManager(user);
 
   const dayDatesMap = useMemo(() => {
@@ -36,6 +37,7 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
   const [storeId, setStoreId] = useState(defaultStoreId);
   const [draftStaffing, setDraftStaffing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [suggestOpenShift, setSuggestOpenShift] = useState(null);
 
   useEffect(() => {
     if (filterDept && filterDept !== 'ALL') setStoreId(filterDept);
@@ -53,6 +55,15 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
 
   const gapData = calculateStaffingGap(employees, weekSchedule, selectedDay, storeId, requiredMatrix);
   const totalDeficits = Object.values(gapData).filter(d => d.gap < 0).length;
+
+  const handleAssignCandidate = (candidate, shiftCode) => {
+    if (!updateShift) return;
+    const isCovering = !candidate.isLocal;
+    const saveVal = isCovering ? { shift: shiftCode, covering_store: storeId } : shiftCode;
+    updateShift(currentWeek, candidate.emp.id, selectedDay, saveVal);
+    toast.success(`Đã gán ${candidate.emp.name} vào ca ${shiftCode} ngày ${selectedDay}${isCovering ? ` (chi viện tới ${storeId})` : ''}`);
+    setSuggestOpenShift(null);
+  };
 
   const handleSaveStaffing = async () => {
     if (!draftStaffing) return;
@@ -160,6 +171,13 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
             {Object.entries(gapData).map(([shiftCode, data]) => {
               const isDeficit = data.gap < 0;
               const isBalanced = data.gap === 0;
+              const candidates = isDeficit ? findAvailableStaffForDeficit({
+                dayKey: selectedDay,
+                shiftCode,
+                storeId,
+                employees,
+                weekSched: weekSchedule
+              }) : [];
 
               return (
                 <div
@@ -172,45 +190,125 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                       : 'bg-indigo-50/70 border-indigo-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono font-black text-sm text-slate-900">Ca {shiftCode}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        isDeficit
-                          ? 'bg-red-200 text-red-800'
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono font-black text-sm text-slate-900">Ca {shiftCode}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          isDeficit
+                            ? 'bg-red-200 text-red-800'
+                            : isBalanced
+                            ? 'bg-emerald-200 text-emerald-800'
+                            : 'bg-indigo-200 text-indigo-800'
+                        }`}
+                      >
+                        {isDeficit
+                          ? `Thiếu ${Math.abs(data.gap)} NV`
                           : isBalanced
-                          ? 'bg-emerald-200 text-emerald-800'
-                          : 'bg-indigo-200 text-indigo-800'
-                      }`}
-                    >
-                      {isDeficit
-                        ? `Thiếu ${Math.abs(data.gap)} NV`
-                        : isBalanced
-                        ? 'Chuẩn định biên'
-                        : `Dư ${data.gap} NV`}
-                    </span>
+                          ? 'Chuẩn định biên'
+                          : `Dư ${data.gap} NV`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1 text-center bg-white/80 p-2 rounded-lg border border-slate-200/60 text-xs">
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Cần</span>
+                        <strong className="font-mono text-slate-800">{data.required}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Tại chỗ</span>
+                        <strong className="font-mono text-blue-700">{data.actual}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Chi viện</span>
+                        <strong className="font-mono text-orange-600">+{data.support}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-bold">Hiện có</span>
+                        <strong className={`font-mono ${isDeficit ? 'text-red-700' : 'text-emerald-700'}`}>
+                          {data.total}
+                        </strong>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1 text-center bg-white/80 p-2 rounded-lg border border-slate-200/60 text-xs">
-                    <div>
-                      <span className="text-[9px] text-slate-400 block uppercase font-bold">Cần</span>
-                      <strong className="font-mono text-slate-800">{data.required}</strong>
+                  {/* Hành động khi thiếu người: Gợi ý & Gán nhanh */}
+                  {isDeficit && (
+                    <div className="mt-2.5 pt-2 border-t border-red-200/80">
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setSuggestOpenShift(suggestOpenShift === shiftCode ? null : shiftCode)}
+                          className="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
+                          title="Bấm để xem danh sách nhân sự rảnh có thể xếp vào ca này"
+                        >
+                          <Sparkles size={11} className="text-amber-300" />
+                          <span>Gợi ý người rảnh ({candidates.length})</span>
+                        </button>
+
+                        {candidates.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleAssignCandidate(candidates[0], shiftCode)}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white text-red-700 border border-red-300 hover:bg-red-100/80 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
+                            title={`Gán nhanh ${candidates[0].emp.name} (${candidates[0].badge})`}
+                          >
+                            <span>⚡ Gán nhanh: <strong>{candidates[0].emp.name.split(' ').pop()}</strong></span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown danh sách gợi ý nhân sự rảnh */}
+                      {suggestOpenShift === shiftCode && (
+                        <div className="mt-2 p-2 bg-white rounded-lg border border-red-200 shadow-sm space-y-1.5 text-xs animate-in fade-in duration-150">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between pb-1 border-b border-slate-100">
+                            <span>Nhân sự rảnh có thể lấp ca:</span>
+                            <span className="text-blue-600 font-extrabold">{candidates.length} bạn</span>
+                          </div>
+
+                          {candidates.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic py-1 text-center">
+                              Không có nhân sự nào rảnh phù hợp định mức.
+                            </p>
+                          ) : (
+                            <div className="max-h-44 overflow-y-auto space-y-1 divide-y divide-slate-100">
+                              {candidates.slice(0, 6).map((cand) => (
+                                <div key={cand.emp.id} className="pt-1.5 flex items-center justify-between gap-1.5">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-bold text-slate-800 text-[11px] truncate flex items-center gap-1">
+                                      <span>{cand.emp.name}</span>
+                                      {cand.hasRegisteredThisShift && (
+                                        <span className="text-[8.5px] px-1 rounded bg-amber-100 text-amber-800 font-bold shrink-0">
+                                          Đã ĐK ca này
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[9.5px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                      <span className={cand.isLocal ? 'text-emerald-700 font-semibold' : 'text-blue-700 font-semibold'}>
+                                        {cand.badge}
+                                      </span>
+                                      <span>• Tuần: {cand.currentWeeklyHours}h</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAssignCandidate(cand, shiftCode)}
+                                    className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors shrink-0 shadow-2xs ${
+                                      cand.isLocal
+                                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                        : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                    }`}
+                                  >
+                                    + {cand.isLocal ? 'Gán ca' : 'Chi viện'}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 block uppercase font-bold">Tại chỗ</span>
-                      <strong className="font-mono text-blue-700">{data.actual}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 block uppercase font-bold">Chi viện</span>
-                      <strong className="font-mono text-orange-600">+{data.support}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 block uppercase font-bold">Hiện có</span>
-                      <strong className={`font-mono ${isDeficit ? 'text-red-700' : 'text-emerald-700'}`}>
-                        {data.total}
-                      </strong>
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

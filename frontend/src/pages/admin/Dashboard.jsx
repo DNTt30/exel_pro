@@ -346,7 +346,7 @@ export default function Dashboard() {
     employees.forEach(emp => {
       if (!pickStore && allowedDepts.size > 0 && !allowedDepts.has(emp.dept)) return;
       if (!map[emp.dept]) {
-        map[emp.dept] = { dept: emp.dept, totalEmps: 0, ptEmps: 0, ptOver91: 0, totalHours: 0 };
+        map[emp.dept] = { dept: emp.dept, totalEmps: 0, ptEmps: 0, ptOver91: 0, ptUnderMin: 0, totalHours: 0 };
       }
       map[emp.dept].totalEmps++;
       const isPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
@@ -392,8 +392,12 @@ export default function Dashboard() {
       }
 
       map[emp.dept].totalHours += empHours;
-      if (isPT && (viewMode === 'month' ? empHours > 91 : empHours > 23)) {
-        map[emp.dept].ptOver91++;
+      if (isPT) {
+        if (viewMode === 'month' ? empHours > 91 : empHours > 23) {
+          map[emp.dept].ptOver91++;
+        } else if (empHours > 0 && (viewMode === 'month' ? empHours < 64 : empHours < 16)) {
+          map[emp.dept].ptUnderMin++;
+        }
       }
     });
 
@@ -954,6 +958,10 @@ export default function Dashboard() {
         employees={employees} 
         weekSchedule={weekSchedule} 
         filterDept={filterDept} 
+        viewMode={viewMode}
+        schedule={schedule}
+        cycleDates={cycleDates}
+        selectedMonthCycle={selectedMonthCycle}
       />
 
       {/* Employee Detail Drill-down Modal */}

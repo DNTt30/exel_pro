@@ -5,6 +5,7 @@ import { checkDeviceTrusted } from '../../lib/adminOtp';
 import { rememberClientIp, clientMeta, redact } from '../../utils/appLogs';
 import { notifyTelegram, telegramConfigured } from '../../utils/telegram';
 import { supabase } from '../../lib/supabase';
+import { verifyAdminPassword } from '../../lib/adminCredential';
 
 
 export function sessionUserFromEmp(emp) {
@@ -44,10 +45,31 @@ export const createAuthSlice = (set, get) => ({
           throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
         }
 
-        const pwCheck = await supabase.auth.signInWithPassword({
+        // Thử 1: Đăng nhập trực tiếp bằng mật khẩu đã lưu trên Supabase Auth
+        let pwCheck = await supabase.auth.signInWithPassword({
           email: 'admin@ofc.app',
           password,
         });
+
+        // Thử 2: Nếu thất bại, kiểm tra mật khẩu đã đổi trên thiết bị (localStorage) hoặc mật khẩu mặc định (1)
+        let usedFallback = false;
+        if (pwCheck.error || !pwCheck.data?.session) {
+          const localOk = await verifyAdminPassword(password);
+          if (password === '1' || localOk) {
+            const fallback = await supabase.auth.signInWithPassword({
+              email: 'admin@ofc.app',
+              password: 'ofc-admin-1',
+            });
+            if (fallback.data?.session) {
+              pwCheck = fallback;
+              usedFallback = true;
+              // Nếu người dùng nhập mật khẩu riêng hợp lệ (>= 6 ký tự), tự động đồng bộ lên Supabase
+              if (localOk && password && password !== '1' && password.length >= 6) {
+                await supabase.auth.updateUser({ password }).catch(() => {});
+              }
+            }
+          }
+        }
 
         if (pwCheck.error || !pwCheck.data?.session) {
           recordFailure('admin');
@@ -61,7 +83,7 @@ export const createAuthSlice = (set, get) => ({
           throw otpErr;
         }
 
-        const mustChange = pwCheck.data.user?.user_metadata?.must_change_password === true;
+        const mustChange = (usedFallback && password === '1') || pwCheck.data.user?.user_metadata?.must_change_password === true;
         
         nextUser = {
           id: 'admin',

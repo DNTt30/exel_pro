@@ -11,7 +11,6 @@ import { createAdminSlice } from './slices/adminSlice';
 import { createEmployeeSlice } from './slices/employeeSlice';
 import { createScheduleSlice } from './slices/scheduleSlice';
 import { createShelfSlice } from './slices/shelfSlice';
-import { hasCustomAdminPassword } from '../lib/adminCredential';
 import { toast } from '../utils/toast';
 
 export const useStore = create(
@@ -195,8 +194,6 @@ export const useStore = create(
               if (nextUser.id !== 'admin' || !nextUser.loginAt || sessionAge > ADMIN_SESSION_MAX_MS) {
                 console.warn('[Security] Phiên admin trong storage không hợp lệ hoặc đã hết hạn. Reset phiên.');
                 nextUser = null;
-              } else if (!hasCustomAdminPassword()) {
-                nextUser = { ...nextUser, mustSetupPassword: true };
               }
             } else {
               const fresh = employees.find(e => e.id === nextUser.id);

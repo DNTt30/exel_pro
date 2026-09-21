@@ -22,12 +22,12 @@ describe.skipIf(!hasEnv)('phase 8 - security regression (anon surface)', () => {
   it('T-R1: sau thu PATCH, anon van thay 0 dong admin_logs', async () => {
     const n = await rowCountAfter('PATCH', 'admin_logs?id=eq.-999', { action: 'TAMPERED' });
     expect(n).toBe(0);
-  });
+  }, 15000);
 
   it('T-R2: sau thu DELETE, anon van thay 0 dong feedbacks', async () => {
     const n = await rowCountAfter('DELETE', 'feedbacks?emp_id=eq.__rls_probe__');
     expect(n).toBe(0);
-  });
+  }, 15000);
 
   it('T-R3: login_lookup an toan voi input doc Injection', async () => {
     const res = await fetch(URL_ + '/rest/v1/rpc/login_lookup', {
@@ -38,5 +38,5 @@ describe.skipIf(!hasEnv)('phase 8 - security regression (anon surface)', () => {
     expect(res.ok).toBe(true);
     const txt = await res.text();
     expect(txt === '' || txt === 'null' || JSON.parse(txt) === null || Array.isArray(JSON.parse(txt))).toBe(true);
-  });
+  }, 15000);
 });

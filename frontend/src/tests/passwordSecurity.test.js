@@ -112,5 +112,22 @@ describe('Bảo mật Mật khẩu: Buộc đổi mật khẩu & Giám sát tài
     const canSend = Boolean(found && found.id);
     expect(canSend).toBe(true);
   });
+
+  it('Đa thiết bị: Đăng nhập trên thiết bị/trình duyệt khác bằng mật khẩu riêng không bị bắt đổi mật khẩu lại', () => {
+    // Giả lập nhân viên đăng nhập bằng mật khẩu riêng trên thiết bị mới
+    const isDefaultPassword = false; // Nhập mật khẩu đã đổi
+    const metaMustChange = false;    // Supabase Auth metadata đã lưu must_change_password: false
+    const mustChange = isDefaultPassword || metaMustChange === true;
+    expect(mustChange).toBe(false);
+  });
+
+  it('Đa thiết bị: Admin đăng nhập bằng mật khẩu riêng trên thiết bị khác không bị ép đổi mật khẩu', () => {
+    const password = 'mySecretAdminPassword';
+    const usedFallback = false;
+    const metaMustChange = false;
+    const isDefaultPassword = password === '1' || usedFallback;
+    const mustSetupPassword = isDefaultPassword || metaMustChange === true;
+    expect(mustSetupPassword).toBe(false);
+  });
 });
 

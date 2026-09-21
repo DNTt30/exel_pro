@@ -60,14 +60,19 @@ export default function SecurityChangePassword() {
       if (next === '1') { toast.error('Không được dùng lại mật khẩu mặc định.'); setBusy(false); return; }
 
       // Cập nhật mật khẩu mới và metadata must_change_password = false
+      const nowIso = new Date().toISOString();
       const { error: updateErr } = await supabase.auth.updateUser({
         password: next,
-        data: { must_change_password: false }
+        data: { must_change_password: false, password_changed_at: nowIso }
       });
 
       if (updateErr) {
         throw updateErr;
       }
+
+      try {
+        await supabase.rpc('mark_credential_set');
+      } catch { /* ignore */ }
 
       // Cập nhật cả bộ nhớ cục bộ để đồng bộ thiết bị cũ
       try {
@@ -95,7 +100,7 @@ export default function SecurityChangePassword() {
           </div>
           <div>
             <h1 className="font-extrabold text-slate-800 leading-tight">Bảo mật tài khoản admin</h1>
-            <p className="text-xs text-slate-500">Thiết lập mật khẩu riêng cho thiết bị này</p>
+            <p className="text-xs text-slate-500">Thiết lập mật khẩu bảo mật đồng bộ cho mọi thiết bị</p>
           </div>
         </div>
 

@@ -30,14 +30,14 @@ export async function changeMyPassword(oldPassword, newPassword, opts = {}) {
     if (check.error) throw new Error('Mật khẩu hiện tại không đúng');
   }
 
+  const nowIso = new Date().toISOString();
   const upd = await supabase.auth.updateUser({ 
     password: newPassword,
-    data: { must_change_password: false }
+    data: { must_change_password: false, password_changed_at: nowIso }
   });
   if (upd.error) throw new Error(upd.error.message || 'Không thể cập nhật mật khẩu');
 
   // Đánh dấu đã tự đặt mật khẩu (RPC definer & cập nhật bảng employees)
-  const nowIso = new Date().toISOString();
   try {
     await supabase.rpc('mark_my_password_changed');
   } catch {

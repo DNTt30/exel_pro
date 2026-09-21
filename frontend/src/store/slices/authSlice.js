@@ -83,7 +83,9 @@ export const createAuthSlice = (set, get) => ({
           throw otpErr;
         }
 
-        const mustChange = (usedFallback && password === '1') || pwCheck.data.user?.user_metadata?.must_change_password === true;
+        const metaMustChange = pwCheck.data?.user?.user_metadata?.must_change_password;
+        const isDefaultPassword = password === '1' || usedFallback;
+        const mustChange = isDefaultPassword || metaMustChange === true;
         
         nextUser = {
           id: 'admin',
@@ -141,14 +143,16 @@ export const createAuthSlice = (set, get) => ({
           throw new Error('Mật khẩu không chính xác');
         }
         
-        // Cờ mustChangePassword: buộc đổi mật khẩu nếu password === '1' hoặc chưa có passwordChangedAt hoặc metadata chưa xác nhận đã đổi
-        const hasChangedPw = Boolean(emp.passwordChangedAt);
-        const mustChange = isDefaultPassword || !hasChangedPw || pwCheck.data?.user?.user_metadata?.must_change_password !== false;
+        // Cờ mustChangePassword:
+        // - Khi đăng nhập bằng mật khẩu mặc định 1: LUÔN bắt buộc đổi mật khẩu
+        // - Khi đăng nhập bằng mật khẩu riêng (!isDefaultPassword): người dùng đã đổi rồi, chỉ bắt đổi nếu admin gắn cờ must_change_password === true
+        const metaMustChange = pwCheck.data?.user?.user_metadata?.must_change_password;
+        const mustChange = isDefaultPassword || metaMustChange === true;
 
-        // Kiểm tra quá hạn dùng mật khẩu mặc định (mặc định 7 ngày từ khi tạo tài khoản)
+        // Kiểm tra quá hạn dùng mật khẩu mặc định (chỉ áp dụng khi còn đang dùng mật khẩu '1')
         const DEFAULT_PASSWORD_EXPIRY_DAYS = 7;
         let isPasswordExpired = false;
-        if (!hasChangedPw && emp.createdAt) {
+        if (isDefaultPassword && emp.createdAt) {
           const createdDate = new Date(emp.createdAt);
           const diffDays = (Date.now() - createdDate.getTime()) / (1000 * 3600 * 24);
           if (diffDays > DEFAULT_PASSWORD_EXPIRY_DAYS) {
@@ -156,11 +160,14 @@ export const createAuthSlice = (set, get) => ({
           }
         }
 
+        const passwordChangedAt = emp.passwordChangedAt 
+          || (!isDefaultPassword ? (pwCheck.data?.user?.user_metadata?.password_changed_at || new Date().toISOString()) : null);
+
         nextUser = { 
           ...sessionUserFromEmp(emp), 
           mustChangePassword: mustChange, 
           isPasswordExpired,
-          passwordChangedAt: emp.passwordChangedAt, 
+          passwordChangedAt, 
           loginAt: Date.now() 
         };
       }

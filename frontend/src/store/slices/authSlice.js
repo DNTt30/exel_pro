@@ -1,5 +1,5 @@
 import * as api from '../../services/api';
-import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail } from '../../lib/authSession';
+import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
 import { checkLocked, recordFailure, resetFailures } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
 import { rememberClientIp, clientMeta, redact } from '../../utils/appLogs';
@@ -108,20 +108,42 @@ export const createAuthSlice = (set, get) => ({
           const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
           throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
         }
-        const pwCheck = await supabase.auth.signInWithPassword({
-          email: toAuthEmail(emp.id),
-          password,
-        });
-        if (pwCheck.error || !pwCheck.data?.session) {
+
+        let pwCheck = null;
+        const isDefaultPassword = password === '1';
+
+        if (isDefaultPassword) {
+          // Lần đầu hoặc dùng mật khẩu mặc định 1: đăng nhập bằng default auth password của nhân viên
+          const defaultAuthPw = toAuthPassword(emp.id);
+          pwCheck = await supabase.auth.signInWithPassword({
+            email: toAuthEmail(emp.id),
+            password: defaultAuthPw,
+          });
+
+          // Nếu chưa có tài khoản Supabase Auth, tự động khởi tạo (provision)
+          if (pwCheck.error || !pwCheck.data?.session) {
+            const provision = await ensureAuthSession(emp, { allowSignUp: true, password: defaultAuthPw });
+            if (provision.ok && provision.session) {
+              pwCheck = { data: { session: provision.session, user: provision.session.user } };
+            }
+          }
+        } else {
+          // Người dùng đã đổi mật khẩu riêng: đăng nhập trực tiếp Supabase Auth
+          pwCheck = await supabase.auth.signInWithPassword({
+            email: toAuthEmail(emp.id),
+            password,
+          });
+        }
+
+        if (pwCheck?.error || !pwCheck?.data?.session) {
           recordFailure(userId);
-          console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck.error));
+          console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck?.error));
           throw new Error('Mật khẩu không chính xác');
         }
         
         // Cờ mustChangePassword: buộc đổi mật khẩu nếu password === '1' hoặc chưa có passwordChangedAt hoặc metadata chưa xác nhận đã đổi
         const hasChangedPw = Boolean(emp.passwordChangedAt);
-        const isDefaultPassword = password === '1';
-        const mustChange = isDefaultPassword || !hasChangedPw || pwCheck.data.user?.user_metadata?.must_change_password !== false;
+        const mustChange = isDefaultPassword || !hasChangedPw || pwCheck.data?.user?.user_metadata?.must_change_password !== false;
 
         // Kiểm tra quá hạn dùng mật khẩu mặc định (mặc định 7 ngày từ khi tạo tài khoản)
         const DEFAULT_PASSWORD_EXPIRY_DAYS = 7;
@@ -181,6 +203,11 @@ export const createAuthSlice = (set, get) => ({
           set({ authWarning });
         }
       }).catch(() => {});
+      try {
+        get().initializeData?.();
+      } catch (err) {
+        console.warn('[auth] initializeData trigger error:', err?.message);
+      }
       return nextUser;
     } catch (err) {
       const meta = clientMeta();

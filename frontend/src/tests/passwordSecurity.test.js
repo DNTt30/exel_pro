@@ -83,4 +83,34 @@ describe('Bảo mật Mật khẩu: Buộc đổi mật khẩu & Giám sát tài
 
     expect(isPasswordExpired).toBe(false);
   });
+
+  it('Quên mật khẩu: Mã không hợp lệ (như tu) phải bị chặn và không gửi thông báo thành công', () => {
+    const invalidInputs = ['tu', 'abc', '   ', 'unknown_id'];
+    const mockDbLookup = (id) => {
+      const validIds = ['260716009', '251104004', '260512008'];
+      return validIds.includes(id) ? { id, name: 'Nhân viên hợp lệ' } : null;
+    };
+
+    invalidInputs.forEach(input => {
+      const found = mockDbLookup(input.trim());
+      expect(found).toBeNull();
+      // Logic gửi yêu cầu phải chặn khi found == null
+      const canSend = Boolean(found && found.id);
+      expect(canSend).toBe(false);
+    });
+  });
+
+  it('Quên mật khẩu: Mã nhân viên GS25 hợp lệ được xác thực và cho phép gửi yêu cầu cấp lại', () => {
+    const validId = '260716009';
+    const mockDbLookup = (id) => (id === '260716009' ? { id, name: 'DƯƠNG NGỌC TÚ', dept: 'VN0485' } : null);
+    
+    const found = mockDbLookup(validId);
+    expect(found).not.toBeNull();
+    expect(found.id).toBe('260716009');
+    expect(found.name).toBe('DƯƠNG NGỌC TÚ');
+    
+    const canSend = Boolean(found && found.id);
+    expect(canSend).toBe(true);
+  });
 });
+

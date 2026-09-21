@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Eye, EyeOff, Lock } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { ADMIN_MIN_PASSWORD_LEN, hasCustomAdminPassword, setAdminPassword, validateAdminPassword, verifyAdminPassword } from '../../lib/adminCredential';
+import { supabase } from '../../lib/supabase';
 import { toast } from '../../components/ui/toastStore';
 
 /**
@@ -23,16 +23,37 @@ export default function SecurityChangePassword() {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (busy) return;
-    const okCurrent = hasCustomAdminPassword() ? await verifyAdminPassword(current) : current === '1';
-    if (!okCurrent) { toast.error('Mật khẩu hiện tại không đúng.'); return; }
-    if (next !== confirm) { toast.error('Xác nhận mật khẩu mới không khớp.'); return; }
-    const invalid = validateAdminPassword(next);
-    if (invalid) { toast.error(invalid); return; }
+    
     setBusy(true);
     try {
-      await setAdminPassword(next);
+      // Xác thực mật khẩu cũ
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: 'admin@ofc.app',
+        password: current,
+      });
+
+      if (signInErr || !signInData?.session) {
+        toast.error('Mật khẩu hiện tại không đúng.');
+        setBusy(false);
+        return;
+      }
+
+      if (next !== confirm) { toast.error('Xác nhận mật khẩu mới không khớp.'); setBusy(false); return; }
+      if (next.length < 6) { toast.error('Mật khẩu phải có ít nhất 6 ký tự.'); setBusy(false); return; }
+      if (next === '1') { toast.error('Không được dùng lại mật khẩu mặc định.'); setBusy(false); return; }
+
+      // Cập nhật mật khẩu mới và metadata must_change_password = false
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: next,
+        data: { must_change_password: false }
+      });
+
+      if (updateErr) {
+        throw updateErr;
+      }
+
       useStore.setState({ user: { ...useStore.getState().user, mustSetupPassword: false } });
-      toast.success('Đã cập nhật mật khẩu admin cho thiết bị này.');
+      toast.success('Đã cập nhật mật khẩu admin an toàn trên hệ thống.');
       navigate('/admin/dashboard', { replace: true });
     } catch (err) {
       toast.error(err.message || 'Không đổi được mật khẩu.');
@@ -56,10 +77,10 @@ export default function SecurityChangePassword() {
           </div>
         </div>
 
-        {!hasCustomAdminPassword() && (
+        {user.mustSetupPassword && (
           <div className="text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 py-2 flex items-start gap-2">
             <Lock size={14} className="mt-0.5 flex-shrink-0" />
-            <span>Bạn đang dùng mật khẩu mặc định. Hãy đặt mật khẩu mới tối thiểu {ADMIN_MIN_PASSWORD_LEN} ký tự để tiếp tục sử dụng hệ thống.</span>
+            <span>Bạn đang dùng mật khẩu mặc định. Hãy đặt mật khẩu mới tối thiểu 6 ký tự để tiếp tục sử dụng hệ thống.</span>
           </div>
         )}
 
@@ -72,7 +93,7 @@ export default function SecurityChangePassword() {
         <label className="block">
           <span className="block text-xs font-bold text-slate-600 mb-1">Mật khẩu mới</span>
           <input type={show ? 'text' : 'password'} value={next} onChange={(e) => setNext(e.target.value)}
-            className={fieldCls} placeholder={`Tối thiểu ${ADMIN_MIN_PASSWORD_LEN} ký tự`} autoComplete="new-password" />
+            className={fieldCls} placeholder={`Tối thiểu 6 ký tự`} autoComplete="new-password" />
         </label>
 
         <label className="block">

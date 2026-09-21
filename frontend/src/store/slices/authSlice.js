@@ -1,7 +1,6 @@
 import * as api from '../../services/api';
-import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
-import { hasCustomAdminPassword, verifyAdminPassword } from '../../lib/adminCredential';
-import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../../lib/loginThrottle';
+import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail } from '../../lib/authSession';
+import { checkLocked, recordFailure, resetFailures } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
 import { rememberClientIp, clientMeta, redact } from '../../utils/appLogs';
 import { notifyTelegram, telegramConfigured } from '../../utils/telegram';
@@ -42,26 +41,35 @@ export const createAuthSlice = (set, get) => ({
         const lock = checkLocked('admin');
         if (!lock.allowed) {
           const mins = Math.max(1, Math.ceil(lock.retryAfterSec / 60));
-          throw new Error('Đã thử sai quá ' + THROTTLE_MAX_FAILS + ' lần. Thử lại sau khoảng ' + mins + ' phút.');
+          throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
         }
-        const customOk = await verifyAdminPassword(password);
-        const usingDefault = password === '1' && !hasCustomAdminPassword();
-        if (!customOk && !usingDefault) {
-          const fail = recordFailure('admin');
-          throw new Error(fail.locked ? 'Sai mật khẩu. Tài khoản tạm khóa 5 phút.' : 'Mật khẩu không chính xác');
+
+        const pwCheck = await supabase.auth.signInWithPassword({
+          email: 'admin@ofc.app',
+          password,
+        });
+
+        if (pwCheck.error || !pwCheck.data?.session) {
+          recordFailure('admin');
+          console.warn('[auth] Admin signIn lỗi:', redact(pwCheck.error));
+          throw new Error('Mật khẩu không chính xác');
         }
+
         if (!(await checkDeviceTrusted())) {
           const otpErr = new Error('Cần xác thực 2 bước qua Telegram');
           otpErr.code = 'OTP_REQUIRED';
           throw otpErr;
         }
+
+        const mustChange = pwCheck.data.user?.user_metadata?.must_change_password === true;
+        
         nextUser = {
           id: 'admin',
           role: 'admin',
           name: 'Quản trị viên',
           jobTitle: 'Quản trị viên',
           isManager: true,
-          mustSetupPassword: usingDefault,
+          mustSetupPassword: mustChange,
           loginAt: Date.now()
         };
       } else {
@@ -78,31 +86,19 @@ export const createAuthSlice = (set, get) => ({
           const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
           throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
         }
-        if (password === '1') {
-          // Lần đầu đăng nhập: thử dùng default Supabase password (không bypass Auth)
-          const defaultPw = toAuthPassword(emp.id);
-          const pwCheck = await supabase.auth.signInWithPassword({
-            email: toAuthEmail(emp.id),
-            password: defaultPw,
-          });
-          if (pwCheck.error || !pwCheck.data?.session) {
-            recordFailure(userId);
-            throw new Error('Tài khoản chưa được kích hoạt hoặc mật khẩu sai. Liên hệ quản lý.');
-          }
-          nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: true, loginAt: Date.now() };
-        } else {
-          const pwCheck = await supabase.auth.signInWithPassword({
-            email: toAuthEmail(emp.id),
-            password,
-          });
-          if (pwCheck.error || !pwCheck.data?.session) {
-            recordFailure(userId);
-            console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck.error));
-            throw new Error('Mật khẩu không chính xác');
-          }
-          // Không lưu authPassword vào store/localStorage — Supabase auth token tự quản lý session
-          nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: false, loginAt: Date.now() };
+        const pwCheck = await supabase.auth.signInWithPassword({
+          email: toAuthEmail(emp.id),
+          password,
+        });
+        if (pwCheck.error || !pwCheck.data?.session) {
+          recordFailure(userId);
+          console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck.error));
+          throw new Error('Mật khẩu không chính xác');
         }
+        
+        // Cờ mustChangePassword dựa trên metadata thay vì hardcode password === '1'
+        const mustChange = pwCheck.data.user?.user_metadata?.must_change_password === true;
+        nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: mustChange, loginAt: Date.now() };
       }
 
       resetFailures(userId);

@@ -39,7 +39,11 @@ const mode = hasEnv ? await (async () => {
   } catch { return 'UNKNOWN'; }
 })() : 'NO-ENV';
 
-describe.skipIf(!hasEnv)('RLS security — chế độ: ' , () => {
+if (!hasEnv) {
+  console.warn('CẢNH BÁO: Thiếu biến môi trường (VITE_SUPABASE_URL), test bảo mật sẽ CHẮC CHẮN FAIL.');
+}
+
+describe('RLS security - chế độ: ', () => {
   it('phát hiện đúng chế độ OPEN/STRICT', () => {
     expect(['OPEN', 'STRICT']).toContain(mode);
   });

@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase, supabaseUrl, supabaseAnonKey } from './supabase';
 
-export const AUTH_PASSWORD = '1';
 
-/** Supabase yêu cầu ≥ 6 ký tự; form Hướng B vẫn là `1`. */
+// Xóa hằng số AUTH_PASSWORD='1' để tránh hardcode password mặc định
+
 export function toAuthPassword(userId) {
   return `ofc-${String(userId || 'user').trim()}-1`;
 }

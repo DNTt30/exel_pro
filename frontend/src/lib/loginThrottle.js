@@ -4,7 +4,7 @@
 // van duoi DB de xem trong Nhat ky.
 // =====================================================================
 
-const KEY = 'ofc-login-throttle';
+
 const MAX_FAILS = 5;
 const WINDOW_MS = 5 * 60 * 1000;
 const LOCK_MS = 5 * 60 * 1000;
@@ -21,21 +21,14 @@ export function evaluateAttempt(rec, now) {
   return { allowed: true, recentFails };
 }
 
+let memoryThrottleStore = {};
+
 function readAll() {
-  try {
-    return JSON.parse(globalThis.localStorage.getItem(KEY)) || {};
-  } catch (err) {
-    console.warn('[loginThrottle] Không đọc được throttle data — throttle tạm vô hiệu:', err?.message);
-    return {};
-  }
+  return memoryThrottleStore;
 }
 
 function writeAll(all) {
-  try {
-    globalThis.localStorage.setItem(KEY, JSON.stringify(all));
-  } catch (err) {
-    console.warn('[loginThrottle] Không ghi được throttle data — counter sẽ reset khi tải lại trang:', err?.message);
-  }
+  memoryThrottleStore = all;
 }
 
 export function checkLocked(userId) {

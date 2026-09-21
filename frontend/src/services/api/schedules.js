@@ -67,31 +67,15 @@ export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
     throw err;
   }
 
-  // CHỈ fallback sang direct upsert khi hàm RPC thực sự chưa được cài đặt trong CSDL
-  if (!/schema cache|could not find the function|function.*does not exist|404/i.test(msg)) {
-    console.error('Lỗi lưu lịch làm việc (RPC):', rpcErr);
-    const err = new Error(msg);
-    err.code = 'DATABASE_ERROR';
-    throw err;
-  }
-
-  console.warn('RPC save_employee_schedule chưa tồn tại trong CSDL, fallback sang direct upsert.');
-  const { error } = await db().from('schedules').upsert({
-    week_date: weekDate,
-    emp_id: empId,
-    shifts: shifts
-  }, { onConflict: 'week_date,emp_id' });
-  
-  if (error) {
-    console.error('Lỗi lưu lịch làm việc:', error);
-    throw error;
-  }
+  console.error('Lỗi lưu lịch làm việc (RPC):', rpcErr);
+  const err = new Error(msg);
+  err.code = 'DATABASE_ERROR';
+  throw err;
 }
 
 // Lưu HÀNG LOẠT lịch của nhiều nhân viên.
 // Phase 3: ưu tiên RPC upsert_schedules_bulk — ATOMIC + optimistic locking (expect_version).
 // Sai version → lỗi code CONFLICT để UI báo người dùng thay vì ghi đè im lặng.
-// Nếu function chưa tồn tại trên DB (chưa chạy sql_phase3) → fallback upsert cũ.
 export async function saveBulkEmployeeSchedules(weekDate, scheduleMap, opts = {}) {
   const payload = Object.entries(scheduleMap).map(([empId, shifts]) => ({
     week_date: weekDate,
@@ -111,20 +95,8 @@ export async function saveBulkEmployeeSchedules(weekDate, scheduleMap, opts = {}
     err.code = 'CONFLICT';
     throw err;
   }
-  if (!/schema cache|could not find the function|404/i.test(msg)) {
-    console.error('Lỗi lưu lịch hàng loạt (RPC):', error);
-    const err = new Error(msg);
-    err.code = 'DATABASE_ERROR';
-    throw err;
-  }
-
-  // Fallback tương thích: DB chưa có function Phase 3
-  const { error: upErr } = await db().from('schedules').upsert(
-    payload.map((row) => ({ week_date: row.week_date, emp_id: row.emp_id, shifts: row.shifts })),
-    { onConflict: 'week_date,emp_id' }
-  );
-  if (upErr) {
-    console.error('Lỗi lưu lịch làm việc hàng loạt:', upErr);
-    throw upErr;
-  }
+  console.error('Lỗi lưu lịch hàng loạt (RPC):', error);
+  const err = new Error(msg);
+  err.code = 'DATABASE_ERROR';
+  throw err;
 }

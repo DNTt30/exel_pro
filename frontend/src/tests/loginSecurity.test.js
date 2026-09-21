@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { evaluateAttempt, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../lib/loginThrottle';
+import { evaluateAttempt, recordFailure, resetFailures, THROTTLE_MAX_FAILS, checkLocked } from '../lib/loginThrottle';
 import { setAdminPassword, verifyAdminPassword, validateAdminPassword, hasCustomAdminPassword } from '../lib/adminCredential';
 
 // Shim localStorage cho môi trường node
@@ -23,7 +23,7 @@ describe('loginThrottle', () => {
     let res = { locked: false };
     for (let i = 0; i < THROTTLE_MAX_FAILS; i++) res = recordFailure('admin');
     expect(res.locked).toBe(true);
-    const chk = evaluateAttempt(JSON.parse(localStorage.getItem('ofc-login-throttle'))['admin'], Date.now());
+    const chk = checkLocked('admin');
     expect(chk.allowed).toBe(false);
     expect(chk.retryAfterSec).toBeGreaterThan(0);
   });

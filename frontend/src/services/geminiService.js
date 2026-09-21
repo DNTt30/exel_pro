@@ -34,44 +34,34 @@ export function getActiveGeminiModel() {
   return DEFAULT_GEMINI_MODEL;
 }
 
-function _getBaseUrl(modelName) {
+function _getBaseUrl(modelName, action) {
   const model = modelName || getActiveGeminiModel();
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}`;
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (!url) throw new Error('Thiếu VITE_SUPABASE_URL để gọi Edge Function');
+  return `${url}/functions/v1/chat-proxy?model=${model}&action=${action}`;
 }
 
 /**
- * Gọi Gemini API (single-turn), tương thích ngược với code cũ.
+ * Ggọi Gemini API (single-turn)
  */
 export async function generateGeminiContent(prompt, systemInstruction = '', apiKey, modelName) {
-  if (!apiKey) {
-    throw new Error('Gemini API Key chưa được cấu hình. Vui lòng thêm key trong Cài đặt AI.');
-  }
   const contents = [{ role: 'user', parts: [{ text: prompt }] }];
-  return _callGeminiWithRetry(contents, systemInstruction, apiKey, 0, modelName);
+  return _callGeminiWithRetry(contents, systemInstruction, 0, modelName);
 }
 
 /**
- * Gọi Gemini API với multi-turn conversation (contents[] array chuẩn Gemini).
- * @param {Array<{role: 'user'|'model', parts: Array<{text: string}>}>} contents
+ * Gọi Gemini API với multi-turn conversation
  */
 export async function generateGeminiMultiTurn(contents, systemInstruction = '', apiKey, modelName) {
-  if (!apiKey) {
-    throw new Error('Gemini API Key chưa được cấu hình. Vui lòng thêm key trong Cài đặt AI.');
-  }
-  return _callGeminiWithRetry(contents, systemInstruction, apiKey, 0, modelName);
+  return _callGeminiWithRetry(contents, systemInstruction, 0, modelName);
 }
 
 /**
- * Streaming multi-turn: gọi onChunk(textDelta) mỗi lần nhận được text chunk.
- * Trả về full text khi hoàn thành.
+ * Streaming multi-turn
  */
 export async function streamGeminiMultiTurn(contents, systemInstruction = '', apiKey, onChunk, modelName) {
-  if (!apiKey) {
-    throw new Error('Gemini API Key chưa được cấu hình. Vui lòng thêm key trong Cài đặt AI.');
-  }
-
   const payload = _buildPayload(contents, systemInstruction);
-  const url = `${_getBaseUrl(modelName)}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const url = _getBaseUrl(modelName, 'streamGenerateContent');
 
   const response = await fetch(url, {
     method: 'POST',
@@ -145,9 +135,9 @@ function _buildPayload(contents, systemInstruction) {
   return payload;
 }
 
-async function _callGeminiWithRetry(contents, systemInstruction, apiKey, attempt = 0, modelName) {
+async function _callGeminiWithRetry(contents, systemInstruction, attempt = 0, modelName) {
   const payload = _buildPayload(contents, systemInstruction);
-  const url = `${_getBaseUrl(modelName)}:generateContent?key=${apiKey}`;
+  const url = _getBaseUrl(modelName, 'generateContent');
 
   const response = await fetch(url, {
     method: 'POST',
@@ -158,7 +148,7 @@ async function _callGeminiWithRetry(contents, systemInstruction, apiKey, attempt
   // Retry 1 lần nếu rate limit hoặc server error
   if ((response.status === 429 || response.status >= 500) && attempt === 0) {
     await new Promise(r => setTimeout(r, 1500));
-    return _callGeminiWithRetry(contents, systemInstruction, apiKey, 1, modelName);
+    return _callGeminiWithRetry(contents, systemInstruction, 1, modelName);
   }
 
   const data = await response.json();

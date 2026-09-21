@@ -1,4 +1,4 @@
-﻿import * as api from '../../services/api';
+import * as api from '../../services/api';
 import {
   assertCanManageStaff,
   assertWeekEditable,
@@ -38,6 +38,7 @@ export const createScheduleSlice = (set, get) => ({
   schedule: {},
   scheduleWeeks: {},
   shiftSwaps: [],
+  syncStatus: 'idle', // idle, saving, saved, error
 
   ensureWeeksLoaded: async (weekKeys = []) => {
     const unique = [...new Set(weekKeys.filter(Boolean))];
@@ -261,6 +262,7 @@ export const createScheduleSlice = (set, get) => ({
       const latestEmpSched = latestWeekSched[empId] || EMPTY_WEEK_SHIFTS;
       const latestUpdated = { ...latestEmpSched, [day]: shiftCode };
       return {
+        syncStatus: 'saving',
         schedule: {
           ...state.schedule,
           [weekDate]: { ...latestWeekSched, [empId]: latestUpdated }
@@ -280,21 +282,22 @@ export const createScheduleSlice = (set, get) => ({
         newData: { weekDate, empId, day, shift: shiftCode },
         description: `${emp?.name || empId} ${day}: ${previousShifts[day] || '—'} → ${shiftCode || '—'}`
       });
+      set({ syncStatus: 'saved' });
+      setTimeout(() => {
+        if (get().syncStatus === 'saved') set({ syncStatus: 'idle' });
+      }, 3000);
     } catch (err) {
       console.error("Lỗi khi lưu lịch làm việc:", err);
-      set((state) => {
-        const currentWeekSched = state.schedule[weekDate] || {};
-        const currentEmpSched = currentWeekSched[empId] || {};
-        return {
-          schedule: {
-            ...state.schedule,
-            [weekDate]: {
-              ...currentWeekSched,
-              [empId]: { ...currentEmpSched, [day]: previousShifts[day] }
-            }
+      set((state) => ({
+        syncStatus: 'error',
+        schedule: {
+          ...state.schedule,
+          [weekDate]: {
+            ...(state.schedule[weekDate] || {}),
+            [empId]: previousShifts
           }
-        };
-      });
+        }
+      }));
       toast.error(`Không thể lưu lịch làm việc của nhân viên (${empId}): ${err.message || 'Lỗi kết nối cơ sở dữ liệu'}`);
     }
   },

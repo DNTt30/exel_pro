@@ -363,3 +363,44 @@ export function parseEzHRAttendance({ rows, cycleDates = [], employees = [], sch
     }
   };
 }
+/**
+ * Hàm d?i soát tính gi? t? c?p timestamp (punchIn, punchOut).
+ * Gi?i quy?t các bài toán ca qua dêm, ca qua tháng, và phát hi?n thi?u ch?m công.
+ */
+export function calculatePunchHours(punchIn, punchOut, scheduledHours = null) {
+  if (!punchIn && !punchOut) {
+    return { missingPunch: true, status: 'NO_PUNCH' };
+  }
+  if (!punchIn) {
+    return { missingPunch: true, status: 'MISSING_IN' };
+  }
+  if (!punchOut) {
+    return { missingPunch: true, status: 'MISSING_OUT' };
+  }
+
+  const dIn = new Date(punchIn);
+  const dOut = new Date(punchOut);
+
+  if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) {
+    return { missingPunch: true, status: 'INVALID_TIME' };
+  }
+
+  let diffMs = dOut.getTime() - dIn.getTime();
+  
+  // N?u ra s? âm do l?i ch? ghi gi? mà b? qua ngày, t? d?ng c?ng thêm 1 ngày
+  if (diffMs < 0 && diffMs > -24 * 60 * 60 * 1000) {
+     diffMs += 24 * 60 * 60 * 1000;
+  }
+
+  const minutes = Math.round(diffMs / 60000);
+  const hours = Math.round((minutes / 60) * 100) / 100;
+
+  const result = { minutes, hours, status: 'OK' };
+
+  if (scheduledHours !== null) {
+    const scheduledMins = Math.round(scheduledHours * 60);
+    result.diffMinutes = minutes - scheduledMins;
+  }
+
+  return result;
+}

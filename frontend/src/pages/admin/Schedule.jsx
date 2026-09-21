@@ -43,7 +43,7 @@ import { toast } from '../../components/ui/toastStore';
 const EMPTY_SCHED = {};
 
 export default function Schedule() {
-  const { employees, stores, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks })));
+  const { employees, stores, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks, syncStatus } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks, syncStatus: s.syncStatus })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
   
   const [searchParams, setSearchParams] = useSearchParams();
@@ -757,6 +757,25 @@ export default function Schedule() {
           {/* Table Zoom Controls & View Mode Toggle */}
           <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
             
+            {/* Sync Status Indicator */}
+            <div className="flex items-center gap-1 text-[11px] font-bold mr-2">
+              {syncStatus === 'saving' && (
+                <span className="text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <RefreshCw size={12} className="animate-spin" /> Đang lưu...
+                </span>
+              )}
+              {syncStatus === 'saved' && (
+                <span className="text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <CheckCircle2 size={12} /> Đã lưu
+                </span>
+              )}
+              {syncStatus === 'error' && (
+                <span className="text-red-600 flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                  <AlertCircle size={12} /> Lưu thất bại
+                </span>
+              )}
+            </div>
+
             {/* View Mode: Tuần vs Tháng */}
             <div className="inline-flex items-center p-0.5 bg-slate-200/80 rounded-lg border border-slate-300/70">
               <button

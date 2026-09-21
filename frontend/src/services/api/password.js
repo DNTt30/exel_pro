@@ -30,14 +30,33 @@ export async function changeMyPassword(oldPassword, newPassword, opts = {}) {
     if (check.error) throw new Error('Mật khẩu hiện tại không đúng');
   }
 
-  const upd = await supabase.auth.updateUser({ password: newPassword });
+  const upd = await supabase.auth.updateUser({ 
+    password: newPassword,
+    data: { must_change_password: false }
+  });
   if (upd.error) throw new Error(upd.error.message || 'Không thể cập nhật mật khẩu');
 
-  // Đánh dấu đã tự đặt mật khẩu (RPC definer — vượt RLS app_profiles)
+  // Đánh dấu đã tự đặt mật khẩu (RPC definer & cập nhật bảng employees)
+  const nowIso = new Date().toISOString();
+  try {
+    await supabase.rpc('mark_my_password_changed');
+  } catch {
+    // bỏ qua nếu RPC chưa khởi tạo
+  }
   try {
     await supabase.rpc('mark_credential_set');
   } catch {
     // bỏ qua nếu RPC chưa khởi tạo
+  }
+
+  // Cập nhật trường password_changed_at trực tiếp trên bảng employees
+  const targetId = userId || (email ? email.split('@')[0] : null);
+  if (targetId && targetId !== 'admin') {
+    try {
+      await supabase.from('employees').update({ password_changed_at: nowIso }).eq('id', targetId);
+    } catch {
+      // bỏ qua nếu RLS không cho phép
+    }
   }
   return true;
 }
@@ -70,5 +89,15 @@ export async function adminResetPassword(targetEmpId, newPassword) {
   });
   const out = await res.json().catch(() => ({}));
   if (!res.ok || out.ok === false) throw new Error(out.error || 'Không đặt lại được mật khẩu');
+
+  // Đặt lại cờ chưa đổi mật khẩu cho nhân viên vừa được reset
+  try {
+    await supabase.rpc('admin_reset_employee_password_flag', { p_emp_id: targetEmpId });
+  } catch {
+    // fallback cập nhật trực tiếp nếu RPC chưa áp dụng
+    try {
+      await supabase.from('employees').update({ password_changed_at: null }).eq('id', targetEmpId);
+    } catch { /* ignore */ }
+  }
   return true;
 }

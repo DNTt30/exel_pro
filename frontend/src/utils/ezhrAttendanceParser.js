@@ -364,8 +364,8 @@ export function parseEzHRAttendance({ rows, cycleDates = [], employees = [], sch
   };
 }
 /**
- * Hàm d?i soát tính gi? t? c?p timestamp (punchIn, punchOut).
- * Gi?i quy?t các bài toán ca qua dêm, ca qua tháng, và phát hi?n thi?u ch?m công.
+ * Hï¿½m d?i soï¿½t tï¿½nh gi? t? c?p timestamp (punchIn, punchOut).
+ * Gi?i quy?t cï¿½c bï¿½i toï¿½n ca qua dï¿½m, ca qua thï¿½ng, vï¿½ phï¿½t hi?n thi?u ch?m cï¿½ng.
  */
 export function calculatePunchHours(punchIn, punchOut, scheduledHours = null) {
   if (!punchIn && !punchOut) {
@@ -387,7 +387,7 @@ export function calculatePunchHours(punchIn, punchOut, scheduledHours = null) {
 
   let diffMs = dOut.getTime() - dIn.getTime();
   
-  // N?u ra s? âm do l?i ch? ghi gi? mà b? qua ngày, t? d?ng c?ng thêm 1 ngày
+  // N?u ra s? ï¿½m do l?i ch? ghi gi? mï¿½ b? qua ngï¿½y, t? d?ng c?ng thï¿½m 1 ngï¿½y
   if (diffMs < 0 && diffMs > -24 * 60 * 60 * 1000) {
      diffMs += 24 * 60 * 60 * 1000;
   }

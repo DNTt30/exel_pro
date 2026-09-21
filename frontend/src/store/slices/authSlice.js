@@ -96,15 +96,37 @@ export const createAuthSlice = (set, get) => ({
           throw new Error('Mật khẩu không chính xác');
         }
         
-        // Cờ mustChangePassword dựa trên metadata thay vì hardcode password === '1'
-        const mustChange = pwCheck.data.user?.user_metadata?.must_change_password === true;
-        nextUser = { ...sessionUserFromEmp(emp), mustChangePassword: mustChange, loginAt: Date.now() };
+        // Cờ mustChangePassword: buộc đổi mật khẩu nếu password === '1' hoặc chưa có passwordChangedAt hoặc metadata chưa xác nhận đã đổi
+        const hasChangedPw = Boolean(emp.passwordChangedAt);
+        const isDefaultPassword = password === '1';
+        const mustChange = isDefaultPassword || !hasChangedPw || pwCheck.data.user?.user_metadata?.must_change_password !== false;
+
+        // Kiểm tra quá hạn dùng mật khẩu mặc định (mặc định 7 ngày từ khi tạo tài khoản)
+        const DEFAULT_PASSWORD_EXPIRY_DAYS = 7;
+        let isPasswordExpired = false;
+        if (!hasChangedPw && emp.createdAt) {
+          const createdDate = new Date(emp.createdAt);
+          const diffDays = (Date.now() - createdDate.getTime()) / (1000 * 3600 * 24);
+          if (diffDays > DEFAULT_PASSWORD_EXPIRY_DAYS) {
+            isPasswordExpired = true;
+          }
+        }
+
+        nextUser = { 
+          ...sessionUserFromEmp(emp), 
+          mustChangePassword: mustChange, 
+          isPasswordExpired,
+          passwordChangedAt: emp.passwordChangedAt, 
+          loginAt: Date.now() 
+        };
       }
 
       resetFailures(userId);
 
       set({ user: nextUser, syncStatus: 'loading' });
       const roleLabel = isOpsManager(nextUser) ? (nextUser.isAreaManager ? 'OFC' : 'SM') : 'Nhân viên';
+      
+      // Ghi log đăng nhập thành công
       get().appendAdminLog('LOGIN_SUCCESS', nextUser.id, roleLabel, {
         category: 'security',
         entityType: 'session',
@@ -112,10 +134,23 @@ export const createAuthSlice = (set, get) => ({
         storeId: nextUser.dept || '',
         description: `Đăng nhập thành công · ${nextUser.name || nextUser.id}`
       });
+
+      // Cảnh báo bảo mật nếu đăng nhập bằng mật khẩu mặc định
+      if (nextUser.mustChangePassword && nextUser.id !== 'admin') {
+        get().appendAdminLog('LOGIN_DEFAULT_PASSWORD', nextUser.id, roleLabel, {
+          category: 'security',
+          entityType: 'session',
+          entityId: nextUser.id,
+          storeId: nextUser.dept || '',
+          description: `⚠️ [CẢNH BÁO BẢO MẬT] ${nextUser.name} (${nextUser.id}) đăng nhập bằng MẬT KHẨU MẶC ĐỊNH chưa đổi${nextUser.isPasswordExpired ? ' (ĐÃ QUÁ HẠN > 7 NGÀY)' : ''}`
+        });
+      }
+
       try {
         if (telegramConfigured()) {
           const when = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-          notifyTelegram('🔑 ' + (nextUser.name || nextUser.id) + ' (' + nextUser.id + ') đăng nhập · ' + roleLabel + ' · ' + when)
+          const extraAlert = nextUser.mustChangePassword ? ' ⚠️ (Dùng MK mặc định)' : '';
+          notifyTelegram('🔑 ' + (nextUser.name || nextUser.id) + ' (' + nextUser.id + ') đăng nhập · ' + roleLabel + extraAlert + ' · ' + when)
             .catch((err) => { console.warn('[auth] Telegram notify failed:', err?.message); });
         }
       } catch (err) { console.warn('[auth] Telegram setup error:', err?.message); }
@@ -127,13 +162,17 @@ export const createAuthSlice = (set, get) => ({
       return nextUser;
     } catch (err) {
       const meta = clientMeta();
+      const lock = checkLocked(userId);
+      const isSuspicious = !lock.allowed || (lock.retryAfterSec && lock.retryAfterSec > 0);
       api.addActivityLog({
         userId: String(userId || ''),
-        action: 'LOGIN_FAILED',
+        action: isSuspicious ? 'SUSPICIOUS_LOGIN_ATTEMPT' : 'LOGIN_FAILED',
         category: 'security',
         entityType: 'session',
         entityId: String(userId || ''),
-        description: err.message || 'Đăng nhập thất bại',
+        description: isSuspicious 
+          ? `🚨 [NGHI VẤN DÒ MẬT KHẨU] Thử đăng nhập sai liên tiếp cho tài khoản ${userId}`
+          : (err.message || 'Đăng nhập thất bại'),
         ...meta
       });
       throw err;

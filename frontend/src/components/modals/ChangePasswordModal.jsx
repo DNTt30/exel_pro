@@ -32,10 +32,17 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
     try {
       if (isAdminReset) {
         await adminResetPassword(targetEmp.id, newPw);
-        toast.success('✅ Đã đặt lại mật khẩu. Nhân viên nên đăng nhập và đổi lại.');
+        useStore.setState(s => ({
+          employees: (s.employees || []).map(e => e.id === targetEmp.id ? { ...e, passwordChangedAt: null } : e)
+        }));
+        toast.success('✅ Đã đặt lại mật khẩu. Nhân viên sẽ bị buộc đổi mật khẩu khi đăng nhập.');
       } else {
         await changeMyPassword(oldPw, newPw, { isFirstTime: isForced, userId: user?.id });
-        useStore.setState(s => ({ user: { ...s.user, mustChangePassword: false, authPassword: newPw } }));
+        const nowIso = new Date().toISOString();
+        useStore.setState(s => ({ 
+          user: { ...s.user, mustChangePassword: false, isPasswordExpired: false, passwordChangedAt: nowIso, authPassword: newPw },
+          employees: (s.employees || []).map(e => e.id === user?.id ? { ...e, passwordChangedAt: nowIso } : e)
+        }));
         toast.success('✅ Thiết lập mật khẩu thành công! Hãy ghi nhớ mật khẩu mới.');
       }
       setOldPw(''); setNewPw(''); setConfirmPw('');
@@ -59,11 +66,25 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
   };
 
   return (
-    <Modal title={title} isOpen={isOpen} onClose={onClose} hideClose={false}>
+    <Modal 
+      title={title} 
+      isOpen={isOpen} 
+      onClose={isForced ? () => {} : onClose} 
+      hideClose={isForced}
+      preventBackdropClose={isForced}
+    >
       <div className="space-y-3 text-sm">
         {isForced && (
-          <div className="px-3.5 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-medium leading-relaxed">
-            👋 <strong>Chào bạn!</strong> Bạn đang đăng nhập bằng mật khẩu mặc định (1). Vui lòng đặt mật khẩu mới riêng cho tài khoản của bạn để tiếp tục sử dụng hệ thống.
+          <div className={`px-3.5 py-2.5 rounded-xl text-xs font-medium leading-relaxed border ${
+            user?.isPasswordExpired 
+              ? 'bg-rose-50 border-rose-200 text-rose-900' 
+              : 'bg-blue-50 border-blue-200 text-blue-900'
+          }`}>
+            {user?.isPasswordExpired ? (
+              <>🚨 <strong>Cảnh báo quá hạn:</strong> Tài khoản đã dùng mật khẩu mặc định quá hạn quy định (&gt; 7 ngày). Vui lòng đặt mật khẩu mới riêng để tiếp tục sử dụng hệ thống.</>
+            ) : (
+              <>👋 <strong>Chào bạn!</strong> Quy định an toàn yêu cầu tất cả nhân sự phải đổi mật khẩu ngay lần đầu sử dụng. Vui lòng đặt mật khẩu mới riêng để bảo vệ thông tin ca làm và công lương.</>
+            )}
           </div>
         )}
         {!isAdminReset && !isForced && (
@@ -110,7 +131,7 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
           </p>
         )}
 
-        {/* Thoát / Đăng xuất hoặc Để sau */}
+        {/* Thoát / Đăng xuất */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
           <button
             type="button"
@@ -119,15 +140,7 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
           >
             <LogOut size={13} /> Đăng xuất tài khoản
           </button>
-          {isForced ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
-            >
-              Để sau, vào xem lịch →
-            </button>
-          ) : (
+          {!isForced && (
             <button
               type="button"
               onClick={onClose}

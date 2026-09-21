@@ -213,20 +213,42 @@ export default function AdminLogs() {
               {activityRows.length === 0 && (
                 <tr><td colSpan={7} className="p-8 text-center text-slate-400">Chưa có hoạt động.</td></tr>
               )}
-              {activityRows.map(log => (
-                <tr key={log.id} className="hover:bg-slate-50">
-                  <td className="p-2.5 font-mono text-slate-500 whitespace-nowrap">{log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : '—'}</td>
-                  <td className="p-2.5">
-                    <div className="font-bold">{log.metadata?.actorName || log.userId}</div>
-                    <div className="font-mono text-[10px] text-slate-400">{log.userId}</div>
-                  </td>
-                  <td className="p-2.5 font-mono">{log.storeId || '—'}</td>
-                  <td className="p-2.5 font-semibold text-indigo-700">{log.action}</td>
-                  <td className="p-2.5 font-mono">{[log.entityType, log.entityId].filter(Boolean).join(' · ') || '—'}</td>
-                  <td className="p-2.5 text-slate-700">{log.description}</td>
-                  <td className="p-2.5 font-mono text-[10px] text-slate-500">{log.ipAddress || '—'}</td>
-                </tr>
-              ))}
+              {activityRows.map(log => {
+                const isSuspicious = log.action === 'SUSPICIOUS_LOGIN_ATTEMPT';
+                const isDefaultPw = log.action === 'LOGIN_DEFAULT_PASSWORD';
+                const isFailed = log.action === 'LOGIN_FAILED';
+
+                const rowBg = isSuspicious 
+                  ? 'bg-rose-50/60 hover:bg-rose-50' 
+                  : isDefaultPw 
+                    ? 'bg-amber-50/60 hover:bg-amber-50' 
+                    : 'hover:bg-slate-50';
+
+                const actionCls = isSuspicious
+                  ? 'px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold border border-rose-200 inline-block'
+                  : isDefaultPw
+                    ? 'px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold border border-amber-200 inline-block'
+                    : isFailed
+                      ? 'px-2 py-0.5 rounded-md bg-red-50 text-red-700 font-bold border border-red-200 inline-block'
+                      : 'font-semibold text-indigo-700';
+
+                return (
+                  <tr key={log.id} className={`${rowBg} transition-colors`}>
+                    <td className="p-2.5 font-mono text-slate-500 whitespace-nowrap">{log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : '—'}</td>
+                    <td className="p-2.5">
+                      <div className="font-bold">{log.metadata?.actorName || log.userId}</div>
+                      <div className="font-mono text-[10px] text-slate-400">{log.userId}</div>
+                    </td>
+                    <td className="p-2.5 font-mono">{log.storeId || '—'}</td>
+                    <td className="p-2.5"><span className={actionCls}>{log.action}</span></td>
+                    <td className="p-2.5 font-mono">{[log.entityType, log.entityId].filter(Boolean).join(' · ') || '—'}</td>
+                    <td className={`p-2.5 ${isSuspicious ? 'font-bold text-rose-900' : isDefaultPw ? 'font-medium text-amber-900' : 'text-slate-700'}`}>
+                      {log.description}
+                    </td>
+                    <td className="p-2.5 font-mono text-[10px] text-slate-500">{log.ipAddress || '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -11,7 +11,10 @@ function mapEmployee(e) {
     role: e.role,
     jobTitle: e.job_title || '',
     maxH: e.max_h,
-    isActive: e.is_active !== false
+    isActive: e.is_active !== false,
+    createdAt: e.created_at || null,
+    passwordChangedAt: e.password_changed_at || null,
+    passwordDeadline: e.password_deadline || null
   };
 }
 
@@ -23,7 +26,7 @@ export async function getEmployeeById(id) {
     const { data: rpcRow, error: rpcErr } = await db().rpc('login_lookup', { p_ma: id }).maybeSingle();
     if (!rpcErr && rpcRow) return mapEmployee(rpcRow);
   } catch (err) { console.warn('[employees] login_lookup RPC failed, fallback to direct query:', err?.message); }
-  const { data, error } = await db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active').eq('id', id).maybeSingle();
+  const { data, error } = await db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline').eq('id', id).maybeSingle();
   if (error) {
     console.error('Lỗi lấy nhân viên:', error);
     return null;
@@ -32,7 +35,7 @@ export async function getEmployeeById(id) {
 }
 
 export async function getEmployees(opts = {}) {
-  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active').order('dept', { ascending: true });
+  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline').order('dept', { ascending: true });
   if (opts.dept) q = q.eq('dept', opts.dept);
   const { data, error } = await q;
   if (error) {
@@ -88,6 +91,8 @@ export async function updateEmployeeInfo(id, updates) {
   if (updates.maxH !== undefined) payload.max_h = updates.maxH;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   if (updates.jobTitle !== undefined) payload.job_title = updates.jobTitle;
+  if (updates.passwordChangedAt !== undefined) payload.password_changed_at = updates.passwordChangedAt;
+  if (updates.passwordDeadline !== undefined) payload.password_deadline = updates.passwordDeadline;
   
   // .select('id') để phát hiện RLS chặn ngầm: PostgREST trả 200 + 0 dòng
   // khi phiên chưa xác thực — không có lỗi, chỉ âm thầm bỏ qua.

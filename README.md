@@ -110,6 +110,10 @@ npm run build
 - **Bảo mật xác thực:** Chống brute-force đăng nhập với cơ chế throttle lũy tiến, mã hóa mật khẩu qua Supabase Auth, hỗ trợ xác thực mã OTP quản trị viên.
 - **Không hardcode Secrets:** Tuyệt đối không lưu trữ Secret token hoặc Service Role key ở client bundle.
 
+### 6.1 Cập nhật trạng thái Security Audit (21/09)
+*   **P0-3 (Quyền Role phụ thuộc Metadata client):** 🔶 Đã được ngăn chặn (Mitigated) ở Frontend. Giải pháp triệt để đã được khởi thảo qua script `20260921000000_p03_custom_jwt_hook.sql` (Custom Access Token Hook của Supabase) chờ kích hoạt trên dashboard.
+*   **P0-2 (Mật khẩu mặc định suy diễn được):** ⚠️ Vẫn đang được cấu hình có chủ đích trong giai đoạn chuyển tiếp. Frontend đã vá lỗ hổng `password === '1'`, bắt buộc nhân viên nhập password thật. Việc xóa bỏ công thức gen password tĩnh sẽ được thực hiện khi tính năng **Đăng nhập OTP (Telegram/Email)** hoàn thiện ở Sprint tiếp theo.
+
 ---
 
 ## 🌐 7. Triển Khai Trực Tuyến

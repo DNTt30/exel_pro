@@ -8,10 +8,44 @@ import StaffingMatrixFields from './StaffingMatrixFields';
 import { isOpsManager } from '../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../components/ui/toastStore';
+import { jevDecide, readChoice } from '../services/api/jevClient';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
   const { stores, user, updateStore, updateShift, currentWeek } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore, updateShift: s.updateShift, currentWeek: s.currentWeek })));
   const isAdmin = isOpsManager(user);
+
+  const [jevLoading, setJevLoading] = useState({});
+  const [jevResults, setJevResults] = useState({});
+
+  const callJevForGap = async (shiftCode, candidates) => {
+    setJevLoading(prev => ({ ...prev, [shiftCode]: true }));
+    try {
+      const state = {
+        gap: { day: selectedDay, shift: shiftCode, store: storeId },
+        candidates: candidates.map(c => ({
+          id: c.emp.id,
+          name: c.emp.name,
+          type: c.emp.type,
+          weeklyHours: c.currentWeeklyHours,
+          isLocal: c.isLocal,
+          registered: c.hasRegisteredThisShift
+        }))
+      };
+      const answers = await jevDecide('staffing_gap_triage', state);
+      if (answers) {
+        const choice = readChoice(answers, 'best_candidate');
+        if (choice) {
+          setJevResults(prev => ({ ...prev, [shiftCode]: choice }));
+          toast.success(`JEV System One đã đề xuất nhân sự cho ca ${shiftCode}!`);
+          setSuggestOpenShift(shiftCode); // Mở dropdown
+          return;
+        }
+      }
+      toast.error('JEV không đưa ra được lựa chọn phù hợp.');
+    } finally {
+      setJevLoading(prev => ({ ...prev, [shiftCode]: false }));
+    }
+  };
 
   const dayDatesMap = useMemo(() => {
     if (!currentWeek) return {};
@@ -243,17 +277,28 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                           title="Bấm để xem danh sách nhân sự rảnh có thể xếp vào ca này"
                         >
                           <Sparkles size={11} className="text-amber-300" />
-                          <span>Gợi ý người rảnh ({candidates.length})</span>
+                          <span>Gợi ý ({candidates.length})</span>
                         </button>
 
-                        {candidates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => callJevForGap(shiftCode, candidates)}
+                          disabled={jevLoading[shiftCode] || candidates.length === 0}
+                          className="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                          title="Nhờ AI phân tích sâu để tìm người phù hợp nhất"
+                        >
+                          <Sparkles size={11} className="text-white" />
+                          <span>{jevLoading[shiftCode] ? 'JEV Đang nghĩ...' : 'Hỏi JEV'}</span>
+                        </button>
+
+                        {candidates.length > 0 && !jevResults[shiftCode] && (
                           <button
                             type="button"
                             onClick={() => handleAssignCandidate(candidates[0], shiftCode)}
                             className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white text-red-700 border border-red-300 hover:bg-red-100/80 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
                             title={`Gán nhanh ${candidates[0].emp.name} (${candidates[0].badge})`}
                           >
-                            <span>⚡ Gán nhanh: <strong>{candidates[0].emp.name.split(' ').pop()}</strong></span>
+                            <span>⚡ Gán nhanh</span>
                           </button>
                         )}
                       </div>
@@ -272,14 +317,21 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                             </p>
                           ) : (
                             <div className="max-h-44 overflow-y-auto space-y-1 divide-y divide-slate-100">
-                              {candidates.slice(0, 6).map((cand) => (
-                                <div key={cand.emp.id} className="pt-1.5 flex items-center justify-between gap-1.5">
+                              {candidates.slice(0, 6).map((cand) => {
+                                const isJevChoice = jevResults[shiftCode] === cand.emp.id;
+                                return (
+                                <div key={cand.emp.id} className={`pt-1.5 flex items-center justify-between gap-1.5 ${isJevChoice ? 'bg-indigo-50 -mx-1 px-1 rounded border border-indigo-200' : ''}`}>
                                   <div className="min-w-0 flex-1">
                                     <div className="font-bold text-slate-800 text-[11px] truncate flex items-center gap-1">
                                       <span>{cand.emp.name}</span>
                                       {cand.hasRegisteredThisShift && (
                                         <span className="text-[8.5px] px-1 rounded bg-amber-100 text-amber-800 font-bold shrink-0">
                                           Đã ĐK ca này
+                                        </span>
+                                      )}
+                                      {isJevChoice && (
+                                        <span className="text-[8.5px] px-1 rounded bg-indigo-600 text-white font-bold shrink-0 shadow-sm animate-pulse">
+                                          JEV Khuyên chọn
                                         </span>
                                       )}
                                     </div>
@@ -302,7 +354,7 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                                     + {cand.isLocal ? 'Gán ca' : 'Chi viện'}
                                   </button>
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           )}
                         </div>

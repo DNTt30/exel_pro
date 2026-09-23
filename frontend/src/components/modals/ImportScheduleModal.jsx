@@ -335,7 +335,8 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
       }
 
       if (Object.keys(bulkUpdates).length > 0) {
-        await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
+        useStore.setState({ employees: currentEmps });
+        await useStore.getState().applyBulkSchedule(currentWeek, bulkUpdates);
         useStore.getState().appendAdminLog('IMPORT_SHIFT_EXCEL', currentWeek, `${updatedShiftCount} NV, thêm mới ${addedEmpCount}`, {
           resourceType: 'shift',
           resourceId: currentWeek,
@@ -343,14 +344,6 @@ export default function ImportScheduleModal({ isOpen, onClose, currentWeek }) {
         });
       }
 
-      // 3. Cập nhật Store
-      useStore.setState({
-        employees: currentEmps,
-        schedule: {
-          ...useStore.getState().schedule,
-          [currentWeek]: destSched
-        }
-      });
 
       toast.success(`✅ Nhập lịch thành công!\n- Đã cập nhật lịch cho ${updatedShiftCount} nhân sự vào Tuần ${currentWeek}.\n${addedEmpCount > 0 ? `- Tự động thêm ${addedEmpCount} nhân sự mới vào danh sách.` : ''}`);
       onClose();

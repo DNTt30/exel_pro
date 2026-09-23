@@ -13,3 +13,4 @@ schedule-app/
 k6.zip
 k6_bin/
 .vercel
+/artifacts/

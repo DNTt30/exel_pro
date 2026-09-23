@@ -16,17 +16,9 @@ function mapScheduleWeek(row) {
 }
 
 export async function getScheduleWeeks() {
-  try {
-    const { data, error } = await db().from('schedule_weeks').select('*').order('week_date', { ascending: false }).limit(250);
-    if (error) {
-      if (/does not exist|schema cache|relation/i.test(error.message || '')) return [];
-      console.error('Lỗi lấy trạng thái tuần:', error);
-      return [];
-    }
-    return (data || []).map(mapScheduleWeek);
-  } catch {
-    return [];
-  }
+  const { data, error } = await db().from('schedule_weeks').select('*').order('week_date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapScheduleWeek);
 }
 
 export async function upsertScheduleWeek(row) {

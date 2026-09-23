@@ -4,6 +4,25 @@ let deferredPrompt = null;
 const listeners = new Set();
 
 export function registerServiceWorker() {
+  // Vite modules must always come from the running dev server. An old worker
+  // can mix two React versions after HMR and cause invalid hook calls.
+  if (import.meta.env.DEV) {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      const expectedUrl = new URL(`${import.meta.env.BASE_URL || './'}sw.js`, window.location.href).href;
+      void navigator.serviceWorker.getRegistrations().then(async registrations => {
+        for (const registration of registrations) {
+          if ([registration.active, registration.waiting, registration.installing].some(worker => worker?.scriptURL === expectedUrl)) {
+            await registration.unregister();
+          }
+        }
+        if ('caches' in window) {
+          const keys = await window.caches.keys();
+          await Promise.all(keys.filter(key => key.startsWith('dntgs25-')).map(key => window.caches.delete(key)));
+        }
+      }).catch(err => console.warn('[DNTgs25] Dev worker cleanup:', err?.message));
+    }
+    return;
+  }
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       // Use relative path for SW to work on subpaths (e.g. GitHub Pages /exel_pro/)

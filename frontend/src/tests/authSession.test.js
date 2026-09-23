@@ -21,7 +21,10 @@ describe('isManagerFromEmp', () => {
     expect(isStoreManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(true);
     expect(isAreaManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(false);
     expect(isAreaManagerFromEmp({ role: 'OFC' })).toBe(true);
-    expect(isAreaManagerFromEmp({ role: 'SM' })).toBe(true);
+    expect(isAreaManagerFromEmp({ role: 'SM' })).toBe(false);
+    expect(isStoreManagerFromEmp({ role: 'SM', jobTitle: 'Store Manager', type: 'STFT' })).toBe(true);
+    expect(canApproveSchedule({ role: 'SM' })).toBe(false);
+    expect(canApproveSchedule({ role: 'employee', jobTitle: 'Operations', isAreaManager: true })).toBe(true);
     expect(isManagerFromEmp({ role: 'OFC' })).toBe(true);
     expect(isManagerFromEmp({ role: 'Cửa hàng trưởng' })).toBe(true);
     expect(isManagerFromEmp({ role: 'STPT', type: 'STPT' })).toBe(false);

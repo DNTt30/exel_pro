@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sessionPersistence } from './sessionStorage';
 
 // Bắt buộc cấu hình trong .env — không hardcode fallback key vào source code
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -15,7 +16,8 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'ofc-supabase-auth'
+        storageKey: 'ofc-supabase-auth',
+        storage: sessionPersistence
       }
     })
   : null;

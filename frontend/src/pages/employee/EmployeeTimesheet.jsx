@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { 
   Download, 
@@ -14,44 +14,35 @@ import { Link } from 'react-router-dom';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { useTimesheetValues } from '../../hooks/useTimesheetValues';
+import { movePayrollCycle, timesheetHours } from '../../utils/timesheetValues';
+import { SCHEDULE_RULES } from '../../data/constants';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
 import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
 import { useShallow } from 'zustand/react/shallow';
 import { isOpsManager, isManagerFromEmp } from '../../lib/authSession';
 
 export default function EmployeeTimesheet() {
-  const { user, schedule, currentWeek, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
+  const { user, schedule, currentWeek } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek })));
   const canViewAll = useMemo(() => isOpsManager(user) || isManagerFromEmp(user), [user]);
   const weekSchedule = schedule[currentWeek] || {};
   const myDept = user?.dept || '';
 
-  const handlePrevMonth = () => {
-    const parts = currentWeek.split('-');
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 2, parseInt(parts[2], 10));
-    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-  };
-
-  const handleNextMonth = () => {
-    const parts = currentWeek.split('-');
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
-    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-  };
+  const handlePrevMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, -1));
+  const handleNextMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, 1));
 
   const [search, setSearch] = useState('');
   const [filterOnlyMe, setFilterOnlyMe] = useState(true);
   const [showPersonalSlip, setShowPersonalSlip] = useState(false);
 
-  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const [payrollCycle, setPayrollCycle] = useState(() => getPayrollCycleFromWeek(currentWeek));
   const cycleDates = useMemo(
     () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
     [payrollCycle]
   );
   const activeDays = useMemo(() => cycleDates.map(d => d.key), [cycleDates]);
 
-  useEffect(() => {
-    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
-  }, [cycleDates, ensureWeeksLoaded]);
+  const { getDayValue, getActualValue, getEffectiveValue } = useTimesheetValues(cycleDates);
 
   const effectiveFilterOnlyMe = canViewAll ? filterOnlyMe : true;
   const rawGroupedEmps = useGroupedEmployees(search, myDept, 'ALL', weekSchedule);
@@ -67,38 +58,19 @@ export default function EmployeeTimesheet() {
     return result;
   }, [rawGroupedEmps, effectiveFilterOnlyMe, user?.id]);
 
-  const getDayValue = useCallback((empId, day) => {
-    const cell = cycleDates.find(d => d.key === day);
-    if (!cell) return '';
-    const actual = getShiftCode(schedule[cell.weekKey]?.[empId]?.[cell.dayKey]);
-    if (!actual || actual === 'off' || actual === 'OFF') return 'OFF';
-    const hours = getShiftHours(actual);
-    return hours > 0 ? String(hours) : actual;
-  }, [cycleDates, schedule]);
-
-  // Tính tổng giờ công của cá nhân
-  const myTotalHours = useMemo(() => {
-    let total = 0;
-    activeDays.forEach(day => {
-      const val = getDayValue(user?.id, day);
-      if (val && val !== 'OFF') {
-        const num = parseFloat(String(val).replace(',', '.'));
-        if (!isNaN(num)) total += num;
-        else total += 8;
-      }
-    });
-    return Math.round(total * 100) / 100;
-  }, [getDayValue, activeDays, user?.id]);
+  const myTotalHours = useMemo(() => Math.round(activeDays.reduce((total, day) =>
+    total + timesheetHours(getEffectiveValue(user?.id, day)), 0) * 100) / 100,
+  [activeDays, getEffectiveValue, user?.id]);
 
   const isPT = user?.type === 'PARTTIME' || user?.type === 'STPT' || (user?.role && user?.role.includes('PT'));
-  const isOver91 = isPT && myTotalHours > 91;
+  const isOver91 = isPT && myTotalHours > SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH;
 
   const handleExportExcel = () => {
     exportTimesheetToExcel({
       currentWeek,
       deptName: myDept,
       groupedEmps,
-      getDayValue,
+      getDayValue: getEffectiveValue,
       activeDays,
       filterOnlyMe: effectiveFilterOnlyMe,
       currentUserId: user?.id,
@@ -115,7 +87,7 @@ export default function EmployeeTimesheet() {
         user={user}
         activeDays={activeDays}
         cycleDates={cycleDates}
-        getDayValue={getDayValue}
+        getDayValue={getEffectiveValue}
         weekSchedule={weekSchedule}
       />
       
@@ -298,6 +270,7 @@ export default function EmployeeTimesheet() {
 
       {/* Shared Timesheet Table */}
       <TimesheetTable
+        getActualValue={getActualValue}
         groupedEmps={groupedEmps}
         cycleDates={cycleDates}
         activeDays={activeDays}

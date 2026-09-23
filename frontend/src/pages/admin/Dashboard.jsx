@@ -190,7 +190,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (viewMode === 'month' && cycleDates.length > 0 && ensureWeeksLoaded) {
       const neededWeeks = Array.from(new Set(cycleDates.map(d => d.weekKey)));
-      ensureWeeksLoaded(neededWeeks);
+      ensureWeeksLoaded(neededWeeks).catch(console.error);
     }
   }, [viewMode, cycleDates, ensureWeeksLoaded]);
 

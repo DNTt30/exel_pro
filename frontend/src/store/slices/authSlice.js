@@ -1,11 +1,14 @@
 import * as api from '../../services/api';
-import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
+import { ensureAuthSession, provisionAuthUser, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
+import { MA_RE } from '../../data/constants';
 import { checkLocked, recordFailure, resetFailures } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
 import { rememberClientIp, clientMeta, redact } from '../../utils/appLogs';
 import { notifyTelegram, telegramConfigured } from '../../utils/telegram';
 import { supabase } from '../../lib/supabase';
 import { verifyAdminPassword } from '../../lib/adminCredential';
+import { setRememberSession } from '../../lib/sessionStorage';
+import { emptySessionData } from '../sessionState';
 
 
 export function sessionUserFromEmp(emp) {
@@ -20,7 +23,7 @@ export function sessionUserFromEmp(emp) {
 }
 
 export async function bindAuthSession(user) {
-  const result = await ensureAuthSession(user, { allowSignUp: true, password: user.authPassword });
+  const result = await ensureAuthSession(user, { restoreOnly: true });
   if (result.ok) {
     try { await api.ensureAppProfile(); } catch (err) { console.warn('[auth] ensureAppProfile failed (non-critical):', err?.message); }
     return null;
@@ -30,36 +33,74 @@ export async function bindAuthSession(user) {
   return result.reason;
 }
 
-export const createAuthSlice = (set, get) => ({
-  user: null, 
+export const createAuthSlice = (set, get) => {
+  let authQueue = Promise.resolve();
+  let operation = 0;
+  const enqueueAuth = (task) => {
+    const result = authQueue.catch(() => {}).then(task);
+    authQueue = result;
+    return result;
+  };
+  return ({
+  user: null,
+  _sessionEpoch: 0,
   authWarning: null,
-  login: async (userId, password) => {
-    rememberClientIp();
+  login: (userId, password, { rememberMe = true } = {}) => {
+    const attempt = ++operation;
+    return enqueueAuth(async () => {
+    const assertCurrent = () => {
+      if (attempt !== operation) throw new Error('Yêu cầu đăng nhập đã được thay thế.');
+    };
+    assertCurrent();
+    userId = String(userId ?? '').trim();
+    if (!userId) throw new Error('Vui lòng nhập mã nhân viên');
+    if (userId !== 'admin' && !MA_RE.test(userId)) {
+      throw new Error('Mã nhân viên phải gồm đúng 9 chữ số');
+    }
+    if (typeof password !== 'string' || !password) throw new Error('Vui lòng nhập mật khẩu');
+
+    // Chỉ lỗi thông tin đăng nhập mới được tính là một lần sai mật khẩu.
+    const isInvalidCredentials = (error) => error?.code === 'invalid_credentials'
+      || /invalid login credentials/i.test(error?.message || '');
+    const signIn = async (authPassword) => {
+      assertCurrent();
+      let result;
+      try {
+        result = await supabase.auth.signInWithPassword({ email: toAuthEmail(userId), password: authPassword });
+      } catch (err) {
+        console.warn('[auth] signIn failed:', redact(err));
+        throw new Error('Không thể kết nối dịch vụ đăng nhập. Vui lòng thử lại sau.');
+      }
+      if ((result.error && !isInvalidCredentials(result.error)) || (!result.error && !result.data?.session)) {
+        throw new Error('Không thể xác thực tài khoản lúc này. Vui lòng thử lại sau.');
+      }
+      return result;
+    };
+    const rejectPassword = () => {
+      recordFailure(userId);
+      throw new Error('Mật khẩu không chính xác');
+    };
     try {
       let nextUser = null;
+      const lock = checkLocked(userId);
+      if (!lock.allowed) {
+        const mins = Math.max(1, Math.ceil(lock.retryAfterSec / 60));
+        throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
+      }
+      if (!supabase) throw new Error('Chưa cấu hình dịch vụ đăng nhập. Vui lòng liên hệ quản lý.');
+      setRememberSession(rememberMe);
+      rememberClientIp();
 
       if (userId === 'admin') {
-        const lock = checkLocked('admin');
-        if (!lock.allowed) {
-          const mins = Math.max(1, Math.ceil(lock.retryAfterSec / 60));
-          throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
-        }
+        // Mật khẩu mặc định trên form vẫn là 1, ánh xạ sang mật khẩu Auth nội bộ.
+        let pwCheck = await signIn(password === '1' ? toAuthPassword(userId) : password);
 
-        // Thử 1: Đăng nhập trực tiếp bằng mật khẩu đã lưu trên Supabase Auth
-        let pwCheck = await supabase.auth.signInWithPassword({
-          email: 'admin@ofc.app',
-          password,
-        });
-
-        // Thử 2: Nếu thất bại, kiểm tra mật khẩu đã đổi trên thiết bị (localStorage) hoặc mật khẩu mặc định (1)
+        // Tương thích mật khẩu admin đã đổi trên thiết bị trước khi đồng bộ Auth.
         let usedFallback = false;
         if (pwCheck.error || !pwCheck.data?.session) {
           const localOk = await verifyAdminPassword(password);
-          if (password === '1' || localOk) {
-            const fallback = await supabase.auth.signInWithPassword({
-              email: 'admin@ofc.app',
-              password: 'ofc-admin-1',
-            });
+          if (password !== '1' && localOk) {
+            const fallback = await signIn(toAuthPassword(userId));
             if (fallback.data?.session) {
               pwCheck = fallback;
               usedFallback = true;
@@ -72,12 +113,14 @@ export const createAuthSlice = (set, get) => ({
         }
 
         if (pwCheck.error || !pwCheck.data?.session) {
-          recordFailure('admin');
-          console.warn('[auth] Admin signIn lỗi:', redact(pwCheck.error));
-          throw new Error('Mật khẩu không chính xác');
+          rejectPassword();
         }
 
         if (!(await checkDeviceTrusted())) {
+          // Không để lại phiên Auth có quyền admin khi bước OTP chưa hoàn tất.
+          // Chỉ dọn thiết bị này, không đăng xuất admin trên các thiết bị khác.
+          const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+          if (signOutError) throw new Error('Không thể hoàn tất bước xác thực. Vui lòng thử lại.');
           const otpErr = new Error('Cần xác thực 2 bước qua Telegram');
           otpErr.code = 'OTP_REQUIRED';
           throw otpErr;
@@ -97,50 +140,32 @@ export const createAuthSlice = (set, get) => ({
           loginAt: Date.now()
         };
       } else {
-        let emp = await api.getEmployeeById(userId);
-        if (!emp) {
-          const emps = await api.getEmployees();
-          if (emps.length) set({ employees: emps });
-          emp = (emps.length ? emps : get().employees).find(e => e.id === userId);
-        }
+        const emp = await api.getEmployeeById(userId);
         if (!emp) throw new Error('Không tìm thấy mã nhân viên');
         if (emp.isActive === false) throw new Error('Mã này đã bị vô hiệu hóa (nghỉ việc). Liên hệ quản lý để mở lại.');
-        const empLock = checkLocked(userId);
-        if (!empLock.allowed) {
-          const mins = Math.max(1, Math.ceil(empLock.retryAfterSec / 60));
-          throw new Error('Đã thử sai quá nhiều lần. Thử lại sau khoảng ' + mins + ' phút.');
-        }
-
         let pwCheck = null;
         const isDefaultPassword = password === '1';
 
         if (isDefaultPassword) {
           // Lần đầu hoặc dùng mật khẩu mặc định 1: đăng nhập bằng default auth password của nhân viên
           const defaultAuthPw = toAuthPassword(emp.id);
-          pwCheck = await supabase.auth.signInWithPassword({
-            email: toAuthEmail(emp.id),
-            password: defaultAuthPw,
-          });
+          pwCheck = await signIn(defaultAuthPw);
 
           // Nếu chưa có tài khoản Supabase Auth, tự động khởi tạo (provision)
-          if (pwCheck.error || !pwCheck.data?.session) {
-            const provision = await ensureAuthSession(emp, { allowSignUp: true, password: defaultAuthPw });
-            if (provision.ok && provision.session) {
-              pwCheck = { data: { session: provision.session, user: provision.session.user } };
-            }
+          if (isInvalidCredentials(pwCheck.error)) {
+            // Tạo bằng client riêng rồi xác thực lại mật khẩu; tuyệt đối không
+            // dùng ensureAuthSession ở đây vì có thể tái sử dụng phiên cũ.
+            const provision = await provisionAuthUser(emp);
+            if (!provision.ok) throw new Error('Chưa thể khởi tạo tài khoản đăng nhập. Vui lòng liên hệ quản lý hoặc thử lại sau.');
+            pwCheck = await signIn(defaultAuthPw);
           }
         } else {
           // Người dùng đã đổi mật khẩu riêng: đăng nhập trực tiếp Supabase Auth
-          pwCheck = await supabase.auth.signInWithPassword({
-            email: toAuthEmail(emp.id),
-            password,
-          });
+          pwCheck = await signIn(password);
         }
 
         if (pwCheck?.error || !pwCheck?.data?.session) {
-          recordFailure(userId);
-          console.warn('[auth] signInWithPassword lỗi:', redact(pwCheck?.error));
-          throw new Error('Mật khẩu không chính xác');
+          rejectPassword();
         }
         
         // Cờ mustChangePassword:
@@ -172,13 +197,20 @@ export const createAuthSlice = (set, get) => ({
         };
       }
 
+      assertCurrent();
       resetFailures(userId);
 
-      set({ user: nextUser, syncStatus: 'loading' });
+      get()._cleanupRealtimeTimers?.();
+      if (get()._realtimeChannel) void supabase.removeChannel(get()._realtimeChannel);
+      set({ ...emptySessionData(), user: nextUser, _sessionEpoch: (get()._sessionEpoch || 0) + 1, syncStatus: 'loading' });
       const roleLabel = isOpsManager(nextUser) ? (nextUser.isAreaManager ? 'OFC' : 'SM') : 'Nhân viên';
       
       // Ghi log đăng nhập thành công
-      get().appendAdminLog('LOGIN_SUCCESS', nextUser.id, roleLabel, {
+      const logLogin = (...args) => {
+        Promise.resolve().then(() => get().appendAdminLog(...args))
+          .catch((err) => console.warn('[auth] Login log failed:', err?.message));
+      };
+      logLogin('LOGIN_SUCCESS', nextUser.id, roleLabel, {
         category: 'security',
         entityType: 'session',
         entityId: nextUser.id,
@@ -188,7 +220,7 @@ export const createAuthSlice = (set, get) => ({
 
       // Cảnh báo bảo mật nếu đăng nhập bằng mật khẩu mặc định
       if (nextUser.mustChangePassword && nextUser.id !== 'admin') {
-        get().appendAdminLog('LOGIN_DEFAULT_PASSWORD', nextUser.id, roleLabel, {
+        logLogin('LOGIN_DEFAULT_PASSWORD', nextUser.id, roleLabel, {
           category: 'security',
           entityType: 'session',
           entityId: nextUser.id,
@@ -205,22 +237,20 @@ export const createAuthSlice = (set, get) => ({
             .catch((err) => { console.warn('[auth] Telegram notify failed:', err?.message); });
         }
       } catch (err) { console.warn('[auth] Telegram setup error:', err?.message); }
-      bindAuthSession(nextUser).then((authWarning) => {
-        if (get().user?.id === nextUser.id && authWarning !== get().authWarning) {
-          set({ authWarning });
-        }
-      }).catch(() => {});
       try {
-        get().initializeData?.();
+        Promise.resolve(get().initializeData?.()).catch((err) => {
+          console.warn('[auth] initializeData trigger error:', err?.message);
+        });
       } catch (err) {
         console.warn('[auth] initializeData trigger error:', err?.message);
       }
       return nextUser;
     } catch (err) {
+      if (err.code === 'OTP_REQUIRED') throw err;
       const meta = clientMeta();
       const lock = checkLocked(userId);
       const isSuspicious = !lock.allowed || (lock.retryAfterSec && lock.retryAfterSec > 0);
-      api.addActivityLog({
+      Promise.resolve().then(() => api.addActivityLog({
         userId: String(userId || ''),
         action: isSuspicious ? 'SUSPICIOUS_LOGIN_ATTEMPT' : 'LOGIN_FAILED',
         category: 'security',
@@ -230,11 +260,13 @@ export const createAuthSlice = (set, get) => ({
           ? `🚨 [NGHI VẤN DÒ MẬT KHẨU] Thử đăng nhập sai liên tiếp cho tài khoản ${userId}`
           : (err.message || 'Đăng nhập thất bại'),
         ...meta
-      });
+      })).catch((logError) => console.warn('[auth] Login log failed:', logError?.message));
       throw err;
     }
+    });
   },
   logout: async () => {
+    operation++;
     const user = get().user;
     if (user) {
       get().appendAdminLog('LOGOUT', user.id, 'Đăng xuất', {
@@ -251,7 +283,9 @@ export const createAuthSlice = (set, get) => ({
       supabase.removeChannel(channel);
       set({ _realtimeChannel: null, realtimeStatus: 'disconnected' });
     }
-    await signOutAuth();
-    set({ user: null, authWarning: null });
+    set({ ...emptySessionData(), user: null, _sessionEpoch: (get()._sessionEpoch || 0) + 1 });
+    try { await enqueueAuth(() => signOutAuth()); }
+    catch (err) { console.warn('[auth] signOut failed:', err?.message); }
   }
 });
+};

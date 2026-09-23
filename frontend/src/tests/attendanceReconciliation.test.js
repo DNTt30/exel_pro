@@ -4,6 +4,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { calculatePunchHours } from '../utils/ezhrAttendanceParser';
 import { createScheduleSlice } from '../store/slices/scheduleSlice';
 
+vi.mock('../services/api', () => ({ upsertAttendanceRows: vi.fn().mockResolvedValue(true) }));
+
 describe('Đối soát ca qua đêm (Night Shift Reconciliation)', () => {
   it('Ca 22:00 -> 06:00 hôm sau: Tính đúng 480 phút, không ra số âm', () => {
     const result = calculatePunchHours('2026-09-21T22:00:00', '2026-09-22T06:00:00');
@@ -54,11 +56,6 @@ describe('Đối soát chấm công: Chống nhân đôi giờ công (P1 Require
 
     const slice = createScheduleSlice(mockSet, mockGet);
     
-    // Mock the API upsert to just succeed
-    vi.mock('../services/api', () => ({
-      upsertAttendanceRows: vi.fn().mockResolvedValue(true)
-    }));
-
     const records = [
       { empId: 'NV001', workDate: '2026-09-21', actualHours: 8, note: '' }
     ];

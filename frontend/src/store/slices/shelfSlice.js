@@ -1,20 +1,23 @@
 import * as api from '../../services/api';
 import { userIsManager } from '../guards';
 import { describeDiff } from '../../utils/appLogs';
+import { getUserDepts, isAreaManagerFromEmp } from '../../lib/authSession';
 
 export const createShelfSlice = (set, get) => ({
   shelves: [],
   shelfItems: [],
 
   saveShelf: async (shelf) => {
+    const epoch = get()._sessionEpoch;
     const user = get().user;
     if (!userIsManager(user) && user?.role !== 'admin') {
       throw new Error('Chỉ SM/admin được tạo hoặc giao kệ');
     }
-    if (user?.role !== 'admin' && user?.dept && shelf.storeId && shelf.storeId !== user.dept) {
+    if (user?.role !== 'admin' && !isAreaManagerFromEmp(user) && !getUserDepts(user).includes(shelf.storeId)) {
       throw new Error('Chỉ giao kệ cửa hàng mình');
     }
     const saved = await api.saveShelf(shelf);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => {
       const exists = state.shelves.some(s => s.id === saved.id);
       return {
@@ -36,11 +39,15 @@ export const createShelfSlice = (set, get) => ({
     return saved;
   },
   deleteShelf: async (id) => {
+    const epoch = get()._sessionEpoch;
     if (!userIsManager(get().user) && get().user?.role !== 'admin') {
       throw new Error('Chỉ SM/admin được xóa kệ');
     }
     const prev = get().shelves.find(s => s.id === id);
+    const user = get().user;
+    if (user?.role !== 'admin' && !isAreaManagerFromEmp(user) && !getUserDepts(user).includes(prev?.storeId)) throw new Error('Chỉ xóa kệ cửa hàng mình');
     await api.deleteShelf(id);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
       shelves: state.shelves.filter(s => s.id !== id),
       shelfItems: state.shelfItems.filter(i => i.shelfId !== id)
@@ -55,6 +62,7 @@ export const createShelfSlice = (set, get) => ({
     });
   },
   saveShelfItems: async (shelfId, rows) => {
+    const epoch = get()._sessionEpoch;
     const user = get().user;
     const shelf = get().shelves.find(s => s.id === shelfId);
     if (!shelf) throw new Error('Không tìm thấy kệ');
@@ -62,13 +70,14 @@ export const createShelfSlice = (set, get) => ({
     if (user?.role !== 'admin' && !userIsManager(user) && !assigneeIds.includes(user?.id)) {
       throw new Error('Bạn chỉ ghi date kệ được giao');
     }
-    if (user?.role !== 'admin' && user?.dept && shelf.storeId !== user.dept) {
+    if (user?.role !== 'admin' && !isAreaManagerFromEmp(user) && !getUserDepts(user).includes(shelf.storeId)) {
       throw new Error('Sai cửa hàng');
     }
     const prevItems = get().shelfItems.filter(i => i.shelfId === shelfId).map(i => ({
       productName: i.productName, sku: i.sku, qty: i.qty, expiryDate: i.expiryDate, expiryDate2: i.expiryDate2
     }));
     const saved = await api.replaceShelfItems(shelfId, shelf.storeId, rows, user?.id);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
       shelfItems: [
         ...state.shelfItems.filter(i => i.shelfId !== shelfId),

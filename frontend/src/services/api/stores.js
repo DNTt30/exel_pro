@@ -5,7 +5,7 @@ export async function getStores() {
   const { data, error } = await db().from('stores').select('*').order('id', { ascending: true });
   if (error) {
     console.error('Lỗi lấy danh sách cửa hàng:', error);
-    return [];
+    throw error;
   }
   try {
     return (data || []).map(mapStore);

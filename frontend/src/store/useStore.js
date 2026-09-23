@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import * as api from '../services/api';
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { weekRecordKey } from '../utils/scheduleWeek';
@@ -12,6 +12,7 @@ import { createEmployeeSlice } from './slices/employeeSlice';
 import { createScheduleSlice } from './slices/scheduleSlice';
 import { createShelfSlice } from './slices/shelfSlice';
 import { toast } from '../utils/toast';
+import { sessionPersistence } from '../lib/sessionStorage';
 
 export const useStore = create(
   persist(
@@ -31,6 +32,9 @@ export const useStore = create(
       _cleanupRealtimeTimers: null,
 
       initRealtime: () => {
+        if (!supabase || !get().user) return;
+        const epoch = get()._sessionEpoch;
+        const active = () => epoch === get()._sessionEpoch && Boolean(get().user);
         const currentChannel = get()._realtimeChannel;
         if (currentChannel) {
           supabase.removeChannel(currentChannel);
@@ -57,61 +61,45 @@ export const useStore = create(
         const channel = supabase.channel('store-sync')
           // 1. Bảng lịch làm việc (schedules): Patch trực tiếp từ row mới, tránh re-fetch cả tuần gây nghẽn DB
           .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
+            if (!active()) return;
             console.log('[Realtime] schedules changed:', payload);
-            const newRow = payload.new;
-            if (newRow && newRow.week_date && newRow.emp_id) {
-              const targetWeek = newRow.week_date;
-              set(state => ({
-                schedule: {
-                  ...state.schedule,
-                  [targetWeek]: {
-                    ...(state.schedule[targetWeek] || {}),
-                    [newRow.emp_id]: newRow.shifts || {}
-                  }
-                },
-                lastSyncedAt: Date.now()
-              }));
-              toast.info('Lịch làm việc vừa được cập nhật thời gian thực');
+            if (payload.new?.week_date && payload.new?.emp_id) {
+              get().receiveScheduleEvent(payload);
               return;
             }
-
-            // Fallback re-fetch an toàn chỉ khi DELETE hoặc payload rỗng
-            if (schedTimer) clearTimeout(schedTimer);
+            clearTimeout(schedTimer);
             schedTimer = setTimeout(() => {
-              const week = get().currentWeek;
-              if (week) {
-                 api.getSchedulesByWeek(week).then(scheds => {
-                    set(state => ({
-                      schedule: { ...state.schedule, [week]: scheds },
-                      lastSyncedAt: Date.now()
-                    }));
-                    toast.info('Lịch làm việc vừa được cập nhật thời gian thực');
-                 }).catch(console.error);
-              }
+              if (active()) get().receiveScheduleEvent(payload);
             }, REALTIME_DEBOUNCE_MS);
           })
           // 2. Bảng kệ hàng & date (shelf_items)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'shelf_items' }, (payload) => {
+            if (!active()) return;
             console.log('[Realtime] shelf_items changed:', payload);
             if (shelfTimer) clearTimeout(shelfTimer);
             shelfTimer = setTimeout(() => {
+              if (!active()) return;
               const plan = bootstrapQueryPlan(get().user);
               const shelves = get().shelves;
               const itemOpts = plan.shelfItems.storeId
                 ? { storeId: plan.shelfItems.storeId }
                 : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
               api.getShelfItems(itemOpts).then(items => {
+                if (!active()) return;
                 set({ shelfItems: items, lastSyncedAt: Date.now() });
               }).catch(console.error);
             }, REALTIME_DEBOUNCE_MS);
           })
           // 3. Bảng đơn đổi ca (shift_swaps)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_swaps' }, (payload) => {
+            if (!active()) return;
             console.log('[Realtime] shift_swaps changed:', payload);
             if (swapsTimer) clearTimeout(swapsTimer);
             swapsTimer = setTimeout(() => {
+              if (!active()) return;
               const plan = bootstrapQueryPlan(get().user);
               api.getShiftSwaps(plan.swaps).then(swaps => {
+                if (!active()) return;
                 set({ shiftSwaps: swaps || [], lastSyncedAt: Date.now() });
                 if (payload.eventType === 'INSERT') {
                   toast.info('Có đơn đổi ca mới vừa gửi!');
@@ -121,13 +109,16 @@ export const useStore = create(
               }).catch(console.error);
             }, REALTIME_DEBOUNCE_MS);
           })
-          // 4. Bảng phản hồi / đơn bù công (employee_feedbacks)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_feedbacks' }, (payload) => {
-            console.log('[Realtime] employee_feedbacks changed:', payload);
+          // 4. Bảng phản hồi / đơn bù công (feedbacks)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'feedbacks' }, (payload) => {
+            if (!active()) return;
+            console.log('[Realtime] feedbacks changed:', payload);
             if (feedbacksTimer) clearTimeout(feedbacksTimer);
             feedbacksTimer = setTimeout(() => {
+              if (!active()) return;
               const plan = bootstrapQueryPlan(get().user);
               api.getFeedbacks(plan.feedbacks).then(fbs => {
+                if (!active()) return;
                 set({ feedbacks: fbs || [], lastSyncedAt: Date.now() });
                 if (payload.eventType === 'INSERT') {
                   toast.info('Có đơn bù công / phản hồi mới!');
@@ -136,6 +127,7 @@ export const useStore = create(
             }, REALTIME_DEBOUNCE_MS);
           })
           .subscribe((status) => {
+            if (!active()) return;
             console.log('[Supabase Realtime Status]:', status);
             if (status === 'SUBSCRIBED') {
               set({ realtimeStatus: 'connected' });
@@ -150,104 +142,70 @@ export const useStore = create(
       },
 
       initializeData: async () => {
-        if (get()._bootstrapping) return;
+        const user = get().user;
+        if (!user || get()._bootstrapping) return;
+        const epoch = get()._sessionEpoch;
+        const active = () => epoch === get()._sessionEpoch && Boolean(get().user);
+        const week = get().currentWeek;
+        const revision = get()._scheduleRevision;
+        const previous = get();
         set({ isInitializing: true, _bootstrapping: true, syncStatus: 'loading' });
         try {
-          const user = get().user;
-          const week = get().currentWeek;
-          if (user) {
-            await bindAuthSession(user).catch(() => {});
-          }
-          const plan = bootstrapQueryPlan(get().user || user);
-          // safeLoad: thử promise, fallback về giá trị mặc định nếu lỗi hoặc timeout
-          const safeLoad = (p, fallback) => {
-            const run = Promise.resolve(p).catch((err) => {
-              console.error("Lỗi tải dữ liệu nhánh:", err);
-              return fallback;
-            });
-            return Promise.race([
-              run,
-              new Promise((resolve) => setTimeout(() => resolve(fallback), BOOTSTRAP_BRANCH_TIMEOUT_MS))
-            ]);
+          const authWarning = await bindAuthSession(user);
+          if (!active()) return;
+          if (authWarning) { set({ authWarning }); throw new Error(authWarning); }
+          const plan = bootstrapQueryPlan(user);
+          let failed = false;
+          const load = async (promise, fallback) => {
+            let timer;
+            try {
+              return await Promise.race([promise, new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Tải dữ liệu quá thời gian chờ')), BOOTSTRAP_BRANCH_TIMEOUT_MS);
+              })]);
+            } catch (error) { failed = true; console.warn('[bootstrap]', error?.message); return fallback; }
+            finally { clearTimeout(timer); }
           };
-
-          const [emps, fbs, scheds, st, swaps, shelves, weekStatuses] = await Promise.all([
-            safeLoad(api.getEmployees(plan.employees), []),
-            safeLoad(api.getFeedbacks(plan.feedbacks), []),
-            safeLoad(api.getSchedulesByWeek(week), {}),
-            safeLoad(api.getStores(), []),
-            safeLoad(api.getShiftSwaps(plan.swaps), []),
-            safeLoad(api.getShelves(plan.shelves), []),
-            safeLoad(api.getScheduleWeeks(), [])
+          const [employees, feedbacks, scheds, stores, shiftSwaps, shelves, weeks] = await Promise.all([
+            load(api.getEmployees(plan.employees), previous.employees),
+            load(api.getFeedbacks(plan.feedbacks), previous.feedbacks),
+            load(api.getSchedulesByWeek(week), previous.schedule[week] || {}),
+            load(api.getStores(), previous.stores),
+            load(api.getShiftSwaps(plan.swaps), previous.shiftSwaps),
+            load(api.getShelves(plan.shelves), previous.shelves),
+            load(api.getScheduleWeeks(), Object.values(previous.scheduleWeeks))
           ]);
-          const prev = get();
-          const employees = emps.length ? emps : prev.employees;
-          const itemOpts = plan.shelfItems.storeId
-            ? { storeId: plan.shelfItems.storeId }
-            : (shelves.length ? { shelfIds: shelves.map(s => s.id) } : {});
-          const shelfItems = await safeLoad(api.getShelfItems(itemOpts), prev.shelfItems || []);
-          let nextUser = prev.user;
-          if (nextUser) {
-            if (nextUser.role === 'admin' || nextUser.id === 'admin') {
-              // SEC-01 & SEC-02: Kiểm tra phiên admin hợp lệ, chặn sửa localStorage
-              const sessionAge = Date.now() - (nextUser.loginAt || 0);
-              if (nextUser.id !== 'admin' || !nextUser.loginAt || sessionAge > ADMIN_SESSION_MAX_MS) {
-                console.warn('[Security] Phiên admin trong storage không hợp lệ hoặc đã hết hạn. Reset phiên.');
-                nextUser = null;
-              }
-            } else {
-              const fresh = employees.find(e => e.id === nextUser.id);
-              if (fresh) {
-                if (fresh.isActive === false) {
-                  console.warn('[Security] Tài khoản đã bị vô hiệu hóa. Reset user.');
-                  nextUser = null;
-                } else {
-                  const synced = sessionUserFromEmp(fresh);
-                  const changed = nextUser.jobTitle !== synced.jobTitle
-                    || nextUser.isManager !== synced.isManager
-                    || nextUser.isAreaManager !== synced.isAreaManager
-                    || nextUser.dept !== synced.dept
-                    || nextUser.name !== synced.name;
-                  nextUser = changed ? { ...synced, loginAt: nextUser.loginAt } : nextUser;
-                }
-              }
+          if (!active()) return;
+          const itemOpts = plan.shelfItems.storeId ? { storeId: plan.shelfItems.storeId } : { shelfIds: shelves.map(s => s.id) };
+          const shelfItems = await load(api.getShelfItems(itemOpts), previous.shelfItems);
+          if (!active()) return;
+          let nextUser = get().user;
+          if (nextUser.id === 'admin' || nextUser.role === 'admin') {
+            if (nextUser.id !== 'admin' || !nextUser.loginAt || Date.now() - nextUser.loginAt > ADMIN_SESSION_MAX_MS) {
+              await get().logout(); return;
             }
+          } else {
+            const fresh = employees.find(e => e.id === nextUser.id);
+            if (fresh?.isActive === false) { await get().logout(); return; }
+            if (fresh) nextUser = { ...nextUser, ...sessionUserFromEmp(fresh) };
           }
-          set({
-            user: nextUser,
-            employees,
-            feedbacks: fbs,
-            stores: st.length ? st : prev.stores,
-            shiftSwaps: swaps,
-            shelves,
-            shelfItems,
-            schedule: {
-              ...prev.schedule,
-              [week]: scheds
-            },
-            scheduleWeeks: Object.fromEntries((weekStatuses || []).map(w => [weekRecordKey(w.storeId, w.weekDate), w])),
-            syncStatus: 'ok',
-            lastSyncedAt: Date.now()
-          });
-          if (user) {
-            bindAuthSession(nextUser || user).then((authWarning) => {
-              const cur = get().authWarning;
-              if (authWarning !== cur) set({ authWarning });
-            }).catch(() => {});
-          }
-
-          get().initRealtime();
-
+          set(state => ({
+            user: nextUser, employees, feedbacks, stores, shiftSwaps, shelves, shelfItems,
+            schedule: revision === state._scheduleRevision && !state._pendingScheduleWrites
+              ? { ...state.schedule, [week]: scheds } : state.schedule,
+            scheduleWeeks: Object.fromEntries(weeks.map(w => [weekRecordKey(w.storeId, w.weekDate), w])),
+            syncStatus: failed ? 'error' : 'ok', lastSyncedAt: failed ? state.lastSyncedAt : Date.now()
+          }));
+          if (active()) get().initRealtime();
         } catch (err) {
-          console.error("Lỗi khởi tạo dữ liệu:", err);
-          set({ syncStatus: 'error' });
+          if (active()) { console.error('Lỗi khởi tạo dữ liệu:', err); set({ syncStatus: 'error' }); }
         } finally {
-          set({ isInitializing: false, _bootstrapping: false });
+          if (active()) set({ isInitializing: false, _bootstrapping: false });
         }
       }
     }),
     {
       name: 'schedule-storage',
+      storage: createJSONStorage(() => sessionPersistence),
       version: 5,
       partialize: (state) => ({
         currentWeek: state.currentWeek,

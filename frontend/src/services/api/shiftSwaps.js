@@ -29,13 +29,12 @@ export async function getShiftSwaps(opts = {}) {
     else if (opts.store) q = q.eq('store', opts.store);
     const { data, error } = await q;
     if (error) {
-      console.error('Lỗi lấy danh sách đổi ca:', error);
-      return [];
+      throw error;
     }
     return (data || []).map(mapShiftSwap);
   } catch (err) {
     console.error('Lỗi lấy danh sách đổi ca:', err);
-    return [];
+    throw err;
   }
 }
 
@@ -74,5 +73,13 @@ export async function updateShiftSwap(id, updates) {
 export async function deleteShiftSwap(id) {
   const { error } = await db().from('shift_swaps').delete().eq('id', id);
   if (error) throw error;
+}
+
+export async function approveShiftSwap(id, managerNote = '') {
+  const { data, error } = await db().rpc('approve_shift_swap_atomic_v2', {
+    p_swap_id: id, p_manager_note: managerNote
+  });
+  if (error) throw error;
+  return data;
 }
 

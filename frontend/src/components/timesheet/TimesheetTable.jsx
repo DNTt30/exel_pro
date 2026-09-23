@@ -71,16 +71,16 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
                 })}
 
                 {/* Cột Tổng Giờ */}
-                <th className="p-2 text-center bg-slate-300 text-slate-800 font-extrabold sticky z-20 min-w-[64px] w-[64px] border-l border-slate-400" style={{ right: '128px' }}>
+                <th className="p-2 text-center bg-slate-300 text-slate-800 font-extrabold min-w-[64px] w-[64px] border-l border-slate-400">
                   Giờ FT
                 </th>
-                <th className="p-2 text-center bg-slate-300 text-slate-800 font-extrabold sticky z-20 min-w-[64px] w-[64px] border-l border-slate-400" style={{ right: '64px' }}>
+                <th className="p-2 text-center bg-slate-300 text-slate-800 font-extrabold min-w-[64px] w-[64px] border-l border-slate-400">
                   Giờ PT
                 </th>
-                <th className="p-2 text-center bg-blue-100 text-blue-900 font-black sticky right-0 z-20 min-w-[64px] w-[64px] border-l border-slate-400">
+                <th className="p-2 text-center bg-blue-100 text-blue-900 font-black min-w-[64px] w-[64px] border-l border-slate-400">
                   Tổng
                 </th>
-                <th className="p-2 text-center bg-amber-200 text-amber-900 font-black sticky right-0 z-20 min-w-[80px] w-[80px] border-l border-slate-400">
+                <th className="p-2 text-center bg-amber-200 text-amber-900 font-black min-w-[80px] w-[80px] border-l border-slate-400">
                   Lương (Ước tính)
                 </th>
               </tr>

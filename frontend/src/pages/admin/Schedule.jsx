@@ -166,7 +166,7 @@ export default function Schedule() {
 
   useEffect(() => {
     if (viewMode !== 'month') return;
-    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey)).catch(console.error);
   }, [viewMode, cycleDates, ensureWeeksLoaded]);
 
   const handleShiftChange = useCallback((emp, day, value) => {
@@ -182,11 +182,11 @@ export default function Schedule() {
     if (viewMode === 'month') {
       const cell = cycleDates.find(d => d.key === day);
       if (cell) {
-        updateShift(cell.weekKey, emp.id, cell.dayKey, saveVal);
+        updateShift(cell.weekKey, emp.id, cell.dayKey, saveVal).catch(() => {});
         return;
       }
     }
-    updateShift(currentWeek, emp.id, day, saveVal);
+    updateShift(currentWeek, emp.id, day, saveVal).catch(() => {});
   }, [currentWeek, updateShift, viewMode, cycleDates]);
 
   // Memo giữ tham chiếu ổn định để EmployeeRow (memo) không re-render hàng loạt
@@ -269,7 +269,7 @@ export default function Schedule() {
 
       // Lưu hàng loạt lên Supabase thay vì N+1 request
       if (copiedCount > 0) {
-        await api.saveBulkEmployeeSchedules(currentWeek, bulkUpdates);
+        await useStore.getState().applyBulkSchedule(currentWeek, bulkUpdates);
         useStore.getState().appendAdminLog('COPY_SHIFT_WEEK', currentWeek, `${copiedCount} nhân sự`, {
           resourceType: 'shift',
           resourceId: currentWeek,
@@ -278,12 +278,7 @@ export default function Schedule() {
         });
       }
 
-      useStore.setState(state => ({
-        schedule: {
-          ...state.schedule,
-          [currentWeek]: destSched
-        }
-      }));
+
 
       toast.success(`✅ Đã sao chép lịch làm việc của ${copiedCount} nhân sự sang tuần này (${curRange})!`);
     } catch (err) {

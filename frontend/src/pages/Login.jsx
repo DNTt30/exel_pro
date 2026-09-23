@@ -102,7 +102,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(empId.trim(), password || '1');
+      const user = await login(empId.trim(), password || '1', { rememberMe });
       if (isOpsManager(user)) {
         navigate('/admin/dashboard');
       } else {

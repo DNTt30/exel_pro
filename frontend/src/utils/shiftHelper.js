@@ -230,7 +230,7 @@ export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthVi
           message: `Vượt ngưỡng tuần tương đương 91h/tháng (${totalHours}h / ~${SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK}h)`
         });
       }
-      if (totalHours > 0 && totalHours < SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK) {
+      if (totalHours < SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK) {
         warnings.push({
           type: 'warning',
           badge: '⚠️ < 16h',
@@ -240,14 +240,14 @@ export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthVi
     }
   } else if (isFT) {
     if (!isMonthView) {
-      if (totalHours > 0 && totalHours < SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK) {
+      if (totalHours < SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK) {
         warnings.push({
           type: 'warning',
           badge: '⚠️ < 48h',
           message: `Full-time chưa đủ ${SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK}h/tuần (${totalHours}h / ${SCHEDULE_RULES.STFT_MIN_HOURS_PER_WEEK}h)`
         });
       }
-      if (totalShifts > 0 && totalShifts < SCHEDULE_RULES.STFT_MIN_SHIFTS_PER_WEEK) {
+      if (totalShifts < SCHEDULE_RULES.STFT_MIN_SHIFTS_PER_WEEK) {
         warnings.push({
           type: 'warning',
           badge: '⚠️ < 6 ca',
@@ -422,7 +422,7 @@ export function mergeAiSchedule(existingWeek = {}, aiSchedule = {}, storeId) {
     Object.entries(days).forEach(([day, code]) => {
       const covering = getCoveringStore(prev[day]);
       if (covering && covering !== storeId) return;
-      next[day] = code;
+      next[day] = covering ? { ...normalizeShift(code), covering_store: covering } : code;
     });
     merged[empId] = next;
   });

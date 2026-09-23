@@ -24,14 +24,15 @@ function jobTitleOf(emp) {
 }
 
 export function isAreaManagerFromEmp(emp) {
+  if (emp?.isAreaManager === true) return true;
   const r = jobTitleOf(emp);
   const t = String(emp?.type || '').trim();
-  return r === 'OFC' || r === 'SM' || /khu vực/i.test(r) || t === 'OFC';
+  return [emp?.role, emp?.jobTitle, t].some(v => ['OFC', 'AM', 'AREA_MANAGER'].includes(String(v || '').trim().toUpperCase())) || /khu vực/i.test(r);
 }
 
 export function isStoreManagerFromEmp(emp) {
   const r = jobTitleOf(emp).toLowerCase();
-  return r.includes('cửa hàng trưởng') && !isAreaManagerFromEmp(emp);
+  return (r.includes('cửa hàng trưởng') || r.includes('quản lý') || [emp?.role, emp?.type, emp?.jobTitle].some(v => ['SM', 'STORE_MANAGER'].includes(String(v || '').trim().toUpperCase()))) && !isAreaManagerFromEmp(emp);
 }
 
 export function isManagerFromEmp(emp) {
@@ -164,7 +165,7 @@ export async function provisionAuthUser(emp) {
   }
 }
 
-export async function ensureAuthSession(user, { allowSignUp = false, password } = {}) {
+export async function ensureAuthSession(user, { allowSignUp = false, password, restoreOnly = false } = {}) {
   if (!supabase) return { ok: false, reason: 'no-client' };
   if (!user?.id) return { ok: false, reason: 'no-user' };
 
@@ -178,9 +179,10 @@ export async function ensureAuthSession(user, { allowSignUp = false, password } 
   );
   const currentEmail = current?.session?.user?.email;
   if (current?.session && currentEmail === email) {
-    await supabase.auth.updateUser({ data: meta }).catch(() => {});
+    if (!restoreOnly) await supabase.auth.updateUser({ data: meta }).catch(() => {});
     return { ok: true, session: current.session };
   }
+  if (restoreOnly) return { ok: false, reason: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
   if (current?.session && currentEmail !== email) {
     await supabase.auth.signOut();
   }
@@ -237,5 +239,6 @@ export async function ensureAuthSession(user, { allowSignUp = false, password } 
 
 export async function signOutAuth() {
   if (!supabase) return;
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) throw error;
 }

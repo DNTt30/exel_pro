@@ -2,7 +2,8 @@ import React from 'react';
 import Modal from './Modal';
 import { Printer, ShieldCheck } from 'lucide-react';
 import { getRoleBadgeInfo } from '../../data/constants';
-import { getShiftHours, normalizeShift } from '../../utils/shiftHelper';
+import { normalizeShift } from '../../utils/shiftHelper';
+import { timesheetHours } from '../../utils/timesheetValues';
 
 export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDays = [], cycleDates = [], getDayValue, weekSchedule = {} }) {
   if (!user) return null;
@@ -19,23 +20,24 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
   const daysDetail = (cycleDates.length > 0 ? cycleDates : activeDays.map(d => ({ key: d, dayKey: d, display: '' }))).map((cell) => {
     const rawVal = getDayValue ? getDayValue(user.id, cell.key) : (weekSchedule[user.id]?.[cell.key || cell.dayKey] || '');
     const { shift } = normalizeShift(rawVal);
-    const isOff = !shift || shift === 'off' || rawVal === 'OFF';
-    const hours = isOff ? 0 : (getShiftHours(shift) || parseFloat(String(rawVal).replace(',', '.')) || 0);
+    const isOff = shift === 'off' || rawVal === 'OFF';
+    const isEmpty = rawVal == null || rawVal === '';
+    const hours = timesheetHours(rawVal);
 
     if (isOff) {
       offDaysCount++;
-    } else {
+    } else if (!isEmpty && hours > 0) {
       totalShifts++;
       totalHours = Math.round((totalHours + hours) * 100) / 100;
       if (String(shift).startsWith('22')) nightShiftsCount++;
     }
 
-    return { 
-      day: cell.key, 
-      dayKey: cell.dayKey, 
+    return {
+      day: cell.key,
+      dayKey: cell.dayKey,
       display: cell.display || cell.shortDisplay || '',
-      shift: isOff ? 'OFF' : (shift || rawVal), 
-      hours 
+      shift: isOff ? 'OFF' : (isEmpty ? '—' : rawVal),
+      hours
     };
   });
 
@@ -51,7 +53,7 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
       <div className="space-y-4 max-h-[85vh] flex flex-col">
         {/* Printable Paper Area */}
         <div className="flex-1 overflow-y-auto p-4 bg-white border border-slate-200 rounded-2xl print:border-none print:p-0">
-          
+
           {/* Header Tiêu Đề */}
           <div className="text-center pb-3 border-b-2 border-slate-800">
             <div className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Hệ Thống Bán Lẻ & Quản Lý Nhân Sự OFC</div>
@@ -97,8 +99,8 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
                   <div
                     key={display || day}
                     className={`p-1 rounded-lg border flex flex-col items-center justify-between min-h-[58px] ${
-                      isOff 
-                        ? 'bg-slate-50 border-slate-200 text-slate-400' 
+                      isOff
+                        ? 'bg-slate-50 border-slate-200 text-slate-400'
                         : 'bg-blue-50/70 border-blue-200 text-blue-900 font-bold'
                     }`}
                   >

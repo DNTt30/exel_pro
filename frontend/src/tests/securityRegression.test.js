@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
-const hasEnv = Boolean(URL_ && KEY);
+const hasEnv = process.env.RUN_LIVE_SECURITY_TESTS === '1' && Boolean(URL_ && KEY);
 
 async function rowCountAfter(method, path, body) {
   await fetch(URL_ + '/rest/v1/' + path, {

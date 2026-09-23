@@ -8,7 +8,7 @@ export async function getFeedbacks(opts = {}) {
   const { data, error } = await q;
   if (error) {
     console.error('Lỗi lấy danh sách feedback:', error);
-    return [];
+    throw error;
   }
   return (data || []).map(f => ({
     id: f.id,
@@ -81,6 +81,16 @@ export async function updateFeedback(id, status, resolutionNote = '') {
   if (resolutionNote) updatePayload.resolution_note = resolutionNote;
   const { error } = await db().from('feedbacks').update(updatePayload).eq('id', id);
   if (error) throw error;
+}
+
+// Commit the resolution and optional corrected shift in one database transaction.
+export async function resolveFeedbackAtomic(id, status, resolutionNote = '', scheduleChange = null) {
+  const { data, error } = await db().rpc('resolve_feedback_atomic_v2', {
+    p_feedback_id: id, p_status: status, p_resolution_note: resolutionNote,
+    p_schedule: scheduleChange
+  });
+  if (error) throw error;
+  return data;
 }
 
 // Xóa Feedback

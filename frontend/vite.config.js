@@ -9,6 +9,6 @@ export default defineConfig({
   // Test chạy 1 worker: bộ test chỉ mất ~4s nhưng tránh OOM trên máy ít RAM trống
   test: {
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    maxWorkers: 1,
   },
 })

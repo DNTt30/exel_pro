@@ -6,6 +6,11 @@ import { createScheduleSlice } from '../store/slices/scheduleSlice';
 import { createShelfSlice } from '../store/slices/shelfSlice';
 import { createAuthSlice } from '../store/slices/authSlice';
 
+vi.mock('../lib/authSession', async (original) => ({
+  ...await original(), provisionAuthUser: vi.fn().mockResolvedValue({ ok: true })
+}));
+vi.mock('../utils/telegram', () => ({ notifyTelegram: vi.fn().mockResolvedValue(), telegramConfigured: () => false }));
+
 // Mock API layer
 vi.mock('../services/api', () => {
   let mockDb = {
@@ -140,6 +145,15 @@ vi.mock('../services/api', () => {
         fb.resolutionNote = resolutionNote;
       }
     }),
+    resolveFeedbackAtomic: vi.fn(async (id, status, resolutionNote, change) => {
+      const fb = mockDb.feedbacks.find(f => f.id === id);
+      if (!fb) throw new Error('FEEDBACK_NOT_FOUND');
+      Object.assign(fb,{status,resolutionNote});
+      if (!change) return null;
+      const shifts={...mockDb.schedules[change.week]?.[change.empId],[change.day]:change.shiftCode};
+      mockDb.schedules[change.week]={...mockDb.schedules[change.week],[change.empId]:shifts};
+      return {week_date:change.week,emp_id:change.empId,shifts,version:1};
+    }),
     deleteFeedback: vi.fn(async (id) => {
       mockDb.feedbacks = mockDb.feedbacks.filter(f => f.id !== id);
     }),
@@ -158,6 +172,19 @@ vi.mock('../services/api', () => {
     }),
     deleteShiftSwap: vi.fn(async (id) => {
       mockDb.shiftSwaps = mockDb.shiftSwaps.filter(s => s.id !== id);
+    }),
+    approveShiftSwap: vi.fn(async (id) => {
+      const swap = mockDb.shiftSwaps.find(s => s.id === id);
+      if (!swap) throw new Error('Missing swap fixture');
+      const schedules = mockDb.schedules[swap.week];
+      const a = schedules[swap.fromEmpId]; const b = schedules[swap.toEmpId];
+      [a[swap.fromDay], b[swap.fromDay]] = [b[swap.fromDay], a[swap.fromDay]];
+      if (swap.fromDay !== swap.toDay) [a[swap.toDay], b[swap.toDay]] = [b[swap.toDay], a[swap.toDay]];
+      swap.status = 'approved';
+      return true;
+    }),
+    deleteAttendanceCell: vi.fn(async (empId, workDate) => {
+      mockDb.attendance = mockDb.attendance.filter(row => row.empId !== empId || row.workDate !== workDate);
     }),
     // Attendance
     getAttendanceRange: vi.fn(async (_from, _to) => mockDb.attendance),
@@ -618,6 +645,7 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
         }]
       });
 
+      api._getDb().feedbacks = structuredClone(store.getState().feedbacks);
       await store.getState().resolveFeedback('fb_1', 'approved', 'Đồng ý bù công', {
         week: '2026-03-09',
         empId: '260512001',
@@ -696,7 +724,7 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
       store.setState({
         user: { id: '260512002', role: 'STFT', dept: 'VN0485' },
         shiftSwaps: [{
-          id: 'swap_1',
+          id: 'persisted-swap-1',
           store: 'VN0485',
           fromEmpId: '260512001',
           toEmpId: '260512002',
@@ -704,9 +732,9 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
         }]
       });
 
-      await store.getState().respondShiftSwap('swap_1', 'pending_manager', 'Tôi đồng ý đổi');
+      await store.getState().respondShiftSwap('persisted-swap-1', 'pending_manager', 'Tôi đồng ý đổi');
 
-      const swap = store.getState().shiftSwaps.find(s => s.id === 'swap_1');
+      const swap = store.getState().shiftSwaps.find(s => s.id === 'persisted-swap-1');
       expect(swap.status).toBe('pending_manager');
     });
 
@@ -721,7 +749,7 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
           }
         },
         shiftSwaps: [{
-          id: 'swap_1',
+          id: 'persisted-swap-1',
           week: WEEK,
           store: 'VN0485',
           fromEmpId: '260512001',
@@ -734,9 +762,11 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
         }]
       });
 
-      await store.getState().respondShiftSwap('swap_1', 'approved', 'SM đồng ý cho đổi ca');
+      api._getDb().shiftSwaps = structuredClone(store.getState().shiftSwaps);
+      api._getDb().schedules = structuredClone(store.getState().schedule);
+      await store.getState().respondShiftSwap('persisted-swap-1', 'approved', 'SM đồng ý cho đổi ca');
 
-      const swap = store.getState().shiftSwaps.find(s => s.id === 'swap_1');
+      const swap = store.getState().shiftSwaps.find(s => s.id === 'persisted-swap-1');
       expect(swap.status).toBe('approved');
 
       // Ca làm việc đã được tự động hoán đổi!
@@ -751,15 +781,15 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
       store.setState({
         user: { id: '260512001', role: 'STFT', dept: 'VN0485' },
         shiftSwaps: [{
-          id: 'swap_c',
+          id: 'persisted-swap-c',
           fromEmpId: '260512001',
           toEmpId: '260512002',
           status: 'pending_partner'
         }]
       });
 
-      await store.getState().respondShiftSwap('swap_c', 'cancelled', 'Người tạo hủy');
-      const swap = store.getState().shiftSwaps.find(s => s.id === 'swap_c');
+      await store.getState().respondShiftSwap('persisted-swap-c', 'cancelled', 'Người tạo hủy');
+      const swap = store.getState().shiftSwaps.find(s => s.id === 'persisted-swap-c');
       expect(swap.status).toBe('cancelled');
     });
 
@@ -767,14 +797,14 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
       store.setState({
         user: { id: '260512999', role: 'STFT', dept: 'VN0485' },
         shiftSwaps: [{
-          id: 'swap_c',
+          id: 'persisted-swap-c',
           fromEmpId: '260512001',
           toEmpId: '260512002',
           status: 'pending_partner'
         }]
       });
 
-      await expect(store.getState().respondShiftSwap('swap_c', 'cancelled', 'Hacker hủy'))
+      await expect(store.getState().respondShiftSwap('persisted-swap-c', 'cancelled', 'Hacker hủy'))
         .rejects.toThrow(/Chỉ người tạo yêu cầu hoặc Quản lý mới có quyền hủy đơn đổi ca/);
     });
 

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const hasEnv = Boolean(URL_ && KEY);
+const hasEnv = process.env.RUN_LIVE_SECURITY_TESTS === '1' && Boolean(URL_ && KEY);
 
 async function anonProbe(table) {
   // PostgREST trả 200 + mảng RỖNG khi RLS chặn SELECT → phải đếm dòng, không nhìn status
@@ -39,11 +39,9 @@ const mode = hasEnv ? await (async () => {
   } catch { return 'UNKNOWN'; }
 })() : 'NO-ENV';
 
-if (!hasEnv) {
-  console.warn('CẢNH BÁO: Thiếu biến môi trường (VITE_SUPABASE_URL), test bảo mật sẽ CHẮC CHẮN FAIL.');
-}
 
-describe('RLS security - chế độ: ', () => {
+
+describe.skipIf(!hasEnv)('RLS security - chế độ: ', () => {
   it('phát hiện đúng chế độ OPEN/STRICT', () => {
     expect(['OPEN', 'STRICT']).toContain(mode);
   });
@@ -53,7 +51,7 @@ describe('RLS security - chế độ: ', () => {
     expect(p.status !== 200 || p.rows === 0).toBe(true);
   });
 
-  it.runIf(mode === 'STRICT')('T2 · STRICT: anon KHÔNG ghi được schedules', async () => {
+  it.runIf(mode === 'STRICT' && process.env.RUN_RLS_WRITE_PROBE === '1')('T2 · STRICT: anon KHÔNG ghi được schedules', async () => {
     // Payload vô hại: khóa trùng lặp sẽ bị từ chối bởi RLS TRƯỚC khi tới unique
     const st = await anonInsert('schedules', { emp_id: '__rls_probe__', week_date: '1970-01-05' });
     expect([401, 403]).toContain(st);

@@ -20,7 +20,8 @@ function dayCell(getDayValue, getActualValue, empId, day) {
     return String(act).trim().toUpperCase(); // AL / PL / UL / NS...
   }
   const sched = getDayValue(empId, day);
-  if (!sched || sched === 'OFF' || sched === '-') return 'OFF';
+  if (!sched || sched === '-') return '';
+  if (sched === 'OFF') return 'OFF';
   const num = parseFloat(String(sched).replace(',', '.'));
   if (!isNaN(num)) return num;
   return String(sched).toUpperCase();

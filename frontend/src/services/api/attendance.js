@@ -12,8 +12,14 @@ export async function getAttendanceRange(fromDate, toDate) {
     .select('emp_id,work_date,actual_hours,note')
     .gte('work_date', fromDate)
     .lte('work_date', toDate);
-  if (error) { console.error('Lỗi tải công thực tế:', error); return []; }
+  if (error) throw error;
   return (data || []).map(mapRow).filter(Boolean);
+}
+
+/** Removing an override is different from recording zero worked hours. */
+export async function deleteAttendanceCell(empId, workDate) {
+  const { error } = await db().from('attendance').delete().eq('emp_id', empId).eq('work_date', workDate);
+  if (error) throw error;
 }
 
 /** Upsert hàng loạt (bulk) công thực tế */

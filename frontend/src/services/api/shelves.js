@@ -1,9 +1,5 @@
 import { db } from './client';
 
-function isMissingTable(message) {
-  return /does not exist|schema cache|relation/i.test(message || '');
-}
-
 function mapShelf(row) {
   if (!row) return null;
   return {
@@ -42,14 +38,13 @@ export async function getShelves(opts = {}) {
     else if (opts.storeId) q = q.eq('store_id', opts.storeId);
     const { data, error } = await q;
     if (error) {
-      if (isMissingTable(error.message)) return [];
       console.error('Lỗi lấy kệ:', error);
-      return [];
+      throw error;
     }
     return (data || []).map(mapShelf);
   } catch (err) {
     console.error('Lỗi lấy kệ:', err);
-    return [];
+    throw err;
   }
 }
 
@@ -61,14 +56,13 @@ export async function getShelfItems(opts = {}) {
     else if (opts.shelfIds?.length) q = q.in('shelf_id', opts.shelfIds);
     const { data, error } = await q;
     if (error) {
-      if (isMissingTable(error.message)) return [];
       console.error('Lỗi lấy hàng kệ:', error);
-      return [];
+      throw error;
     }
     return (data || []).map(mapShelfItem);
   } catch (err) {
     console.error('Lỗi lấy hàng kệ:', err);
-    return [];
+    throw err;
   }
 }
 

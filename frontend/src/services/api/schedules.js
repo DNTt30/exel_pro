@@ -1,20 +1,21 @@
 import { db } from './client';
+import { scheduleVersion, withScheduleVersion } from '../../utils/scheduleVersion';
 
 // Lấy lịch làm việc của 1 tuần
 export async function getSchedulesByWeek(weekDate, opts = {}) {
   if (opts.empIds && opts.empIds.length === 0) return {};
-  let q = db().from('schedules').select('emp_id,shifts').eq('week_date', weekDate);
+  let q = db().from('schedules').select('emp_id,shifts,version').eq('week_date', weekDate);
   if (opts.empId) q = q.eq('emp_id', opts.empId);
   else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
   const { data, error } = await q;
   if (error) {
     console.error('Lỗi lấy lịch làm việc:', error);
-    return {};
+    throw error;
   }
   
   const scheduleMap = {};
   (data || []).forEach(row => {
-    scheduleMap[row.emp_id] = row.shifts || {};
+    scheduleMap[row.emp_id] = withScheduleVersion(row.shifts || {}, row.version);
   });
   return scheduleMap;
 }
@@ -25,14 +26,14 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
   if (uniqueWeeks.length === 0) return {};
   if (opts.empIds && opts.empIds.length === 0) return {};
 
-  let q = db().from('schedules').select('week_date,emp_id,shifts').in('week_date', uniqueWeeks);
+  let q = db().from('schedules').select('week_date,emp_id,shifts,version').in('week_date', uniqueWeeks);
   if (opts.empId) q = q.eq('emp_id', opts.empId);
   else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
 
   const { data, error } = await q;
   if (error) {
     console.error('Lỗi lấy lịch làm việc theo nhiều tuần:', error);
-    return {};
+    throw error;
   }
 
   const result = {};
@@ -42,7 +43,7 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
 
   (data || []).forEach(row => {
     if (!result[row.week_date]) result[row.week_date] = {};
-    result[row.week_date][row.emp_id] = row.shifts || {};
+    result[row.week_date][row.emp_id] = withScheduleVersion(row.shifts || {}, row.version);
   });
 
   return result;
@@ -55,13 +56,16 @@ export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
     p_week_date: weekDate,
     p_emp_id: empId,
     p_shifts: shifts,
-    p_expect_version: opts.expectVersion ?? null
+    p_expect_version: opts.expectVersion ?? scheduleVersion(shifts)
   });
 
-  if (!rpcErr) return rpcVer;
+  if (!rpcErr) {
+    withScheduleVersion(shifts, rpcVer);
+    return rpcVer;
+  }
 
   const msg = String(rpcErr.message || '');
-  if (/40001|CONFLICT/i.test(msg)) {
+  if (rpcErr.code === '40001' || /40001|CONFLICT/i.test(msg)) {
     const err = new Error(msg);
     err.code = 'CONFLICT';
     throw err;
@@ -81,16 +85,19 @@ export async function saveBulkEmployeeSchedules(weekDate, scheduleMap, opts = {}
     week_date: weekDate,
     emp_id: empId,
     shifts,
-    expect_version: opts.expectVersions?.[empId] ?? null
+    expect_version: opts.expectVersions?.[empId] ?? scheduleVersion(shifts)
   }));
 
   if (payload.length === 0) return;
 
   const { data, error } = await db().rpc('upsert_schedules_bulk', { p_rows: payload });
-  if (!error) return data;
+  if (!error) {
+    (data || []).forEach(row => withScheduleVersion(scheduleMap[row.o_emp_id], row.o_version));
+    return data;
+  }
 
   const msg = String(error.message || '');
-  if (/40001|CONFLICT/i.test(msg)) {
+  if (error.code === '40001' || /40001|CONFLICT/i.test(msg)) {
     const err = new Error(msg);
     err.code = 'CONFLICT';
     throw err;

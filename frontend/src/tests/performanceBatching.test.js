@@ -32,6 +32,7 @@ describe('Performance & Concurrency Optimizations', () => {
       get = vi.fn(() => state);
 
       slice = createScheduleSlice(set, get);
+      state = { ...slice, ...state };
     });
 
     it('ensureWeeksLoaded batches missing weeks into a single API call', async () => {

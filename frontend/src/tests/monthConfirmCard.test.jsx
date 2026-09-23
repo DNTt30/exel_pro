@@ -1,10 +1,16 @@
 // @vitest-environment happy-dom
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import MonthConfirmCard from '../components/employee/MonthConfirmCard';
 import { useStore } from '../store/useStore';
+
+vi.mock('../services/api', () => ({
+  getSchedulesByWeeks: vi.fn().mockResolvedValue({}),
+  getAttendanceRange: vi.fn().mockResolvedValue([])
+}));
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('MonthConfirmCard stability test', () => {
   it('does not cause React 19 getSnapshot infinite loop (Error #185)', async () => {

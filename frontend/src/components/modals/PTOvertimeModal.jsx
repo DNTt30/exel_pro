@@ -22,7 +22,7 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
   );
 
   React.useEffect(() => {
-    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
+    ensureWeeksLoaded(cycleDates.map(d => d.weekKey)).catch(console.error);
   }, [cycleDates, ensureWeeksLoaded]);
 
   // Format ca: 14-22 -> 14:00-22:00

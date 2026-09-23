@@ -1,6 +1,6 @@
 // Guards phân quyền & khóa tuần — hàm thuần nhận `state`, tách khỏi store để kiểm thử trực tiếp.
 import { weekRecordKey, isWeekLocked } from '../utils/scheduleWeek';
-import { isOpsManager, isBuiltinStoreManager, getUserDepts } from '../lib/authSession';
+import { isOpsManager, isBuiltinStoreManager, isAreaManagerFromEmp, getUserDepts } from '../lib/authSession';
 
 export function userIsManager(user) {
   return isOpsManager(user);
@@ -24,10 +24,11 @@ export function assertCanEditShift(state, empId, weekDate) {
   const emp = (state.employees || []).find(e => e.id === empId);
   const myDepts = getUserDepts(user);
   const targetDept = emp?.dept || myDepts[0] || '';
-  assertWeekEditable(state, targetDept, weekDate);
-  if (user.role === 'admin') return;
+  const targetDepts = getUserDepts({ dept: targetDept });
+  targetDepts.forEach(dept => assertWeekEditable(state, dept, weekDate));
+  if (user.role === 'admin' || isAreaManagerFromEmp(user)) return;
   if (userIsManager(user)) {
-    if (emp && emp.dept && myDepts.length > 0 && !myDepts.includes(emp.dept) && empId !== user.id) {
+    if (emp && emp.dept && !targetDepts.some(dept => myDepts.includes(dept)) && empId !== user.id) {
       throw new Error('Không có quyền sửa lịch cửa hàng khác');
     }
     return;
@@ -65,9 +66,9 @@ export function assertCanManageEmpInDept(state, empDept) {
   assertCanManageStaff(state);
   const user = state.user;
   if (!user) throw new Error('Chưa đăng nhập');
-  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+  if (user.role === 'admin' || isBuiltinStoreManager(user) || isAreaManagerFromEmp(user)) return;
   const myDepts = getUserDepts(user);
-  if (empDept && myDepts.length > 0 && !myDepts.includes(empDept)) {
+  if (empDept && !getUserDepts({ dept: empDept }).some(dept => myDepts.includes(dept))) {
     throw new Error('Nhân viên không thuộc cửa hàng quản lý');
   }
 }
@@ -80,7 +81,7 @@ export function assertCanResolveFeedback(state, feedbackDept) {
   assertCanManageStaff(state);
   const user = state.user;
   if (!user) throw new Error('Chưa đăng nhập');
-  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+  if (user.role === 'admin' || isBuiltinStoreManager(user) || isAreaManagerFromEmp(user)) return;
   const myDepts = getUserDepts(user);
   if (feedbackDept && myDepts.length > 0 && !myDepts.includes(feedbackDept)) {
     throw new Error('Không có quyền duyệt phản hồi của cửa hàng khác');
@@ -95,7 +96,7 @@ export function assertCanResolveFeedback(state, feedbackDept) {
 export function assertCanRespondShiftSwap(state, swap, newStatus) {
   const user = state.user;
   if (!user) throw new Error('Chưa đăng nhập');
-  if (user.role === 'admin' || isBuiltinStoreManager(user)) return;
+  if (user.role === 'admin' || isBuiltinStoreManager(user) || isAreaManagerFromEmp(user)) return;
 
   if (newStatus === 'approved' || newStatus === 'rejected') {
     assertCanManageStaff(state);

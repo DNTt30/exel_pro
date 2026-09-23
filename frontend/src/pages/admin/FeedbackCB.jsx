@@ -46,7 +46,7 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek, user })
         shiftCode: newShift
       };
     }
-    resolveFeedback(fb.id, action, resolutionNote, shiftData);
+    void resolveFeedback(fb.id, action, resolutionNote, shiftData).catch(() => {});
   };
 
   return (

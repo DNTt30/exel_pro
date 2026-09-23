@@ -1,6 +1,7 @@
 import React, { memo, useState, useEffect } from 'react';
 import { SHIFTS } from '../data/initialData';
-import { getRoleBadgeInfo, SCHEDULE_RULES, NIGHT_SHIFT_MULTIPLIER, DEFAULT_PT_HOURLY_RATE } from '../data/constants';
+import { getRoleBadgeInfo, SCHEDULE_RULES, DEFAULT_PT_HOURLY_RATE } from '../data/constants';
+import { timesheetHours } from '../utils/timesheetValues';
 import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
 
 /**
@@ -144,27 +145,9 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       const act = getActualValue(emp.id, day);
       if (act !== null && act !== undefined && act !== '') val = String(act);
     }
-    if (val && val !== 'OFF' && val !== 'off') {
-      const normalizedVal = String(val).trim().replace(',', '.');
-      const parsed = parseFloat(normalizedVal);
-      let num = 0;
-      if (!isNaN(parsed)) {
-        num = parsed;
-      } else {
-        const u = String(val).trim().toUpperCase();
-        if (u === 'AL' || u === 'PL') num = 8;
-        else if (u === 'AL_H' || u === 'PL_H') num = 4;
-      }
-      
-      if (num > 0) {
-        // Phụ cấp ca đêm (x1.3)
-        const isNight = String(val).includes('22-6');
-        const effectiveHours = isNight ? num * NIGHT_SHIFT_MULTIPLIER : num;
-
-        if (isPT) totalPT += effectiveHours;
-        else totalFT += effectiveHours;
-      }
-    }
+    const hours = timesheetHours(val);
+    if (isPT) totalPT += hours;
+    else totalFT += hours;
   });
 
   totalPT = Math.round(totalPT * 100) / 100;
@@ -200,7 +183,8 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
       {/* 31 Ngày */}
       {activeDays.map(day => {
         const val = getDayValue(emp.id, day);
-        const isOff = !val || val === 'OFF' || val === 'off' || val === '-';
+        const isEmpty = !val || val === '-';
+        const isOff = val === 'OFF' || val === 'off';
         
         let badgeStyle = { backgroundColor: '#ffffff', color: '#94a3b8' };
         if (!isOff) {
@@ -243,14 +227,14 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
               actNum === 0 ? (
                 <span 
                   className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300 leading-tight" 
-                  title={`Công thực tế: 0h (Lịch xếp: ${val || 'OFF'})`}
+                  title={`Công thực tế: 0h (Lịch xếp: ${val || 'Chưa xếp ca'})`}
                 >
                   0
                 </span>
               ) : (
                 <span 
                   className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 leading-tight" 
-                  title={`Công thực tế: ${actNum}h (Lịch xếp: ${val || 'OFF'})`}
+                  title={`Công thực tế: ${actNum}h (Lịch xếp: ${val || 'Chưa xếp ca'})`}
                 >
                   {actNum}
                 </span>
@@ -258,19 +242,21 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
             ) : actStr === 'OFF' ? (
               <span 
                 className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 leading-tight" 
-                title={`Chấm nghỉ (OFF). Lịch xếp: ${val || 'OFF'}`}
+                title={`Chấm nghỉ (OFF). Lịch xếp: ${val || 'Chưa xếp ca'}`}
               >
                 OFF
               </span>
             ) : actStr !== '' ? (
               <span 
                 className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 leading-tight" 
-                title={`Mã công: ${actStr} (Lịch xếp: ${val || 'OFF'})`}
+                title={`Mã công: ${actStr} (Lịch xếp: ${val || 'Chưa xếp ca'})`}
               >
                 {actStr}
               </span>
+            ) : isEmpty ? (
+              <span className="text-slate-300" title="Chưa xếp ca">—</span>
             ) : isOff ? (
-              <span className="text-slate-300 text-[11px] block py-1" title="Lịch xếp: OFF">-</span>
+              <span className="text-slate-300 text-[11px] block py-1" title="Lịch xếp: OFF">OFF</span>
             ) : (
               <span 
                 className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold truncate leading-tight shadow-2xs"

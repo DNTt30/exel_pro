@@ -7,11 +7,13 @@ import { sessionUserFromEmp } from './authSlice';
 export const createEmployeeSlice = (set, get) => ({
   employees: [],
   addEmployee: async (emp) => {
+    const epoch = get()._sessionEpoch;
     assertCanManageEmpInDept(get(), emp.dept);
     const [, provisioned] = await Promise.all([
       api.addEmployee(emp),
       provisionAuthUser(emp),
     ]);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({ employees: [...state.employees, emp] }));
     get().appendAdminLog('CREATE_EMPLOYEE', emp.id, `${emp.name} · ${emp.dept} · ${emp.role || emp.type}`, {
       resourceType: 'employee',
@@ -30,15 +32,17 @@ export const createEmployeeSlice = (set, get) => ({
     return { ok: true };
   },
   updateEmployee: async (id, updates) => {
+    const epoch = get()._sessionEpoch;
     const prev = get().employees.find(e => e.id === id) || {};
     assertCanManageEmpInDept(get(), updates.dept || prev.dept);
     await api.updateEmployeeInfo(id, updates);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => {
       const employees = state.employees.map(e => e.id === id ? { ...e, ...updates } : e);
       let user = state.user;
       if (user && user.id === id && user.role !== 'admin') {
         const emp = employees.find(e => e.id === id);
-        if (emp) user = sessionUserFromEmp(emp);
+        if (emp) user = { ...user, ...sessionUserFromEmp(emp) };
       }
       return { employees, user };
     });
@@ -55,9 +59,11 @@ export const createEmployeeSlice = (set, get) => ({
     });
   },
   deleteEmployee: async (id) => {
+    const epoch = get()._sessionEpoch;
     const prev = get().employees.find(e => e.id === id) || { id };
     assertCanManageEmpInDept(get(), prev.dept);
     await api.deleteEmployeeData(id);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
       employees: state.employees.filter(e => e.id !== id)
     }));

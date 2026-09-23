@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
@@ -8,16 +8,17 @@ import { toast } from '../../components/ui/toastStore';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { downloadPayrollXlsx } from '../../utils/exportPayroll';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateHelper';
-import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { useTimesheetValues } from '../../hooks/useTimesheetValues';
+import { movePayrollCycle } from '../../utils/timesheetValues';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
 const ImportAttendanceModal = React.lazy(() => import('../../components/modals/ImportAttendanceModal'));
 
 export default function Timesheet() {
-  const { user, currentWeek, schedule, employees, ensureWeeksLoaded, setCurrentWeek } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, schedule: s.schedule, employees: s.employees, ensureWeeksLoaded: s.ensureWeeksLoaded, setCurrentWeek: s.setCurrentWeek })));
+  const { user, currentWeek, employees } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, employees: s.employees })));
   const attendance = useStore((s) => s.attendance);
-  const loadAttendanceRange = useStore((s) => s.loadAttendanceRange);
+  const schedule = useStore((s) => s.schedule);
   const saveAttendanceCell = useStore((s) => s.saveAttendanceCell);
 
   // Chế độ sửa CÔNG THỰC TẾ (nhập số giờ từ ezHR)
@@ -31,49 +32,15 @@ export default function Timesheet() {
   // Nhan/xuat theo CH dang chon (Toolbar da gioi han pham vi sm_id)
   const effDept = pickStore ? filterDept : (filterDept || user?.dept);
 
-  const payrollCycle = useMemo(() => getPayrollCycleFromWeek(currentWeek), [currentWeek]);
+  const [payrollCycle, setPayrollCycle] = useState(() => getPayrollCycleFromWeek(currentWeek));
   const cycleDates = useMemo(
     () => getPayrollCycleDates(payrollCycle.year, payrollCycle.month),
     [payrollCycle]
   );
   const activeDays = useMemo(() => cycleDates.map(d => d.key), [cycleDates]);
 
-  useEffect(() => {
-    ensureWeeksLoaded(cycleDates.map(d => d.weekKey));
-  }, [cycleDates, ensureWeeksLoaded]);
-
-  // Tải công thực tế của cả chu kỳ (26 tháng trước -> 25)
-  useEffect(() => {
-    if (cycleDates.length >= 2) {
-      loadAttendanceRange(cycleDates[0].fullDateStr, cycleDates[cycleDates.length - 1].fullDateStr);
-    }
-  }, [cycleDates, loadAttendanceRange]);
-
   const groupedEmps = useGroupedEmployees(search, filterDept, filterRole);
-
-  // useCallback giữ tham chiếu ổn định để TimesheetRow (memo) bỏ qua render thừa
-  const getDayValue = useCallback((empId, day) => {
-    const cell = cycleDates.find(d => d.key === day);
-    if (!cell) return '';
-    const raw = schedule[cell.weekKey]?.[empId]?.[cell.dayKey];
-    const code = getShiftCode(raw);
-    if (!code || code === 'off') return 'OFF';
-    const hours = getShiftHours(code);
-    return hours > 0 ? String(hours) : code;
-  }, [cycleDates, schedule]);
-
-  // Đọc công thực tế: ưu tiên MÃ (AL/PL/UL/OFF), không thì số giờ; '' khi chưa có override
-  const getActualValue = useCallback((empId, day) => {
-    const cell = cycleDates.find(d => d.key === day);
-    if (!cell) return '';
-    const rec = attendance[cell.fullDateStr ? empId + '|' + cell.fullDateStr : ''];
-    if (!rec) return '';
-    if (rec.note && rec.note.trim() !== '') return rec.note.trim().toUpperCase();
-    if (rec.actualHours !== null && rec.actualHours !== undefined && !isNaN(rec.actualHours)) {
-      return String(rec.actualHours);
-    }
-    return '';
-  }, [cycleDates, attendance]);
+  const { getDayValue, getActualValue, getEffectiveValue } = useTimesheetValues(cycleDates);
 
   const handleActualChange = useCallback(async (empId, day, raw) => {
     const cell = cycleDates.find(d => d.key === day);
@@ -106,17 +73,8 @@ export default function Timesheet() {
     }
   }, [cycleDates, saveAttendanceCell, user?.id]);
 
-  const handlePrevMonth = () => {
-    const parts = currentWeek.split('-');
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 2, parseInt(parts[2], 10));
-    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-  };
-
-  const handleNextMonth = () => {
-    const parts = currentWeek.split('-');
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
-    setCurrentWeek(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-  };
+  const handlePrevMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, -1));
+  const handleNextMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, 1));
 
   const overrideCount = Object.keys(attendance).filter(k => attendance[k] && attendance[k].actualHours > 0).length;
 
@@ -160,7 +118,7 @@ export default function Timesheet() {
                   currentWeek,
                   deptName: effDept === 'ALL' ? 'Toan_Bo_Cua_Hang' : effDept,
                   groupedEmps,
-                  getDayValue,
+                  getDayValue: getEffectiveValue,
                   activeDays,
                   filterOnlyMe: false,
                   currentUserId: user?.id,
@@ -193,7 +151,7 @@ export default function Timesheet() {
                 onClick={() => downloadPayrollXlsx({
                   cycleDates,
                   groupedEmps,
-                  getDayValue,
+                  getDayValue: getEffectiveValue,
                   getActualValue
                 }, `OFC_CongLuong_Thang_${payrollCycle.month}_${payrollCycle.year}.xlsx`)}
                 className="text-xs py-1.5 px-3 rounded-lg font-bold border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 transition-colors cursor-pointer"

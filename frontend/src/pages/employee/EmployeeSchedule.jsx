@@ -127,7 +127,7 @@ export default function EmployeeSchedule() {
     }
     setSaveStatus('saving');
     const valToSave = value === 'off' ? 'off' : { shift: value, confirmed: false, registered: true };
-    await updateShift(currentWeek, user.id, day, valToSave);
+    try { await updateShift(currentWeek, user.id, day, valToSave); } catch { setSaveStatus('error'); return; }
     setTimeout(() => setSaveStatus('saved'), 400);
   }, [currentWeek, updateShift, user?.id, isFutureWeek, isDeadlineExpired, isDraft, deadlineInfo?.formattedDeadline]);
 
@@ -157,7 +157,7 @@ export default function EmployeeSchedule() {
         shiftsMap[day] = { shift: shiftCode, confirmed: false, registered: true };
       }
     }
-    await updateEmployeeWeeklyShifts(currentWeek, user.id, shiftsMap);
+    try { await updateEmployeeWeeklyShifts(currentWeek, user.id, shiftsMap); } catch { setSaveStatus('error'); return; }
     setTimeout(() => setSaveStatus('saved'), 400);
   };
 
@@ -178,9 +178,9 @@ export default function EmployeeSchedule() {
     setSaveStatus('saving');
     const formatted = {};
     Object.entries(suggestedShifts || {}).forEach(([d, code]) => {
-      formatted[d] = (code === 'off' || !code) ? 'off' : { shift: code, confirmed: false, registered: true };
+      formatted[d] = !code ? '' : code === 'off' ? 'off' : { shift: code, confirmed: false, registered: true };
     });
-    await updateEmployeeWeeklyShifts(currentWeek, user.id, formatted);
+    try { await updateEmployeeWeeklyShifts(currentWeek, user.id, formatted); } catch { setSaveStatus('error'); return; }
     setTimeout(() => setSaveStatus('saved'), 400);
     toast.success('Đã áp dụng lịch gợi ý thành công!');
   };
@@ -660,7 +660,7 @@ export default function EmployeeSchedule() {
                   <div className="text-xs font-bold text-blue-800 uppercase mb-0.5">Ca làm hôm nay</div>
                   <div className="text-sm font-bold text-slate-700">
                     {!todayCard || todayCard.isOff
-                      ? <span className="text-slate-500">Chưa xếp ca / OFF</span>
+                      ? <span className="text-slate-500">{todayCard?.shift === 'off' ? 'Nghỉ (OFF)' : 'Chưa xếp ca'}</span>
                       : <span className="text-blue-700">{todayCard.shift}</span>}
                   </div>
                   {todayCard?.isSupport && (

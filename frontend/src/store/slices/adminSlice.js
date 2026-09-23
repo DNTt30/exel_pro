@@ -12,6 +12,7 @@ export const createAdminSlice = (set, get) => ({
   stores: [],
 
   loadAdminLogs: async () => {
+    const epoch = get()._sessionEpoch;
     if (!userIsManager(get().user)) return [];
     const user = get().user;
     const opts = canPickStore(user) || !user?.dept ? {} : { storeId: user.dept };
@@ -21,6 +22,7 @@ export const createAdminSlice = (set, get) => ({
       api.getAiConversations(opts),
       api.getAdminLogs()
     ]);
+    if (epoch !== get()._sessionEpoch) return;
     set({
       activityLogs: activity,
       auditLogs: audit,
@@ -39,6 +41,7 @@ export const createAdminSlice = (set, get) => ({
   },
 
   appendAdminLog: async (action, target = '', detail = '', extra = {}) => {
+    const epoch = get()._sessionEpoch;
     try {
       const user = get().user;
       const meta = clientMeta();
@@ -81,6 +84,7 @@ export const createAdminSlice = (set, get) => ({
           detail: description
         }).catch(() => null)
       ]);
+      if (epoch !== get()._sessionEpoch) return;
       set(state => ({
         activityLogs: savedActivity ? [savedActivity, ...(state.activityLogs || [])].slice(0, 300) : state.activityLogs,
         auditLogs: savedAudit ? [savedAudit, ...(state.auditLogs || [])].slice(0, 300) : state.auditLogs,
@@ -98,6 +102,7 @@ export const createAdminSlice = (set, get) => ({
   },
 
   logAiTurn: async (payload) => {
+    const epoch = get()._sessionEpoch;
     const user = get().user;
     const saved = await api.addAiConversation({
       conversationId: payload.conversationId || `ai_${user?.id || 'anon'}`,
@@ -111,11 +116,13 @@ export const createAdminSlice = (set, get) => ({
       contextUsed: capJson(payload.contextUsed),
       error: payload.error || null
     });
+    if (epoch !== get()._sessionEpoch) return saved;
     if (saved) set(state => ({ aiConversations: [saved, ...(state.aiConversations || [])].slice(0, 200) }));
     return saved;
   },
 
   addStore: async (store) => {
+    const epoch = get()._sessionEpoch;
     assertCanManageStore(get());
     const payload = {
       ...store,
@@ -123,6 +130,7 @@ export const createAdminSlice = (set, get) => ({
       demand: normalizeStoreDemand(store.demand)
     };
     await api.addStore(payload);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({ stores: [...state.stores, payload] }));
     get().appendAdminLog('CREATE_STORE', payload.id, payload.name, {
       resourceType: 'store',
@@ -134,12 +142,14 @@ export const createAdminSlice = (set, get) => ({
     });
   },
   updateStore: async (id, updates) => {
+    const epoch = get()._sessionEpoch;
     assertCanManageStaff(get());
     const prev = get().stores.find(s => s.id === id) || { id };
     const payload = { ...updates };
     if (payload.staffing) payload.staffing = normalizeStaffingConfig(payload.staffing);
     if (payload.demand) payload.demand = normalizeStoreDemand(payload.demand);
     await api.updateStore(id, payload);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
       stores: state.stores.map(s => s.id === id ? { ...s, ...payload } : s)
     }));
@@ -157,9 +167,11 @@ export const createAdminSlice = (set, get) => ({
     });
   },
   deleteStore: async (id) => {
+    const epoch = get()._sessionEpoch;
     assertCanManageStore(get());
     const prev = get().stores.find(s => s.id === id) || { id };
     await api.deleteStore(id);
+    if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
       stores: state.stores.filter(s => s.id !== id)
     }));

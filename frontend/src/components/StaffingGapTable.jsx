@@ -2,50 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Users, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { WEEK_DAYS, getStaffingMatrix, normalizeStaffingConfig } from '../data/constants';
 import { calculateStaffingGap } from '../utils/shiftHelper';
-import { findAvailableStaffForDeficit } from '../utils/shiftSuggestionHelper';
+import { rankGapCandidates, requiredDecisionWeeks } from '../utils/aiDecisionEngine';
+import ConfirmModal from './modals/ConfirmModal';
 import { useStore } from '../store/useStore';
 import StaffingMatrixFields from './StaffingMatrixFields';
 import { isOpsManager } from '../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../components/ui/toastStore';
-import { jevDecide, readChoice } from '../services/api/jevClient';
+import { suggestGapCandidates, inviteGapCandidate, telegramConfigured } from '../services/api';
 
 export default function StaffingGapTable({ employees, weekSchedule, filterDept }) {
-  const { stores, user, updateStore, updateShift, currentWeek } = useStore(useShallow((s) => ({ stores: s.stores, user: s.user, updateStore: s.updateStore, updateShift: s.updateShift, currentWeek: s.currentWeek })));
+  const { stores, user, updateStore, updateShift, currentWeek, schedule } = useStore(useShallow((s) => ({ schedule: s.schedule, stores: s.stores, user: s.user, updateStore: s.updateStore, updateShift: s.updateShift, currentWeek: s.currentWeek })));
   const isAdmin = isOpsManager(user);
 
-  const [jevLoading, setJevLoading] = useState({});
+  const [jevLoading, setJevLoading] = useState('');
   const [jevResults, setJevResults] = useState({});
-
-  const callJevForGap = async (shiftCode, candidates) => {
-    setJevLoading(prev => ({ ...prev, [shiftCode]: true }));
-    try {
-      const state = {
-        gap: { day: selectedDay, shift: shiftCode, store: storeId },
-        candidates: candidates.map(c => ({
-          id: c.emp.id,
-          name: c.emp.name,
-          type: c.emp.type,
-          weeklyHours: c.currentWeeklyHours,
-          isLocal: c.isLocal,
-          registered: c.hasRegisteredThisShift
-        }))
-      };
-      const answers = await jevDecide('staffing_gap_triage', state);
-      if (answers) {
-        const choice = readChoice(answers, 'best_candidate');
-        if (choice) {
-          setJevResults(prev => ({ ...prev, [shiftCode]: choice }));
-          toast.success(`JEV System One đã đề xuất nhân sự cho ca ${shiftCode}!`);
-          setSuggestOpenShift(shiftCode); // Mở dropdown
-          return;
-        }
-      }
-      toast.error('JEV không đưa ra được lựa chọn phù hợp.');
-    } finally {
-      setJevLoading(prev => ({ ...prev, [shiftCode]: false }));
-    }
-  };
+  const [assignment, setAssignment] = useState(null);
+  const [sending, setSending] = useState(false);
 
   const dayDatesMap = useMemo(() => {
     if (!currentWeek) return {};
@@ -90,13 +63,46 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
   const gapData = calculateStaffingGap(employees, weekSchedule, selectedDay, storeId, requiredMatrix);
   const totalDeficits = Object.values(gapData).filter(d => d.gap < 0).length;
 
-  const handleAssignCandidate = (candidate, shiftCode) => {
-    if (!updateShift) return;
-    const isCovering = !candidate.isLocal;
-    const saveVal = isCovering ? { shift: shiftCode, covering_store: storeId } : shiftCode;
-    updateShift(currentWeek, candidate.emp.id, selectedDay, saveVal);
-    toast.success(`Đã gán ${candidate.emp.name} vào ca ${shiftCode} ngày ${selectedDay}${isCovering ? ` (chi viện tới ${storeId})` : ''}`);
-    setSuggestOpenShift(null);
+  const contextKey = JSON.stringify([currentWeek, selectedDay, storeId, schedule, employees]);
+  const gapContext = shift => ({ employees, schedule: { ...schedule, [currentWeek]: weekSchedule }, week: currentWeek, day: selectedDay, shift, storeId });
+  const callJevForGap = async shift => {
+    const key = contextKey, epoch = useStore.getState()._sessionEpoch;
+    setSuggestOpenShift(shift);
+    setJevLoading(key + shift);
+    try {
+      await useStore.getState().ensureWeeksLoaded(requiredDecisionWeeks(currentWeek));
+      if (epoch !== useStore.getState()._sessionEpoch) return;
+      const result = await suggestGapCandidates({ ...gapContext(shift), schedule: useStore.getState().schedule });
+      setJevResults({ key: JSON.stringify([currentWeek, selectedDay, storeId, useStore.getState().schedule, employees]), shift, ...result });
+    } catch { toast.info('Đang dùng danh sách kiểm tra cục bộ; chưa tải đủ lịch liên quan.'); }
+    finally { setJevLoading(''); }
+  };
+  const handleAssignCandidate = (candidate, shift) => setAssignment({ candidate, shift, week: currentWeek, day: selectedDay, store: storeId });
+  const confirmAssignment = async () => {
+    if (!assignment || sending) return;
+    setSending(true);
+    try {
+      const state = useStore.getState();
+      const current = rankGapCandidates({ employees: state.employees, schedule: state.schedule, week: assignment.week, day: assignment.day, shift: assignment.shift, storeId: assignment.store }).find(c => c.emp.id === assignment.candidate.emp.id);
+      if (!current) throw new Error('Lịch đã thay đổi; nhân viên không còn phù hợp.');
+      await updateShift(assignment.week, current.emp.id, assignment.day, current.isLocal ? assignment.shift : { shift: assignment.shift, covering_store: assignment.store });
+      toast.success('Đã lưu ca sau khi xác nhận nhân viên đồng ý.');
+      setAssignment(null);
+      setSuggestOpenShift(null);
+    } catch (error) { toast.error(error.message || 'Không lưu được ca'); }
+    finally { setSending(false); }
+  };
+  const invite = async (candidate, shift) => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const state = useStore.getState();
+      const current = rankGapCandidates({ ...gapContext(shift), schedule: state.schedule, employees: state.employees }).find(c => c.emp.id === candidate.emp.id);
+      if (!current) throw new Error('Lịch đã thay đổi. Hãy tìm lại ứng viên.');
+      await inviteGapCandidate({ candidate: current, storeId, week: currentWeek, day: selectedDay, shift });
+      toast.success('Đã gửi lời mời vào nhóm Telegram được cấu hình.');
+    } catch (error) { toast.error(error.message); }
+    finally { setSending(false); }
   };
 
   const handleSaveStaffing = async () => {
@@ -113,6 +119,8 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
   };
 
   return (
+    <>
+    <ConfirmModal isOpen={!!assignment} loading={sending} variant="info" onClose={() => !sending && setAssignment(null)} onConfirm={confirmAssignment} title="Xác nhận nhận ca" message={`${assignment?.candidate.emp.name || ''} đã đồng ý nhận ca ${assignment?.shift || ''}? ${assignment?.candidate.availability === 'off' ? 'Ca này sẽ thay thế ngày OFF.' : ''}`} confirmText={sending ? 'Đang lưu...' : 'Đã đồng ý · lưu ca'} />
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden print:hidden">
       <div
         onClick={() => setIsExpanded(!isExpanded)}
@@ -205,13 +213,10 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
             {Object.entries(gapData).map(([shiftCode, data]) => {
               const isDeficit = data.gap < 0;
               const isBalanced = data.gap === 0;
-              const candidates = isDeficit ? findAvailableStaffForDeficit({
-                dayKey: selectedDay,
-                shiftCode,
-                storeId,
-                employees,
-                weekSched: weekSchedule
-              }) : [];
+              const ranked = isDeficit ? rankGapCandidates(gapContext(shiftCode)) : [];
+              const suggestion = jevResults.key === contextKey && jevResults.shift === shiftCode ? jevResults : null;
+              const candidates = suggestion?.candidates || ranked;
+
 
               return (
                 <div
@@ -282,16 +287,16 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
 
                         <button
                           type="button"
-                          onClick={() => callJevForGap(shiftCode, candidates)}
-                          disabled={jevLoading[shiftCode] || candidates.length === 0}
+                          onClick={() => callJevForGap(shiftCode)}
+                          disabled={jevLoading === contextKey + shiftCode || candidates.length === 0}
                           className="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
                           title="Nhờ AI phân tích sâu để tìm người phù hợp nhất"
                         >
                           <Sparkles size={11} className="text-white" />
-                          <span>{jevLoading[shiftCode] ? 'JEV Đang nghĩ...' : 'Hỏi JEV'}</span>
+                          <span>{jevLoading === contextKey + shiftCode ? 'JEV Đang nghĩ...' : 'Tìm người thay thế'}</span>
                         </button>
 
-                        {candidates.length > 0 && !jevResults[shiftCode] && (
+                        {candidates.length > 0 && (
                           <button
                             type="button"
                             onClick={() => handleAssignCandidate(candidates[0], shiftCode)}
@@ -317,8 +322,8 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                             </p>
                           ) : (
                             <div className="max-h-44 overflow-y-auto space-y-1 divide-y divide-slate-100">
-                              {candidates.slice(0, 6).map((cand) => {
-                                const isJevChoice = jevResults[shiftCode] === cand.emp.id;
+                              {candidates.slice(0, 2).map((cand) => {
+                                const isJevChoice = suggestion?.source === 'jev' && suggestion.candidates[0]?.emp.id === cand.emp.id;
                                 return (
                                 <div key={cand.emp.id} className={`pt-1.5 flex items-center justify-between gap-1.5 ${isJevChoice ? 'bg-indigo-50 -mx-1 px-1 rounded border border-indigo-200' : ''}`}>
                                   <div className="min-w-0 flex-1">
@@ -339,11 +344,15 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
                                       <span className={cand.isLocal ? 'text-emerald-700 font-semibold' : 'text-blue-700 font-semibold'}>
                                         {cand.badge}
                                       </span>
-                                      <span>• Tuần: {cand.currentWeeklyHours}h</span>
+                                      <span>• Tuần: {cand.currentWeeklyHours}h → {cand.hoursAfterAssign}h</span>
+                                    </div>
+                                    <div className="text-[10px] text-amber-700">{[...new Set(cand.issues.map(i => i.message))].join(' · ')}
                                     </div>
                                   </div>
+                                  <button type="button" disabled={sending || !telegramConfigured()} onClick={() => invite(cand, shiftCode)} className="text-xs text-indigo-700 disabled:opacity-40" title="Gửi vào nhóm Telegram đã cấu hình">Mời Telegram</button>
                                   <button
                                     type="button"
+                                    disabled={sending}
                                     onClick={() => handleAssignCandidate(cand, shiftCode)}
                                     className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors shrink-0 shadow-2xs ${
                                       cand.isLocal
@@ -368,5 +377,6 @@ export default function StaffingGapTable({ employees, weekSchedule, filterDept }
         </div>
       )}
     </div>
+    </>
   );
 }

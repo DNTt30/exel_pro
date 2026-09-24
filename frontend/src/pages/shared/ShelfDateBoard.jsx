@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Trash2, Search, CalendarClock, Save, Eye, X, Pencil } from 'lucide-react';
+import ShelfTriagePanel from '../../components/shelves/ShelfTriagePanel';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { useStore } from '../../store/useStore';
 import { isOpsManager, canPickStore as canPickAnyStore } from '../../lib/authSession';
@@ -62,12 +63,12 @@ function ShelfDetailModal({ shelf, items, empName, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {items.map((it) => (
-                    <tr key={it.id || it.product_name}>
-                      <td className="px-3 py-2 font-medium text-slate-800">{it.product_name}</td>
+                    <tr key={it.id || it.productName}>
+                      <td className="px-3 py-2 font-medium text-slate-800">{it.productName}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{it.qty ?? '—'}</td>
                       <td className="px-3 py-2 text-center text-slate-600">
-                        {it.expiry_date
-                          ? new Date(it.expiry_date).toLocaleDateString('vi-VN')
+                        {it.expiryDate
+                          ? new Date(it.expiryDate).toLocaleDateString('vi-VN')
                           : '—'}
                       </td>
                       <td className="px-3 py-2 text-slate-500">{it.note || '—'}</td>
@@ -306,6 +307,7 @@ export default function ShelfDateBoard() {
         </div>
       )}
 
+      <ShelfTriagePanel shelves={storeShelves} items={shelfItems} />
       <ExpiryAlertBanner alerts={alerts} />
 
       <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-wrap gap-2 items-center">

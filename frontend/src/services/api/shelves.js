@@ -25,6 +25,7 @@ function mapShelfItem(row) {
     qty: row.qty == null ? '' : row.qty,
     expiryDate: row.expiry_date || '',
     expiryDate2: row.expiry_date_2 || '',
+    expiryTime: row.expiry_time || '', expiryTime2: row.expiry_time_2 || '', averageSalesPerHour: row.average_sales_per_hour ?? '', triagePolicy: row.triage_policy || {},
     note: row.note || '',
     updatedBy: row.updated_by || '',
     updatedAt: row.updated_at
@@ -117,15 +118,13 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
       qty: r.qty === '' || r.qty == null || isNaN(Number(r.qty)) ? null : Number(r.qty),
       expiry_date: r.expiryDate || null,
       expiry_date_2: r.expiryDate2 || null,
+      expiry_time: r.expiryTime || null,
+      expiry_time_2: r.expiryTime2 || null,
+      average_sales_per_hour: r.averageSalesPerHour === '' || r.averageSalesPerHour == null ? null : Number(r.averageSalesPerHour),
+      triage_policy: r.triagePolicy || {},
       note: r.note || '',
       updated_by: empId || null
     }));
-
-  if (!payload.length) {
-    const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
-    if (delErr) throw delErr;
-    return [];
-  }
 
   // 1. Thử gọi RPC atomic (BUG-02 fix)
   const { data: rpcData, error: rpcErr } = await db().rpc('replace_shelf_items_atomic', {
@@ -139,38 +138,6 @@ export async function replaceShelfItems(shelfId, storeId, rows, empId) {
     return (rpcData || []).map(mapShelfItem);
   }
 
-  // Nếu RPC chưa được tạo trong DB, lỗi sẽ chứa "function ... does not exist" -> Fallback về logic cũ
-  if (!rpcErr.message?.includes('function') && !rpcErr.message?.includes('does not exist')) {
-    throw rpcErr;
-  }
-
-  console.warn('RPC replace_shelf_items_atomic chưa có. Đang fallback về logic cũ.');
-
-  // 2. Fallback: backup dữ liệu cũ trước khi xóa để có thể phục hồi nếu insert thất bại
-  const { data: backup } = await db().from('shelf_items').select('*').eq('shelf_id', shelfId);
-
-  const { error: delErr } = await db().from('shelf_items').delete().eq('shelf_id', shelfId);
-  if (delErr) throw delErr;
-
-  const { data, error } = await db().from('shelf_items').insert(payload).select();
-  if (error) {
-    // Cố phục hồi dữ liệu cũ nếu insert thất bại
-    if (backup?.length) {
-      const restorePayload = backup.map(({ id: _id, ...rest }) => rest);
-      await db().from('shelf_items').insert(restorePayload).select();
-    }
-    if (/sku|expiry_date_2|schema cache|column/i.test(error.message || '')) {
-      const slim = payload.map(({ sku: _sku, expiry_date_2: _expiry_date2, ...rest }) => rest);
-      const retry = await db().from('shelf_items').insert(slim).select();
-      if (retry.error) throw retry.error;
-      return (retry.data || []).map((row, i) => mapShelfItem({
-        ...row,
-        sku: payload[i]?.sku || row.sku,
-        expiry_date_2: payload[i]?.expiry_date_2 || row.expiry_date_2
-      }));
-    }
-    throw error;
-  }
-  return (data || []).map(mapShelfItem);
+  // Never delete data as a fallback for a missing/misconfigured RPC.
+  throw rpcErr;
 }
-

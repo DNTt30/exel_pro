@@ -12,13 +12,14 @@ import { supabase } from '../../lib/supabase';
 const FN_URL = import.meta.env.VITE_JEV_FN_URL || '';
 const CLIENT_TIMEOUT_MS = 2500; // > timeout phia server (2000ms) mot chut
 
-// Bat/tat tung use case ma khong can deploy lai. Mac dinh TAT HET.
+// Build-time feature flags. Rebuild the frontend after changing them.
 // Chi bat sau khi use case do qua duoc cong hieu chinh JEV-02.
 const FLAGS = {
   notification_routing: import.meta.env.VITE_JEV_UC3 === 'on',
   staffing_gap_triage: import.meta.env.VITE_JEV_UC1 === 'on',
   candidate_ranking: import.meta.env.VITE_JEV_UC2 === 'on',
   lock_readiness: import.meta.env.VITE_JEV_UC4 === 'on',
+  shift_swap_assessment: import.meta.env.VITE_JEV_SWAPS === 'on',
 };
 
 export function jevEnabled(task) {
@@ -29,7 +30,7 @@ export function jevEnabled(task) {
  * Goi Jev cho mot task da duoc whitelist phia server.
  * @returns {Promise<Object|null>} answers, hoac null khi bat ky dieu gi tro trot.
  */
-export async function jevDecide(task, state, questions = undefined) {
+export async function jevRequest(task, state) {
   if (!jevEnabled(task)) return null;
 
   try {
@@ -43,16 +44,20 @@ export async function jevDecide(task, state, questions = undefined) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(questions ? { task, state, questions } : { task, state }),
+      body: JSON.stringify({ task, state }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.ok ? json.answers : null;
+    return json?.ok ? json : null;
   } catch {
     return null; // timeout, mat mang, CORS... deu ve mot moi: dung duong cu
   }
+}
+
+export async function jevDecide(task, state) {
+  return (await jevRequest(task, state))?.answers ?? null;
 }
 
 // ─── DOC DAP AN AN TOAN ──────────────────────────────────────────────
@@ -65,23 +70,23 @@ export async function jevDecide(task, state, questions = undefined) {
 
 export function readNoul(answers, key, fallback = null) {
   const v = answers?.[key]?.noul;
-  return typeof v === 'number' ? v : fallback;
+  return answers?.[key]?.type === 'noul' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
 }
 
 export function readChoice(answers, key, fallback = null) {
   const v = answers?.[key]?.choice;
-  return typeof v === 'string' ? v : fallback;
+  return answers?.[key]?.type === 'choice' && typeof v === 'string' ? v : fallback;
 }
 
 export function readScore(answers, key, fallback = null) {
   const v = answers?.[key]?.score;
-  return typeof v === 'number' ? v : fallback;
+  return answers?.[key]?.type === 'score' && Number.isFinite(v) && v >= 0 ? v : fallback;
 }
 
 export function readConfidence(answers, key, fallback = 0) {
   const a = answers?.[key];
   const v = a?.confidence ?? a?.conf;
-  return typeof v === 'number' ? v : fallback;
+  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
 }
 
 /**

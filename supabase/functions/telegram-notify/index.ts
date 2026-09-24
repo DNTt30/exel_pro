@@ -7,6 +7,7 @@
 //   VITE_TELEGRAM_PROXY_URL=https://<ref>.functions.supabase.co/telegram-notify
 //   VITE_TELEGRAM_PROXY_SECRET=z   (khớp NOTIFY_SECRET)
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
 const CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID') ?? '';
@@ -24,9 +25,15 @@ serve(async (req) => {
   const authHeader = req.headers.get('authorization') || '';
   const ofcSecret = req.headers.get('x-ofc-secret');
   const hasValidSecret = SECRET && ofcSecret === SECRET;
-  const hasBearerToken = authHeader.startsWith('Bearer ');
-
-  if (SECRET && !hasValidSecret && !hasBearerToken) {
+  let hasVerifiedUser = false;
+  if (authHeader.startsWith('Bearer ')) {
+    const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data, error } = await client.auth.getUser();
+    hasVerifiedUser = !error && !!data.user;
+  }
+  if (!hasValidSecret && !hasVerifiedUser) {
     return new Response('forbidden', { status: 403, headers: cors });
   }
   try {

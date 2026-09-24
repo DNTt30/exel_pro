@@ -534,14 +534,32 @@ export const createScheduleSlice = (set, get) => {
       }
       if (epoch !== get()._sessionEpoch) return;
 
+      let autoApproved = false;
+      if (newStatus === 'pending_manager') {
+        // Consent has already been persisted. Assessment failure must not roll it back.
+        try {
+          const decision = await api.assessSwapDecision({ swap: { ...targetSwap, status: newStatus }, employees: get().employees, schedule: get().schedule });
+          if (epoch !== get()._sessionEpoch) return;
+          autoApproved = decision.auto_approved === true;
+          if (autoApproved) {
+            set(state => ({ shiftSwaps: state.shiftSwaps.map(s => s.id === swapId ? { ...s, status: 'approved', managerNote: 'Jev đã tự duyệt', resolvedAt: new Date().toISOString() } : s) }));
+            const fresh = await api.getSchedulesByWeek(targetSwap.week);
+            if (epoch === get()._sessionEpoch) set(state => ({ schedule: { ...state.schedule, [targetSwap.week]: fresh } }));
+          }
+        } catch {
+          if (autoApproved) toast.error('Đã tự duyệt nhưng chưa tải được lịch mới. Vui lòng tải lại tuần.');
+        }
+      }
+      if (epoch !== get()._sessionEpoch) return;
       get().appendAdminLog('UPDATE_SHIFT_SWAP', swapId, newStatus, {
         resourceType: 'shift_swap',
         resourceId: swapId,
         storeId: targetSwap.store || get().user?.dept || '',
         oldData: { status: targetSwap.status, managerNote: targetSwap.managerNote || '' },
-        newData: { status: newStatus, managerNote: note || targetSwap.managerNote || '' },
-        description: `Đổi ca ${targetSwap.fromEmpName} ⇄ ${targetSwap.toEmpName}: ${targetSwap.status} → ${newStatus}`
+        newData: { status: autoApproved ? 'approved' : newStatus, managerNote: autoApproved ? 'Jev đã tự duyệt' : note || targetSwap.managerNote || '' },
+        description: `Đổi ca ${targetSwap.fromEmpName} ⇄ ${targetSwap.toEmpName}: ${targetSwap.status} → ${autoApproved ? 'approved' : newStatus}`
       });
+      return { autoApproved };
     } catch (err) {
       console.error('Lỗi khi cập nhật đơn đổi ca:', err);
       if (epoch === get()._sessionEpoch) set(state => ({ shiftSwaps: state.shiftSwaps.map(s => s.id === swapId ? previousSwaps.find(old => old.id === swapId) : s) }));

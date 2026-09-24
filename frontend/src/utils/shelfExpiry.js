@@ -85,6 +85,7 @@ export function emptyShelfItemRow() {
     qty: '',
     expiryDate: '',
     expiryDate2: '',
+    expiryTime: '', expiryTime2: '', averageSalesPerHour: '', triagePolicy: {},
     note: ''
   };
 }
@@ -97,6 +98,7 @@ export function toShelfItemRow(item) {
     qty: item.qty,
     expiryDate: item.expiryDate || '',
     expiryDate2: item.expiryDate2 || '',
+    expiryTime: item.expiryTime || '', expiryTime2: item.expiryTime2 || '', averageSalesPerHour: item.averageSalesPerHour ?? '', triagePolicy: item.triagePolicy || {},
     note: item.note || ''
   };
 }

@@ -7,6 +7,7 @@ import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { isValidGeminiKey, AVAILABLE_MODELS, getActiveGeminiModel } from '../../services/geminiService';
 import { useShallow } from 'zustand/react/shallow';
+import { routePersonalQuery, answerPersonalQuery } from '../../utils/decisionRouting';
 import RecipeQuickModal from '../modals/RecipeQuickModal';
 import ConfirmModal from '../modals/ConfirmModal';
 
@@ -80,7 +81,12 @@ function inlineMarkdown(text) {
 
 
 
-export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId }) {
+export default function AICopilotDrawer(props) {
+  const userId = useStore(s => s.user?.id || 'anonymous');
+  return <CopilotConversation key={`${userId}:${props.storeId || ''}`} {...props} />;
+}
+
+function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, stores: s.stores, shiftSwaps: s.shiftSwaps, feedbacks: s.feedbacks, user: s.user })));
   const weekSched = schedule[currentWeek] || {};
   const activeStoreId = storeId === 'ALL' ? (user?.dept || '') : storeId;
@@ -96,7 +102,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
 
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = localStorage.getItem(`ai_chat_history_${activeStoreId}`);
+      const saved = localStorage.getItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`);
       if (saved) return JSON.parse(saved);
     } catch (err) {
       console.warn('[AICopilot] Không đọc được lịch sử chat — dùng mặc định:', err?.message);
@@ -105,8 +111,8 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
   });
 
   useEffect(() => {
-    localStorage.setItem(`ai_chat_history_${activeStoreId}`, JSON.stringify(messages));
-  }, [messages, activeStoreId]);
+    try { localStorage.setItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`, JSON.stringify(messages)); } catch { /* Chat remains usable when storage is unavailable. */ }
+  }, [messages, activeStoreId, user?.id]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -154,8 +160,9 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
 
   const handleSend = async (textToSend = null) => {
     const query = (textToSend || inputText).trim();
-    if (!query) return;
+    if (!query || isTyping || isStreaming) return;
 
+    const sessionEpoch = useStore.getState()._sessionEpoch;
     const userMsg = { id: 'user_' + Date.now(), sender: 'user', text: query };
     setMessages(prev => [...prev, userMsg]);
     if (!textToSend) setInputText('');
@@ -198,7 +205,15 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     const validKey = geminiApiKey && geminiApiKey.trim();
 
     try {
-      if (validKey) {
+      const route = routePersonalQuery(query);
+      if (route) {
+        const epoch = useStore.getState()._sessionEpoch;
+        try { await useStore.getState().ensureWeeksLoaded([route.week]); } catch { /* answer reports missing data */ }
+        if (epoch !== useStore.getState()._sessionEpoch) return;
+        aiReply = answerPersonalQuery(route, useStore.getState());
+        model = 'local-intent-router';
+        setMessages(prev => [...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]);
+      } else if (validKey) {
         // Tạo placeholder message để stream vào
         const streamMsgId = 'ai_' + Date.now();
         streamingMsgIdRef.current = streamMsgId;
@@ -243,7 +258,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
     } finally {
       setIsTyping(false);
       setActiveModel(model);
-      useStore.getState().logAiTurn?.({
+      if (sessionEpoch === useStore.getState()._sessionEpoch) useStore.getState().logAiTurn?.({
         conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
         storeId: activeStoreId,
         userMessage: query,
@@ -601,7 +616,7 @@ export default function AICopilotDrawer({ isOpen, onClose, currentWeek, storeId 
         confirmText="Xác nhận xóa"
         onConfirm={() => {
           setMessages([initialWelcome]);
-          localStorage.removeItem(`ai_chat_history_${activeStoreId}`);
+          localStorage.removeItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`);
           setShowConfirmClear(false);
         }}
       />

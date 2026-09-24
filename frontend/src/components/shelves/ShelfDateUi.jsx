@@ -80,11 +80,20 @@ export function ShelfItemTable({ rows, onChange, notifyDays }) {
                 </td>
                 <td className="p-0 border-r border-slate-300">
                   <input type="date" className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500" value={row.expiryDate} onChange={e => patch(idx, 'expiryDate', e.target.value)} />
+                  <input aria-label="Giờ HSD 1" type="time" className="w-full px-2 py-1 text-xs" value={row.expiryTime || ''} onChange={e => patch(idx, 'expiryTime', e.target.value)} />
                 </td>
                 <td className="p-0 border-r border-slate-300">
                   <input type="date" className="w-full h-full px-2 py-2 outline-none bg-transparent focus:ring-inset focus:ring-2 focus:ring-blue-500" value={row.expiryDate2} onChange={e => patch(idx, 'expiryDate2', e.target.value)} />
+                  <input aria-label="Giờ HSD 2" type="time" className="w-full px-2 py-1 text-xs" value={row.expiryTime2 || ''} onChange={e => patch(idx, 'expiryTime2', e.target.value)} />
                 </td>
-                <td className="p-1 px-2 border-r border-slate-300 bg-white"><ExpiryBadge status={itemExpiryStatus(row, notifyDays)} /></td>
+                <td className="p-1 px-2 border-r border-slate-300 bg-white"><ExpiryBadge status={itemExpiryStatus(row, notifyDays)} />
+                  <details className="mt-1 text-xs"><summary className="cursor-pointer">Dữ liệu ưu tiên kiểm date</summary>
+                    <label className="block">Bán trung bình (SP/giờ)<input type="number" min="0" step="0.1" className="w-full border rounded p-1" value={row.averageSalesPerHour ?? ''} onChange={e => patch(idx, 'averageSalesPerHour', e.target.value)} /></label>
+                    <p className="my-1 text-slate-500">Chỉ nhập cửa sổ đã được cửa hàng cho phép. Để trống nếu chưa có chính sách.</p>
+                    <label className="block">Giảm giá trước hạn (giờ)<input type="number" min="0" className="w-full border rounded p-1" value={row.triagePolicy?.discountWindowHours ?? ''} onChange={e => patch(idx, 'triagePolicy', { ...row.triagePolicy, canDiscount: Number(e.target.value) > 0, discountWindowHours: e.target.value })} /></label>
+                    <label className="block">Trả NCC trước hạn (giờ)<input type="number" min="0" className="w-full border rounded p-1" value={row.triagePolicy?.returnWindowHours ?? ''} onChange={e => patch(idx, 'triagePolicy', { ...row.triagePolicy, canReturn: Number(e.target.value) > 0, returnWindowHours: e.target.value })} /></label>
+                  </details>
+                </td>
                 <td className="p-0 text-center bg-white">
                   <button type="button" className="w-full h-full py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center font-black" onClick={() => onChange(rows.filter((_, i) => i !== idx))}>×</button>
                 </td>

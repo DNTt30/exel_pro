@@ -5,15 +5,17 @@ import StatusBadge from '../ui/StatusBadge';
 import { useStore } from '../../store/useStore';
 import { ArrowRightLeft, Check, Sparkles } from 'lucide-react';
 
-import { canPickStore, isOpsManager } from '../../lib/authSession';
+import { canPickStore, isOpsManager, getUserDepts } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
+import { assessShiftSwap } from '../../utils/aiDecisionEngine';
 import { toast } from '../../components/ui/toastStore';
 
 export default function ShiftSwapListModal({ isOpen, onClose }) {
-  const { user, shiftSwaps, respondShiftSwap } = useStore(useShallow((s) => ({ user: s.user, shiftSwaps: s.shiftSwaps, respondShiftSwap: s.respondShiftSwap })));
+  const { user, shiftSwaps, respondShiftSwap, employees, schedule } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, user: s.user, shiftSwaps: s.shiftSwaps, respondShiftSwap: s.respondShiftSwap })));
   const pickStore = canPickStore(user);
   const isManager = isOpsManager(user);
 
+  const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'resolved'
   const [swapToCancel, setSwapToCancel] = useState(null);
 
@@ -22,7 +24,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
     const list = shiftSwaps || [];
     return list.filter(s => {
       if (pickStore) return true;
-      if (isManager && s.store === user?.dept) return true;
+      if (isManager && getUserDepts(user).includes(s.store)) return true;
       return s.fromEmpId === user?.id || s.toEmpId === user?.id;
     });
   }, [shiftSwaps, user, pickStore, isManager]);
@@ -37,25 +39,19 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
     return mySwaps;
   }, [mySwaps, activeTab]);
 
-  const handlePartnerResponse = (swapId, agree) => {
-    if (agree) {
-      respondShiftSwap(swapId, 'pending_manager', 'Đồng nghiệp đã đồng ý, chuyển Quản lý phê duyệt.');
-      toast.success('✅ Bạn đã đồng ý đổi ca! Yêu cầu đã được chuyển tới Quản lý để phê duyệt.');
-    } else {
-      respondShiftSwap(swapId, 'rejected', 'Đồng nghiệp đã từ chối đổi ca.');
-      toast.info('Đã từ chối yêu cầu đổi ca.');
-    }
+  const respond = async (swapId, status, note) => {
+    if (busy) return;
+    const epoch = useStore.getState()._sessionEpoch;
+    setBusy(true);
+    try {
+      const result = await respondShiftSwap(swapId, status, note);
+      if (epoch !== useStore.getState()._sessionEpoch) return;
+      toast.success(result?.autoApproved ? 'Jev đã tự duyệt và cập nhật lịch.' : status === 'pending_manager' ? 'Đã đồng ý. Đơn đang chờ quản lý xem xét.' : status === 'approved' ? 'Đã duyệt và cập nhật lịch.' : status === 'cancelled' ? 'Đã hủy đơn đổi ca.' : 'Đã từ chối yêu cầu.');
+    } catch (error) { toast.error(error.message || 'Không cập nhật được đơn'); }
+    finally { setBusy(false); }
   };
-
-  const handleManagerResponse = (swapId, approve) => {
-    if (approve) {
-      respondShiftSwap(swapId, 'approved', 'Quản lý đã phê duyệt và tự động hoán đổi ca.');
-      toast.success('✅ Phê duyệt thành công! Lịch làm việc của 2 nhân viên đã được tự động cập nhật trên hệ thống.');
-    } else {
-      respondShiftSwap(swapId, 'rejected', 'Quản lý đã từ chối đơn đổi ca.');
-      toast.info('Đã từ chối đơn đổi ca.');
-    }
-  };
+  const handlePartnerResponse = (id, agree) => respond(id, agree ? 'pending_manager' : 'rejected', agree ? 'Đồng nghiệp đã đồng ý.' : 'Đồng nghiệp đã từ chối.');
+  const handleManagerResponse = (id, approve) => respond(id, approve ? 'approved' : 'rejected', approve ? 'Quản lý đã phê duyệt.' : 'Quản lý đã từ chối.');
 
   const handleCancel = (swapId) => {
     setSwapToCancel(swapId);
@@ -111,10 +107,11 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
             </div>
           ) : (
             filteredSwaps.map((swap) => {
+              const assessment = ['pending_partner', 'pending_manager'].includes(swap.status) ? assessShiftSwap({ swap, employees, schedule }) : null;
               const isCreator = swap.fromEmpId === user?.id;
               const isPartner = swap.toEmpId === user?.id;
               const canPartnerAct = isPartner && swap.status === 'pending_partner';
-              const canManagerAct = isManager && swap.status === 'pending_manager';
+              const canManagerAct = isManager && (pickStore || getUserDepts(user).includes(swap.store)) && swap.status === 'pending_manager';
               const canCancel = isCreator && (swap.status === 'pending_partner' || swap.status === 'pending_manager');
 
               return (
@@ -162,6 +159,10 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                     </div>
                   </div>
 
+                  {assessment && <div className="p-2 rounded-lg bg-slate-50 text-xs text-slate-700">
+                    <strong>Sơ duyệt: rủi ro {assessment.risk_level}/100</strong>
+                    <p>{assessment.eligible ? 'Qua kiểm tra cục bộ. Tự duyệt cần dữ liệu server và cấu hình đã hiệu chỉnh.' : [...new Set(assessment.issues.map(i => i.message))].slice(0, 4).join(' · ')}</p>
+                  </div>}
                   {/* Reason & Notes */}
                   {swap.reason && (
                     <div className="text-[11px] text-slate-600 bg-slate-100/60 px-2.5 py-1 rounded-lg">
@@ -213,6 +214,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                         <>
                           <button
                             type="button"
+                            disabled={busy}
                             onClick={() => handlePartnerResponse(swap.id, false)}
                             className="w-full sm:w-auto px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
                           >
@@ -220,6 +222,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                           </button>
                           <button
                             type="button"
+                            disabled={busy}
                             onClick={() => handlePartnerResponse(swap.id, true)}
                             className="w-full sm:w-auto px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
@@ -233,6 +236,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                         <>
                           <button
                             type="button"
+                            disabled={busy}
                             onClick={() => handleManagerResponse(swap.id, false)}
                             className="w-full sm:w-auto px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
                           >
@@ -240,6 +244,7 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
                           </button>
                           <button
                             type="button"
+                            disabled={busy}
                             onClick={() => handleManagerResponse(swap.id, true)}
                             className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                           >
@@ -274,12 +279,10 @@ export default function ShiftSwapListModal({ isOpen, onClose }) {
         message="Bạn có chắc chắn muốn hủy yêu cầu đổi ca này?"
         variant="warning"
         confirmText="Xác nhận hủy đơn"
-        onConfirm={() => {
-          if (swapToCancel) {
-            respondShiftSwap(swapToCancel, 'cancelled', 'Người tạo đã hủy yêu cầu.');
-            toast.info('Đã hủy đơn đổi ca.');
-            setSwapToCancel(null);
-          }
+        loading={busy}
+        onConfirm={async () => {
+          if (swapToCancel) await respond(swapToCancel, 'cancelled', 'Người tạo đã hủy yêu cầu.');
+          setSwapToCancel(null);
         }}
       />
     </Modal>

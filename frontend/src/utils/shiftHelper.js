@@ -1,5 +1,5 @@
-import { SHIFTS } from '../data/initialData';
-import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX } from '../data/constants';
+import { SHIFTS } from '../data/initialData.js';
+import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } from '../data/constants.js';
 
 /**
  * Chuẩn hóa giá trị ca làm việc thành object thống nhất:
@@ -334,7 +334,7 @@ export function checkEmployeeShiftRestGap(weekSched = {}, empId, targetDay, targ
     const { shift: prevShift } = normalizeShift(prevRaw);
     if (prevShift && prevShift !== 'off') {
       const gap = calculateShiftRestGap(prevShift, targetShift);
-      if (gap < 11) {
+      if (gap < DECISION_RULES.MIN_REST_HOURS) {
         if (gap < minGap) minGap = gap;
         issues.push({
           type: 'prev',
@@ -354,7 +354,7 @@ export function checkEmployeeShiftRestGap(weekSched = {}, empId, targetDay, targ
     const { shift: nextShift } = normalizeShift(nextRaw);
     if (nextShift && nextShift !== 'off') {
       const gap = calculateShiftRestGap(targetShift, nextShift);
-      if (gap < 11) {
+      if (gap < DECISION_RULES.MIN_REST_HOURS) {
         if (gap < minGap) minGap = gap;
         issues.push({
           type: 'next',
@@ -389,10 +389,10 @@ export function buildSwappedSchedules(fromSched = {}, toSched = {}, swap) {
 
   const fromDay = swap.fromDay;
   const toDay = swap.toDay;
-  const aFromRaw = fromSched[fromDay] ?? 'off';
-  const bToRaw = toSched[toDay] ?? 'off';
-  const aToRaw = fromSched[toDay] ?? 'off';
-  const bFromRaw = toSched[fromDay] ?? 'off';
+  const aFromRaw = fromSched[fromDay] ?? '';
+  const bToRaw = toSched[toDay] ?? '';
+  const aToRaw = fromSched[toDay] ?? '';
+  const bFromRaw = toSched[fromDay] ?? '';
 
   const aNew = { ...fromSched };
   const bNew = { ...toSched };

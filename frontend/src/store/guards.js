@@ -99,6 +99,7 @@ export function assertCanRespondShiftSwap(state, swap, newStatus) {
   if (user.role === 'admin' || isBuiltinStoreManager(user) || isAreaManagerFromEmp(user)) return;
 
   if (newStatus === 'approved' || newStatus === 'rejected') {
+    if (newStatus === 'rejected' && swap?.status === 'pending_partner' && swap.toEmpId === user.id) return;
     assertCanManageStaff(state);
     const myDepts = getUserDepts(user);
     if (swap?.store && myDepts.length > 0 && !myDepts.includes(swap.store)) {

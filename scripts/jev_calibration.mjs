@@ -19,20 +19,10 @@
 // =====================================================================
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { questionsFor, validateAnswers, JEV_API_URL } from '../supabase/functions/_shared/jevContract.js';
 
-const JEV_API_URL = process.env.JEV_API_URL || 'https://api.typesafe.ai/v1/system-one';
 const JEV_API_KEY = process.env.TYPESAFE_API_KEY || '';
 const JEV_MODEL = process.env.JEV_MODEL || 'jev-latest';
-
-// Bo cau hoi phai GIONG HET bo trong Edge Function, neu khac thi so do vo nghia.
-const QUESTION_SETS = {
-  notification_routing: {
-    channel: { type: 'choice', instructions: 'Su kien van hanh cua hang tien loi nay nen duoc gui qua kenh nao cho quan ly?', criteria: { in_app: 'Chi hien trong chuong thong bao, khong day di dau', telegram: 'Day Telegram ngay vi can xu ly som', both: 'Vua hien chuong vua day Telegram vi rat quan trong', digest: 'Gom vao ban tin tong hop 8h sang hom sau' } },
-    priority: { type: 'score', instructions: 'Muc do uu tien xu ly cua su kien nay doi voi quan ly cua hang.', criteria: ['Khong can lam gi', 'De y sau', 'Xu ly trong tuan', 'Xu ly hom nay', 'Xu ly ngay'] },
-    can_wait: { type: 'noul', instructions: 'Viec nay co the doi den 8 gio sang hom sau moi bao cho quan ly ma khong gay hau qua van hanh khong?' },
-  },
-  // Them staffing_gap_triage / lock_readiness khi chay hieu chinh cho chung.
-};
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, cur, i, arr) => {
@@ -56,12 +46,6 @@ if (!JEV_API_KEY) {
   process.exit(1);
 }
 
-const questions = QUESTION_SETS[task];
-if (!questions) {
-  console.error(`Chua khai bao bo cau hoi cho task "${task}".`);
-  process.exit(1);
-}
-
 const cases = readFileSync(casesPath, 'utf8')
   .split('\n')
   .filter(Boolean)
@@ -76,13 +60,18 @@ if (cases.length < MIN_CASES) {
 
 // ─── Goi Jev cho tung ca ─────────────────────────────────────────────
 async function askJev(state) {
+  const questions = questionsFor(task, state);
+  if (questions[field]?.type !== kind) throw new Error('Field/type does not match server template');
   const res = await fetch(JEV_API_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${JEV_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: JEV_MODEL, state, questions }),
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json())?.answers ?? {};
+  const answers = validateAnswers((await res.json())?.answers, questions);
+  if (!answers) throw new Error('INVALID_ANSWERS');
+  return answers;
 }
 
 function predictionOf(answer) {
@@ -107,6 +96,7 @@ let errors = 0;
 for (let i = 0; i < cases.length; i++) {
   const c = cases[i];
   try {
+    const started = performance.now();
     const answers = await askJev(c.state);
     const a = answers[field];
     results.push({
@@ -114,6 +104,7 @@ for (let i = 0; i < cases.length; i++) {
       label: c.label,
       pred: predictionOf(a),
       conf: confidenceOf(a),
+      latencyMs: performance.now() - started,
     });
   } catch (e) {
     errors += 1;
@@ -125,7 +116,7 @@ process.stdout.write('\n');
 
 const scored = results.filter((r) => r.pred !== undefined);
 scored.forEach((r) => {
-  r.correct = kind === 'noul' ? Boolean(r.label) === r.pred : r.label === r.pred;
+  r.correct = r.label === r.pred;
 });
 
 // ─── Bang reliability ────────────────────────────────────────────────
@@ -166,12 +157,14 @@ function thresholdFor(target) {
   for (let i = 0; i < sorted.length; i++) {
     if (sorted[i].correct) correct += 1;
     const acc = correct / (i + 1);
-    if (i + 1 >= 30 && acc >= target) best = sorted[i].conf;
+    // Evaluate the whole confidence bucket, never a favorable prefix of a tie.
+    const endOfBucket = i === sorted.length - 1 || sorted[i + 1].conf !== sorted[i].conf;
+    if (endOfBucket && i + 1 >= 30 && acc >= target) best = sorted[i].conf;
   }
   return best;
 }
 
-const autoT = thresholdFor(0.95);
+const autoT = cases.length >= MIN_CASES && errors === 0 ? thresholdFor(0.95) : null;
 const confirmT = thresholdFor(0.85);
 
 console.log('\n=== NGUONG DE NGHI ===');
@@ -182,7 +175,7 @@ console.log(`  confirm (>=85% dung): ${confirmT !== null ? confirmT.toFixed(3) :
 console.log('\n=== KET LUAN ===');
 if (autoT !== null) {
   const covered = scored.filter((r) => r.conf >= autoT).length / scored.length;
-  console.log(`  ✅ BAT DUOC che do tu dong cho ${(covered * 100).toFixed(0)}% luu luong (conf >= ${autoT.toFixed(3)}).`);
+  console.log(`  Ngưỡng tham khảo, cần đánh giá trên tập giữ riêng trước khi bật tự động cho ${(covered * 100).toFixed(0)}% luu luong (conf >= ${autoT.toFixed(3)}).`);
   console.log(`     Phan con lai di qua duong "can xac nhan" hoac deterministic.`);
 } else if (confirmT !== null) {
   console.log('  ⚠️  CHI DUOC chay che do goi y co nguoi xac nhan. Khong tu dong hoa.');
@@ -200,6 +193,9 @@ confidentWrong.slice(0, 15).forEach((r) =>
   console.log(`  ${r.id}  conf=${r.conf.toFixed(3)}  doan="${r.pred}"  that="${r.label}"`)
 );
 
+const latencies = results.map(r => r.latencyMs).sort((a,b) => a-b);
+const p95Ms = latencies[Math.max(0, Math.ceil(latencies.length * 0.95) - 1)] ?? null;
+console.log('Provider p95 ms:', p95Ms);
 const outPath = `jev_calibration_${task}_${field}.json`;
-writeFileSync(outPath, JSON.stringify({ task, field, kind, overall, rows, autoT, confirmT, confidentWrong, results: scored }, null, 2));
+writeFileSync(outPath, JSON.stringify({ task, field, kind, overall, p95Ms, rows, autoT, confirmT, confidentWrong, results: scored }, null, 2));
 console.log(`\nBao cao day du: ${outPath}\n`);

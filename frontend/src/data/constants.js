@@ -63,6 +63,15 @@ export const SCHEDULE_RULES = {
   STFT_MAX_HOURS_PER_MONTH: 192,  // Định mức tháng
 };
 
+// Conservative automation gates, not new contractual hour limits.
+export const DECISION_RULES = {
+  MIN_REST_HOURS: 11,
+  AUTO_SWAP_MAX_RISK: 60,
+  SHORT_NOTICE_HOURS: 24,
+  CONSECUTIVE_NIGHTS_WARNING: 3,
+  CANDIDATE_LIMIT: 2,
+};
+
 // Hệ số lương ca đêm và lương cơ bản part-time
 export const NIGHT_SHIFT_MULTIPLIER = 1.3;
 export const DEFAULT_PT_HOURLY_RATE = 25000;

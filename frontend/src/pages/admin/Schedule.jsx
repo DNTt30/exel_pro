@@ -33,6 +33,7 @@ const AISchedulerModal = React.lazy(() => import('../../components/modals/AISche
 const VulnerabilityRadarModal = React.lazy(() => import('../../components/modals/VulnerabilityRadarModal'));
 import RegistrationDeadlineModal from '../../components/modals/RegistrationDeadlineModal';
 import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
+import ScheduleQualityPanel from '../../components/ScheduleQualityPanel';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
@@ -701,6 +702,7 @@ export default function Schedule() {
       </div>
 
       {/* 3.5 Staffing Gap Analysis Widget */}
+      <ScheduleQualityPanel employees={employees} week={currentWeek} storeId={filterDept} />
       <StaffingGapTable 
         employees={employees} 
         weekSchedule={weekSchedule} 

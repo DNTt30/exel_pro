@@ -108,10 +108,13 @@ export const createScheduleSlice = (set, get) => {
       set(state => ({ schedule: { ...state.schedule, [row.week_date]: {
         ...state.schedule[row.week_date], [row.emp_id]: withScheduleVersion(row.shifts || {}, row.version)
       } }, lastSyncedAt: Date.now() }));
-      // Thông báo khi lịch người khác thay đổi (không phải do mình ghi)
+      // Thông báo khi lịch người khác thay đổi — debounce 1.5s tránh spam toast
       const me = get().user;
       if (row.emp_id !== me?.id) {
-        toast.info('📅 Lịch vừa được cập nhật theo thời gian thực');
+        clearTimeout(receiveScheduleEvent._toastTimer);
+        receiveScheduleEvent._toastTimer = setTimeout(() => {
+          toast.info('📅 Lịch vừa được cập nhật theo thời gian thực');
+        }, 1500);
       }
       // Emit event để UI highlight ô vừa đổi
       window.dispatchEvent(new CustomEvent('gs25_schedule_realtime', {

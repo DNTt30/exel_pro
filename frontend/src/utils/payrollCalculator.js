@@ -1,4 +1,4 @@
-/**
+﻿/**
  * payrollCalculator.js
  * Tính lương preview cho nhân viên GS25 (chu kỳ 26→25)
  * 
@@ -10,8 +10,8 @@
 
 // ─── Đơn giá mặc định (VNĐ) ───────────────────────────────────────────────
 export const DEFAULT_RATES = {
-  PT_HOURLY:        20_000,   // Part-time: giá/giờ cơ bản
-  FT_HOURLY:        18_000,   // Full-time: ước tính giá/giờ (lương cứng ÷ 208h)
+  PT_HOURLY:        22_000,   // Part-time: giá/giờ cơ bản (~2tr/91h)
+  FT_HOURLY:        24_000,   // Full-time: ước tính giá/giờ (5tr ÷ 208h ≈ 24k)
   WEEKEND_BONUS:    1.5,      // Hệ số cuối tuần (T7, CN)
   HOLIDAY_BONUS:    2.0,      // Hệ số ngày lễ
   OVERTIME_BONUS:   1.5,      // Hệ số OT (vượt định mức)
@@ -66,10 +66,16 @@ export function calculatePayrollPreview({ empType, totalHours, dayDetails = [], 
     }
   });
 
-  // OT: phần vượt định mức
+  // OT: phần vượt định mức — phân bổ proportional từ tất cả loại giờ
   if (isPT && totalHours > R.PT_MAX_HOURS) {
     overtimeHours = totalHours - R.PT_MAX_HOURS;
-    baseHours     = Math.max(0, baseHours - overtimeHours);
+    // Ưu tiên trừ từ baseHours trước, sau đó weekendHours, holidayHours
+    const fromBase = Math.min(overtimeHours, baseHours);
+    baseHours -= fromBase;
+    const fromWeekend = Math.min(overtimeHours - fromBase, weekendHours);
+    weekendHours -= fromWeekend;
+    const fromHoliday = Math.min(overtimeHours - fromBase - fromWeekend, holidayHours);
+    holidayHours -= fromHoliday;
   }
 
   const hourlyRate = isPT ? R.PT_HOURLY : R.FT_HOURLY;

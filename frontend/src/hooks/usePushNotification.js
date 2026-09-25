@@ -33,11 +33,24 @@ export function usePushNotification(userId) {
     return 'unsubscribed';
   });
 
-  // Sync với browser permission state
+  // Verify SW subscription thực tế khi mount — localStorage có thể stale
+  // (SW update, trình duyệt xoá subscription, đổi device...)
   useEffect(() => {
-    if (status === 'unsupported') return;
-    if (Notification.permission === 'denied') setStatus('denied');
-  }, [status]);
+    if (status === 'unsupported' || !userId) return;
+    if (Notification.permission === 'denied') { setStatus('denied'); return; }
+    if (localStorage.getItem(STORAGE_KEY) !== userId) return;
+
+    navigator.serviceWorker.ready.then(reg =>
+      reg.pushManager.getSubscription()
+    ).then(sub => {
+      if (!sub) {
+        // SW đã mất subscription nhưng localStorage chưa biết → reset
+        localStorage.removeItem(STORAGE_KEY);
+        setStatus('unsubscribed');
+      }
+    }).catch(() => {}); // im lặng nếu SW chưa ready
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const subscribe = useCallback(async () => {
     if (!VAPID_PUBLIC_KEY) {

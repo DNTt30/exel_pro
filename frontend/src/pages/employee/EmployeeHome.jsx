@@ -126,7 +126,7 @@ export default function EmployeeHome() {
       <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-4 text-white shadow-lg shadow-blue-500/20">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">Hôm nay · {todayKey}</span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-white/85">Hôm nay · {todayKey}</span>
             {todayOff ? (
               <div className="text-xl sm:text-2xl font-black flex items-center gap-2 mt-0.5"><Coffee size={22} /> Nghỉ</div>
             ) : (
@@ -143,12 +143,12 @@ export default function EmployeeHome() {
           </div>
           {/* Đồng hồ giờ trong ca */}
           <div className="flex-shrink-0 text-right">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-white/60">Tuần này</div>
-            <div className="text-2xl font-black leading-none mt-1">{totalH}<span className="text-sm text-white/70">h</span></div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/85">Tuần này</div>
+            <div className="text-2xl font-black leading-none mt-1">{totalH}<span className="text-sm text-white/85">h</span></div>
             <div className="w-24 h-1.5 rounded-full bg-white/20 overflow-hidden mt-1.5">
               <div className={`h-full rounded-full ${hourWarn ? 'bg-amber-300' : 'bg-emerald-300'}`} style={{ width: pct + '%' }} />
             </div>
-            <div className={`text-[10px] font-semibold mt-1 ${hourWarn ? 'text-amber-200' : 'text-white/70'}`}>{hourNote}</div>
+            <div className={`text-[11px] font-semibold mt-1 ${hourWarn ? 'text-amber-200' : 'text-white/85'}`}>{hourNote}</div>
           </div>
         </div>
         {swapToday && (

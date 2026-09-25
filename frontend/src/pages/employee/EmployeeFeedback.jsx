@@ -109,6 +109,28 @@ export default function EmployeeFeedback() {
   // Search in History
   const [historySearch, setHistorySearch] = useState('');
 
+  // QW-1: Tính ngày max cho datepicker — khóa ngày quá hạn chốt công (mùng 10)
+  const dateInputMax = useMemo(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    // Nếu hôm nay > 10: chỉ cho chọn từ ngày 1 tháng này trở đi (không cho chọn tháng trước)
+    if (today.getDate() > 10) {
+      return todayStr; // max = hôm nay, min sẽ là ngày 1 tháng này
+    }
+    return todayStr; // max luôn = hôm nay
+  }, []);
+
+  const dateInputMin = useMemo(() => {
+    const today = new Date();
+    // Nếu hôm nay > 10: min = ngày 1 tháng này (chặn chọn tháng trước)
+    if (today.getDate() > 10) {
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    }
+    // Nếu hôm nay <= 10: cho phép chọn từ ngày 1 tháng trước (còn trong hạn)
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
+  }, []);
+
   const filteredFeedbacks = useMemo(() => {
     if (!historySearch) return myFeedbacks;
     const s = historySearch.toLowerCase();
@@ -348,6 +370,8 @@ export default function EmployeeFeedback() {
                     <input 
                       type="date" 
                       required 
+                      min={dateInputMin}
+                      max={dateInputMax}
                       className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                       value={date}
                       onChange={e => setDate(e.target.value)}

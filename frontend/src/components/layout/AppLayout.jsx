@@ -133,15 +133,18 @@ export default function AppLayout() {
         { to: '/admin/schedule', label: 'Lịch ca', icon: CalendarDays, badge: pendingSwapsCount },
         { to: '/admin/timesheet', label: 'Chấm công', icon: Clock },
         { to: '/admin/feedback', label: 'Bù công', icon: FileText, badge: pendingFeedbacksCount },
-        { to: '/admin/handbook', label: 'Sổ tay', icon: BookOpen },
       ]
     : [
         { to: '/employee/home', label: 'Trang chủ', icon: Home },
         { to: '/employee/schedule', label: 'Lịch ca', icon: CalendarDays },
         { to: '/employee/timesheet', label: 'Chấm công', icon: Clock },
         { to: '/employee/feedback', label: 'Bù công', icon: FileText },
-        { to: '/employee/handbook', label: 'Sổ tay', icon: BookOpen },
       ];
+
+  // QW-5: Auto-close helper — chỉ một drawer mở tại một thời điểm
+  const openAI = () => { setIsAIOpen(true); setIsHelpOpen(false); setMobileMenuOpen(false); };
+  const openHelp = () => { setIsHelpOpen(true); setIsAIOpen(false); setMobileMenuOpen(false); };
+  const openMobileMenu = () => { setMobileMenuOpen(true); setIsAIOpen(false); setIsHelpOpen(false); };
 
   const getRoleInfo = () => {
     const role = appRoleOf(user); const label = appRoleLabel(user);
@@ -158,7 +161,7 @@ export default function AppLayout() {
       {/* ── Header ── */}
       <header className="relative bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs z-30 px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-safe flex items-center justify-between print:hidden">
         <div className="flex items-center gap-2 sm:gap-3">
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+          <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : openMobileMenu()} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2">
@@ -193,7 +196,7 @@ export default function AppLayout() {
               <span className="sm:hidden">App</span>
             </button>
           )}
-          <button onClick={() => setIsHelpOpen(true)} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
+          <button onClick={openHelp} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell />
           <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
@@ -285,7 +288,7 @@ export default function AppLayout() {
             </button>
             <button 
               type="button" 
-              onClick={() => { setMobileMenuOpen(false); setIsHelpOpen(true); }}
+              onClick={() => { setMobileMenuOpen(false); openHelp(); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer"
             >
               <HelpCircle size={14} className="text-blue-300" /> Hướng dẫn sử dụng
@@ -332,7 +335,7 @@ export default function AppLayout() {
 
         {/* Floating AI Button - blue (above mobile bottom bar with safe-area spacing) */}
         <button 
-          onClick={() => setIsAIOpen(true)} 
+          onClick={openAI} 
           className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3.5 md:right-6 w-11 h-11 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-40 print:hidden focus:ring-3 focus:ring-blue-300 group cursor-pointer" 
           title="GS25 AI Copilot"
         >

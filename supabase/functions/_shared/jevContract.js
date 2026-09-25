@@ -1,6 +1,8 @@
 // Jev scores are expected level indices, not percentages. See docs.typesafe.ai/api.
+import { agentQuestions } from '../../../frontend/src/utils/agentQuestions.js';
 export const JEV_API_URL = 'https://api.typesafe.ai/v1/systemone';
 export function questionsFor(task, state) {
+  if (task === 'agent_next_step') return agentQuestions(state);
   if (task === 'candidate_ranking') {
     const candidates = state?.candidates;
     if (!Array.isArray(candidates) || !candidates.length || candidates.length > 60 || candidates.some((c, i) => c.alias !== `candidate_${i}`)) throw new Error('INVALID_CANDIDATES');

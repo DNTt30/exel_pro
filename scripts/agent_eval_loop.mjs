@@ -3,17 +3,18 @@ import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { workspaceRevision } from './agents/workspace.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT_DIR = resolve(__dirname, '..');
 const FRONTEND_DIR = join(ROOT_DIR, 'frontend');
+const startRevision = workspaceRevision(ROOT_DIR);
 
 console.log('='.repeat(60));
 console.log('🚀 SCHEDULE APP — AGENT AUTONOMOUS EVALUATION LOOP');
 console.log('='.repeat(60));
 
-let score = 0;
 const results = {
   unitTests: { passed: false, score: 0, max: 35, detail: '' },
   lintClean: { passed: false, score: 0, max: 25, detail: '' },
@@ -24,35 +25,25 @@ const results = {
 // 1. UNIT TESTS (35 pts)
 try {
   process.stdout.write('⏳ [1/4] Chạy Unit Test Suite (vitest)... ');
-  const testOutput = execSync('npm run test', { cwd: FRONTEND_DIR, stdio: 'pipe' }).toString();
+  const testOutput = execSync('npm run test', { cwd: FRONTEND_DIR, stdio: 'pipe', timeout: 120000, maxBuffer: 8 * 1024 * 1024 }).toString();
   results.unitTests.passed = true;
   results.unitTests.score = 35;
-  results.unitTests.detail = 'Toàn bộ bài test đều PASS.';
+  results.unitTests.detail = testOutput.replace(/\u001b\[[0-9;]*m/g, '').match(/Tests\s+[^\r\n]+/)?.[0] || 'Toàn bộ bài test đều PASS.';
   console.log('✅ PASS (35/35)');
 } catch (err) {
   results.unitTests.score = 0;
-  results.unitTests.detail = err.stdout?.toString() || err.message;
+  results.unitTests.detail = [err.stdout?.toString(), err.stderr?.toString(), err.message].filter(Boolean).join('\n');
   console.log('❌ FAIL (0/35)');
 }
 
 // 2. LINT CLEAN (25 pts)
 try {
   process.stdout.write('⏳ [2/4] Kiểm tra Code Quality (oxlint)... ');
-  const lintOutput = execSync('npm run lint', { cwd: FRONTEND_DIR, stdio: 'pipe' }).toString();
-  const match = lintOutput.match(/Found (\d+) warning/i);
-  const warningCount = match ? parseInt(match[1], 10) : (lintOutput.toLowerCase().includes('warning') && !lintOutput.includes('0 warning') ? 1 : 0);
-  if (warningCount === 0) {
-    results.lintClean.passed = true;
-    results.lintClean.score = 25;
-    results.lintClean.detail = '0 error, 0 warning.';
-    console.log('✅ PASS (25/25)');
-  } else {
-    // Trừ 3 điểm cho mỗi warning
-    const penalty = Math.min(25, warningCount * 3);
-    results.lintClean.score = 25 - penalty;
-    results.lintClean.detail = `Phát hiện ${warningCount} warnings. Cần dọn dẹp.`;
-    console.log(`⚠️ WARNING (${results.lintClean.score}/25) - ${warningCount} warnings`);
-  }
+  execSync('npm run lint -- --deny-warnings', { cwd: FRONTEND_DIR, stdio: 'pipe', timeout: 120000, maxBuffer: 8 * 1024 * 1024 });
+  results.lintClean.passed = true;
+  results.lintClean.score = 25;
+  results.lintClean.detail = '0 error, 0 warning (oxlint --deny-warnings).';
+  console.log('✅ PASS (25/25)');
 } catch (err) {
   results.lintClean.score = 0;
   results.lintClean.detail = err.stdout?.toString() || err.message;
@@ -73,15 +64,15 @@ function scanFiles(dir, filter, found = []) {
         found.push(full);
       }
     }
-  } catch (_) {}
+  } catch (error) { throw new Error(`Cannot scan ${dir}: ${error.message}`); }
   return found;
 }
 
-const componentFiles = scanFiles(join(FRONTEND_DIR, 'src', 'components'), f => f.endsWith('.jsx') || f.endsWith('.js'));
+const componentFiles = ['components', 'pages'].flatMap(dir => scanFiles(join(FRONTEND_DIR, 'src', dir), f => f.endsWith('.jsx') || f.endsWith('.js')));
 const violations = [];
 for (const file of componentFiles) {
   const content = readFileSync(file, 'utf-8');
-  if (content.includes('@supabase/supabase-js') || content.includes("from '../lib/supabase'") || content.includes('from "@/lib/supabase"')) {
+  if (content.includes('@supabase/supabase-js') || /(?:from\s*|import\s*\()(['"])[^'"]*lib\/supabase(?:\.js)?\1/.test(content)) {
     violations.push(file);
   }
 }
@@ -125,13 +116,17 @@ if (guardrailViolations.length === 0) {
   console.log(`❌ FAIL (0/20) - Vi phạm: ${results.guardrails.detail}`);
 }
 
-// TỔNG KẾT
-const totalScore = Object.values(results).reduce((sum, r) => sum + r.score, 0);
-console.log('\n' + '='.repeat(60));
-console.log(`🎯 ĐIỂM ĐÁNH GIÁ TỰ CHẤM (EVAL SCORE): ${totalScore}/100`);
-console.log(`📊 KẾT LUẬN NGHIỆM THU: ${totalScore >= 90 ? '🟢 PASS (SẴN SÀNG RELEASE)' : totalScore >= 70 ? '🟡 CẦN SỬA CHỮA THÊM' : '🔴 FAIL (CẦN SỬA GẤP)'}`);
-console.log('='.repeat(60));
-
-if (totalScore < 90) {
-  process.exitCode = 1;
+// Build and every mandatory gate must pass; scores cannot override a failure.
+try {
+  execSync('npm run build', { cwd: FRONTEND_DIR, stdio: 'pipe', timeout: 120000, maxBuffer: 8 * 1024 * 1024 });
+  results.build = { passed: true, score: 0, max: 0, detail: 'Build passed' };
+} catch (error) {
+  results.build = { passed: false, score: 0, max: 0, detail: error.stdout?.toString() || error.message };
 }
+const finalRevision = workspaceRevision(ROOT_DIR);
+const passed = Object.values(results).every(r => r.passed) && finalRevision === startRevision;
+const totalScore = Object.values(results).reduce((sum, r) => sum + r.score, 0);
+console.log(JSON.stringify({ passed, totalScore, revision: startRevision, unchanged: finalRevision === startRevision, results }, null, 2));
+console.log('JEV_AUDIT_RESULT=' + JSON.stringify({ passed, revision: startRevision, results }));
+console.log(passed ? 'PASS: machine checks passed. Independent code review still required.' : 'FAIL: a mandatory check failed or source changed during evaluation.');
+if (!passed) process.exitCode = 1;

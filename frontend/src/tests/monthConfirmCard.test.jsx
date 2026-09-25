@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import MonthConfirmCard from '../components/employee/MonthConfirmCard';
@@ -8,12 +8,16 @@ import { useStore } from '../store/useStore';
 
 vi.mock('../services/api', () => ({
   getSchedulesByWeeks: vi.fn().mockResolvedValue({}),
-  getAttendanceRange: vi.fn().mockResolvedValue([])
+  getAttendanceRange: vi.fn().mockResolvedValue([]),
+  getFeedbacks: vi.fn().mockResolvedValue([])
 }));
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+afterEach(() => vi.useRealTimers());
 
 describe('MonthConfirmCard stability test', () => {
-  it('does not cause React 19 getSnapshot infinite loop (Error #185)', async () => {
+  it.each([24, 25])('does not cause React 19 getSnapshot infinite loop on day %i', async day => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, day, 12));
     useStore.setState({
       user: {
         id: '2405001',

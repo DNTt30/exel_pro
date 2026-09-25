@@ -1,5 +1,6 @@
 import { JEV_API_URL, questionsFor, validateAnswers } from '../_shared/jevContract.js';
 import { assessShiftSwap, requiredDecisionWeeks } from '../../../frontend/src/utils/aiDecisionEngine.js';
+import { agentDecisionState } from '../../../frontend/src/utils/agentArbiter.js';
 
 export function createJevHandler({ createClient, env, fetch: providerFetch = globalThis.fetch, logger = console }) {
   const URL = env('SUPABASE_URL') ?? '';
@@ -39,7 +40,13 @@ export function createJevHandler({ createClient, env, fetch: providerFetch = glo
       return json({ ok: true, answers, assessment, reason, latencyMs: Date.now() - started });
     };
     try {
-      if (body.task === 'shift_swap_assessment') {
+      if (body.task === 'agent_next_step') {
+        const plan = body.state;
+        const allowed = new Set(['personal_schedule', 'schedule_review', 'shelf_review', 'synthesis']);
+        if (plan?.mode !== 'assistant' || !Array.isArray(plan.tasks) || plan.tasks.some(t => !allowed.has(t.id) || t.access !== 'read' || t.role !== t.id)) throw new Error('INVALID_ASSISTANT_PLAN');
+        // Recompute readiness on the server; do not accept a browser-supplied menu.
+        state = agentDecisionState(plan);
+      } else if (body.task === 'shift_swap_assessment') {
         // Caller sees only swaps allowed by RLS. Never trust browser hours, IDs or decisions.
         const visible = await client.from('shift_swaps').select('id').eq('id', body.state?.swapId).single();
         if (visible.error || !visible.data) return json({ ok: false, reason: 'FORBIDDEN' }, 403);

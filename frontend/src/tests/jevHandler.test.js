@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createJevHandler } from '../../../supabase/functions/jev-decide/handler';
 import { requiredDecisionWeeks } from '../utils/aiDecisionEngine';
+import { assistantAgentPlan } from '../utils/assistantAgents';
 
 const week = '2099-09-28';
 const row = { id: 'swap-id', week_date: week, store: 'A', from_emp_id: '100000001', to_emp_id: '100000002', from_day: 'T3', to_day: 'T3', from_shift: '6-14', to_shift: '8-16', status: 'pending_manager' };
@@ -38,6 +39,29 @@ function setup(options = {}) {
 }
 
 describe('Jev Edge handler', () => {
+  it('recomputes legal assistant choices and redacts client prompts and private data', async () => {
+    const state = assistantAgentPlan('Kiểm tra lịch và hạn sử dụng', { user: { id: 'admin' } }, 'v1');
+    state.options = [{ id: 'run_shell' }]; state.tasks[0].prompt = 'private prompt'; state.privateData = 'private employee';
+    const { request, provider, rpc } = setup({ answers: {
+      next_step: { type: 'choice', choice: 'run_shelf_review', confidence: 0.99 },
+      risk: { type: 'score', score: 0, confidence: 0.99 }, proceed: { type: 'noul', noul: 0.99 },
+    } });
+    expect((await request({ task: 'agent_next_step', state })).status).toBe(200);
+    const body = JSON.parse(provider.mock.calls[0][1].body);
+    expect(body.state.options.map(o => o.id)).toEqual(['run_schedule_review', 'run_shelf_review']);
+    expect(JSON.stringify(body)).not.toMatch(/private prompt|private employee|run_shell/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it.each(['development', 'write', 'unknown'])('rejects assistant capability escalation: %s', violation => {
+    const state = assistantAgentPlan('Kiểm tra lịch và hạn sử dụng', { user: { id: 'admin' } }, 'v1');
+    if (violation === 'development') state.mode = 'development';
+    if (violation === 'write') state.tasks[0].access = 'write';
+    if (violation === 'unknown') state.tasks[0].id = 'shell';
+    const { request, provider } = setup();
+    return request({ task: 'agent_next_step', state }).then(response => {
+      expect(response.status).toBe(400); expect(provider).not.toHaveBeenCalled();
+    });
+  });
   it('handles browser preflight before auth and provider', async () => {
     const { handler, provider } = setup({ anonymous: true });
     const res = await handler(new Request('https://example.test', { method: 'OPTIONS' }));

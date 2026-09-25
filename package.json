@@ -3,6 +3,8 @@
   "private": true,
   "description": "Prisma (server-side only) — không import vào frontend Vite",
   "scripts": {
+    "agents:next": "node scripts/jev_agents.mjs",
+    "agents:demo": "node scripts/jev_agents.mjs --demo",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
     "prisma:migrate": "prisma migrate dev",

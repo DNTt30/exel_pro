@@ -100,6 +100,19 @@ try {
         assert.equal(await evaluate("testStore.getState().schedule['2026-09-21']['100000002'].T3"),'off');
         await evaluate("[...document.querySelectorAll('button')].find(e=>e.textContent==='Hủy bỏ').click()");
         console.log('PASS gap invitation and explicit consent before changing OFF');
+        await evaluate("document.querySelector('button[title=\"GS25 AI Copilot\"]').click()");
+        await waitFor("document.querySelector('button[title=\"Gửi câu hỏi\"]')");
+        await evaluate("[...document.querySelectorAll('button')].find(e=>e.textContent.includes('Kiểm tra lịch và hạn sử dụng')).click()");
+        await waitFor("window.aiTurns.some(t=>t.model==='rule-agent-orchestrator')");
+        assert.ok(await evaluate("window.aiTurns.at(-1).assistantResponse.includes('Lịch tuần') && window.aiTurns.at(-1).assistantResponse.includes('Ưu tiên kiểm date')"));
+        for(const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+          await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
+          await wait(100);
+          const shot=await send('Page.captureScreenshot',{format:'png'});
+          await writeFile(new URL(`assistant-agents-${name}.png`,out),Buffer.from(shot.data,'base64'));
+        }
+        await evaluate("document.querySelector('button[title=\"Đóng trợ lý\"]').click()");
+        console.log('PASS multiple assistant agents synthesize schedule and shelf results without LLM');
       }
       if(page==='schedule' && role==='employee') {
         await evaluate(`(async()=>{

@@ -1,5 +1,7 @@
 # Jev / bộ quyết định nhanh — tiến độ và triển khai
 
+Phạm vi bổ sung đã chốt: Jev làm trọng tài cho cả agent phát triển repo bằng Codex CLI và các tác vụ trợ lý trong app. Xem [hướng dẫn điều phối agent](JEV_AGENT_ORCHESTRATION.md). Các tính năng nghiệp vụ bên dưới tiếp tục dùng chung rule và proxy Jev.
+
 Bản ổn định trước thay đổi này đã commit tại `c20d94c`. Không sửa prototype `schedule-app/`, không đổi cơ chế đăng nhập hoặc mật khẩu mặc định.
 
 ## Phạm vi đã triển khai

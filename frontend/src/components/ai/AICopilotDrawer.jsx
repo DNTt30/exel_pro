@@ -7,6 +7,9 @@ import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { isValidGeminiKey, AVAILABLE_MODELS, getActiveGeminiModel } from '../../services/geminiService';
 import { useShallow } from 'zustand/react/shallow';
+import { assistantAgentPlan, assistantStoreIds, runAssistantAgents } from '../../utils/assistantAgents';
+import { requiredDecisionWeeks } from '../../utils/aiDecisionEngine';
+import { decideAssistantAgent } from '../../services/api';
 import { routePersonalQuery, answerPersonalQuery } from '../../utils/decisionRouting';
 import RecipeQuickModal from '../modals/RecipeQuickModal';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -89,7 +92,7 @@ export default function AICopilotDrawer(props) {
 function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const { employees, schedule, stores, shiftSwaps, feedbacks, user } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, stores: s.stores, shiftSwaps: s.shiftSwaps, feedbacks: s.feedbacks, user: s.user })));
   const weekSched = schedule[currentWeek] || {};
-  const activeStoreId = storeId === 'ALL' ? (user?.dept || '') : storeId;
+  const activeStoreId = storeId === 'ALL' ? '' : storeId;
 
   const userName = user?.name || user?.username || 'bạn';
   const firstName = userName.split(' ').pop();
@@ -125,6 +128,12 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [geminiKeyDraft, setGeminiKeyDraft] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const agentRequestRef = useRef(null);
+  useEffect(() => {
+    setIsTyping(false);
+    setIsStreaming(false);
+    return () => agentRequestRef.current?.abort();
+  }, [currentWeek, activeStoreId, user?.id]);
   const streamingMsgIdRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -148,6 +157,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const isAdmin = isOpsManager(user);
   const quickPrompts = isAdmin ? [
     '🔍 Quét lỗi & vi phạm lịch tuần',
+    '📋 Kiểm tra lịch và hạn sử dụng',
     '🕒 Giờ hủy hàng FF & GM GS25',
     '🔄 Có đơn đổi ca nào đang chờ?',
     '🧪 Hóa chất Saraya 6 mã màu'
@@ -163,6 +173,10 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     if (!query || isTyping || isStreaming) return;
 
     const sessionEpoch = useStore.getState()._sessionEpoch;
+    agentRequestRef.current?.abort();
+    const request = new AbortController();
+    agentRequestRef.current = request;
+    let startSnapshot = useStore.getState();
     const userMsg = { id: 'user_' + Date.now(), sender: 'user', text: query };
     setMessages(prev => [...prev, userMsg]);
     if (!textToSend) setInputText('');
@@ -183,6 +197,12 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       ? shiftSwaps
       : (shiftSwaps || []).filter(s => s.fromEmpId === user?.id || s.toEmpId === user?.id || s.store === user?.dept);
 
+    const shelfScope = new Set(visibleDeptIds(user, stores));
+    const selectedStoreIds = assistantStoreIds(activeStoreId);
+    const scopedShelves = (startSnapshot.shelves || []).filter(s =>
+      shelfScope.has(s.storeId) && (!selectedStoreIds || selectedStoreIds.has(s.storeId)) &&
+      (isAdmin || String(s.assigneeId).split(',').map(id => id.trim()).includes(user?.id)));
+    const scopedShelfIds = new Set(scopedShelves.map(s => s.id));
     const contextData = {
       employees: scopedEmployees,
       weekSchedule: scopedSchedule,
@@ -190,6 +210,8 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       stores: isAdmin ? stores : (() => { const ok = new Set(visibleDeptIds(user, stores)); if (activeStoreId) ok.add(activeStoreId); return stores.filter(s => ok.has(s.id)); })(),
       shiftSwaps: scopedSwaps,
       feedbacks: scopedFeedbacks,
+      shelves: scopedShelves,
+      shelfItems: (startSnapshot.shelfItems || []).filter(i => scopedShelfIds.has(i.shelfId)),
       storeId: activeStoreId,
       currentWeek,
       user
@@ -206,10 +228,34 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
     try {
       const route = routePersonalQuery(query);
-      if (route) {
+      const agentEvents = [];
+      const revision = `${sessionEpoch}:${user?.id}:${activeStoreId}:${currentWeek}:${t0}`;
+      const plan = route ? null : assistantAgentPlan(query, contextData, revision);
+      if (plan?.tasks.some(t => t.id === 'schedule_review')) {
+        try { await useStore.getState().ensureWeeksLoaded(requiredDecisionWeeks(currentWeek)); } catch { /* Report provisional scores if loading fails. */ }
+        if (request.signal.aborted || sessionEpoch !== useStore.getState()._sessionEpoch) return;
+        // Loading adds weeks; only accept that snapshot change. A change in user,
+        // assignment or other input still invalidates this request below.
+        startSnapshot = { ...startSnapshot, schedule: useStore.getState().schedule };
+      }
+      const agentResult = route ? null : await runAssistantAgents(query, { ...contextData, schedule: startSnapshot.schedule }, {
+        revision,
+        decide: decideAssistantAgent, signal: request.signal,
+        isCurrent: () => {
+          const latest = useStore.getState();
+          return latest._sessionEpoch === sessionEpoch && ['user', 'employees', 'stores', 'schedule', 'shelves', 'shelfItems'].every(key => latest[key] === startSnapshot[key]);
+        },
+        onEvent: event => agentEvents.push(event),
+      });
+      if (request.signal.aborted) return;
+      if (agentResult) {
+        aiReply = agentResult.text;
+        model = agentEvents.some(e => e.decision?.source === 'jev') ? 'jev-agent-orchestrator' : 'rule-agent-orchestrator';
+        setMessages(prev => [...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]);
+      } else if (route) {
         const epoch = useStore.getState()._sessionEpoch;
         try { await useStore.getState().ensureWeeksLoaded([route.week]); } catch { /* answer reports missing data */ }
-        if (epoch !== useStore.getState()._sessionEpoch) return;
+        if (request.signal.aborted || epoch !== useStore.getState()._sessionEpoch) return;
         aiReply = answerPersonalQuery(route, useStore.getState());
         model = 'local-intent-router';
         setMessages(prev => [...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]);
@@ -223,14 +269,17 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
         try {
           aiReply = await askGeminiCopilot(query, contextData, chatHistory, validKey, (delta) => {
+            if (request.signal.aborted) return;
             // Stream: cập nhật tin nhắn theo từng chunk
             setMessages(prev => prev.map(m =>
               m.id === streamMsgId ? { ...m, text: m.text + delta } : m
             ));
           });
+          if (request.signal.aborted) return;
           model = selectedModel;
           setActiveModel(selectedModel);
         } catch (geminiErr) {
+          if (request.signal.aborted) return;
           console.warn('Gemini API call failed, falling back to local engine:', geminiErr);
           // Xóa placeholder rỗng, dùng local engine
           setMessages(prev => prev.filter(m => m.id !== streamMsgId));
@@ -239,8 +288,10 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
           const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
           setMessages(prev => [...prev, aiMsg]);
         } finally {
-          setIsStreaming(false);
-          streamingMsgIdRef.current = null;
+          if (agentRequestRef.current === request) {
+            setIsStreaming(false);
+            streamingMsgIdRef.current = null;
+          }
         }
       } else {
         aiReply = askAICopilot(query, contextData, chatHistory);
@@ -249,6 +300,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         setMessages(prev => [...prev, aiMsg]);
       }
     } catch (error) {
+      if (request.signal.aborted) return;
       console.warn('AI error:', error);
       err = error.message || 'ai-error';
       aiReply = askAICopilot(query, contextData, chatHistory);
@@ -256,9 +308,11 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       setMessages(prev => [...prev, aiMsg]);
       setIsStreaming(false);
     } finally {
-      setIsTyping(false);
-      setActiveModel(model);
-      if (sessionEpoch === useStore.getState()._sessionEpoch) useStore.getState().logAiTurn?.({
+      if (agentRequestRef.current === request) {
+        setIsTyping(false);
+        setActiveModel(model);
+      }
+      if (!request.signal.aborted && sessionEpoch === useStore.getState()._sessionEpoch) useStore.getState().logAiTurn?.({
         conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
         storeId: activeStoreId,
         userMessage: query,

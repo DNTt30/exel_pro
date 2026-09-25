@@ -24,6 +24,9 @@ export async function assessSwapDecision(context) {
   return a;
 }
 export { telegramConfigured };
+export async function decideAssistantAgent(state, signal) {
+  return jevDecide('agent_next_step', state, signal);
+}
 export async function inviteGapCandidate({ candidate, storeId, week, day, shift }) {
   if (!telegramConfigured()) throw new Error('Chưa cấu hình Telegram cho ứng dụng');
   const result = await notifyTelegram(`[Mời nhận ca · ${storeId}] ${candidate.emp.name}: ${day}, tuần ${week}, ca ${shift}. Vui lòng phản hồi quản lý nếu có thể nhận ca. Lời mời chưa thay đổi lịch.`);

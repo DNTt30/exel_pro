@@ -20,6 +20,7 @@ const FLAGS = {
   candidate_ranking: import.meta.env.VITE_JEV_UC2 === 'on',
   lock_readiness: import.meta.env.VITE_JEV_UC4 === 'on',
   shift_swap_assessment: import.meta.env.VITE_JEV_SWAPS === 'on',
+  agent_next_step: import.meta.env.VITE_JEV_AGENTS === 'on',
 };
 
 export function jevEnabled(task) {
@@ -30,11 +31,13 @@ export function jevEnabled(task) {
  * Goi Jev cho mot task da duoc whitelist phia server.
  * @returns {Promise<Object|null>} answers, hoac null khi bat ky dieu gi tro trot.
  */
-export async function jevRequest(task, state) {
+export async function jevRequest(task, state, signal) {
   if (!jevEnabled(task)) return null;
 
   try {
+    signal?.throwIfAborted();
     const { data } = await supabase.auth.getSession();
+    signal?.throwIfAborted();
     const token = data?.session?.access_token;
     if (!token) return null; // chua dang nhap -> khong goi
 
@@ -45,7 +48,7 @@ export async function jevRequest(task, state) {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ task, state }),
-      signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(CLIENT_TIMEOUT_MS)]) : AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -56,8 +59,8 @@ export async function jevRequest(task, state) {
   }
 }
 
-export async function jevDecide(task, state) {
-  return (await jevRequest(task, state))?.answers ?? null;
+export async function jevDecide(task, state, signal) {
+  return (await jevRequest(task, state, signal))?.answers ?? null;
 }
 
 // ─── DOC DAP AN AN TOAN ──────────────────────────────────────────────

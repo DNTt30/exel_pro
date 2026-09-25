@@ -21,6 +21,7 @@ import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../utils/dateH
 import PersonalTimesheetModal from '../../components/modals/PersonalTimesheetModal';
 import { useShallow } from 'zustand/react/shallow';
 import { isOpsManager, isManagerFromEmp } from '../../lib/authSession';
+import PayrollPreviewCard from '../../components/payroll/PayrollPreviewCard';
 
 export default function EmployeeTimesheet() {
   const { user, schedule, currentWeek } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, currentWeek: s.currentWeek })));
@@ -255,6 +256,15 @@ export default function EmployeeTimesheet() {
           </div>
         </div>
       </div>
+
+      {/* Payroll Preview Card — hiện khi đang xem công cá nhân */}
+      {effectiveFilterOnlyMe && (
+        <PayrollPreviewCard
+          user={user}
+          cycleDates={cycleDates}
+          getEffectiveValue={getEffectiveValue}
+        />
+      )}
 
       {/* Print Header */}
       <div className="hidden print:block text-center mb-4 pb-2 border-b border-slate-300">

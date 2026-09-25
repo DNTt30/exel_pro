@@ -189,7 +189,8 @@ export async function ensureAuthSession(user, { allowSignUp = false, password, r
 
   try {
     const signedIn = await withTimeout(
-      supabase.auth.signInWithPassword({ email, password: password || toAuthPassword(user.id) }),
+      // Không còn dùng toAuthPassword() làm fallback trong login — chỉ dùng password được truyền vào
+      supabase.auth.signInWithPassword({ email, password }),
       10000,
       'timeout-sign-in'
     );
@@ -219,7 +220,8 @@ export async function ensureAuthSession(user, { allowSignUp = false, password, r
     }
 
     const retry = await withTimeout(
-      supabase.auth.signInWithPassword({ email, password: password || toAuthPassword(user.id) }),
+      // Không còn dùng toAuthPassword() làm fallback trong login — chỉ dùng password được truyền vào
+      supabase.auth.signInWithPassword({ email, password }),
       10000,
       'timeout-sign-in-retry'
     );

@@ -103,7 +103,12 @@ export default function Login() {
     setSubmitting(true);
     try {
       const user = await login(empId.trim(), password || '1', { rememberMe });
-      if (isOpsManager(user)) {
+      if (user.mustChangePassword) {
+        navigate(
+          isOpsManager(user) ? '/admin/security/change-password' : '/employee/change-password',
+          { state: { forced: true, reason: user.isPasswordExpired ? 'expired' : 'default' } }
+        );
+      } else if (isOpsManager(user)) {
         navigate('/admin/dashboard');
       } else {
         navigate('/employee/home');

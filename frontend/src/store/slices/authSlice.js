@@ -185,6 +185,14 @@ export const createAuthSlice = (set, get) => {
           }
         }
 
+        // Block login hoàn toàn khi mật khẩu mặc định đã quá hạn 7 ngày
+        if (isDefaultPassword && isPasswordExpired) {
+          await signOutAuth(); // dọn Supabase session vừa tạo
+          const blockErr = new Error('Mật khẩu mặc định đã quá hạn 7 ngày. Vui lòng liên hệ quản lý để được cấp mật khẩu mới.');
+          blockErr.code = 'PASSWORD_EXPIRED';
+          throw blockErr;
+        }
+
         const passwordChangedAt = emp.passwordChangedAt 
           || (!isDefaultPassword ? (pwCheck.data?.user?.user_metadata?.password_changed_at || new Date().toISOString()) : null);
 

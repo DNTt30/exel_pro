@@ -26,7 +26,10 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
     : (isForced ? 'Thiết lập mật khẩu mới' : 'Đổi mật khẩu của bạn');
 
   const submit = async () => {
+    const BANNED_PASSWORDS = ['1', '123', '12345678', 'password'];
     if (newPw.length < MIN_LEN) return toast.error('Mật khẩu mới tối thiểu ' + MIN_LEN + ' ký tự');
+    if (BANNED_PASSWORDS.includes(newPw.toLowerCase())) return toast.error('Mật khẩu quá đơn giản, vui lòng chọn mật khẩu khác');
+    if (!/[0-9]/.test(newPw) && !/[^a-zA-Z0-9]/.test(newPw)) return toast.error('Mật khẩu phải có ít nhất 1 chữ số hoặc 1 ký tự đặc biệt');
     if (newPw !== confirmPw) return toast.error('Xác nhận mật khẩu không khớp');
     setBusy(true);
     try {

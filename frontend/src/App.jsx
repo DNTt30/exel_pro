@@ -20,6 +20,7 @@ const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
 const ShelfDateBoard = lazy(() => import('./pages/shared/ShelfDateBoard'));
 const Handbook = lazy(() => import('./pages/shared/Handbook'));
+const EmployeeChangePassword = lazy(() => import('./pages/employee/EmployeeChangePassword'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -160,6 +161,7 @@ function App() {
               <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />
               <Route path="employee/shelves" element={<PrivateRoute allowedRoles={['employee', 'admin']}><ShelfDateBoard /></PrivateRoute>} />
               <Route path="employee/handbook" element={<PrivateRoute allowedRoles={['employee', 'admin']}><Handbook /></PrivateRoute>} />
+              <Route path="employee/change-password" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeChangePassword /></PrivateRoute>} />
             </Route>
             
             <Route path="*" element={<CatchAllRedirect />} />

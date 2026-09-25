@@ -1,4 +1,4 @@
-import * as api from '../../services/api';
+﻿import * as api from '../../services/api';
 import {
   assertCanManageStaff,
   assertWeekEditable,
@@ -108,6 +108,15 @@ export const createScheduleSlice = (set, get) => {
       set(state => ({ schedule: { ...state.schedule, [row.week_date]: {
         ...state.schedule[row.week_date], [row.emp_id]: withScheduleVersion(row.shifts || {}, row.version)
       } }, lastSyncedAt: Date.now() }));
+      // Thông báo khi lịch người khác thay đổi (không phải do mình ghi)
+      const me = get().user;
+      if (row.emp_id !== me?.id) {
+        toast.info('📅 Lịch vừa được cập nhật theo thời gian thực');
+      }
+      // Emit event để UI highlight ô vừa đổi
+      window.dispatchEvent(new CustomEvent('gs25_schedule_realtime', {
+        detail: { weekDate: row.week_date, empId: row.emp_id }
+      }));
     } else {
       // DELETE may include only the primary key: refresh every cached week.
       void get().refreshScheduleWeeks(Object.keys(get().schedule)).catch(() => {

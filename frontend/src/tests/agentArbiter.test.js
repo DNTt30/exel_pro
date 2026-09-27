@@ -321,4 +321,13 @@ describe('real adapter execution', () => {
     expect(result.action).toBe('ESCALATE');
     expect(result.state.checks).toEqual({});
   });
+
+  it('preserves non-retryable failures and stops without spending remaining attempts', async () => {
+    const error = Object.assign(new Error('CODEX_USAGE_LIMIT'), { code: 'CODEX_USAGE_LIMIT', retryable: false, retryAfterHint: 'Sep 30th, 2026 1:06 PM' });
+    const execute = vi.fn(async () => { throw error; });
+    const result = await runAgentWorkflow(state([task('analyze', { maxAttempts: 3 }), task('later', { dependsOn: ['analyze'] })]), { execute });
+    expect(result).toMatchObject({ action: 'ESCALATE', reason: 'CODEX_USAGE_LIMIT' });
+    expect(result.state.tasks[0].failure).toMatchObject({ code: 'CODEX_USAGE_LIMIT', retryable: false, retryAfterHint: error.retryAfterHint });
+    expect(execute).toHaveBeenCalledOnce();
+  });
 });

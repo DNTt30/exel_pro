@@ -40,6 +40,9 @@ npm.cmd run agents:next
 # Demo scheduler, toàn bộ kết quả agent và bằng chứng đều giả lập
 npm.cmd run agents:demo
 
+# Đọc báo cáo local mới nhất; không gọi Codex/Jev
+npm.cmd run agents:status
+
 # objective.txt là yêu cầu cụ thể do người dùng viết, không chứa secret
 node scripts/jev_agents.mjs --codex --task-file artifacts/objective.txt --review-only
 
@@ -53,6 +56,10 @@ node scripts/jev_agents.mjs --codex --task-file artifacts/objective.txt --live
 `--live` yêu cầu `TYPESAFE_API_KEY` trong môi trường process. Không đặt key trong `VITE_*`, task file hoặc git. Không có `--live` thì vẫn chạy Codex thật nhưng dùng rule để chọn bước. `--demo` luôn giả lập và từ chối kết hợp `--live`/`--run`/`--codex`. `--review-only` không chạy agent sửa code.
 
 Lưu trace JSONL, phản hồi JSON và log kiểm thử trong `artifacts/jev-agents/<run-id>/` đã gitignore. Các log có thể chứa nội dung repo; không công khai chúng tự động. Ctrl+C hủy workflow và dừng cây tiến trình Codex do adapter khởi chạy trên Windows. Mỗi process có timeout 4 phút, runner giới hạn mỗi bước 5 phút; vượt thời gian thì ESCALATE và giữ lại thay đổi để xem xét.
+
+Mỗi lượt demo/chạy adapter mới còn lưu `workflow-events.jsonl`, `run-report.json` và `run-report.md`: trạng thái từng task, nguyên nhân lỗi, finding, bằng chứng và hướng xử lý tiếp. `agents:status` đọc báo cáo mới nhất và so revision với workspace; `stale: true` nghĩa là source đã thay đổi. `RUNNING` chỉ là trạng thái cuối được lưu, không chứng minh process còn sống nếu máy bị tắt đột ngột. Báo cáo hỏng trả `UNREADABLE_REPORT`, không quay về kết quả thành công cũ. Trace cũ trước tính năng này chưa có báo cáo tổng hợp.
+
+Lỗi quota (`CODEX_USAGE_LIMIT`), đăng nhập (`CODEX_AUTH_REQUIRED`), timeout/hủy và lỗi khởi chạy process dừng workflow; không tiêu lượt retry còn lại. Gợi ý thời điểm từ provider được giữ nguyên dưới `retryAfterHint`, không suy diễn múi giờ và không đặt lịch tự retry. Log dở dang khi timeout/hủy vẫn được giữ. Báo cáo demo luôn có `simulation: true` và không phải bằng chứng hoàn thành thật.
 
 Jev chỉ được gọi khi có nhiều lựa chọn, ví dụ hai reviewer cùng sẵn sàng. Vì vậy `agents:next -- --live` trên plan mới chỉ có `analyze` sẽ dùng rule, không phát sinh request Jev.
 
@@ -90,5 +97,9 @@ Kiểm chứng ngày 25/09/2026: `npm.cmd run audit:all` đạt 553 tests, 7 ski
 | Jev provider thật và đo độ trễ/chất lượng | Chờ cấu hình `TYPESAFE_API_KEY` |
 | Deploy Edge và bật flag production | Chưa thực hiện |
 | Tự sửa theo finding, worktree riêng từng writer, bộ dữ liệu hiệu chỉnh | Chưa triển khai |
+
+Tiếp tục local ngày 27/09/2026 theo lựa chọn của người dùng: chưa cấu hình key Jev, bổ sung báo cáo workflow và chặn retry lỗi quota. Lượt CLI ngày 25/09 lúc 13:39 vẫn gặp hạn mức; log mới nhất hẹn thử lại `Sep 30th, 2026 1:06 PM`. Chưa có approval CLI cuối; không tiếp tục gọi provider trong đợt hoàn thiện local này.
+
+Audit local ngày 27/09 đạt **563 tests, 7 skipped**, lint sạch, build pass. Đã kiểm tra `--demo` và `--status` không gọi provider. Khi chạy audit trên các commit mới của repo, phát hiện và sửa lỗi tham chiếu timer realtime; thông báo debounce hiện gắn với từng store instance và bỏ qua phiên đã đổi. Test đăng nhập đã cập nhật theo hành vi chặn mật khẩu mặc định quá hạn trong commit bảo mật hiện có; không thay đổi mật khẩu mặc định hoặc logic auth của commit đó.
 
 Contract provider theo [TypeSafe API](https://docs.typesafe.ai/api). Adapter dùng stdin, JSONL và schema output theo [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode); các cờ đã đối chiếu `codex exec --help` trên máy này.

@@ -3,7 +3,7 @@ import { createStore } from 'zustand';
 import { createAuthSlice } from '../store/slices/authSlice';
 import * as api from '../services/api';
 import { supabase } from '../lib/supabase';
-import { ensureAuthSession, provisionAuthUser, isOpsManager } from '../lib/authSession';
+import { ensureAuthSession, provisionAuthUser, isOpsManager, signOutAuth } from '../lib/authSession';
 import { checkDeviceTrusted } from '../lib/adminOtp';
 import { checkLocked, recordFailure, resetFailures, THROTTLE_MAX_FAILS } from '../lib/loginThrottle';
 import { verifyAdminPassword } from '../lib/adminCredential';
@@ -73,9 +73,22 @@ describe('useStore.login', () => {
 
   it.each([[8,true],[2,false]])('computes expiry from the real login with an account %i days old', async (days,expired) => {
     api.getEmployeeById.mockResolvedValueOnce({...employee,createdAt:new Date(Date.now()-days*86400000).toISOString()});
+    if (expired) {
+      await expect(store.getState().login(employee.id, '1')).rejects.toMatchObject({ code: 'PASSWORD_EXPIRED' });
+      expect(signOutAuth).toHaveBeenCalledOnce();
+      expect(store.getState().user).toBeNull();
+      expect(store.getState().initializeData).not.toHaveBeenCalled();
+      return;
+    }
     const user=await store.getState().login(employee.id,'1');
     expect(user.mustChangePassword).toBe(true);
     expect(user.isPasswordExpired).toBe(expired);
+  });
+  it('allows an older account with its changed password', async () => {
+    api.getEmployeeById.mockResolvedValueOnce({ ...employee, createdAt: new Date(Date.now() - 8 * 86400000).toISOString() });
+    const user = await store.getState().login(employee.id, 'changed-password');
+    expect(user.isPasswordExpired).toBe(false);
+    expect(signOutAuth).not.toHaveBeenCalled();
   });
   it.each(['', 'abc', '12345678', '1234567890', '12345678a'])('chặn mã không hợp lệ: %j trước khi gọi API', async (id) => {
     await expect(store.getState().login(id, '1')).rejects.toThrow();

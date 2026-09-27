@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCodexAdapter, runProcess } from '../../../scripts/agents/codexAdapter.mjs';
@@ -74,5 +74,14 @@ describe('Codex CLI adapter boundaries', () => {
     const rejected = expect(promise).rejects.toThrow('CANCELLED');
     controller.abort();
     await rejected;
+  });
+  it('keeps partial process output when an adapter times out', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jev-codex-adapter-')); directories.push(directory);
+    const adapter = createCodexAdapter({ root: directory, objective: 'Review', revisionOf: () => 'rev', codex: { command: 'fixture', args: [] }, processRunner: async () => {
+      throw Object.assign(new Error('PROCESS_TIMEOUT'), { code: 'PROCESS_TIMEOUT', retryable: false, stdout: '{"type":"thread.started"}\n', stderr: 'partial diagnostic' });
+    } });
+    await expect(adapter.execute(task('code_review'), ctx())).rejects.toMatchObject({ code: 'PROCESS_TIMEOUT', retryable: false });
+    expect(readFileSync(join(adapter.artifactDir, 'code_review-1.jsonl'), 'utf8')).toContain('thread.started');
+    expect(readFileSync(join(adapter.artifactDir, 'code_review-1.stderr.log'), 'utf8')).toBe('partial diagnostic');
   });
 });

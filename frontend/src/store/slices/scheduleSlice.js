@@ -37,6 +37,7 @@ export const createScheduleSlice = (set, get) => {
   let attendanceRequest = 0;
   let attendanceQueue = Promise.resolve();
   let attendancePending = 0;
+  let scheduleToastTimer;
   const scheduleEvents = [];
   const enqueueAttendance = (task) => {
     const epoch = get()._sessionEpoch;
@@ -110,14 +111,15 @@ export const createScheduleSlice = (set, get) => {
       } }, lastSyncedAt: Date.now() }));
       // Thông báo khi lịch người khác thay đổi — debounce 1.5s tránh spam toast
       const me = get().user;
-      if (row.emp_id !== me?.id) {
-        clearTimeout(receiveScheduleEvent._toastTimer);
-        receiveScheduleEvent._toastTimer = setTimeout(() => {
-          toast.info('📅 Lịch vừa được cập nhật theo thời gian thực');
+      if (me && row.emp_id !== me.id) {
+        const epoch = get()._sessionEpoch;
+        clearTimeout(scheduleToastTimer);
+        scheduleToastTimer = setTimeout(() => {
+          if (get()._sessionEpoch === epoch && get().user?.id === me.id) toast.info('📅 Lịch vừa được cập nhật theo thời gian thực');
         }, 1500);
       }
       // Emit event để UI highlight ô vừa đổi
-      window.dispatchEvent(new CustomEvent('gs25_schedule_realtime', {
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('gs25_schedule_realtime', {
         detail: { weekDate: row.week_date, empId: row.emp_id }
       }));
     } else {

@@ -80,10 +80,10 @@ export function startAgentTask(state, taskId, runId) {
   return { ...state, stepsUsed: state.stepsUsed + 1, tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'running', attempts: t.attempts + 1, runId, startedRevision: state.revision } : t) };
 }
 
-export function finishAgentTask(state, { taskId, runId, revision, ok }) {
+export function finishAgentTask(state, { taskId, runId, revision, ok, failure = null }) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task || task.status !== 'running' || task.runId !== runId || task.startedRevision !== revision || state.revision !== revision) throw new Error('STALE_AGENT_RESULT');
-  return { ...state, tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: ok === true ? 'succeeded' : 'failed', outputRevision: ok === true ? revision : null } : t) };
+  return { ...state, tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: ok === true ? 'succeeded' : 'failed', outputRevision: ok === true ? revision : null, failure: ok === true ? null : failure } : t) };
 }
 
 /** A runtime supplies real agent adapters; the scheduler does not execute model text. */
@@ -136,7 +136,7 @@ export async function runAgentWorkflow(initial, { decide, execute, getRevision, 
         // adapter may still be running. Adapters must honor their abort signal.
         let timer;
         const promise = Promise.race([
-          Promise.resolve().then(() => execute(task, { revision, runId, outputs: structuredClone(outputs), signal: combined })).then(output => ({ taskId, runId, revision, ok: true, output }), error => ({ taskId, runId, revision, ok: false, error: error instanceof Error ? error.message : 'Adapter failure' })),
+          Promise.resolve().then(() => execute(task, { revision, runId, outputs: structuredClone(outputs), signal: combined })).then(output => ({ taskId, runId, revision, ok: true, output }), error => ({ taskId, runId, revision, ok: false, error: error instanceof Error ? error.message : 'Adapter failure', failure: { code: typeof error?.code === 'string' ? error.code : 'ADAPTER_FAILURE', message: error instanceof Error ? error.message : 'Adapter failure', retryable: error?.retryable !== false, retryAfterHint: typeof error?.retryAfterHint === 'string' ? error.retryAfterHint : null } })),
           new Promise(resolve => { timer = setTimeout(() => resolve({ timeout: true, taskId }), timeoutMs); workerTimers.add(timer); }),
         ]).finally(() => { clearTimeout(timer); workerTimers.delete(timer); });
         pending.set(taskId, promise);
@@ -162,6 +162,7 @@ export async function runAgentWorkflow(initial, { decide, execute, getRevision, 
           state = { ...state, checks: evidence?.checks || state.checks, review: evidence?.review || state.review };
         }
         onEvent({ type: 'result', taskId: result.taskId, ok: result.ok, revision: state.revision, error: result.error });
+        if (result.failure?.retryable === false) return { state, outputs, action: 'ESCALATE', reason: result.failure.code };
       }
     }
   } catch (error) {

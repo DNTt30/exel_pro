@@ -5,6 +5,7 @@
   "scripts": {
     "agents:next": "node scripts/jev_agents.mjs",
     "agents:demo": "node scripts/jev_agents.mjs --demo",
+    "agents:status": "node scripts/jev_agents.mjs --status",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
     "prisma:migrate": "prisma migrate dev",

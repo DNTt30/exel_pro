@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { delimiter, join, resolve } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { workspaceRevision } from './workspace.mjs';
+import { codexEvents, codexFailure } from './codexDiagnostics.mjs';
 
 export const CODEX_RESULT_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['summary', 'verdict', 'findings'],
@@ -35,6 +36,8 @@ export function runProcess(command, args, { cwd, input = '', signal, env = proce
     const terminate = reason => {
       if (failure) return;
       failure = new Error(reason);
+      failure.code = reason;
+      failure.retryable = false;
       if (child.pid && process.platform === 'win32') {
         try { execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore', timeout: 5000 }); }
         catch { child.kill(); }
@@ -49,8 +52,8 @@ export function runProcess(command, args, { cwd, input = '', signal, env = proce
     const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
     child.stdout.on('data', chunk => { if (failure) return; stdout += chunk; if (stdout.length + stderr.length > 8 * 1024 * 1024) terminate('PROCESS_OUTPUT_LIMIT'); });
     child.stderr.on('data', chunk => { if (failure) return; stderr += chunk; if (stdout.length + stderr.length > 8 * 1024 * 1024) terminate('PROCESS_OUTPUT_LIMIT'); });
-    child.on('error', error => { cleanup(); reject(error); });
-    child.on('close', code => { cleanup(); if (failure) reject(failure); else resolveResult({ code, stdout, stderr }); });
+    child.on('error', error => { cleanup(); error.retryable = false; reject(error); });
+    child.on('close', code => { cleanup(); if (failure) { failure.stdout = stdout; failure.stderr = stderr; reject(failure); } else resolveResult({ code, stdout, stderr }); });
     child.stdin.on('error', () => { /* Process exit is handled above. */ });
     child.stdin.end(input);
   });
@@ -115,13 +118,19 @@ export function createCodexAdapter({ root, objective, readOnly = false, processR
     ].join('\n\n');
     const env = { ...process.env }; delete env.TYPESAFE_API_KEY;
     const args = [...codex.args, 'exec', '--ephemeral', '--json', '--color', 'never', '--sandbox', writer ? 'workspace-write' : 'read-only', '-c', 'approval_policy="never"', '-c', 'features.multi_agent=false', '--cd', root, '--output-schema', schemaPath, '--output-last-message', outputFile, '-'];
-    const result = await processRunner(codex.command, args, { cwd: root, input: prompt, signal, env });
+    let result;
+    try { result = await processRunner(codex.command, args, { cwd: root, input: prompt, signal, env }); }
+    catch (error) {
+      writeFileSync(join(artifactDir, `${task.id}-${task.attempts}.jsonl`), error.stdout || '');
+      writeFileSync(join(artifactDir, `${task.id}-${task.attempts}.stderr.log`), error.stderr || error.message);
+      throw error;
+    }
     writeFileSync(join(artifactDir, `${task.id}-${task.attempts}.jsonl`), result.stdout);
     writeFileSync(join(artifactDir, `${task.id}-${task.attempts}.stderr.log`), result.stderr);
-    if (result.code !== 0) throw new Error(`CODEX_EXIT_${result.code}: see ${artifactDir}`);
+    if (result.code !== 0) throw codexFailure(result);
     const output = JSON.parse(readFileSync(outputFile, 'utf8'));
     if (typeof output.summary !== 'string' || !['completed', 'approved', 'changes_requested'].includes(output.verdict) || !Array.isArray(output.findings) || output.findings.some(f => typeof f !== 'string')) throw new Error('INVALID_CODEX_RESULT');
-    const events = result.stdout.split(/\r?\n/).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
+    const events = codexEvents(result.stdout);
     const thread = events.find(e => e.type === 'thread.started')?.thread_id;
     if (!thread || !events.some(e => e.type === 'turn.completed') || events.some(e => e.type === 'turn.failed')) throw new Error('CODEX_COMPLETION_NOT_VERIFIED');
     if (!writer && revisionOf(root) !== revision) throw new Error('READ_ONLY_AGENT_CHANGED_WORKSPACE');

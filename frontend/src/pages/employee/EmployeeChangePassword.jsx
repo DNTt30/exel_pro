@@ -15,7 +15,7 @@ const WEAK_PASSWORDS = new Set(['1', '12345678', '123456', 'password', 'gs25', '
 function validateNewPassword(pw) {
   if (!pw || pw.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
   if (WEAK_PASSWORDS.has(pw.toLowerCase())) return 'Mật khẩu quá đơn giản, vui lòng chọn mật khẩu khác';
-  if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw)) return 'Mật khẩu phải có ít nhất 1 chữ số hoặc ký tự đặc biệt';
+  if (!/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return 'Mật khẩu phải có ít nhất 1 chữ số hoặc ký tự đặc biệt';
   return null;
 }
 

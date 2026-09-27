@@ -8,6 +8,7 @@ import * as api from '../services/api';
 import { validateEmployeeSchedule, mergeAiSchedule } from '../utils/shiftHelper';
 import { scheduleVersion, withScheduleVersion } from '../utils/scheduleVersion';
 import { actualAttendanceValue, scheduledAttendanceValue, timesheetHours, movePayrollCycle } from '../utils/timesheetValues';
+import { toast } from '../utils/toast';
 
 vi.mock('../lib/supabase', () => ({ supabase: null }));
 vi.mock('../lib/authSession', async (original) => ({ ...await original(),
@@ -39,9 +40,29 @@ beforeEach(() => {
   api.upsertAttendanceRows.mockResolvedValue([]);
   api.getSchedulesByWeek.mockResolvedValue({});
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('schedule integrity', () => {
+  it('debounces remote schedule notices per store instance', async () => {
+    vi.useFakeTimers();
+    const store = makeStore();
+    const event = { new: { week_date: week, emp_id: employee.id, version: 9, shifts: { T2: '6-14' } } };
+    store.getState().receiveScheduleEvent(event);
+    await vi.advanceTimersByTimeAsync(1000);
+    store.getState().receiveScheduleEvent(event);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(toast.info).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(toast.info).toHaveBeenCalledOnce();
+  });
+  it('does not show a delayed realtime notice after the session changes', async () => {
+    vi.useFakeTimers();
+    const store = makeStore();
+    store.getState().receiveScheduleEvent({ new: { week_date: week, emp_id: employee.id, version: 9, shifts: {} } });
+    store.setState({ user: null, _sessionEpoch: (store.getState()._sessionEpoch || 0) + 1 });
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(toast.info).not.toHaveBeenCalled();
+  });
   it('buffers realtime during a write and applies the newer server version afterwards', async () => {
     const store=makeStore(), request=deferred();
     api.saveEmployeeSchedule.mockReturnValueOnce(request.promise);

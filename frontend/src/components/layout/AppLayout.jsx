@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager, canManageStoreList } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen, Smartphone, BellOff, Bell } from 'lucide-react';
@@ -14,19 +14,12 @@ import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
 import { usePWAInstall } from '../../utils/pwaHelper';
 import { usePushNotification } from '../../hooks/usePushNotification';
+import { requiredPasswordPath } from '../../utils/authNavigation';
 
 export default function AppLayout() {
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
   const [showPw, setShowPw] = useState(false);
-  // Nhắc đổi mật khẩu MỘT LẦN bằng effect (tránh mở modal trong cùng commit mount
-  const pwPromptedRef = useRef(false);
-  useEffect(() => {
-    if (user?.mustChangePassword && !pwPromptedRef.current) {
-      pwPromptedRef.current = true;
-      setShowPw(true);
-    }
-  }, [user?.mustChangePassword]);
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
   const authWarning = useStore(state => state.authWarning);
@@ -39,15 +32,7 @@ export default function AppLayout() {
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
   const isManager = isOpsManager(user);
-  const location = useLocation();
   const { status: pushStatus, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification(user?.id);
-
-  // ── Bảo mật 1: admin chưa đặt mật khẩu riêng → ép vào trang đổi mật khẩu
-  useEffect(() => {
-    if (user?.id === 'admin' && user?.mustSetupPassword && location.pathname !== '/admin/security/change-password') {
-      navigate('/admin/security/change-password', { replace: true });
-    }
-  }, [user?.id, user?.mustSetupPassword, location.pathname, navigate]);
 
   // ── Bảo mật 2: tự đăng xuất khi không tương tác (20 phút) hoặc hết phiên tuyệt đối (12h)
   const logoutRef = useRef(handleLogout);
@@ -156,6 +141,21 @@ export default function AppLayout() {
     return { label, side: 'bg-white/10 text-white/60 border-white/20', top: 'bg-slate-100 text-slate-600 border-slate-200' };
   };
   const ri = getRoleInfo();
+
+  if (requiredPasswordPath(user)) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+          <span className="text-sm font-bold text-blue-600">GS25 · Bảo mật tài khoản</span>
+          <button type="button" onClick={handleLogout} className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+            <LogOut size={16} /> Đăng xuất
+          </button>
+        </header>
+        <main><Outlet /></main>
+        <Toaster />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full bg-slate-50 print:bg-white print:h-auto print:block overflow-x-hidden overflow-y-hidden">

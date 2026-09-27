@@ -2,6 +2,7 @@
 // POST { target_emp_id, new_password } với Authorization = JWT của admin.
 // Kiểm tra: caller phải có role ADMIN trong user_store_roles (qua app_profiles).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateNewPassword } from '../_shared/passwordPolicy.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -35,14 +36,12 @@ Deno.serve(async (req) => {
   }
 
   const { target_emp_id, new_password } = await req.json();
-  if (!target_emp_id || !new_password || String(new_password).length < 8) {
-    return new Response(JSON.stringify({ ok: false, error: 'bad-input' }), { status: 400, headers: cors });
+  const passwordError = validateNewPassword(new_password);
+  if (!target_emp_id || passwordError) {
+    return new Response(JSON.stringify({ ok: false, error: passwordError || 'bad-input' }), { status: 400, headers: cors });
   }
 
   // Tìm auth user của NV đích theo email quy ước
-  const email = target_emp_id === 'admin' ? 'admin@ofc.app' : target_emp_id + '@ofc.app';
-  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 }).then(r => r)
-    .catch(() => ({ data: null }));
   // listUsers không lọc được email trực tiếp — dùng lookup qua profiles trước
   const { data: tProf } = await admin.from('app_profiles').select('id').eq('emp_id', target_emp_id).single();
   let targetUserId = tProf?.id;
@@ -50,14 +49,16 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: false, error: 'target-has-no-auth-user' }), { status: 404, headers: cors });
   }
 
-  const upd = await admin.auth.admin.updateUserById(targetUserId, { password: new_password });
+  const upd = await admin.auth.admin.updateUserById(targetUserId, {
+    password: new_password,
+    user_metadata: { must_change_password: true, password_changed_at: null },
+  });
   if (upd.error) {
     return new Response(JSON.stringify({ ok: false, error: upd.error.message }), { status: 500, headers: cors });
   }
 
-  // Đặt lại cờ ép đổi: NULL để NV bị yêu cầu tự đổi lần đăng nhập tới? Không —
-  // admin đã cấp mật khẩu riêng => đánh dấu đã đặt (không ép).
-  await admin.from('app_profiles').update({ credential_set_at: new Date().toISOString() })
+  // Mật khẩu quản lý cấp là tạm thời: buộc tự đổi ở lần đăng nhập tiếp theo.
+  await admin.from('app_profiles').update({ credential_set_at: null })
     .eq('emp_id', target_emp_id);
 
   return new Response(JSON.stringify({ ok: true }), { headers: cors });

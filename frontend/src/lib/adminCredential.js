@@ -4,7 +4,8 @@
 // mac dinh '1' se bi buoc doi ngay truoc khi vao Dashboard.
 // =====================================================================
 
-export const ADMIN_MIN_PASSWORD_LEN = 8;
+import { MIN_PASSWORD_LENGTH, validateNewPassword } from '../utils/passwordPolicy';
+export const ADMIN_MIN_PASSWORD_LEN = MIN_PASSWORD_LENGTH;
 const STORAGE_KEY = 'ofc-admin-cred-v1';
 
 function toHex(buf) {
@@ -35,13 +36,7 @@ export function hashPassword(password, salt) {
 }
 
 export function validateAdminPassword(pw) {
-  if (typeof pw !== 'string' || pw.length < ADMIN_MIN_PASSWORD_LEN) return 'Mật khẩu tối thiểu ' + ADMIN_MIN_PASSWORD_LEN + ' ký tự.';
-  if (pw === '1') return 'Không được dùng lại mật khẩu mặc định.';
-  const first = pw[0];
-  let allSame = true;
-  for (const ch of pw) if (ch !== first) { allSame = false; break; }
-  if (allSame) return 'Mật khẩu không được lặp một ký tự.';
-  return '';
+  return validateNewPassword(pw) || '';
 }
 
 function readCred() {

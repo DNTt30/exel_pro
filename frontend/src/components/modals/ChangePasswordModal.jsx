@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
-import { changeMyPassword, adminResetPassword } from '../../services/api/password';
+import { adminResetPassword } from '../../services/api';
+import { MIN_PASSWORD_LENGTH as MIN_LEN, validateNewPassword } from '../../utils/passwordPolicy';
 import { toast } from '../ui/toastStore';
 import { KeyRound, LogOut } from 'lucide-react';
-
-const MIN_LEN = 8;
 
 export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null }) {
   // targetEmp != null → chế độ ADMIN RESET cho nhân viên đó
   const user = useStore(s => s.user);
   const logout = useStore(s => s.logout);
+  const changeMyPassword = useStore(s => s.changeMyPassword);
   const navigate = useNavigate();
   // Khi SM/Manager dùng mật khẩu mặc định → nhắc đổi mật khẩu
   const isForced = !targetEmp && user?.mustChangePassword && !user?.id?.startsWith('admin');
@@ -26,10 +26,9 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
     : (isForced ? 'Thiết lập mật khẩu mới' : 'Đổi mật khẩu của bạn');
 
   const submit = async () => {
-    const BANNED_PASSWORDS = ['1', '123', '12345678', 'password'];
-    if (newPw.length < MIN_LEN) return toast.error('Mật khẩu mới tối thiểu ' + MIN_LEN + ' ký tự');
-    if (BANNED_PASSWORDS.includes(newPw.toLowerCase())) return toast.error('Mật khẩu quá đơn giản, vui lòng chọn mật khẩu khác');
-    if (!/[0-9]/.test(newPw) && !/[^a-zA-Z0-9]/.test(newPw)) return toast.error('Mật khẩu phải có ít nhất 1 chữ số hoặc 1 ký tự đặc biệt');
+    if (busy) return;
+    const validationError = validateNewPassword(newPw);
+    if (validationError) return toast.error(validationError);
     if (newPw !== confirmPw) return toast.error('Xác nhận mật khẩu không khớp');
     setBusy(true);
     try {
@@ -40,12 +39,7 @@ export default function ChangePasswordModal({ isOpen, onClose, targetEmp = null 
         }));
         toast.success('✅ Đã đặt lại mật khẩu. Nhân viên sẽ bị buộc đổi mật khẩu khi đăng nhập.');
       } else {
-        await changeMyPassword(oldPw, newPw, { isFirstTime: isForced, userId: user?.id });
-        const nowIso = new Date().toISOString();
-        useStore.setState(s => ({ 
-          user: { ...s.user, mustChangePassword: false, isPasswordExpired: false, passwordChangedAt: nowIso, authPassword: newPw },
-          employees: (s.employees || []).map(e => e.id === user?.id ? { ...e, passwordChangedAt: nowIso } : e)
-        }));
+        await changeMyPassword(oldPw, newPw, { isFirstTime: isForced });
         toast.success('✅ Thiết lập mật khẩu thành công! Hãy ghi nhớ mật khẩu mới.');
       }
       setOldPw(''); setNewPw(''); setConfirmPw('');

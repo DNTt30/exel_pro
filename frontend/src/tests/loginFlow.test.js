@@ -12,6 +12,7 @@ vi.mock('../services/api', () => ({
   getEmployeeById: vi.fn(),
   getEmployees: vi.fn(),
   addActivityLog: vi.fn(),
+  changeMyPassword: vi.fn(),
 }));
 vi.mock('../lib/supabase', () => ({
   supabase: { auth: { signInWithPassword: vi.fn(), updateUser: vi.fn(), signOut: vi.fn() } },
@@ -59,6 +60,22 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('useStore.login', () => {
+  it('allows exactly seven days and blocks one millisecond later', async () => {
+    const now = new Date('2026-09-27T00:00:00Z').getTime();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    api.getEmployeeById.mockResolvedValue({ ...employee, createdAt: new Date(now - 7 * 86400000).toISOString() });
+    await expect(store.getState().login(employee.id, '1')).resolves.toMatchObject({ mustChangePassword: true });
+    await store.getState().logout();
+    vi.mocked(Date.now).mockReturnValue(now + 1);
+    supabase.auth.signInWithPassword.mockClear();
+    await expect(store.getState().login(employee.id, '1')).rejects.toMatchObject({ code: 'PASSWORD_EXPIRED' });
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('honors an admin reset flag with a non-default password', async () => {
+    supabase.auth.signInWithPassword.mockResolvedValueOnce(signedIn(employee.id, { must_change_password: true }));
+    await expect(store.getState().login(employee.id, 'Temporary9')).resolves.toMatchObject({ mustChangePassword: true });
+  });
   it('does not revive a session when logout occurs during sign-in', async () => {
     let finish;
     supabase.auth.signInWithPassword.mockReturnValueOnce(new Promise(resolve => { finish=resolve; }));
@@ -75,7 +92,7 @@ describe('useStore.login', () => {
     api.getEmployeeById.mockResolvedValueOnce({...employee,createdAt:new Date(Date.now()-days*86400000).toISOString()});
     if (expired) {
       await expect(store.getState().login(employee.id, '1')).rejects.toMatchObject({ code: 'PASSWORD_EXPIRED' });
-      expect(signOutAuth).toHaveBeenCalledOnce();
+      expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
       expect(store.getState().user).toBeNull();
       expect(store.getState().initializeData).not.toHaveBeenCalled();
       return;
@@ -166,11 +183,11 @@ describe('useStore.login', () => {
     expect(provisionAuthUser).not.toHaveBeenCalled();
   });
 
-  it('tạo tài khoản nhân viên mới rồi xác thực lại bằng mật khẩu mặc định', async () => {
+  it('không tự tạo tài khoản nhân viên khi mật khẩu mặc định bị từ chối', async () => {
     supabase.auth.signInWithPassword.mockResolvedValueOnce(invalidPassword).mockResolvedValueOnce(signedIn());
-    await expect(store.getState().login(employee.id, '1')).resolves.toMatchObject({ id: employee.id });
-    expect(provisionAuthUser).toHaveBeenCalledWith(employee);
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledTimes(2);
+    await expect(store.getState().login(employee.id, '1')).rejects.toThrow('Mật khẩu không chính xác');
+    expect(provisionAuthUser).not.toHaveBeenCalled();
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledOnce();
   });
 
   it('không dùng lại phiên cũ để vượt qua mật khẩu bị từ chối', async () => {
@@ -181,11 +198,10 @@ describe('useStore.login', () => {
     expect(store.getState().user).toBeNull();
   });
 
-  it('không tính lỗi tạo tài khoản thành lỗi mật khẩu', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValue(invalidPassword);
-    provisionAuthUser.mockResolvedValue({ ok: false, reason: 'network' });
-    await expect(store.getState().login(employee.id, '1')).rejects.toThrow('khởi tạo');
-    expect(checkLocked(employee.id).recentFails).toBe(0);
+  it('chặn cả mật khẩu Auth mặc định nhập trực tiếp khi quá hạn', async () => {
+    api.getEmployeeById.mockResolvedValueOnce({ ...employee, createdAt: new Date(Date.now() - 8 * 86400000).toISOString() });
+    await expect(store.getState().login(employee.id, `ofc-${employee.id}-1`)).rejects.toMatchObject({ code: 'PASSWORD_EXPIRED' });
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 
   it('giữ đăng nhập bằng mật khẩu riêng trên thiết bị mới', async () => {
@@ -234,5 +250,31 @@ describe('useStore.login', () => {
     await store.getState().login(employee.id, '1');
     expect(checkLocked(employee.id).recentFails).toBe(0);
     expect(store.getState().authWarning).toBeNull();
+  });
+});
+
+describe('password state updates', () => {
+  it('clears flags only after successful API write and never stores the password', async () => {
+    store.setState({ user: { ...employee, mustChangePassword: true } });
+    api.changeMyPassword.mockRejectedValueOnce(new Error('write failed'));
+    await expect(store.getState().changeMyPassword('1', 'MatKhau9')).rejects.toThrow('write failed');
+    expect(store.getState().user.mustChangePassword).toBe(true);
+    api.changeMyPassword.mockResolvedValueOnce(true);
+    await store.getState().changeMyPassword('1', 'MatKhau9');
+    expect(store.getState().user).toMatchObject({ mustChangePassword: false, mustSetupPassword: false });
+    expect(JSON.stringify(store.getState())).not.toContain('MatKhau9');
+  });
+  it('does not revive the user if logout occurs while the API write is pending', async () => {
+    store.setState({ user: { ...employee, mustChangePassword: true } });
+    let finish;
+    api.changeMyPassword.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const write = store.getState().changeMyPassword('1', 'MatKhau9');
+    const rejected = expect(write).rejects.toThrow('đã thay đổi');
+    await vi.waitFor(() => expect(api.changeMyPassword).toHaveBeenCalled());
+    const logout = store.getState().logout();
+    finish(true);
+    await rejected;
+    await logout;
+    expect(store.getState().user).toBeNull();
   });
 });

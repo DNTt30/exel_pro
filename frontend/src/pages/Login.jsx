@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import bgImg from '../assets/gs25_cafe_bg_real.jpg';
 import manager3d from '../assets/gs25_manager_hd.jpg';
-import { isOpsManager } from '../lib/authSession';
+import { signedInPath } from '../utils/authNavigation';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
 import ForgotPasswordModal from '../components/modals/ForgotPasswordModal';
 import { 
@@ -22,11 +22,12 @@ import {
 } from 'lucide-react';
 
 export default function Login() {
+  const location = useLocation();
   const [empId, setEmpId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.authError || '');
   const [submitting, setSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
@@ -102,17 +103,8 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(empId.trim(), password || '1', { rememberMe });
-      if (user.mustChangePassword) {
-        navigate(
-          isOpsManager(user) ? '/admin/security/change-password' : '/employee/change-password',
-          { state: { forced: true, reason: user.isPasswordExpired ? 'expired' : 'default' } }
-        );
-      } else if (isOpsManager(user)) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/employee/home');
-      }
+      const user = await login(empId.trim(), password, { rememberMe });
+      navigate(signedInPath(user), { replace: true });
     } catch (err) {
       if (err.code === 'OTP_REQUIRED') {
         setOtpStep(true);

@@ -1,9 +1,16 @@
 import { supabase, supabaseAnonKey } from '../../lib/supabase';
 import { toAuthEmail, toAuthPassword } from '../../lib/authSession';
 import { verifyAdminPassword } from '../../lib/adminCredential';
+import { validateNewPassword } from '../../utils/passwordPolicy';
+
+function assertNewPassword(password) {
+  const error = validateNewPassword(password);
+  if (error) throw new Error(error);
+}
 
 /** Adapter for the existing admin credential form; UI never calls Supabase. */
 export async function verifyAdminSessionPassword(current) {
+  if (typeof current !== 'string' || !current) return false;
   const checked = await supabase.auth.signInWithPassword({ email: 'admin@ofc.app', password: current });
   if (!checked.error && checked.data?.session) return true;
   const localMatch = await verifyAdminPassword(current);
@@ -13,6 +20,7 @@ export async function verifyAdminSessionPassword(current) {
 }
 
 export async function updateAdminSessionPassword(password) {
+  assertNewPassword(password);
   const { error } = await supabase.auth.updateUser({ password, data: { must_change_password: false, password_changed_at: new Date().toISOString() } });
   if (error) throw error;
   try { await supabase.rpc('mark_credential_set'); } catch { /* Legacy RPC is optional. */ }
@@ -20,31 +28,20 @@ export async function updateAdminSessionPassword(password) {
 
 /** Đổi mật khẩu của CHÍNH MÌNH: xác thực lại mật khẩu cũ rồi updateUser. */
 export async function changeMyPassword(oldPassword, newPassword, opts = {}) {
+  assertNewPassword(newPassword);
   const { isFirstTime = false, userId } = opts;
-  let { data: sess } = await supabase.auth.getSession();
-  let email = sess?.session?.user?.email;
-
-  // Nếu chưa có session nhưng có userId, thử thiết lập phiên bằng default password
-  if (!email && userId) {
-    email = toAuthEmail(userId);
-    const defPw = toAuthPassword(userId);
-    const signRes = await supabase.auth.signInWithPassword({ email, password: defPw });
-    if (signRes.data?.session) {
-      sess = signRes.data;
-    }
-  }
-
+  const { data: sess } = await supabase.auth.getSession();
+  const email = sess?.session?.user?.email;
   if (!email) throw new Error('Chưa có phiên đăng nhập. Vui lòng tải lại trang.');
+  if (userId && email !== toAuthEmail(userId)) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.');
+  if (oldPassword && oldPassword === newPassword) throw new Error('Mật khẩu mới không được trùng mật khẩu cũ');
 
   // Chỉ xác thực mật khẩu cũ nếu KHÔNG phải lần đầu đổi mật khẩu mặc định
   if (!isFirstTime) {
-    let check = await supabase.auth.signInWithPassword({ email, password: oldPassword });
-    // Nếu thất bại và mật khẩu cũ là '1' (hoặc người dùng đang dùng mặc định), thử mật khẩu mặc định của hệ thống
-    if (check.error && (oldPassword === '1' || !oldPassword)) {
-      const uId = userId || email.split('@')[0];
-      check = await supabase.auth.signInWithPassword({ email, password: toAuthPassword(uId) });
-    }
-    if (check.error) throw new Error('Mật khẩu hiện tại không đúng');
+    if (typeof oldPassword !== 'string' || !oldPassword) throw new Error('Vui lòng nhập mật khẩu hiện tại');
+    const password = oldPassword === '1' ? toAuthPassword(email.split('@')[0]) : oldPassword;
+    const check = await supabase.auth.signInWithPassword({ email, password });
+    if (check.error || !check.data?.session) throw new Error('Mật khẩu hiện tại không đúng');
   }
 
   const nowIso = new Date().toISOString();
@@ -94,10 +91,12 @@ export async function getMyCredentialState() {
  * Trả true nếu thành công; ném lỗi với message thân thiện.
  */
 export async function adminResetPassword(targetEmpId, newPassword) {
+  assertNewPassword(newPassword);
   const fnUrl = String(import.meta.env?.VITE_ADMIN_OTP_URL || '').replace(/admin-otp$/, 'reset-password');
   if (!fnUrl || !/reset-password$/.test(fnUrl)) throw new Error('Tính năng đặt lại mật khẩu chưa được kích hoạt. Vui lòng liên hệ quản trị viên hệ thống.');
   const { data: sess } = await supabase.auth.getSession();
   const jwt = sess?.session?.access_token;
+  if (!jwt) throw new Error('Chưa có phiên đăng nhập. Vui lòng đăng nhập lại.');
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY || supabaseAnonKey;
   const res = await fetch(fnUrl, {
     method: 'POST',

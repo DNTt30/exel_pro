@@ -2,31 +2,21 @@
  * EmployeeChangePassword.jsx
  * Trang bắt buộc đổi mật khẩu cho nhân viên khi:
  *  - Còn dùng mật khẩu mặc định (forced: true, reason: 'default')
- *  - Mật khẩu mặc định quá hạn 7 ngày (reason: 'expired')
  *  - Admin yêu cầu đổi (must_change_password flag)
  */
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { hasPasswordNumberOrSymbol, validateNewPassword } from '../../utils/passwordPolicy';
+import { signedInPath } from '../../utils/authNavigation';
 import { useStore } from '../../store/useStore';
-import { KeyRound, ShieldCheck, Eye, EyeOff, AlertTriangle, Lock } from 'lucide-react';
-
-const WEAK_PASSWORDS = new Set(['1', '12345678', '123456', 'password', 'gs25', '00000000', '11111111']);
-
-function validateNewPassword(pw) {
-  if (!pw || pw.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
-  if (WEAK_PASSWORDS.has(pw.toLowerCase())) return 'Mật khẩu quá đơn giản, vui lòng chọn mật khẩu khác';
-  if (!/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return 'Mật khẩu phải có ít nhất 1 chữ số hoặc ký tự đặc biệt';
-  return null;
-}
+import { KeyRound, Eye, EyeOff, AlertTriangle, Lock } from 'lucide-react';
 
 export default function EmployeeChangePassword() {
-  const location = useLocation();
   const navigate = useNavigate();
   const user = useStore(s => s.user);
   const changeMyPassword = useStore(s => s.changeMyPassword);
 
-  const forced = location.state?.forced ?? true;
-  const reason = location.state?.reason || 'default';
+  const forced = !!user?.mustChangePassword;
 
   const [oldPw, setOldPw]       = useState('');
   const [newPw, setNewPw]       = useState('');
@@ -35,13 +25,13 @@ export default function EmployeeChangePassword() {
   const [showNew, setShowNew]   = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
-  const [done, setDone]         = useState(false);
-
-  const isExpired = reason === 'expired';
+  const isExpired = !!user?.isPasswordExpired;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
+    if (!oldPw) { setError('Vui lòng nhập mật khẩu hiện tại'); return; }
 
     const valErr = validateNewPassword(newPw);
     if (valErr) { setError(valErr); return; }
@@ -50,28 +40,14 @@ export default function EmployeeChangePassword() {
 
     setLoading(true);
     try {
-      // oldPw: nếu còn mật khẩu mặc định thì truyền '1', store sẽ xử lý
-      await changeMyPassword(oldPw || '1', newPw);
-      setDone(true);
-      setTimeout(() => navigate('/employee/home', { replace: true }), 2000);
+      await changeMyPassword(oldPw, newPw);
+      navigate(signedInPath(useStore.getState().user), { replace: true });
     } catch (err) {
       setError(err.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
   };
-
-  if (done) return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-8 shadow-xl text-center max-w-sm w-full">
-        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <ShieldCheck size={32} className="text-emerald-600" />
-        </div>
-        <h2 className="text-xl font-black text-slate-900 mb-2">Đổi mật khẩu thành công!</h2>
-        <p className="text-sm text-slate-500">Đang chuyển hướng về trang chủ...</p>
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -89,8 +65,8 @@ export default function EmployeeChangePassword() {
               </div>
               <div className="text-white/80 text-xs">
                 {isExpired
-                  ? 'Mật khẩu mặc định đã quá 7 ngày. Bạn cần đặt mật khẩu riêng để tiếp tục.'
-                  : 'Đây là lần đầu đăng nhập. Vui lòng đặt mật khẩu riêng của bạn.'}
+                  ? 'Mật khẩu mặc định đã quá 7 ngày. Vui lòng liên hệ quản lý.'
+                  : 'Vui lòng đặt mật khẩu riêng để bảo vệ tài khoản của bạn.'}
               </div>
             </div>
           </div>
@@ -172,8 +148,8 @@ export default function EmployeeChangePassword() {
             <div className={newPw.length >= 8 ? 'text-emerald-600' : ''}>
               {newPw.length >= 8 ? '✓' : '○'} Tối thiểu 8 ký tự
             </div>
-            <div className={/[0-9!@#$%^&*]/.test(newPw) ? 'text-emerald-600' : ''}>
-              {/[0-9!@#$%^&*]/.test(newPw) ? '✓' : '○'} Có ít nhất 1 chữ số hoặc ký tự đặc biệt
+            <div className={hasPasswordNumberOrSymbol(newPw) ? 'text-emerald-600' : ''}>
+              {hasPasswordNumberOrSymbol(newPw) ? '✓' : '○'} Có ít nhất 1 chữ số hoặc ký tự đặc biệt
             </div>
             <div className={confirmPw && confirmPw === newPw ? 'text-emerald-600' : ''}>
               {confirmPw && confirmPw === newPw ? '✓' : '○'} Mật khẩu xác nhận khớp

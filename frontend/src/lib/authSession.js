@@ -165,7 +165,7 @@ export async function provisionAuthUser(emp) {
   }
 }
 
-export async function ensureAuthSession(user, { allowSignUp = false, password, restoreOnly = false } = {}) {
+export async function ensureAuthSession(user, { password, restoreOnly = false } = {}) {
   if (!supabase) return { ok: false, reason: 'no-client' };
   if (!user?.id) return { ok: false, reason: 'no-user' };
 
@@ -183,6 +183,7 @@ export async function ensureAuthSession(user, { allowSignUp = false, password, r
     return { ok: true, session: current.session };
   }
   if (restoreOnly) return { ok: false, reason: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
+  if (typeof password !== 'string' || !password) return { ok: false, reason: 'Vui lòng nhập mật khẩu' };
   if (current?.session && currentEmail !== email) {
     await supabase.auth.signOut();
   }
@@ -199,40 +200,9 @@ export async function ensureAuthSession(user, { allowSignUp = false, password, r
       return { ok: true, session: signedIn.data.session };
     }
 
-    if (!allowSignUp) {
-      return {
-        ok: false,
-        reason: signedIn.error?.message || 'Chưa có tài khoản Auth. Nhờ admin thêm lại nhân viên để tạo user.'
-      };
-    }
-
-    const signedUp = await withTimeout(
-      supabase.auth.signUp({
-        email,
-        password: toAuthPassword(user.id),
-        options: { data: meta }
-      }),
-      10000,
-      'timeout-sign-up'
-    );
-    if (signedUp.data?.session) {
-      return { ok: true, session: signedUp.data.session };
-    }
-
-    const retry = await withTimeout(
-      // Không còn dùng toAuthPassword() làm fallback trong login — chỉ dùng password được truyền vào
-      supabase.auth.signInWithPassword({ email, password }),
-      10000,
-      'timeout-sign-in-retry'
-    );
-    if (retry.data?.session) {
-      await supabase.auth.updateUser({ data: meta }).catch(() => {});
-      return { ok: true, session: retry.data.session };
-    }
-
     return {
       ok: false,
-      reason: signedUp.error?.message || signedIn.error?.message || retry.error?.message || 'no-session'
+      reason: signedIn.error?.message || 'Chưa có tài khoản Auth. Nhờ admin tạo tài khoản nhân viên.'
     };
   } catch (err) {
     return { ok: false, reason: err.message || 'auth-failed' };

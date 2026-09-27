@@ -1,5 +1,5 @@
 import * as api from '../../services/api';
-import { ensureAuthSession, provisionAuthUser, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
+import { ensureAuthSession, signOutAuth, isManagerFromEmp, isAreaManagerFromEmp, isOpsManager, toAuthEmail, toAuthPassword } from '../../lib/authSession';
 import { MA_RE } from '../../data/constants';
 import { checkLocked, recordFailure, resetFailures } from '../../lib/loginThrottle';
 import { checkDeviceTrusted } from '../../lib/adminOtp';
@@ -127,7 +127,7 @@ export const createAuthSlice = (set, get) => {
         }
 
         const metaMustChange = pwCheck.data?.user?.user_metadata?.must_change_password;
-        const isDefaultPassword = password === '1' || usedFallback;
+        const isDefaultPassword = password === '1' || password === toAuthPassword(userId) || usedFallback;
         const mustChange = isDefaultPassword || metaMustChange === true;
         
         nextUser = {
@@ -137,6 +137,7 @@ export const createAuthSlice = (set, get) => {
           jobTitle: 'Quản trị viên',
           isManager: true,
           mustSetupPassword: mustChange,
+          mustChangePassword: mustChange,
           loginAt: Date.now()
         };
       } else {
@@ -144,21 +145,21 @@ export const createAuthSlice = (set, get) => {
         if (!emp) throw new Error('Không tìm thấy mã nhân viên');
         if (emp.isActive === false) throw new Error('Mã này đã bị vô hiệu hóa (nghỉ việc). Liên hệ quản lý để mở lại.');
         let pwCheck = null;
-        const isDefaultPassword = password === '1';
+        const isDefaultPassword = password === '1' || password === toAuthPassword(emp.id);
+        // Từ chối trước khi tạo phiên Auth để tài khoản hết hạn không có token mới.
+        const DEFAULT_PASSWORD_EXPIRY_DAYS = 7;
+        const isPasswordExpired = isDefaultPassword && !!emp.createdAt
+          && Date.now() - new Date(emp.createdAt).getTime() > DEFAULT_PASSWORD_EXPIRY_DAYS * 86400000;
+        if (isPasswordExpired) {
+          const blockErr = new Error('Mật khẩu mặc định đã quá hạn 7 ngày. Vui lòng liên hệ quản lý để được cấp mật khẩu mới.');
+          blockErr.code = 'PASSWORD_EXPIRED';
+          throw blockErr;
+        }
 
         if (isDefaultPassword) {
           // Lần đầu hoặc dùng mật khẩu mặc định 1: đăng nhập bằng default auth password của nhân viên
           const defaultAuthPw = toAuthPassword(emp.id);
           pwCheck = await signIn(defaultAuthPw);
-
-          // Nếu chưa có tài khoản Supabase Auth, tự động khởi tạo (provision)
-          if (isInvalidCredentials(pwCheck.error)) {
-            // Tạo bằng client riêng rồi xác thực lại mật khẩu; tuyệt đối không
-            // dùng ensureAuthSession ở đây vì có thể tái sử dụng phiên cũ.
-            const provision = await provisionAuthUser(emp);
-            if (!provision.ok) throw new Error('Chưa thể khởi tạo tài khoản đăng nhập. Vui lòng liên hệ quản lý hoặc thử lại sau.');
-            pwCheck = await signIn(defaultAuthPw);
-          }
         } else {
           // Người dùng đã đổi mật khẩu riêng: đăng nhập trực tiếp Supabase Auth
           pwCheck = await signIn(password);
@@ -173,25 +174,6 @@ export const createAuthSlice = (set, get) => {
         // - Khi đăng nhập bằng mật khẩu riêng (!isDefaultPassword): người dùng đã đổi rồi, chỉ bắt đổi nếu admin gắn cờ must_change_password === true
         const metaMustChange = pwCheck.data?.user?.user_metadata?.must_change_password;
         const mustChange = isDefaultPassword || metaMustChange === true;
-
-        // Kiểm tra quá hạn dùng mật khẩu mặc định (chỉ áp dụng khi còn đang dùng mật khẩu '1')
-        const DEFAULT_PASSWORD_EXPIRY_DAYS = 7;
-        let isPasswordExpired = false;
-        if (isDefaultPassword && emp.createdAt) {
-          const createdDate = new Date(emp.createdAt);
-          const diffDays = (Date.now() - createdDate.getTime()) / (1000 * 3600 * 24);
-          if (diffDays > DEFAULT_PASSWORD_EXPIRY_DAYS) {
-            isPasswordExpired = true;
-          }
-        }
-
-        // Block login hoàn toàn khi mật khẩu mặc định đã quá hạn 7 ngày
-        if (isDefaultPassword && isPasswordExpired) {
-          await signOutAuth(); // dọn Supabase session vừa tạo
-          const blockErr = new Error('Mật khẩu mặc định đã quá hạn 7 ngày. Vui lòng liên hệ quản lý để được cấp mật khẩu mới.');
-          blockErr.code = 'PASSWORD_EXPIRED';
-          throw blockErr;
-        }
 
         const passwordChangedAt = emp.passwordChangedAt 
           || (!isDefaultPassword ? (pwCheck.data?.user?.user_metadata?.password_changed_at || new Date().toISOString()) : null);
@@ -271,6 +253,29 @@ export const createAuthSlice = (set, get) => {
       })).catch((logError) => console.warn('[auth] Login log failed:', logError?.message));
       throw err;
     }
+    });
+  },
+  changeMyPassword: (oldPassword, newPassword, { isFirstTime = false } = {}) => {
+    const user = get().user;
+    const epoch = get()._sessionEpoch;
+    return enqueueAuth(async () => {
+      const assertSession = () => {
+        if (!user?.id || get().user?.id !== user.id || get()._sessionEpoch !== epoch) {
+          throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.');
+        }
+      };
+      assertSession();
+      await api.changeMyPassword(oldPassword, newPassword, { userId: user.id, isFirstTime: isFirstTime && !!user.mustChangePassword });
+      assertSession();
+      const nowIso = new Date().toISOString();
+      set(s => {
+        const { authPassword: _obsoletePassword, ...safeUser } = s.user;
+        return {
+          user: { ...safeUser, mustChangePassword: false, mustSetupPassword: false, isPasswordExpired: false, passwordChangedAt: nowIso },
+          employees: (s.employees || []).map(emp => emp.id === user.id ? { ...emp, passwordChangedAt: nowIso } : emp),
+        };
+      });
+      return true;
     });
   },
   logout: async () => {

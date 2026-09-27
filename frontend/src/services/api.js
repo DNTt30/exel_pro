@@ -11,4 +11,4 @@ export * from './api/weeks';
 export * from './api/attendance';
 export * from './api/profiles';
 export * from './api/aiDecisions';
-export { verifyAdminSessionPassword, updateAdminSessionPassword } from './api/password';
+export * from './api/password';

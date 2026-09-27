@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { requiredPasswordPath } from './utils/authNavigation';
 import { useStore } from './store/useStore';
 import { isOpsManager, isBuiltinStoreManager, canManageStoreList } from './lib/authSession';
 import { lazy, Suspense } from 'react';
@@ -69,10 +70,16 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const PrivateRoute = ({ children, allowedRoles, fullAdminOnly, storeAdminOnly }) => {
+export const PrivateRoute = ({ children, allowedRoles, fullAdminOnly, storeAdminOnly }) => {
   const user = useStore(state => state.user);
+  const location = useLocation();
   
   if (!user) return <Navigate to="/login" replace />;
+  if (user.isPasswordExpired) return <Navigate to="/login" replace state={{ authError: 'Mật khẩu mặc định đã quá hạn 7 ngày. Vui lòng liên hệ quản lý để được cấp mật khẩu mới.' }} />;
+  const passwordPath = requiredPasswordPath(user);
+  if (passwordPath && location.pathname.replace(/\/$/, '') !== passwordPath) {
+    return <Navigate to={passwordPath} replace />;
+  }
 
   const isMgr = isOpsManager(user);
   const homePath = isMgr ? "/admin/dashboard" : "/employee/home";

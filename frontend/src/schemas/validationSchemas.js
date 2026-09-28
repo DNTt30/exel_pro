@@ -1,13 +1,18 @@
 import { z } from 'zod';
 import { WEEK_DAYS } from '../data/constants';
+import { normalizeRecoveryEmail } from '../utils/recoveryEmail';
 
 // Regex chuẩn mã nhân viên 9 chữ số
 const MA_RE = /^\d{9}$/;
+export const recoveryEmailSchema = z.string().trim().toLowerCase().refine(value => {
+  try { normalizeRecoveryEmail(value); return true; } catch { return false; }
+}, { message: 'Email khôi phục không hợp lệ' }).optional();
 
 // Schema kiểm thực Nhân viên
 export const employeeSchema = z.object({
   id: z.string().regex(MA_RE, { message: 'Mã nhân viên phải gồm đúng 9 chữ số' }),
   name: z.string().min(2, { message: 'Họ tên nhân viên phải có ít nhất 2 ký tự' }),
+  recoveryEmail: recoveryEmailSchema,
   dept: z.string().min(2, { message: 'Mã cửa hàng không được để trống' }),
   role: z.string().optional(),
   type: z.enum(['STPT', 'STFT', 'CSR_NEW', 'SM', 'PARTTIME', 'FULLTIME']).default('STPT'),

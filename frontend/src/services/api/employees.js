@@ -1,4 +1,5 @@
 import { db } from './client';
+import { normalizeRecoveryEmail } from '../../utils/recoveryEmail';
 
 // --- EMPLOYEES API ---
 function mapEmployee(e) {
@@ -14,7 +15,8 @@ function mapEmployee(e) {
     isActive: e.is_active !== false,
     createdAt: e.created_at || null,
     passwordChangedAt: e.password_changed_at || null,
-    passwordDeadline: e.password_deadline || null
+    passwordDeadline: e.password_deadline || null,
+    recoveryEmail: e.recovery_email || ''
   };
 }
 
@@ -35,7 +37,7 @@ export async function getEmployeeById(id) {
 }
 
 export async function getEmployees(opts = {}) {
-  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline').order('dept', { ascending: true });
+  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline,recovery_email').order('dept', { ascending: true });
   if (opts.dept) q = q.eq('dept', opts.dept);
   const { data, error } = await q;
   if (error) {
@@ -56,6 +58,7 @@ export async function addEmployee(emp) {
   };
   if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
   if (emp.isActive !== undefined) row.is_active = emp.isActive;
+  if (emp.recoveryEmail !== undefined) row.recovery_email = normalizeRecoveryEmail(emp.recoveryEmail) || null;
 
   const { error } = await db().from('employees').insert([row]);
   if (error) throw error;
@@ -75,6 +78,7 @@ export async function addEmployeesBulk(emps = []) {
     };
     if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
     if (emp.isActive !== undefined) row.is_active = emp.isActive;
+    if (emp.recoveryEmail !== undefined) row.recovery_email = normalizeRecoveryEmail(emp.recoveryEmail) || null;
     return row;
   });
 
@@ -85,6 +89,7 @@ export async function addEmployeesBulk(emps = []) {
 export async function updateEmployeeInfo(id, updates) {
   const payload = {};
   if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.recoveryEmail !== undefined) payload.recovery_email = normalizeRecoveryEmail(updates.recoveryEmail) || null;
   if (updates.dept !== undefined) payload.dept = updates.dept;
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.role !== undefined) payload.role = updates.role;
@@ -107,4 +112,3 @@ export async function deleteEmployeeData(id) {
   const { error } = await db().from('employees').delete().eq('id', id);
   if (error) throw error;
 }
-

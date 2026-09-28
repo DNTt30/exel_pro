@@ -33,6 +33,8 @@ export default function Login() {
   const [currentTime, setCurrentTime] = useState('');
   const [particles, setParticles] = useState([]);
   const containerRef = useRef(null);
+  const passwordRef = useRef(null);
+  const [recoveryNotice, setRecoveryNotice] = useState('');
 
   // ── 2FA OTP ──
   const [otpStep, setOtpStep] = useState(false);
@@ -429,6 +431,7 @@ export default function Login() {
                       <KeyRound size={18} strokeWidth={2.2} />
                     </div>
                     <input
+                      ref={passwordRef}
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
@@ -505,11 +508,16 @@ export default function Login() {
 
       </div>
 
+      {recoveryNotice && <div role="status" className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{recoveryNotice}</div>}
       <ForgotPasswordModal
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
         initialEmpId={empId}
-        onUseDefaultPassword={() => setPassword('1')}
+        onSuccess={(id, warning) => {
+          setEmpId(id); setPassword(''); setError(''); setOtpStep(false);
+          setRecoveryNotice(warning || 'Đã đổi mật khẩu. Hãy đăng nhập bằng mật khẩu mới.');
+          requestAnimationFrame(() => passwordRef.current?.focus());
+        }}
       />
     </div>
   );

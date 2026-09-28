@@ -25,6 +25,22 @@ socket.addEventListener('message', ({ data }) => {
   }
   if (message.method === 'Fetch.requestPaused') {
     const { requestId, request } = message.params;
+    if (new URL(request.url).pathname.endsWith('/reset-password')) {
+      if (request.method === 'OPTIONS') {
+        void send('Fetch.fulfillRequest', { requestId, responseCode: 204, responseHeaders: [
+          { name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Access-Control-Allow-Methods', value: 'POST, OPTIONS' },
+          { name: 'Access-Control-Allow-Headers', value: 'content-type, apikey' },
+        ] });
+        return;
+      }
+      const body = JSON.parse(request.postData || '{}');
+      const result = body.action === 'request_otp' ? { ok: true, channel: body.emp_id === 'admin' ? 'telegram' : 'email', expires_in: 300 }
+        : body.otp_code === '012345' && body.new_password === 'MatKhau9' ? { ok: true } : { ok: false, code: 'OTP_INVALID', error: 'Mã OTP không đúng' };
+      void send('Fetch.fulfillRequest', { requestId, responseCode: result.ok ? 200 : 400,
+        responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }],
+        body: Buffer.from(JSON.stringify(result)).toString('base64') });
+      return;
+    }
     const local = request.url.startsWith('http://127.0.0.1:5179/');
     void send(local ? 'Fetch.continueRequest' : 'Fetch.failRequest', local ? { requestId } : { requestId, errorReason: 'BlockedByClient' });
   }
@@ -77,8 +93,45 @@ try {
     await evaluate("history.pushState({}, '', '/employee/schedule'); dispatchEvent(new PopStateEvent('popstate'));");
     await waitFor(`location.pathname === '${expected}' && document.querySelector('form')`);
   }
+  await evaluate("testStore.setState({user:null});history.pushState({},'', '/login');dispatchEvent(new PopStateEvent('popstate'));");
+  await waitFor("document.querySelector('input[type=password]')");
+  await evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Quên mật khẩu')).click()");
+  await waitFor("document.querySelector('[aria-label=\"Các bước khôi phục\"]')");
+  const fill = async (selector, value) => evaluate(`{
+    const input=${selector}; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  }`);
+  const formInput = index => `[...document.querySelectorAll('form')].at(-1).querySelectorAll('input')[${index}]`;
+  const recoverySubmit = () => evaluate("[...document.querySelectorAll('form')].at(-1).requestSubmit()");
+  await fill(formInput(0), '260512001');
+  for (const step of [1, 2, 3]) {
+    if (step === 2) { await recoverySubmit(); await waitFor("document.querySelector('[autocomplete=\"one-time-code\"]')"); }
+    if (step === 3) { await fill(formInput(0), '012345'); await recoverySubmit(); await waitFor("document.querySelector('[autocomplete=\"new-password\"]')"); }
+    for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+      await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'}); await wait(150);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
+      const shot=await send('Page.captureScreenshot',{format:'png'});
+      await writeFile(new URL(`recovery-step${step}-${name}.png`,out),Buffer.from(shot.data,'base64'));
+      console.log('PASS recovery',step,name);
+    }
+  }
+  await fill(formInput(0), 'MatKhau9'); await fill(formInput(1), 'MatKhau9'); await recoverySubmit();
+  await waitFor("document.activeElement === document.querySelector('input[type=password]') && !document.querySelector('[aria-label=\"Các bước khôi phục\"]')");
+  assert.equal(await evaluate("document.querySelector('input[type=password]').value"), '');
+  assert.equal(await evaluate("document.querySelector('input[type=text]').value"), '260512001');
+  await evaluate(`testStore.setState({user:{id:'admin',role:'admin',name:'Quản trị kiểm thử',loginAt:Date.now()},employees:[{id:'260512001',name:'Nhân viên kiểm thử',dept:'VN0485',role:'STFT',type:'STFT',recoveryEmail:'staff@gmail.com'}]});history.pushState({},'', '/admin/employees');dispatchEvent(new PopStateEvent('popstate'));`);
+  await waitFor("document.querySelector('button[title=\"Sửa thông tin\"]')");
+  await evaluate("document.querySelector('button[title=\"Sửa thông tin\"]').click()");
+  await waitFor("document.querySelector('input[type=email]')");
+  assert.equal(await evaluate("document.querySelector('input[type=email]').value"),'staff@gmail.com');
+  for (const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'}); await wait(150);
+    const shot=await send('Page.captureScreenshot',{format:'png'});
+    await writeFile(new URL(`recovery-email-${name}.png`,out),Buffer.from(shot.data,'base64'));
+    console.log('PASS employee recovery email',name);
+  }
   assert.deepEqual(errors, []);
-  console.log('PASS 6 desktop/mobile renders; no external requests allowed');
+  console.log('PASS password/recovery desktop/mobile renders; recovery requests mocked; no external requests allowed');
 } finally {
   await fetch(`http://127.0.0.1:9227/json/close/${target.id}`).catch(() => {});
   socket.close();

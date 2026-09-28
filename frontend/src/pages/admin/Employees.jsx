@@ -9,6 +9,7 @@ import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 import { updateEmployeeInfo } from '../../services/api';
+import { recoveryEmailSchema } from '../../schemas/validationSchemas';
 
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
@@ -116,6 +117,8 @@ export default function Employees() {
   const handleSaveAdd = async () => {
     const trimmedId = formData.id.trim();
     const trimmedName = formData.name.trim();
+    const emailCheck = recoveryEmailSchema.safeParse(formData.recoveryEmail || '');
+    if (!emailCheck.success) return toast.error('Email khôi phục không hợp lệ');
 
     if (!trimmedId || !trimmedName || !formData.dept) {
       return toast.error('Vui lòng nhập đủ Mã NV, Họ tên và Chọn Cửa hàng');
@@ -142,6 +145,8 @@ export default function Employees() {
   };
 
   const handleSaveEdit = async () => {
+    const emailCheck = recoveryEmailSchema.safeParse(formData.recoveryEmail || '');
+    if (!emailCheck.success) return toast.error('Email khôi phục không hợp lệ');
     try {
       await updateEmployee(editingId, formData);
       setEditingId(null);
@@ -361,6 +366,9 @@ export default function Employees() {
                     value={formData.name} 
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                   />
+                  <input type="email" aria-label="Email khôi phục nhân viên mới" placeholder="Gmail khôi phục"
+                    className="mt-2 w-full min-w-40 rounded border border-blue-300 p-1.5 text-xs"
+                    value={formData.recoveryEmail || ''} onChange={e => setFormData({ ...formData, recoveryEmail: e.target.value })} />
                 </td>
                 <td className="p-2.5">
                   <select 
@@ -415,6 +423,11 @@ export default function Employees() {
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
                     ) : <span className="font-bold text-slate-800">{emp.name}</span>}
+                    {editingId === emp.id ? <label className="mt-2 block text-[11px] text-slate-500">Email khôi phục (Gmail)
+                      <input type="email" aria-label={`Email khôi phục ${emp.id}`} className="mt-1 w-full min-w-40 rounded border border-blue-300 p-1.5 text-xs"
+                        disabled={!canPromote && isManagerFromEmp(emp)} value={formData.recoveryEmail || ''}
+                        onChange={e => setFormData({ ...formData, recoveryEmail: e.target.value })} placeholder="nhanvien@gmail.com" />
+                    </label> : <div className="mt-1 break-all text-[11px] text-slate-500">{emp.recoveryEmail || 'Chưa có email khôi phục'}</div>}
                   </td>
                   <td className="p-3">
                     {editingId === emp.id ? (

@@ -1,267 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
-import { KeyRound, Send, CheckCircle2, AlertCircle, HelpCircle, ShieldAlert } from 'lucide-react';
-import * as api from '../../services/api';
-import { notifyTelegram } from '../../utils/telegram';
-import { toast } from '../ui/toastStore';
+import { requestPasswordResetOtp, resetPasswordWithOtp } from '../../services/api';
+import { validateNewPassword } from '../../utils/passwordPolicy';
 
-export default function ForgotPasswordModal({ isOpen, onClose, initialEmpId = '', onUseDefaultPassword }) {
-  const [empId, setEmpId] = useState(initialEmpId);
+function RecoveryForm({ onClose, initialEmpId, onSuccess }) {
+  const [empId, setEmpId] = useState(initialEmpId.trim());
+  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
-  const [emp, setEmp] = useState(null);
-  const [searched, setSearched] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [isAdminUser, setIsAdminUser] = useState(false);
-  const [sentSuccess, setSentSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [channel, setChannel] = useState('email');
+  const pending = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      const initId = (initialEmpId || '').trim();
-      setEmpId(initId);
-      setSentSuccess(false);
-      setSearched(false);
-      setSearchError('');
-      setIsAdminUser(false);
-      setEmp(null);
-      if (initId) {
-        checkEmp(initId);
-      }
+  const submit = async event => {
+    event.preventDefault();
+    if (pending.current) return;
+    setError('');
+    const id = empId.trim();
+    if (!/^(admin|\d{9})$/.test(id)) { setError('Nhập mã nhân viên 9 chữ số hoặc admin.'); return; }
+    if (step === 2) {
+      if (!/^\d{6}$/.test(otp)) { setError('Mã OTP phải gồm đúng 6 chữ số.'); return; }
+      setStep(3); return;
     }
-  }, [isOpen, initialEmpId]);
-
-  const checkEmp = async (id) => {
-    const trimmed = (id || '').trim();
-    if (!trimmed) {
-      setEmp(null);
-      setSearched(false);
-      setSearchError('');
-      setIsAdminUser(false);
-      return;
+    if (step === 3) {
+      const validationError = validateNewPassword(password);
+      if (validationError) { setError(validationError); return; }
+      if (password !== confirm) { setError('Mật khẩu xác nhận không khớp.'); return; }
     }
-
-    if (trimmed.toLowerCase() === 'admin') {
-      setIsAdminUser(true);
-      setEmp(null);
-      setSearched(true);
-      setSearchError('');
-      return;
-    }
-
-    setIsAdminUser(false);
+    pending.current = true; setBusy(true);
     try {
-      const found = await api.getEmployeeById(trimmed);
-      if (found && found.id) {
-        setEmp(found);
-        setSearched(true);
-        setSearchError('');
+      if (step === 1) {
+        const result = await requestPasswordResetOtp(id);
+        if (!alive.current) return;
+        setEmpId(id); setChannel(result.channel); setOtp(''); setStep(2);
       } else {
-        setEmp(null);
-        setSearched(true);
-        setSearchError(`Mã nhân viên "${trimmed}" không tồn tại trên hệ thống GS25. Vui lòng kiểm tra lại.`);
+        const result = await resetPasswordWithOtp(id, otp, password);
+        if (!alive.current) return;
+        setPassword(''); setConfirm(''); setOtp('');
+        onSuccess?.(id, result.warning);
+        onClose();
       }
-    } catch {
-      setEmp(null);
-      setSearched(true);
-      setSearchError(`Không tìm thấy mã nhân viên "${trimmed}". Vui lòng kiểm tra lại.`);
-    }
-  };
-
-  const handleSendRequest = async () => {
-    const targetId = empId.trim();
-    if (!targetId) {
-      toast.error('Vui lòng nhập mã nhân viên của bạn');
-      return;
-    }
-
-    if (targetId.toLowerCase() === 'admin') {
-      toast.info('Tài khoản Quản trị viên: Vui lòng liên hệ trực tiếp Quản lý cấp cao / Kỹ thuật hệ thống.');
-      return;
-    }
-
-    setBusy(true);
-    try {
-      let foundEmp = emp;
-      if (!foundEmp) {
-        foundEmp = await api.getEmployeeById(targetId);
-        setEmp(foundEmp);
-      }
-
-      if (!foundEmp || !foundEmp.id) {
-        toast.error(`Không tìm thấy mã nhân viên "${targetId}". Vui lòng nhập đúng Mã số nhân viên GS25.`);
-        setSearchError(`Mã nhân viên "${targetId}" không tồn tại trên hệ thống.`);
-        setBusy(false);
-        return;
-      }
-
-      const empName = foundEmp.name || `Nhân viên ${targetId}`;
-      const dept = foundEmp.dept || 'Chưa gán';
-      const job = foundEmp.jobTitle || foundEmp.role || 'STPT';
-      const when = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
-
-      const msg = [
-        '🆘 YÊU CẦU ĐẶT LẠI MẬT KHẨU GS25',
-        `• Nhân viên: ${empName} (Mã: ${targetId})`,
-        `• Cửa hàng / Bộ phận: ${dept}`,
-        `• Vị trí / Chức danh: ${job}`,
-        `• Thời gian gửi: ${when}`,
-        '👉 Cửa hàng trưởng (SM) vui lòng vào mục "Hệ thống > Nhân viên" trên website để Cấp lại mật khẩu bảo mật mới cho nhân viên.'
-      ].join('\n');
-
-      api.addActivityLog({
-        userId: targetId,
-        action: 'FORGOT_PASSWORD_REQUEST',
-        category: 'security',
-        entityType: 'session',
-        entityId: targetId,
-        description: `Gửi yêu cầu cấp lại mật khẩu cho nhân viên ${empName} (${targetId}) - Cửa hàng ${dept}`
-      });
-
-      const res = await notifyTelegram(msg);
-      if (res.ok) {
-        setSentSuccess(true);
-        toast.success('Đã chuyển yêu cầu cấp lại mật khẩu tới Cửa hàng trưởng!');
-      } else {
-        toast.info('Đã ghi nhận yêu cầu. Vui lòng báo trực tiếp Cửa hàng trưởng (SM) trong ca trực.');
-        setSentSuccess(true);
-      }
-    } catch {
-      toast.error('Không gửi được yêu cầu. Vui lòng liên hệ trực tiếp Cửa hàng trưởng ca trực.');
+    } catch (failure) {
+      if (!alive.current) return;
+      setError(failure.message || 'Thao tác thất bại. Vui lòng thử lại.');
+      if (['OTP_INVALID', 'OTP_EXPIRED', 'OTP_LOCKED', 'OTP_USED', 'RESET_FAILED'].includes(failure.code)) setStep(2);
     } finally {
-      setBusy(false);
+      pending.current = false;
+      if (alive.current) setBusy(false);
     }
   };
-
-  return (
-    <Modal title="Quên mật khẩu đăng nhập" isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
-      <div className="space-y-4 text-sm">
-
-        {/* Khối hướng dẫn mật khẩu ban đầu */}
-        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5">
-          <div className="flex items-center gap-2 text-blue-900 font-bold text-xs">
-            <KeyRound size={15} className="text-blue-600" />
-            <span>Mẹo: Thử mật khẩu khởi tạo</span>
-          </div>
-          <p className="text-xs text-blue-800 leading-relaxed">
-            Nếu bạn là nhân viên mới nhận việc hoặc vừa được cấp lại tài khoản, hãy thử đăng nhập bằng mật khẩu khởi tạo là số <strong>1</strong>. Hệ thống sẽ yêu cầu bạn đổi mật khẩu bảo mật mới ngay sau đó.
-          </p>
-          {onUseDefaultPassword && (
-            <button
-              type="button"
-              onClick={() => {
-                onUseDefaultPassword();
-                onClose();
-              }}
-              className="mt-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-            >
-              👉 Thử điền mật khẩu khởi tạo (1) & Đăng nhập
-            </button>
-          )}
-        </div>
-
-        {/* Form gửi yêu cầu tới SM */}
-        <div className="space-y-2.5">
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Mã nhân viên của bạn</span>
-            <div className="flex gap-2 mt-1">
-              <input
-                type="text"
-                value={empId}
-                onChange={(e) => {
-                  setEmpId(e.target.value);
-                  setSearched(false);
-                  setSearchError('');
-                  setIsAdminUser(false);
-                }}
-                onBlur={() => checkEmp(empId)}
-                placeholder="VD: 260716009 hoặc 251104004"
-                className={`flex-1 border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 font-medium transition-all ${
-                  searchError
-                    ? 'border-rose-300 focus:ring-rose-400 bg-rose-50/30 text-rose-900'
-                    : 'border-slate-300 focus:ring-blue-500'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => checkEmp(empId)}
-                className="px-3 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300 cursor-pointer"
-              >
-                Kiểm tra
-              </button>
-            </div>
+  const fieldClass = 'w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500';
+  return <Modal title="Khôi phục mật khẩu" isOpen onClose={busy ? () => {} : onClose} preventBackdropClose={busy} hideClose={busy}>
+    <form onSubmit={submit} className="space-y-4">
+      <ol className="grid grid-cols-3 gap-2 text-xs" aria-label="Các bước khôi phục">
+        {['Tài khoản', 'Mã OTP', 'Mật khẩu mới'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined}
+          className={`rounded-lg p-2 text-center ${step === index + 1 ? 'bg-blue-600 text-white font-bold' : 'bg-slate-100 text-slate-500'}`}>{index + 1}. {label}</li>)}
+      </ol>
+      {step === 1 ? <>
+        <label className="block space-y-1 text-sm font-semibold">Mã nhân viên / admin
+          <input autoFocus autoComplete="username" value={empId} onChange={event => setEmpId(event.target.value)} disabled={busy} className={fieldClass} placeholder="Mã NV 9 chữ số hoặc admin" />
+        </label>
+        <p className="text-xs text-slate-500">Nhân viên nhận OTP qua Gmail đã được quản lý cập nhật trong hồ sơ. Tài khoản admin nhận mã qua Telegram.</p>
+      </> : <>
+        <p className="rounded-xl bg-blue-50 p-3 text-xs text-blue-800">Đã gửi OTP cho tài khoản <strong>{empId}</strong> qua {channel === 'telegram' ? 'Telegram của quản trị viên' : 'email đã đăng ký'}. Mã có hiệu lực 5 phút; chỉ mã mới nhất còn dùng được. {channel === 'email' && 'Hãy kiểm tra cả thư rác.'}</p>
+        {step === 2 ? <label className="block space-y-1 text-sm font-semibold">Mã OTP 6 số
+          <input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, ''))} className={`${fieldClass} font-mono tracking-widest`} />
+        </label> : <>
+          <label className="block space-y-1 text-sm font-semibold">Mật khẩu mới
+            <input autoFocus type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} className={fieldClass} />
           </label>
+          <label className="block space-y-1 text-sm font-semibold">Xác nhận mật khẩu mới
+            <input type="password" autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} disabled={busy} className={fieldClass} />
+          </label>
+          <p className="text-xs text-slate-500">Tối thiểu 8 ký tự, có số hoặc ký tự đặc biệt; không dùng mật khẩu phổ biến như 12345678. Mã OTP được xác thực khi bấm xác nhận đổi.</p>
+        </>}
+      </>}
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+      <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+        {busy ? 'Đang xử lý…' : step === 1 ? 'Nhận mã OTP' : step === 2 ? 'Tiếp tục' : 'Xác nhận đổi'}
+      </button>
+      {step > 1 && <div className="flex justify-between gap-3 text-xs text-blue-700">
+        <button type="button" disabled={busy} onClick={() => { setStep(1); setError(''); setOtp(''); setPassword(''); setConfirm(''); }}>Nhận mã mới / Đổi tài khoản</button>
+        {step === 3 && <button type="button" disabled={busy} onClick={() => { setStep(2); setError(''); }}>Sửa mã OTP</button>}
+      </div>}
+    </form>
+  </Modal>;
+}
 
-          {/* Cảnh báo mã admin */}
-          {isAdminUser && (
-            <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-medium">
-              <ShieldAlert size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong>Tài khoản Quản trị viên (admin):</strong> Để đảm bảo an ninh hệ thống, việc khôi phục mật khẩu admin phải qua xác thực của Trưởng khu vực (OFC) hoặc bộ phận Kỹ thuật.
-              </div>
-            </div>
-          )}
-
-          {/* Cảnh báo không tìm thấy mã NV */}
-          {searched && searchError && !isAdminUser && (
-            <div className="flex items-start gap-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-medium animate-fadeIn">
-              <AlertCircle size={15} className="text-rose-600 flex-shrink-0 mt-0.5" />
-              <span>{searchError}</span>
-            </div>
-          )}
-
-          {/* Xác nhận nhân viên hợp lệ */}
-          {searched && emp && !isAdminUser && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium animate-fadeIn">
-              <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
-              <span>Xác nhận: <strong>{emp.name}</strong> ({emp.dept || 'Chưa gán CH'}) - {emp.jobTitle || emp.role || 'STPT'}</span>
-            </div>
-          )}
-
-          {sentSuccess ? (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-center">
-              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 size={22} />
-              </div>
-              <h4 className="text-xs font-bold text-emerald-900">Đã gửi yêu cầu tới Quản lý</h4>
-              <p className="text-[11px] text-emerald-700 leading-relaxed">
-                Yêu cầu đã được chuyển đến Cửa hàng trưởng (SM). Quản lý ca sẽ đặt lại mật khẩu bảo mật mới và trực tiếp cấp lại cho bạn trong ca trực.
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-sm"
-              >
-                Đã hiểu & Đóng
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={busy || !empId.trim() || isAdminUser || Boolean(searchError)}
-              onClick={handleSendRequest}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-            >
-              {busy ? (
-                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              <span>{busy ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu Quản lý cấp lại mật khẩu'}</span>
-            </button>
-          )}
-        </div>
-
-        {/* Hướng dẫn quy trình cửa hàng */}
-        <div className="pt-2 border-t border-slate-200 text-slate-500 text-[11px] space-y-1">
-          <div className="flex items-center gap-1 font-bold text-slate-600">
-            <HelpCircle size={13} />
-            <span>Quy trình cấp lại trực tiếp trong ca làm:</span>
-          </div>
-          <p>
-            Bạn có thể báo trực tiếp với <strong>Cửa hàng trưởng (SM)</strong> trong ca trực. Quản lý có thể vào mục <strong>Hệ thống &gt; Nhân viên</strong> và bấm <strong>"Đặt lại mật khẩu"</strong> cho bạn ngay lập tức.
-          </p>
-        </div>
-
-      </div>
-    </Modal>
-  );
+export default function ForgotPasswordModal({ isOpen, onClose, initialEmpId = '', onSuccess }) {
+  return isOpen ? <RecoveryForm onClose={onClose} initialEmpId={initialEmpId} onSuccess={onSuccess} /> : null;
 }

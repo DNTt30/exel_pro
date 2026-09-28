@@ -1,4 +1,4 @@
-import { supabase, supabaseAnonKey } from '../../lib/supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { toAuthEmail, toAuthPassword } from '../../lib/authSession';
 import { verifyAdminPassword } from '../../lib/adminCredential';
 import { validateNewPassword } from '../../utils/passwordPolicy';
@@ -92,7 +92,7 @@ export async function getMyCredentialState() {
  */
 export async function adminResetPassword(targetEmpId, newPassword) {
   assertNewPassword(newPassword);
-  const fnUrl = String(import.meta.env?.VITE_ADMIN_OTP_URL || '').replace(/admin-otp$/, 'reset-password');
+  const fnUrl = passwordRecoveryEndpoint();
   if (!fnUrl || !/reset-password$/.test(fnUrl)) throw new Error('Tính năng đặt lại mật khẩu chưa được kích hoạt. Vui lòng liên hệ quản trị viên hệ thống.');
   const { data: sess } = await supabase.auth.getSession();
   const jwt = sess?.session?.access_token;
@@ -116,4 +116,38 @@ export async function adminResetPassword(targetEmpId, newPassword) {
     } catch { /* ignore */ }
   }
   return true;
+}
+
+function passwordRecoveryEndpoint() {
+  return import.meta.env.VITE_PASSWORD_RESET_URL
+    || String(import.meta.env.VITE_ADMIN_OTP_URL || '').replace(/admin-otp$/, 'reset-password')
+    || (supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/reset-password` : '');
+}
+
+async function callPasswordRecovery(body) {
+  const endpoint = passwordRecoveryEndpoint();
+  if (!endpoint) throw new Error('Chưa cấu hình khôi phục mật khẩu. Vui lòng liên hệ quản lý.');
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: supabaseAnonKey },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+    });
+  } catch { throw new Error('Không kết nối được dịch vụ. Nếu vừa xác nhận đổi, hãy thử đăng nhập bằng mật khẩu mới trước khi yêu cầu mã khác.'); }
+  const result = await response.json().catch(() => null);
+  if (!response.ok || result?.ok !== true) {
+    const error = new Error(result?.error || 'Không thể khôi phục mật khẩu lúc này.');
+    error.code = result?.code || 'SERVER_ERROR';
+    throw error;
+  }
+  return result;
+}
+
+export function requestPasswordResetOtp(empId) {
+  return callPasswordRecovery({ action: 'request_otp', emp_id: String(empId).trim() });
+}
+
+export function resetPasswordWithOtp(empId, otpCode, newPassword) {
+  assertNewPassword(newPassword);
+  return callPasswordRecovery({ action: 'verify_and_reset', emp_id: String(empId).trim(), otp_code: otpCode, new_password: newPassword });
 }

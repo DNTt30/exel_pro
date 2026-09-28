@@ -12,7 +12,8 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
   const pickStore = canPickStore(user);
   const [formData, setFormData] = useState({ 
     id: '', 
-    name: '', 
+    name: '',
+    recoveryEmail: '',
     dept: pickStore ? (stores[0]?.id || '') : (getUserDepts(user)[0] || ''), 
     role: 'STFT',
     type: 'STFT', 
@@ -63,7 +64,8 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
       onClose();
       setFormData({ 
         id: '', 
-        name: '', 
+        name: '',
+        recoveryEmail: '',
         dept: pickStore ? (stores[0]?.id || '') : (getUserDepts(user)[0] || ''), 
         role: 'STFT',
         type: 'STFT', 
@@ -103,6 +105,12 @@ export default function AddEmployeeModal({ isOpen, onClose }) {
           />
         </div>
 
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Email khôi phục (Gmail)</label>
+          <input type="email" className="w-full p-2 border border-slate-300 rounded-lg" placeholder="nhanvien@gmail.com"
+            value={formData.recoveryEmail || ''} onChange={e => setFormData({ ...formData, recoveryEmail: e.target.value })} />
+          <p className="mt-1 text-xs text-slate-500">Xác minh email thuộc nhân viên trước khi lưu để nhận OTP khôi phục.</p>
+        </div>
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">Cửa hàng làm việc *</label>
           <select 

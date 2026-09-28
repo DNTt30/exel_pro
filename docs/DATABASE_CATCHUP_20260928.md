@@ -2,7 +2,9 @@
 
 Đối chiếu schema thật ngày 28/09/2026, project **plitfdjzuealjxbylwxy**. **Đã áp dụng lên production:** chủ dự án chạy gói trong SQL Editor và nhận `DATABASE_CATCHUP_OK`; kiểm tra độc lập qua Management API sau đó trả `DATABASE_CHECKS_OK`. OTP SQL và Edge Function `reset-password` đã được triển khai riêng trước đó.
 
-Kiểm tra hiện tại xác nhận RPC, cột tương thích, RLS và quyền OTP; chưa thay thế smoke test đăng nhập/lưu lịch trên frontend sau phát hành. Hai secrets `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM` vẫn chưa có; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` đã có. Chưa phát hành frontend trong bước xác nhận này.
+Kiểm tra hiện tại xác nhận RPC, cột tương thích, RLS và quyền OTP; chưa thay thế smoke test đăng nhập/lưu lịch trên frontend sau phát hành. Hai secrets `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM` vẫn chưa có; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` đã có.
+
+Frontend đã được xác minh đang phục vụ tại `https://dntt30.github.io/exel_pro/`: HTTP 200; bundle `index-C7zbM4Mw.js` khớp nguyên nội dung build local và chứa `request_otp`, `verify_and_reset`, `login_lookup_v2`. Nhánh `gh-pages` ở commit `d187ef5faaa340e705645ddeff84a7425a1f193d` (2026-09-28 08:59:01 UTC). Đây là xác nhận bản phát hành, chưa phải kiểm chứng gửi OTP/đổi mật khẩu thật. Handler hiện phân kênh theo ID: `admin` nhận Telegram; mọi mã NV 9 số, kể cả SM, nhận email.
 
 ## File cần chạy
 

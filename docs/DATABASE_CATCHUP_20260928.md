@@ -1,6 +1,8 @@
 # Bù migration trước khi phát hành frontend
 
-Đối chiếu schema thật ngày 28/09/2026, project **plitfdjzuealjxbylwxy**. Gói bên dưới đã chuẩn bị để chạy trong SQL Editor; **chưa áp dụng lên production**. OTP SQL và Edge Function `reset-password` đã được triển khai riêng trước đó.
+Đối chiếu schema thật ngày 28/09/2026, project **plitfdjzuealjxbylwxy**. **Đã áp dụng lên production:** chủ dự án chạy gói trong SQL Editor và nhận `DATABASE_CATCHUP_OK`; kiểm tra độc lập qua Management API sau đó trả `DATABASE_CHECKS_OK`. OTP SQL và Edge Function `reset-password` đã được triển khai riêng trước đó.
+
+Kiểm tra hiện tại xác nhận RPC, cột tương thích, RLS và quyền OTP; chưa thay thế smoke test đăng nhập/lưu lịch trên frontend sau phát hành. Hai secrets `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM` vẫn chưa có; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` đã có. Chưa phát hành frontend trong bước xác nhận này.
 
 ## File cần chạy
 
@@ -10,7 +12,7 @@ Kết quả cuối phải là **`DATABASE_CATCHUP_OK`**. File có kiểm tra RPC
 
 Chuẩn bị bản sao lưu DB theo quy trình vận hành trước khi chạy. Chọn thời điểm phát hành đồng bộ với frontend: bản mới yêu cầu `expect_version` khi lưu lịch; overload lưu lịch 3 tham số cũ bị gỡ để tránh PostgREST chọn nhầm. Client cũ đang mở có thể phải tải lại sau khi cập nhật frontend.
 
-## Những gì còn thiếu trên DB thật
+## Những thiếu sót đã xử lý trên DB thật
 
 | Phần | Hiện trạng quan sát | Xử lý trong gói |
 | --- | --- | --- |

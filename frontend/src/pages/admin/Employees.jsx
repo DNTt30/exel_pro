@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, Copy, Check } from 'lucide-react';
 import ChangePasswordModal from '../../components/modals/ChangePasswordModal';
@@ -523,8 +523,7 @@ export default function Employees() {
                           onClick={async () => {
                             const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';
                             try {
-                              await updateEmployeeInfo(emp.id, { jobTitle: next });
-                              updateEmployee(emp.id, { jobTitle: next });
+                              await updateEmployee(emp.id, { jobTitle: next });
                               toast.success(next ? `${emp.name} đã là Quản lý (SM)` : `${emp.name} về vai trò Nhân viên`);
                             } catch (e) {
                               toast.error('Lỗi: ' + e.message);

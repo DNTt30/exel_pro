@@ -45,17 +45,28 @@ CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{}'::
 GRANT USAGE ON SCHEMA auth TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid(), auth.jwt() TO authenticated, anon, service_role;
 """)
-if '--legacy' in sys.argv:
+if '--legacy' in sys.argv or '--production-shape' in sys.argv:
     sql((ROOT / 'supabase/migrations/20260919000000_baseline_schema.sql').read_text(encoding='utf-8'))
+    if '--production-shape' in sys.argv:
+        sql((ROOT / 'scripts/fixtures/production_schema_20260928.sql').read_text(encoding='utf-8'))
     # Emulate the actual pre-baseline role table variant, then load the repo's
     # original policies/triggers instead of inventing an upgrade fixture.
     sql('DROP TABLE user_store_roles;')
     for name in ['sql_admin_logs.sql','sql_app_logs.sql','sql_phase1_security.sql']:
         sql((ROOT / 'legacy_sql_scripts' / name).read_text(encoding='utf-8'))
     print('Loaded legacy Phase 1 schema and policies', flush=True)
-for migration in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
-    sql('BEGIN;\n' + migration.read_text(encoding='utf-8') + '\nCOMMIT;')
-    print('MIGRATED', migration.name, flush=True)
+    if '--production-shape' in sys.argv:
+        for name in ['sql_phase3_schedule.sql', 'sql_phase4_weeks_compat.sql', 'sql_phase4b_credentials.sql']:
+            sql((ROOT / 'legacy_sql_scripts' / name).read_text(encoding='utf-8'))
+        # OTP was deployed separately on production before these foundation migrations.
+        sql((ROOT / 'docs/sql_password_reset_otps.sql').read_text(encoding='utf-8'))
+if '--bundle' in sys.argv:
+    sql((ROOT / 'docs/sql_database_catchup_20260928.sql').read_text(encoding='utf-8'))
+    print('MIGRATED single SQL Editor bundle', flush=True)
+else:
+    for migration in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
+        sql('BEGIN;\n' + migration.read_text(encoding='utf-8') + '\nCOMMIT;')
+        print('MIGRATED', migration.name, flush=True)
 
 sql("""
 INSERT INTO stores(id,name) VALUES ('A','A'),('B','B');
@@ -141,7 +152,7 @@ assert sql("SELECT count(*) FROM attendance WHERE emp_id='100000002'") == '0'
 print('PASS legacy covering lock and attendance deletion', flush=True)
 
 feedback_id = '22222222-2222-2222-2222-222222222222'
-sql(actor('100000002', f"INSERT INTO feedbacks(id,emp_id,dept,status) VALUES('{feedback_id}','100000002','A','pending');"))
+sql(actor('100000002', f"INSERT INTO feedbacks(id,emp_id,emp_name,dept,date,shift,hours,status) VALUES('{feedback_id}','100000002','Staff A','A','2026-09-21','6-14',8,'pending');"))
 correction = ''''{"week":"2026-10-05","empId":"100000002","day":"T2","shiftCode":"6-14","expect_version":0}'::jsonb'''
 resolve_feedback = f"SELECT resolve_feedback_atomic_v2('{feedback_id}','approved','agreed',{correction});"
 # SELECT FOR UPDATE also applies UPDATE RLS, hiding the employee's own row.

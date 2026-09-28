@@ -1,3 +1,7 @@
 # Public recovery actions; admin_reset still verifies JWT and ADMIN role in the handler.
 [functions.reset-password]
 verify_jwt = false
+
+# JWT is validated with Auth by the handler before every operation.
+[functions.employee-profile]
+verify_jwt = false

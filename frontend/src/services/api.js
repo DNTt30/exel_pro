@@ -12,3 +12,4 @@ export * from './api/attendance';
 export * from './api/profiles';
 export * from './api/aiDecisions';
 export * from './api/password';
+export * from './api/employeeProfile';

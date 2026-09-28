@@ -91,6 +91,7 @@ export default function AppLayout() {
     {
       title: 'HỆ THỐNG',
       items: [
+        ...(user?.id !== 'admin' ? [{ to: '/employee/profile', icon: <User size={17} />, label: 'Hồ sơ của tôi' }] : []),
         { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
         ...(canManageStoreList(user) ? [{ to: '/admin/stores', icon: <Store size={17} />, label: 'Cửa hàng' }] : []),
         ...(isFullAdmin ? [{ to: '/admin/logs', icon: <ScrollText size={17} />, label: 'Nhật ký' }] : [])
@@ -102,6 +103,7 @@ export default function AppLayout() {
     {
       title: 'CÁ NHÂN',
       items: [
+        { to: '/employee/profile',   icon: <User size={17} />,         label: 'Hồ sơ của tôi' },
         { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
         { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
         { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },

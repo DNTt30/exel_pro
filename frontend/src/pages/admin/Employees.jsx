@@ -1,14 +1,17 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
+import { useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, Copy, Check } from 'lucide-react';
 import ChangePasswordModal from '../../components/modals/ChangePasswordModal';
 import ConfirmModal from '../../components/modals/ConfirmModal';
+import EmployeeProfileModal from '../../components/modals/EmployeeProfileModal';
+import { workPlanReminder } from '../../utils/employeeProfile';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
 import { canPickStore, isManagerFromEmp, isOpsManager, canAssignManager } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
-import { updateEmployeeInfo } from '../../services/api';
+import { getEmployeeProfiles } from '../../services/api';
 import { recoveryEmailSchema } from '../../schemas/validationSchemas';
 
 export default function Employees() {
@@ -22,6 +25,18 @@ export default function Employees() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
+  const [profileTarget, setProfileTarget] = useState(null);
+  const [profiles, setProfiles] = useState({});
+  const [profileError, setProfileError] = useState('');
+  useEffect(() => {
+    let current = true;
+    setProfiles({}); setProfileError('');
+    if (!user?.id) return;
+    getEmployeeProfiles().then(rows => {
+      if (current) setProfiles(Object.fromEntries(rows.map(row => [row.id, row])));
+    }).catch(() => { if (current) setProfileError('Chưa tải được thông tin dự định làm việc. Tải lại trang để thử lại.'); });
+    return () => { current = false; };
+  }, [user?.id, employees]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL'); // ALL | sm | nv
   const [passwordFilter, setPasswordFilter] = useState('ALL'); // ALL | CHANGED | DEFAULT | EXPIRED
@@ -219,6 +234,8 @@ export default function Employees() {
 
   return (
     <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-6 h-full flex flex-col">
+      {profileTarget && <EmployeeProfileModal key={`${user?.id}:${profileTarget}`} employeeId={profileTarget} onClose={() => setProfileTarget(null)} />}
+      {profileError && <p role="status" className="mb-3 text-xs text-amber-700">{profileError}</p>}
       {/* ── BẢNG THỐNG KÊ AN TOÀN MẬT KHẨU ── */}
       <div className={`mb-4 p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
         securityStats.unchanged === 0 
@@ -410,6 +427,7 @@ export default function Employees() {
             
             {filteredEmps.map(emp => {
               const badgeInfo = getRoleBadgeInfo(emp.role || emp.type);
+              const reminder = emp.isActive !== false && workPlanReminder(profiles[emp.id]?.workPlanUntil);
               
               return (
                 <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
@@ -422,7 +440,8 @@ export default function Employees() {
                         value={formData.name} 
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
-                    ) : <span className="font-bold text-slate-800">{emp.name}</span>}
+                    ) : <button type="button" onClick={() => setProfileTarget(emp.id)} title={`Xem hồ sơ ${emp.name}`} className="text-left font-bold text-blue-700 hover:underline">{emp.name}</button>}
+                    {reminder && <span className="mt-1 block w-fit rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800" title="Dự định của nhân viên; SM nên trao đổi và chuẩn bị nhân sự.">{reminder}</span>}
                     {editingId === emp.id ? <label className="mt-2 block text-[11px] text-slate-500">Email khôi phục (Gmail)
                       <input type="email" aria-label={`Email khôi phục ${emp.id}`} className="mt-1 w-full min-w-40 rounded border border-blue-300 p-1.5 text-xs"
                         disabled={!canPromote && isManagerFromEmp(emp)} value={formData.recoveryEmail || ''}

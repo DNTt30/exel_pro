@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Service to handle Google Gemini API integration via REST
  * v3 — fixed model, handbook context, streaming, retry
  */

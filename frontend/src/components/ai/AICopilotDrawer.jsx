@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
@@ -588,7 +588,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                 }`}
               />
               {geminiKeyDraft && !isValidGeminiKey(geminiKeyDraft) && (
-                <p className="text-[11px] text-red-500 mt-1">⚠️ Key không đúng định dạng (phải bắt đầu bằng AIzaSy...)</p>
+                <p className="text-[11px] text-red-500 mt-1">⚠️ Key không hợp lệ (phải dài ít nhất 35 ký tự)</p>
               )}
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
                 Chỉ admin cấu hình. Key được lưu bảo mật trên máy chủ để toàn ứng dụng dùng chung; nhân viên không cần nhập key.

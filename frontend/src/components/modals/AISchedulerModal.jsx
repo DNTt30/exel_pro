@@ -8,6 +8,8 @@ import { demandToMatrices } from '../../utils/revenueDemand';
 import { analyzeSalesImages } from '../../utils/salesImageAnalyzer';
 import { normalizeShift } from '../../utils/shiftHelper';
 import { useShallow } from 'zustand/react/shallow';
+import { getSchedulesByWeeks } from '../../services/api';
+import { managedStoreIds, offsetWeek } from '../../utils/employeeSkills';
 
 function fmtVnd(n) {
   const v = Number(n) || 0;
@@ -47,9 +49,11 @@ function DemandField({ label, customers, sales, onCustomers, onSales }) {
 const EMPTY_SCHED = {};
 
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
-  const { employees, schedule, applyAiSchedule, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
+  const { employees, schedule, scheduleWeeks, applyAiSchedule, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, scheduleWeeks: s.scheduleWeeks, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
-  const defaultStoreId = storeId === 'ALL' ? (user?.dept || stores[0]?.id || '') : storeId;
+  const allowedIds = managedStoreIds(user, stores);
+  const manageableStores = stores.filter(s => allowedIds.includes(s.id));
+  const defaultStoreId = allowedIds.includes(storeId) ? storeId : (allowedIds[0] || '');
 
   const [selectedStoreId, setSelectedStoreId] = useState(defaultStoreId);
 
@@ -71,15 +75,23 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
   const [respectAvailability, setRespectAvailability] = useState(true);
   const [respectOffRequests, setRespectOffRequests] = useState(true);
   const smDebounceRef = useRef(null);
+  const runRef = useRef(0);
+  useEffect(() => {
+    runRef.current++;
+    setAiResult(null);
+    setGenerating(false);
+    return () => { runRef.current++; };
+  }, [isOpen, selectedStoreId, currentWeek, user, employees, weekSched, scheduleWeeks, demand, smText, respectAvailability, respectOffRequests]);
 
   const storeEmps = useMemo(
-    () => employees.filter(e => e.dept === activeStoreId),
+    () => employees.filter(e => e.dept === activeStoreId && e.isActive !== false),
     [employees, activeStoreId]
   );
 
   // Auto-parse SM instructions sau 700ms debounce
   const handleSmTextChange = useCallback((text) => {
     setSmText(text);
+    setSmConstraints(null);
     setAiResult(null);
     if (smDebounceRef.current) clearTimeout(smDebounceRef.current);
     if (!text.trim()) { setSmConstraints(null); return; }
@@ -197,10 +209,17 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
     }
   };
 
-  const handleRun = () => {
+  const handleRun = async () => {
+    const run = ++runRef.current;
     setGenerating(true);
+    setAiResult(null);
     setError('');
     try {
+      if (!allowedIds.includes(activeStoreId)) throw new Error('Không có quyền xếp lịch cửa hàng này.');
+      const previousWeek = offsetWeek(currentWeek, -1);
+      const nextWeek = offsetWeek(currentWeek, 1);
+      const adjacent = await getSchedulesByWeeks([previousWeek, nextWeek]);
+      if (run !== runRef.current) return;
       let opts;
       if (hasDemand) {
         // Doanh thu -> nhu cau theo gio -> ma tran ca (co ca ngan cho PT gio vang)
@@ -216,6 +235,12 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
       opts.existingSchedule = weekSched;
       opts.respectAvailability = respectAvailability;
       opts.respectOffRequests = respectOffRequests;
+      opts.user = user;
+      opts.stores = stores;
+      opts.currentWeek = currentWeek;
+      opts.scheduleWeeks = scheduleWeeks;
+      opts.previousWeekSchedule = adjacent[previousWeek] || {};
+      opts.nextWeekSchedule = adjacent[nextWeek] || {};
 
       // Áp dụng ràng buộc từ lệnh / ghi chú của Cửa hàng trưởng (SM)
       const effectiveSm = smConstraints || (smText.trim() ? parseSmInstructions(smText, currentWeek, storeEmps) : null);
@@ -228,6 +253,7 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
       }
 
       const result = generateAISchedule(employees, activeStoreId, opts);
+      result.sourceSchedule = weekSched;
       if (hasDemand) {
         const wdM = demandToMatrices(demand).weekday;
         const weM = demandToMatrices(demand).weekend;
@@ -235,14 +261,15 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
         result.insights = [
           `Theo doanh số ${fmtVnd(demand.weekday.sales) || '—'} (T2–T6) / ${fmtVnd(demand.weekend.sales) || '—'} (T7–CN). FT gánh khung xương ca dài; PT lấp giờ vàng bằng ca ngắn.`,
           `🧮 Định biên sinh tự động — thường: ${fmtM(wdM)} · cuối tuần: ${fmtM(weM)}.`,
-          ...result.insights.slice(1, 3)
+          ...result.insights
         ];
       }
       setAiResult(result);
     } catch (e) {
+      if (run !== runRef.current) return;
       setError(e.message || 'Không sinh được lịch.');
     } finally {
-      setGenerating(false);
+      if (run === runRef.current) setGenerating(false);
     }
   };
 
@@ -250,7 +277,7 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
     if (!aiResult) return;
     setApplying(true);
     try {
-      await applyAiSchedule(currentWeek, aiResult.schedule, activeStoreId);
+      await applyAiSchedule(currentWeek, aiResult.schedule, activeStoreId, aiResult.sourceSchedule);
       onClose();
     } catch (e) {
       setError(e.message || 'Không lưu được lịch.');
@@ -280,7 +307,7 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
               onChange={e => setSelectedStoreId(e.target.value)}
               className="mr-2 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-indigo-400 outline-none cursor-pointer"
             >
-              {stores.map(s => (
+              {manageableStores.map(s => (
                 <option key={s.id} value={s.id}>{s.id} — {s.name || s.id}</option>
               ))}
             </select>
@@ -477,11 +504,18 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
               </div>
               {Array.isArray(aiResult.insights) && aiResult.insights.length > 0 && (
                 <div className="space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                  {aiResult.insights.slice(0, 4).map((ins, i) => (
+                  {aiResult.insights.filter(ins => !aiResult.criticalInsights.includes(ins)).slice(0, 4).map((ins, i) => (
                     <p key={i} className="text-[11px] text-slate-600 leading-snug">{ins}</p>
                   ))}
                 </div>
               )}
+              {!!aiResult.criticalInsights.length && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 space-y-1">
+                {aiResult.criticalInsights.map(ins => <p key={ins}>{ins}</p>)}
+              </div>}
+              {!!aiResult.borrowedAssignments.length && <div className="rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs text-orange-900">
+                <p className="font-bold">Chi viện đề xuất — giữ nguyên cửa hàng gốc</p>
+                {aiResult.borrowedAssignments.map(row => <p key={`${row.empId}:${row.day}`}>{row.name} · {row.fromStore} → {activeStoreId} · {row.day} ca {row.shift}</p>)}
+              </div>}
               {Array.isArray(aiResult.warnings) && aiResult.warnings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 space-y-0.5">
                   <p className="text-[11px] font-bold text-amber-800">⚠️ Cần SM bổ sung tay ({aiResult.warnings.length}):</p>
@@ -505,16 +539,16 @@ export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId
                     </tr>
                   </thead>
                   <tbody>
-                    {storeEmps.map(emp => {
+                    {employees.filter(emp => aiResult.schedule[emp.id]).map(emp => {
                       const sched = aiResult.schedule[emp.id] || {};
                       return (
                         <tr key={emp.id} className="border-t border-slate-100">
-                          <td className="p-1.5 font-semibold text-slate-800 whitespace-nowrap">{emp.name}</td>
+                          <td className="p-1.5 font-semibold text-slate-800 whitespace-nowrap">{emp.name}{emp.dept !== activeStoreId && <span className="ml-1 text-orange-700">(Hỗ trợ · {emp.dept})</span>}</td>
                           {WEEK_DAYS.map(d => {
-                            const shift = sched[d] || 'off';
+                            const { shift, covering_store, confirmed } = normalizeShift(sched[d]);
                             return (
                               <td key={d} className={`p-1 text-center font-mono ${shift === 'off' ? 'text-slate-300' : 'text-blue-700'}`}>
-                                {shift === 'off' ? '—' : shift}
+                                {shift === 'off' ? 'OFF' : (shift || '—')}{covering_store ? ` ${covering_store}` : ''}{shift && shift !== 'off' && !confirmed ? ' (đăng ký)' : ''}
                               </td>
                             );
                           })}

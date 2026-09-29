@@ -268,8 +268,13 @@ export const createScheduleSlice = (set, get) => {
     });
   },
 
-  applyAiSchedule: (weekDate, aiSchedule, storeId) => {
+  applyAiSchedule: (weekDate, aiSchedule, storeId, sourceSchedule) => {
     const existing = get().schedule[weekDate] || {};
+    if (sourceSchedule && Object.keys(aiSchedule).some(id =>
+      scheduleVersion(existing[id]) !== scheduleVersion(sourceSchedule[id]) ||
+      JSON.stringify(existing[id]) !== JSON.stringify(sourceSchedule[id]))) {
+      throw new Error('Lịch đã thay đổi sau khi AI tạo đề xuất. Vui lòng xếp lịch lại.');
+    }
     const merged = mergeAiSchedule(existing, aiSchedule, storeId);
     const changes = Object.fromEntries(Object.keys(aiSchedule).map(id => [id, merged[id]]));
     return get().applyBulkSchedule(weekDate, changes, storeId);

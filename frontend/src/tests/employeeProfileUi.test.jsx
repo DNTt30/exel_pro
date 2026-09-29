@@ -80,6 +80,18 @@ it('shows manager reminder and personal details from scoped API', async () => {
   expect(container.textContent).toContain('Trường thử');
   expect(container.textContent).toContain('CNTT');
 });
+it('edits Night Ready without removing other skill tags', async () => {
+  const updateEmployee = vi.fn().mockResolvedValue();
+  useStore.setState({ user: { id: 'admin', role: 'admin' }, employees: [{ ...profile, skills: ['CASHIER', 'NIGHT_READY'] }], updateEmployee });
+  await mount(<Employees />);
+  expect(container.textContent).toContain('☾ Night Ready');
+  await act(async () => container.querySelector('[title="Sửa thông tin"]').click());
+  const checkbox = container.querySelector('input[type=checkbox]');
+  expect(checkbox.checked).toBe(true);
+  await act(async () => checkbox.click());
+  await act(async () => container.querySelector('[title="Lưu"]').click());
+  expect(updateEmployee).toHaveBeenCalledWith(profile.id, expect.objectContaining({ skills: ['CASHIER'] }));
+});
 it('discards a late response when the account changes', async () => {
   let finish;
   api.getEmployeeProfiles.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));

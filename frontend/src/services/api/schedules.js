@@ -26,14 +26,17 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
   if (uniqueWeeks.length === 0) return {};
   if (opts.empIds && opts.empIds.length === 0) return {};
 
-  let q = db().from('schedules').select('week_date,emp_id,shifts,version').in('week_date', uniqueWeeks);
-  if (opts.empId) q = q.eq('emp_id', opts.empId);
-  else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
-
-  const { data, error } = await q;
-  if (error) {
-    console.error('Lỗi lấy lịch làm việc theo nhiều tuần:', error);
-    throw error;
+  // Page deterministic batches: history for multiple stores can exceed PostgREST's row cap.
+  const data = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let q = db().from('schedules').select('week_date,emp_id,shifts,version').in('week_date', uniqueWeeks);
+    if (opts.empId) q = q.eq('emp_id', opts.empId);
+    else if (opts.empIds?.length) q = q.in('emp_id', opts.empIds);
+    const page = await q.order('week_date').order('emp_id').range(offset, offset + pageSize - 1);
+    if (page.error) throw page.error;
+    data.push(...(page.data || []));
+    if ((page.data || []).length < pageSize) break;
   }
 
   const result = {};

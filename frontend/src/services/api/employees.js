@@ -1,11 +1,13 @@
 import { db } from './client';
 import { normalizeRecoveryEmail } from '../../utils/recoveryEmail';
+import { normalizeSkills } from '../../utils/employeeSkills';
 
 // --- EMPLOYEES API ---
 function mapEmployee(e) {
   if (!e) return null;
   return {
     id: e.id,
+    skills: normalizeSkills(e.skills),
     name: e.name,
     dept: e.dept,
     type: e.type,
@@ -37,7 +39,7 @@ export async function getEmployeeById(id) {
 }
 
 export async function getEmployees(opts = {}) {
-  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline,recovery_email').order('dept', { ascending: true });
+  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline,recovery_email,skills').order('dept', { ascending: true });
   if (opts.dept) q = q.eq('dept', opts.dept);
   const { data, error } = await q;
   if (error) {
@@ -58,6 +60,7 @@ export async function addEmployee(emp) {
   };
   if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
   if (emp.isActive !== undefined) row.is_active = emp.isActive;
+  if (emp.skills !== undefined) row.skills = normalizeSkills(emp.skills);
   if (emp.recoveryEmail !== undefined) row.recovery_email = normalizeRecoveryEmail(emp.recoveryEmail) || null;
 
   const { error } = await db().from('employees').insert([row]);
@@ -78,6 +81,7 @@ export async function addEmployeesBulk(emps = []) {
     };
     if (emp.jobTitle || emp.role) row.job_title = emp.jobTitle || emp.role;
     if (emp.isActive !== undefined) row.is_active = emp.isActive;
+    if (emp.skills !== undefined) row.skills = normalizeSkills(emp.skills);
     if (emp.recoveryEmail !== undefined) row.recovery_email = normalizeRecoveryEmail(emp.recoveryEmail) || null;
     return row;
   });
@@ -88,6 +92,7 @@ export async function addEmployeesBulk(emps = []) {
 
 export async function updateEmployeeInfo(id, updates) {
   const payload = {};
+  if (updates.skills !== undefined) payload.skills = normalizeSkills(updates.skills);
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.recoveryEmail !== undefined) payload.recovery_email = normalizeRecoveryEmail(updates.recoveryEmail) || null;
   if (updates.dept !== undefined) payload.dept = updates.dept;

@@ -13,6 +13,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
 import { getEmployeeProfiles } from '../../services/api';
 import { recoveryEmailSchema } from '../../schemas/validationSchemas';
+import { isNightReady, toggleNightReady } from '../../utils/employeeSkills';
 
 export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
@@ -441,6 +442,13 @@ export default function Employees() {
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
                     ) : <button type="button" onClick={() => setProfileTarget(emp.id)} title={`Xem hồ sơ ${emp.name}`} className="text-left font-bold text-blue-700 hover:underline">{emp.name}</button>}
+                    {editingId === emp.id ? (
+                      <label className="mt-2 flex items-center gap-2 text-xs text-purple-800">
+                        <input type="checkbox" checked={isNightReady(formData)}
+                          onChange={e => setFormData({ ...formData, skills: toggleNightReady(formData.skills, e.target.checked) })} />
+                        Cứng Ca Đêm (Night Ready)
+                      </label>
+                    ) : isNightReady(emp) && <span className="ml-2 inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-800" title="Đã được quản lý xác nhận đủ kỹ năng ca đêm">☾ Night Ready</span>}
                     {reminder && <span className="mt-1 block w-fit rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800" title="Dự định của nhân viên; SM nên trao đổi và chuẩn bị nhân sự.">{reminder}</span>}
                     {editingId === emp.id ? <label className="mt-2 block text-[11px] text-slate-500">Email khôi phục (Gmail)
                       <input type="email" aria-label={`Email khôi phục ${emp.id}`} className="mt-1 w-full min-w-40 rounded border border-blue-300 p-1.5 text-xs"

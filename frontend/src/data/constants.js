@@ -72,6 +72,11 @@ export const DECISION_RULES = {
   CANDIDATE_LIMIT: 2,
 };
 
+export const SKILL_ANALYTICS_RULES = {
+  HISTORY_WEEKS: 8,
+  TENURE_DAYS: 90,
+};
+
 // Hệ số lương ca đêm và lương cơ bản part-time
 export const NIGHT_SHIFT_MULTIPLIER = 1.3;
 export const DEFAULT_PT_HOURLY_RATE = 25000;

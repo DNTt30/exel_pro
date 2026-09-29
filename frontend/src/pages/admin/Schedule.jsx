@@ -34,6 +34,7 @@ const VulnerabilityRadarModal = React.lazy(() => import('../../components/modals
 import RegistrationDeadlineModal from '../../components/modals/RegistrationDeadlineModal';
 import AICopilotDrawer from '../../components/ai/AICopilotDrawer';
 import ScheduleQualityPanel from '../../components/ScheduleQualityPanel';
+import ShiftAnalyticsBoard from '../../components/ShiftAnalyticsBoard';
 import StaffingGapTable from '../../components/StaffingGapTable';
 import EmployeeRow from '../../components/EmployeeRow';
 import * as api from '../../services/api';
@@ -703,6 +704,7 @@ export default function Schedule() {
 
       {/* 3.5 Staffing Gap Analysis Widget */}
       <ScheduleQualityPanel employees={employees} week={currentWeek} storeId={filterDept} />
+      {isManager && <ShiftAnalyticsBoard employees={employees} stores={stores} user={user} storeId={filterDept} currentWeek={currentWeek} />}
       <StaffingGapTable 
         employees={employees} 
         weekSchedule={weekSchedule} 

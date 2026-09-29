@@ -135,6 +135,14 @@ describe('schedule integrity', () => {
     expect(store.getState().schedule[week].outside.T2).toBe('22-6');
   });
 
+  it('rejects an AI proposal if a source row changes after generation', () => {
+    const store = makeStore();
+    const source = { [employee.id]: withScheduleVersion({ T2: 'off' }, 2) };
+    store.setState({ schedule: { [week]: { [employee.id]: withScheduleVersion({ T2: '6-14' }, 3) } } });
+    expect(() => store.getState().applyAiSchedule(week, { [employee.id]: { T2: '22-6' } }, employee.dept, source)).toThrow('Lịch đã thay đổi');
+    expect(api.saveBulkEmployeeSchedules).not.toHaveBeenCalled();
+  });
+
   it('shows a bulk change optimistically and restores only its rows on failure', async () => {
     const store=makeStore(), request=deferred();
     store.setState({schedule:{[week]:{[employee.id]:{T2:'6-14'},outside:{T2:'off'}}}});

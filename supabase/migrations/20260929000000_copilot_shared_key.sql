@@ -1,4 +1,4 @@
-BEGIN;
+﻿BEGIN;
 CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA vault;
 
 -- Only the Edge Function's service role can access the shared credential.
@@ -12,7 +12,7 @@ CREATE OR REPLACE FUNCTION public.copilot_set_api_key(p_key text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE secret_id uuid;
 BEGIN
-  IF p_key IS NULL OR p_key !~ '^AIza[0-9A-Za-z_-]{35,}$' OR length(p_key) > 256 THEN
+  IF p_key IS NULL OR length(p_key) < 35 OR length(p_key) > 256 THEN
     RAISE EXCEPTION 'Invalid Gemini key format';
   END IF;
   PERFORM pg_catalog.pg_advisory_xact_lock(29092026, 1);

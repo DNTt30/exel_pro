@@ -88,7 +88,7 @@ export async function streamGeminiMultiTurn(contents, systemInstruction = '', _l
  * Validate Gemini API key format (kiểm tra format, không gọi API).
  */
 export function isValidGeminiKey(key) {
-  return typeof key === 'string' && /^AIza[0-9A-Za-z_-]{35,}$/.test(key.trim());
+  return typeof key === 'string' && (key.trim().length >= 35);
 }
 
 // ===================== INTERNAL HELPERS =====================

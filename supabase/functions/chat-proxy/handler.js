@@ -2,22 +2,37 @@ import { DEFAULT_GEMINI_MODEL, COPILOT_MAX_OUTPUT_TOKENS } from '../_shared/copi
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-gemini-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const json = (status, error) => new Response(JSON.stringify({ error }), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-export function createChatProxyHandler({ authorize, apiKey = '', fetchImpl = fetch }) {
+export function createChatProxyHandler({ authorize, getApiKey, saveApiKey, fetchImpl = fetch }) {
   return async req => {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, 'Phương thức không hỗ trợ.');
     try {
       const token = req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
-      if (!token || !await authorize(token)) return json(401, 'Vui lòng đăng nhập lại để dùng trợ lý.');
+      const identity = token && await authorize(token);
+      if (!identity) return json(401, 'Vui lòng đăng nhập lại để dùng trợ lý.');
       const action = new URL(req.url).searchParams.get('action') || 'generateContent';
+      if (['config_status', 'configure'].includes(action)) {
+        if (identity.isAdmin !== true) return json(403, 'Chỉ admin được cấu hình trợ lý AI.');
+        if (action === 'configure') {
+          const raw = await req.text();
+          if (raw.length > 1024) return json(413, 'Cấu hình quá dài.');
+          let config;
+          try { config = JSON.parse(raw); } catch { return json(400, 'Cấu hình không hợp lệ.'); }
+          const key = typeof config?.apiKey === 'string' ? config.apiKey.trim() : '';
+          if (!/^AIza[0-9A-Za-z_-]{35,}$/.test(key) || key.length > 256) return json(400, 'Gemini API Key không đúng định dạng.');
+          await saveApiKey(key);
+        }
+        const configured = !!await getApiKey();
+        return new Response(JSON.stringify({ configured }), { headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      }
       if (!['generateContent', 'streamGenerateContent'].includes(action)) return json(400, 'Yêu cầu AI không hợp lệ.');
-      const key = req.headers.get('x-gemini-api-key')?.trim() || apiKey;
-      if (!key) return json(503, 'Chưa cấu hình Gemini API Key. Anh/chị mở Cài đặt AI để nhập key.');
+      const key = await getApiKey();
+      if (!key) return json(503, 'Trợ lý AI chưa được cấu hình. Vui lòng liên hệ admin.');
       if (!/^AIza[0-9A-Za-z_-]{35,}$/.test(key)) return json(400, 'Gemini API Key không đúng định dạng.');
       const raw = await req.text();
       if (new TextEncoder().encode(raw).length > 256000) return json(413, 'Nội dung quá dài. Vui lòng rút gọn lịch sử trò chuyện.');

@@ -13,3 +13,4 @@ export * from './api/profiles';
 export * from './api/aiDecisions';
 export * from './api/password';
 export * from './api/employeeProfile';
+export * from './api/copilotConfig';

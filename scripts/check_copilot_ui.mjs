@@ -7,6 +7,7 @@ const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
 let serial = 0;
 const pending = new Map(), errors = [], requests = [];
+const configurations = [];
 function send(method, params = {}) {
   const id = ++serial;
   return new Promise((resolve, reject) => { pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
@@ -36,6 +37,13 @@ socket.addEventListener('message', ({ data }) => {
         void send('Fetch.fulfillRequest', {requestId,responseCode:204,responseHeaders:[{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Methods',value:'POST,OPTIONS'},{name:'Access-Control-Allow-Headers',value:request.headers['Access-Control-Request-Headers'] || request.headers['access-control-request-headers'] || '*'}]});
         return;
       }
+      const action = new URL(request.url).searchParams.get('action');
+      if (['configure', 'config_status'].includes(action)) {
+        if (action === 'configure') configurations.push(JSON.parse(request.postData));
+        void send('Fetch.fulfillRequest', {requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'}],body:Buffer.from(JSON.stringify({configured:configurations.length > 0})).toString('base64')});
+        return;
+      }
+      assert.equal(request.headers['x-gemini-api-key'], undefined);
       requests.push({url:request.url,body:JSON.parse(request.postData)});
       const reply = 'Buoc 1: Doc So tay.\nBuoc 2: Lam theo huong dan.\nBuoc 3: Xac nhan voi quan ly.';
       const data = 'data: ' + JSON.stringify({candidates:[{content:{parts:[{text:reply}]}}]}) + '\n\n';
@@ -106,7 +114,12 @@ try {
     assert.equal(await evaluate("/Gemini 2.0|Thinking|Mô hình AI/.test(document.body.innerText)"),false);
     let shot=await send('Page.captureScreenshot',{format:'png'});
     await writeFile(new URL(`${device}-settings.png`,out),Buffer.from(shot.data,'base64'));
+    await evaluate(`(() => { const input=document.querySelector('input[type=password]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'AIza'+'x'.repeat(35)); input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await wait(100);
     await evaluate("[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Lưu cấu hình').click()");
+    await waitFor("document.body.innerText.includes('Đã cấu hình cho toàn ứng dụng')");
+    assert.equal(await evaluate("localStorage.getItem('gemini_api_key')"), null);
+    await evaluate("document.querySelector('[title=\"Đóng cài đặt AI\"]').click()");
     await evaluate(`(() => { const input=document.querySelector('input[placeholder^="Hỏi lịch"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Nấu phần lẩu đó từng bước thế nào?'); input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
     await wait(100);
     await evaluate("document.querySelector('[title=\"Gửi câu hỏi\"]').click()");
@@ -117,6 +130,19 @@ try {
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
     await evaluate("document.querySelector('[title=\"Đóng trợ lý\"]').click()");
   }
+  assert.equal(configurations.length,2);
+  await evaluate("window.testStore.setState({user:{id:'260512001',role:'employee',dept:'VN0485',name:'NV thử',loginAt:Date.now()}});history.pushState({}, '', '/employee/home');dispatchEvent(new PopStateEvent('popstate'));");
+  for (const [device,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:device==='mobile'});
+    await waitFor("document.querySelector('[title=\"GS25 AI Copilot\"]')");
+    await evaluate("document.querySelector('[title=\"GS25 AI Copilot\"]').click()");
+    await waitFor("document.querySelector('input[placeholder^=\"Hỏi công thức\"]')");
+    assert.equal(await evaluate("!!document.querySelector('[title=\"Cài đặt AI\"]')"),false);
+    assert.equal(await evaluate("!!document.querySelector('input[type=password]')"),false);
+    const shot=await send('Page.captureScreenshot',{format:'png'});
+    await writeFile(new URL(`${device}-employee.png`,out),Buffer.from(shot.data,'base64'));
+    await evaluate("document.querySelector('[title=\"Đóng trợ lý\"]').click()");
+  }
   assert.equal(requests.length,2);
   const {GS25_HANDBOOK_DATA}=await import('../frontend/src/data/gs25HandbookData.js');
   for (const request of requests) {
@@ -124,7 +150,7 @@ try {
     assert.deepEqual(JSON.parse(request.body.systemInstruction.parts[0].text.split('SỔ TAY NGHIỆP VỤ GS25 — TOÀN BỘ NỘI DUNG:\n')[1]),GS25_HANDBOOK_DATA);
   }
   assert.deepEqual(errors,[]);
-  console.log('PASS desktop/mobile settings and streaming chat; no model controls; full handbook and fixed model verified in both real UI requests (mock provider).');
+  console.log('PASS desktop/mobile admin shared configuration, employee settings hidden, streaming chat, full handbook and fixed model (mock provider).');
 } catch (error) {
   console.error(await evaluate('document.body.innerText.slice(-1600)'),errors);
   throw error;

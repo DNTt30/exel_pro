@@ -13,39 +13,38 @@ function _getBaseUrl(action) {
   return `${url}/functions/v1/chat-proxy?model=${DEFAULT_GEMINI_MODEL}&action=${action}`;
 }
 
-async function requestHeaders(apiKey) {
+async function requestHeaders() {
   const session = await supabase?.auth.getSession();
   if (session?.error || !session?.data?.session?.access_token) throw new Error('Vui lòng đăng nhập lại để dùng trợ lý.');
   return { 'Content-Type': 'application/json', apikey: supabaseAnonKey,
-    Authorization: `Bearer ${session.data.session.access_token}`,
-    ...(apiKey?.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {}) };
+    Authorization: `Bearer ${session.data.session.access_token}` };
 }
 
 /**
  * Ggọi Gemini API (single-turn)
  */
-export async function generateGeminiContent(prompt, systemInstruction = '', apiKey) {
+export async function generateGeminiContent(prompt, systemInstruction = '') {
   const contents = [{ role: 'user', parts: [{ text: prompt }] }];
-  return _callGeminiWithRetry(contents, systemInstruction, apiKey);
+  return _callGeminiWithRetry(contents, systemInstruction);
 }
 
 /**
  * Gọi Gemini API với multi-turn conversation
  */
-export async function generateGeminiMultiTurn(contents, systemInstruction = '', apiKey) {
-  return _callGeminiWithRetry(contents, systemInstruction, apiKey);
+export async function generateGeminiMultiTurn(contents, systemInstruction = '') {
+  return _callGeminiWithRetry(contents, systemInstruction);
 }
 
 /**
  * Streaming multi-turn
  */
-export async function streamGeminiMultiTurn(contents, systemInstruction = '', apiKey, onChunk) {
+export async function streamGeminiMultiTurn(contents, systemInstruction = '', _legacyApiKey, onChunk) {
   const payload = _buildPayload(contents, systemInstruction);
   const url = _getBaseUrl('streamGenerateContent');
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: await requestHeaders(apiKey),
+    headers: await requestHeaders(),
     body: JSON.stringify(payload)
   });
 
@@ -112,20 +111,20 @@ function _buildPayload(contents, systemInstruction) {
   return payload;
 }
 
-async function _callGeminiWithRetry(contents, systemInstruction, apiKey, attempt = 0) {
+async function _callGeminiWithRetry(contents, systemInstruction, attempt = 0) {
   const payload = _buildPayload(contents, systemInstruction);
   const url = _getBaseUrl('generateContent');
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: await requestHeaders(apiKey),
+    headers: await requestHeaders(),
     body: JSON.stringify(payload)
   });
 
   // Retry 1 lần nếu rate limit hoặc server error
   if ((response.status === 429 || response.status >= 500) && attempt === 0) {
     await new Promise(r => setTimeout(r, 1500));
-    return _callGeminiWithRetry(contents, systemInstruction, apiKey, 1);
+    return _callGeminiWithRetry(contents, systemInstruction, 1);
   }
 
   const data = await response.json();

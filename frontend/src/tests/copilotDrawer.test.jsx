@@ -6,6 +6,8 @@ import AICopilotDrawer from '../components/ai/AICopilotDrawer';
 import { useStore } from '../store/useStore';
 import { askGeminiCopilot } from '../utils/aiSchedulerEngine';
 import { DEFAULT_GEMINI_MODEL } from '../services/geminiService';
+import { getCopilotConfiguration, saveCopilotConfiguration } from '../services/api';
+vi.mock('../services/api', async importOriginal => ({ ...await importOriginal(), getCopilotConfiguration: vi.fn(), saveCopilotConfiguration: vi.fn() }));
 vi.mock('../utils/aiSchedulerEngine', () => ({ askGeminiCopilot: vi.fn() }));
 vi.mock('../utils/assistantAgents', () => ({ assistantAgentPlan: () => null, assistantStoreIds: () => null, runAssistantAgents: async () => null }));
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -14,6 +16,8 @@ let root, container, log;
 beforeEach(() => {
   localStorage.clear(); localStorage.setItem('gemini_model', 'gemini-2.0-flash-thinking-exp-01-21');
   log = vi.fn();
+  getCopilotConfiguration.mockResolvedValue({ configured: false });
+  saveCopilotConfiguration.mockResolvedValue({ configured: true });
   useStore.setState({ user: { id: 'a', role: 'employee', dept: 'A' }, employees: [], stores: [{ id: 'A' }], schedule: {}, feedbacks: [], shiftSwaps: [], shelves: [], shelfItems: [], logAiTurn: log });
   Element.prototype.scrollIntoView = vi.fn();
   askGeminiCopilot.mockImplementation(async (_q, _context, _history, _key, chunk) => { chunk('Bước 1: Đọc Sổ tay.'); return 'Bước 1: Đọc Sổ tay.'; });
@@ -29,11 +33,35 @@ async function send(question) {
   await act(async () => container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 }
 it('removes model controls and badges even with old saved preferences', async () => {
+  useStore.setState({ user: { id: 'admin', role: 'admin' } });
   await mount();
   await act(async () => container.querySelector('[title="Cài đặt AI"]').click());
   expect(container.querySelector('input[type=radio]')).toBeNull();
   expect(container.textContent).not.toMatch(/Thinking|Lite|Mô hình AI|Gemini 2\.0/);
   expect(container.querySelector('input[type=password]')).not.toBeNull();
+});
+it.each([{ id: 'staff', role: 'employee' }, { id: 'sm', role: 'SM', isManager: true }])('hides settings for $role and removes old browser keys', async user => {
+  useStore.setState({ user });
+  localStorage.setItem('gemini_api_key', 'old-key');
+  await mount();
+  expect(container.querySelector('[title="Cài đặt AI"]')).toBeNull();
+  expect(container.querySelector('input[type=password]')).toBeNull();
+  expect(localStorage.getItem('gemini_api_key')).toBeNull();
+  await send('Hướng dẫn nấu lẩu');
+  expect(askGeminiCopilot.mock.calls[0][3]).toBe('');
+});
+it('saves shared configuration for admin, clears the field and never stores the key locally', async () => {
+  useStore.setState({ user: { id: 'admin', role: 'admin' } });
+  await mount();
+  await act(async () => container.querySelector('[title="Cài đặt AI"]').click());
+  const input = container.querySelector('input[type=password]');
+  const key = 'AIza' + 'x'.repeat(35);
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, key); input.dispatchEvent(new Event('input', { bubbles: true })); });
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent.includes('Lưu cấu hình')).click());
+  expect(saveCopilotConfiguration).toHaveBeenCalledWith(key);
+  expect(input.value).toBe('');
+  expect(localStorage.getItem('gemini_api_key')).toBeNull();
+  expect(container.textContent).toContain('Đã cấu hình cho toàn ứng dụng');
 });
 it('sends SOP and follow-up questions to Gemini even without a browser key', async () => {
   await mount(); await send('Cách kiểm tra hạn sử dụng?'); await send('Còn bước tiếp theo?');

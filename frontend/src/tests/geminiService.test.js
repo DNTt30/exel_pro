@@ -9,14 +9,16 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => 'gemini-2.0-flash-thinking-exp-01-21' });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.clearAllMocks(); });
-it('ignores saved/explicit model overrides and sends authenticated personal-key requests', async () => {
+it('ignores saved models and legacy personal keys, sending only session authentication', async () => {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'internal' }, { text: 'Bước 1' }, { text: ': đọc Sổ tay' }] } }] })));
   vi.stubGlobal('fetch', fetchMock);
   expect(await generateGeminiMultiTurn(contents, 'Sổ tay đầy đủ', 'personal-key', 'other-model')).toBe('Bước 1: đọc Sổ tay');
   const [url, request] = fetchMock.mock.calls[0];
   expect(url).toContain(`model=${DEFAULT_GEMINI_MODEL}`);
   expect(url).not.toContain('personal-key');
-  expect(request.headers).toMatchObject({ Authorization: 'Bearer session-token', 'x-gemini-api-key': 'personal-key' });
+  expect(request.headers).toMatchObject({ Authorization: 'Bearer session-token' });
+  expect(request.headers).not.toHaveProperty('x-gemini-api-key');
+  expect(request.body).not.toContain('personal-key');
   expect(JSON.parse(request.body).generationConfig.maxOutputTokens).toBe(8192);
 });
 it('handles split UTF-8 streaming chunks and a final event without newline', async () => {

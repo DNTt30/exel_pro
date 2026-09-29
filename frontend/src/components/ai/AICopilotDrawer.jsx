@@ -6,6 +6,7 @@ import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { isValidGeminiKey, DEFAULT_GEMINI_MODEL } from '../../services/geminiService';
+import { getCopilotConfiguration, saveCopilotConfiguration } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
 import { assistantAgentPlan, assistantStoreIds, runAssistantAgents } from '../../utils/assistantAgents';
 import { requiredDecisionWeeks } from '../../utils/aiDecisionEngine';
@@ -123,8 +124,30 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
-  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
-  const [geminiKeyDraft, setGeminiKeyDraft] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const canConfigureAi = user?.id === 'admin';
+  const [geminiKeyDraft, setGeminiKeyDraft] = useState('');
+  const [configStatus, setConfigStatus] = useState(null);
+  const [configBusy, setConfigBusy] = useState(false);
+  const [configError, setConfigError] = useState('');
+  useEffect(() => {
+    try { localStorage.removeItem('gemini_api_key'); } catch { /* Ignore unavailable storage. */ }
+  }, []);
+  const openAiSettings = async () => {
+    if (!canConfigureAi) return;
+    setShowSettings(true); setGeminiKeyDraft(''); setConfigError(''); setConfigStatus(null); setConfigBusy(true);
+    try { setConfigStatus((await getCopilotConfiguration()).configured); }
+    catch (error) { setConfigError(error.message); }
+    finally { setConfigBusy(false); }
+  };
+  const saveAiSettings = async () => {
+    if (!canConfigureAi || configBusy || !isValidGeminiKey(geminiKeyDraft)) return;
+    setConfigBusy(true); setConfigError('');
+    try {
+      setConfigStatus((await saveCopilotConfiguration(geminiKeyDraft.trim())).configured);
+      setGeminiKeyDraft('');
+    } catch (error) { setConfigError(error.message); }
+    finally { setConfigBusy(false); }
+  };
   const agentRequestRef = useRef(null);
   useEffect(() => {
     setIsTyping(false);
@@ -221,7 +244,6 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     let model = 'local-engine';
     let aiReply = '';
     let err = '';
-    const validKey = geminiApiKey && geminiApiKey.trim();
 
     try {
       const route = routePersonalQuery(query);
@@ -265,7 +287,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         setIsStreaming(true);
 
         try {
-          aiReply = await askGeminiCopilot(query, contextData, chatHistory, validKey, (delta) => {
+          aiReply = await askGeminiCopilot(query, contextData, chatHistory, '', (delta) => {
             if (request.signal.aborted) return;
             // Stream: cập nhật tin nhắn theo từng chunk
             setMessages(prev => prev.map(m =>
@@ -382,14 +404,14 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
-            <button
+            {canConfigureAi && <button
               type="button"
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={openAiSettings}
               className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white/80 hover:text-white cursor-pointer"
               title="Cài đặt AI"
             >
               <Settings size={17} />
-            </button>
+            </button>}
             <button
               type="button"
               onClick={handleClearHistory}
@@ -529,27 +551,31 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         </div>
 
       {/* Settings Overlay */}
-      {showSettings && (
+      {canConfigureAi && showSettings && (
         <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col p-6 animate-in slide-in-from-bottom-2">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
               <KeyRound className="text-indigo-600" /> Cấu hình Gemini AI
             </h3>
-            <button onClick={() => { setShowSettings(false); setGeminiKeyDraft(geminiApiKey); }} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 cursor-pointer">
+            <button title="Đóng cài đặt AI" disabled={configBusy} onClick={() => { setShowSettings(false); setGeminiKeyDraft(''); }} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 cursor-pointer">
               <X size={18} />
             </button>
           </div>
           
           <div className="space-y-4">
+            <p role="status" className="text-sm text-slate-600">{configBusy ? 'Đang xử lý cấu hình…' : configStatus === true ? 'Đã cấu hình cho toàn ứng dụng. Nhân viên có thể dùng trợ lý.' : configStatus === false ? 'Chưa cấu hình. Admin nhập key để kích hoạt trợ lý.' : 'Chưa đọc được trạng thái cấu hình.'}</p>
+            {configError && <p role="alert" className="text-sm text-red-600">{configError}</p>}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">
                 Gemini API Key
                 {isValidGeminiKey(geminiKeyDraft) && (
-                  <span className="ml-2 text-emerald-600 text-xs font-semibold">✓ Hợp lệ</span>
+                  <span className="ml-2 text-emerald-600 text-xs font-semibold">✓ Đúng định dạng</span>
                 )}
               </label>
               <input 
                 type="password" 
+                autoComplete="new-password"
+                disabled={configBusy}
                 value={geminiKeyDraft}
                 onChange={(e) => setGeminiKeyDraft(e.target.value)}
                 placeholder="AIzaSy..."
@@ -565,36 +591,18 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                 <p className="text-[11px] text-red-500 mt-1">⚠️ Key không đúng định dạng (phải bắt đầu bằng AIzaSy...)</p>
               )}
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                Key được lưu trên trình duyệt này và gửi qua máy chủ để kết nối Google. Không lưu key trên máy dùng chung.
+                Chỉ admin cấu hình. Key được lưu bảo mật trên máy chủ để toàn ứng dụng dùng chung; nhân viên không cần nhập key.
               </p>
             </div>
 
             <button 
-              onClick={() => {
-                if (geminiKeyDraft && !isValidGeminiKey(geminiKeyDraft)) return;
-                localStorage.setItem('gemini_api_key', geminiKeyDraft);
-                setGeminiApiKey(geminiKeyDraft);
-                setShowSettings(false);
-              }}
-              disabled={!!(geminiKeyDraft && !isValidGeminiKey(geminiKeyDraft))}
+              onClick={saveAiSettings}
+              disabled={configBusy || !isValidGeminiKey(geminiKeyDraft)}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-md transition-all cursor-pointer"
             >
               Lưu cấu hình
             </button>
 
-            {geminiApiKey && (
-              <button
-                onClick={() => {
-                  localStorage.removeItem('gemini_api_key');
-                  setGeminiApiKey('');
-                  setGeminiKeyDraft('');
-                  setShowSettings(false);
-                }}
-                className="w-full text-red-500 hover:bg-red-50 font-medium py-2 rounded-xl text-sm transition-all cursor-pointer"
-              >
-                Xóa API key
-              </button>
-            )}
           </div>
         </div>
       )}

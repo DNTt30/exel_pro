@@ -4,8 +4,8 @@ import { stripVi } from '../data/ffOnsiteRecipes';
 
 // =====================================================================
 // INTENT MO RONG CHO AI COPILOT - module rieng de de mo rong & test.
-// tryAnswerWithData() chi don cac intent nay; cau con lai roi xuong
-// chuoi xu ly cu cua aiSchedulerEngine nen khong pha hanh vi hien co.
+// tryAnswerWithData() only handles structured app-data questions.
+// Handbook/SOP conversation belongs to Gemini, with the complete source handbook.
 // Khop mau bang substring/token - ho tro cau hoi khong dau.
 // =====================================================================
 
@@ -216,184 +216,6 @@ export function isSelfUserQuery(q, qn) {
   return false;
 }
 
-export function answerHandbookQuestions(qn) {
-  // 1. Giờ hủy & hạn sử dụng (Ưu tiên từng món cụ thể trước khi trả lời cả nhóm)
-  const isExpiryAsk = inc(qn, ['huy', 'het han', 'date', 'gio', 'khi nao', 'bao gio', 'khung gio']);
-  if (isExpiryAsk && !inc(qn, ['cong thuc', 'cach nau', 'bao nhieu nuoc'])) {
-    // Từng món cụ thể (trọng tâm, ngắn gọn)
-    if (inc(qn, ['sandwich co rau'])) {
-      return '🥪 **Sandwich có rau**: Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['sandwich khong rau'])) {
-      return '🥪 **Sandwich không rau**: Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['burger'])) {
-      return '🍔 **Burger**: Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['gimbap', 'kimbap'])) {
-      return '🍙 **Gimbap**: Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['onigiri', 'com nam'])) {
-      return '🍙 **Cơm nắm Onigiri**: Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['sushi'])) {
-      return '🍱 **Sushi**: Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['bento', 'com hop'])) {
-      return '🍱 **Cơm Bento**: Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['mi hop'])) {
-      return '🍜 **Mì hộp**: Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['hang tuoi', 'ff tuoi'])) {
-      return '🥗 **FF rau & thức ăn nhanh tươi** (Sandwich có rau, Burger, Gimbap, Soup): Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['soup', 'sup']) && !inc(qn, ['nau', 'nuoc', 'bot sup'])) {
-      return '🍲 **Soup / Súp**: Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['sandwich'])) {
-      return '🥪 **Giờ hủy Sandwich tại GS25:**\n- **Sandwich có rau**: Hủy lúc **11:00 & 22:00** (Trưa & Đêm).\n- **Sandwich không rau**: Hủy lúc **19:00** (Tối).\n⚠️ Lưu ý: Luôn xé rách bao bì trước khi vứt vào túi rác!';
-    }
-    if (inc(qn, ['hang gm', 'bach hoa', 'do gm', 'gio huy gm'])) {
-      return [
-        '📦 **Quy định Giờ Hủy Hàng GM (Bách hóa) tại GS25:**',
-        '- HSD ≤ 7 ngày: Hủy trước 2 tiếng.',
-        '- HSD 7 ngày - 1 tháng: Hủy trước 1 ngày.',
-        '- HSD 1 - 6 tháng: Hủy trước 3 ngày.',
-        '- HSD 6 tháng - 1 năm: Hủy trước 5 ngày.',
-        '⚠️ Lưu ý: Quét barcode hủy và làm biến dạng bao bì trước khi vứt túi rác.'
-      ].join('\n');
-    }
-
-    // Nhóm gộp nếu câu hỏi hỏi chung nhóm
-    if (inc(qn, ['com', 'mi', 'sushi'])) {
-      return '🕒 Nhóm **cơm, mì & sushi** (Cơm nắm Onigiri, Bento, Sushi, Mì hộp): Hủy vào lúc **19:00** (Tối) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-    if (inc(qn, ['rau', 'do tuoi', 'thuc an nhanh'])) {
-      return '🕒 Nhóm **FF rau & thức ăn nhanh tươi** (Sandwich có rau, Burger, Gimbap, Soup): Hủy vào 2 khung giờ **11:00** (Trưa) và **22:00** (Đêm) hàng ngày bạn nhé!\n⚠️ Lưu ý: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác.';
-    }
-  }
-
-  if (inc(qn, ['gio huy', 'huy hang', 'khi nao huy', 'gio huy ff', 'gio huy gm', 'xoa bao bi', 'khung gio huy'])) {
-    return [
-      '🕒 **Quy định Giờ Hủy Hàng & HSD tại GS25:**',
-      '- **11:00 & 22:00 (Trưa & Đêm)**: FF rau & thức ăn nhanh tươi (*Sandwich có rau, Burger, Gimbap, Soup*).',
-      '- **19:00 (Tối)**: FF cơm, mì & sushi (*Cơm nắm Onigiri, Bento, Sandwich không rau, Mì hộp, Sushi*).',
-      '- **Theo HSD / Tem**: FF Onsite, Salad, Bánh mì que, Dessert tủ OSC, Bánh tươi Patachou.',
-      '- **Hàng GM (Bách hóa)**: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.',
-      '⚠️ *Quy tắc bắt buộc: Phải xé rách hoặc làm biến dạng bao bì trước khi vứt vào túi rác!*'
-    ].join('\n');
-  }
-
-  // 2. Nhiệt độ thiết bị
-  if (inc(qn, ['nhiet do tu mat', 'nhiet do tu dong', 'nhiet do noi lau', 'nhiet do banh bao', 'nhiet do chuan', 'nhiet do bao quan'])) {
-    return [
-      '🌡️ **Nhiệt độ chuẩn thiết bị bảo quản & chế biến:**',
-      '- **Tủ mát / Kho mát**: `0°C đến 5°C` (sữa, nước, sandwich, BTP)',
-      '- **Tủ đông / Kho đông**: `< -18°C` (kem, đá viên, chả cá)',
-      '- **Tủ hấp bánh bao**: `90°C` (hấp ít nhất 30 phút, CẤM hâm lò vi sóng!)',
-      '- **Nồi súp lẩu**: `70°C` (duy trì công suất 200W; đun sôi 110°C / 2000W)'
-    ].join('\n');
-  }
-
-  // 3. Lò vi sóng công nghiệp bấm số mấy
-  if (inc(qn, ['vi song', 'lo vi song', 'bam so may', 'bam nut', 'so 3', 'so 5', 'ham nong cha ca', 'ham nong to mi', 'quay vi song'])) {
-    if (inc(qn, ['ly cha ca', 'ly lau', 'ly'])) {
-      return '🔥 **Lò vi sóng Ly lẩu chả cá (GS25):**\n- Lò công nghiệp: **BẤM SỐ 3** (Lò gia dụng: quay `30 giây`).\n⚠️ *Lưu ý: Luôn tháo xiên chả cá ra trước khi cho vào ly!*';
-    }
-    if (inc(qn, ['to mi', 'to mi cha ca', 'mi cha ca'])) {
-      return '🔥 **Lò vi sóng Tô mì chả cá (GS25):**\n- Lò công nghiệp: **BẤM SỐ 5** (Lò gia dụng: quay `2 phút`).\n⚠️ *Lưu ý: Luôn tháo xiên chả cá ra trước khi cho vào tô!*';
-    }
-    return [
-      '🔥 **Quy tắc bấm Lò vi sóng Công nghiệp (GS25):**',
-      '- **Ly lẩu chả cá**: Lò gia dụng `30 giây` | Lò công nghiệp **BẤM SỐ 3**.',
-      '- **Tô mì chả cá**: Lò gia dụng `2 phút` | Lò công nghiệp **BẤM SỐ 5**.',
-      '- **Xôi bánh bao**: Bánh bao hấp tủ 90°C (CẤM vi sóng). Xôi cắt bao nilon quay vi sóng 1 phút.',
-      '⚠️ *Lưu ý: Luôn tháo xiên chả cá ra trước khi cho vào ly/tô!*'
-    ].join('\n');
-  }
-
-  // 4. Công thức lẩu chả cá & mì kimchi & định lượng nước súp
-  if (inc(qn, ['nau lau', 'sup cha ca', 'bot sup', 'nau cha ca', 'dinh luong sup', 'va sup', 'so va sup', 'cong thuc sup', 'cong thuc nau sup', 'nau sup', 'nuoc lau', 'bao nhieu nuoc', 'may lit nuoc'])) {
-    if (inc(qn, ['bao nhieu nuoc', 'may lit nuoc', 'luong nuoc', 'nuoc'])) {
-      return [
-        '🍲 **Định lượng Nước Nấu Súp Lẩu Chả Cá (GS25 Miền Bắc):**',
-        '- **2000ml (2 lít)** nước lọc + **1 gói bột súp cay (120g)**.',
-        '- Đun nấu công suất **2000W** trong **15 phút**.',
-        '- Giữ nóng trên chảo ở công suất **200W** (tối đa 2 tiếng).'
-      ].join('\n');
-    }
-    if (inc(qn, ['cong thuc nau sup', 'cong thuc sup', 'nau sup', 'bot sup'])) {
-      return [
-        '🍲 **Công thức Nấu Nước Súp Lẩu Chả Cá Cay (GS25):**',
-        '- **Nước súp**: 2000ml nước lọc + 1 gói bột súp cay (120g). Nấu công suất **2000W** trong **15 phút**.',
-        '- **Trưng bày**: Duy trì nóng ở công suất **200W** (tối đa 2 tiếng).'
-      ].join('\n');
-    }
-    return [
-      '🍲 **Công thức & SOP Lẩu chả cá cay (GS25 Miền Bắc):**',
-      '- **Nước súp**: 2000ml nước lọc + 1 gói bột súp cay (120g). Nấu công suất **2000W** trong **15 phút**.',
-      '- **Chả cá xoắn**: 10 xiên, nấu **1200W** trong **10 phút** (sau 5 phút lật mặt 1 lần). Nhiệt độ tâm sau nấu ≥ 75°C.',
-      '- **Mì chả cá**: Nước sôi ≥ 95°C, trụng đúng **2 phút 30 giây**.',
-      '- **Múc nước súp bán**: Ly lẩu = *Số xiên + 1 vá súp*. Tô mì = *4 vá nước súp* (~30g/vá). Tháo xiên trước khi trao khách.',
-      '- **Trưng bày chảo**: Tối đa 2 tiếng ở công suất 200W.'
-    ].join('\n');
-  }
-
-  // 5. Hóa chất Saraya / Ecolab
-  if (inc(qn, ['hoa chat', 'saraya', 'ecolab', 'smart san', 'h-1', 's-4', 'n-12', 'g-2', '211', '311', 'con sat khuan', 'tay dau mo'])) {
-    return [
-      '🧪 **Hệ 6 Mã Màu Hóa Chất SARAYA Greentek tại GS25:**',
-      '- ⚪ **Trắng (H-1 Smart San)**: Xà phòng rửa tay nhân viên, dùng NGUYÊN CHẤT.',
-      '- 🔴 **Đỏ đô (S-4 Sanitizer)**: Cồn sát khuẩn tay & dao thớt, dùng NGUYÊN CHẤT (giữ xa lửa!).',
-      '- 🟢 **Xanh lá (N-12 Sara Wash)**: Rửa CCDC (pha 6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (1 lần nhấn 30ml + nước).',
-      '- 🟤 **Nâu (G-2 Smart San Degreaser)**: Tẩy dầu mỡ bếp chiên, tủ hút khói, dùng NGUYÊN CHẤT (mang găng cao su!).',
-      '- 🔴 **Đỏ tươi (211 Pro WC)**: Tẩy bồn cầu & sàn toilet (4 lần nhấn 120ml + nước).',
-      '- 🔵🟡 **Xanh + Vàng (311 Multi Floor & Glass)**: Lau kính và sàn gạch (1 lần nhấn 30ml + nước).'
-    ].join('\n');
-  }
-
-  // 6. Quy trình rửa tay 12 bước
-  if (inc(qn, ['rua tay', '12 buoc', 've sinh tay', '60 giay', 'saraya rua tay'])) {
-    return [
-      '🧼 **Quy trình Vệ sinh tay 12 bước Saraya (60 giây):**',
-      '1. Rửa nước -> 2. Lấy 2 lần nhấn H-1 -> 3. Xoa 2 lòng bàn tay (5 lần)',
-      '4. Đan ngón tay cọ lòng bàn tay -> 5. Cọ mu bàn tay -> 6. Cọ đầu ngón tay',
-      '7. Vặn ngón tay cái -> 8. Cọ cổ tay đến khuỷu tay -> 9. Chà móng tay bằng bàn chải',
-      '10. Xả sạch nước dưới vòi (quá trình ≥ 60s) -> 11. Lau khô khăn giấy -> 12. Xịt cồn S-4 để khô.',
-      '⚠️ *4 vùng hay bị sót: Đầu móng tay, ngón cái, kẽ ngón và mu bàn tay.*'
-    ].join('\n');
-  }
-
-  // 7. Vệ sinh ca / Phân công ca
-  if (inc(qn, ['ve sinh ca', 'ca 1 lam gi', 'ca 2 lam gi', 'ca 3 lam gi', 'thay dau bep', 'thay dau'])) {
-    return [
-      '📋 **Phân công Vệ sinh theo Ca (GS25):**',
-      '- ☀️ **Ca 1 (6h - 14h)**: Quạt hút, thanh nẹp, kho bãi WH, tủ mát kho, quét mạng nhện, lau kệ hàng.',
-      '- 🌤️ **Ca 2 (14h - 22h)**: Chân bàn ghế, rổ mua sắm, tủ mát/đông counter, kệ snack, sọt rác, xô lau sàn.',
-      '- 🌙 **Ca 3 (22h - 6h)**: Chà sàn gạch xám, vệ sinh toilet, hộc quầy counter, và **BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3**.',
-      '💡 *Mẹo: Vào mục "Sổ tay GS25 / Sổ tay SOP" trên thanh menu để tick checklist theo ca và ngày hiện tại!*'
-    ].join('\n');
-  }
-
-  // 8. Báo cáo ca trong ngày (Zalo & App Times)
-  if (inc(qn, ['bao cao ca', 'gui bao cao', 'app times', 'zalo cua hang', 'bao cao 17h', 'bao cao ff', 'chup may nestea', 'chup tu osc', 'bao cao ket ca', 'thay bao rac', 'moc bao cao'])) {
-    return [
-      '📸 **Quy Định Báo Cáo Mỗi Ca Trong Ngày (GS25):**',
-      '📌 **Nơi gửi**: Group Zalo Cửa Hàng · **App chụp hình**: `App TIMES` (bắt buộc có watermark ngày giờ & vị trí).',
-      '📷 **6 góc chụp hình FF bắt buộc**: (1) Nguyên tủ OSC (1-2 tấm), (2) Kệ bakery, (3) Tủ bánh bao, (4) Tủ warmer, (5) Kệ khuyến mãi, (6) Máy Nestea (mở nắp ra chụp).',
-      '',
-      '• ☀️ **Ca 1 (6h - 14h)**: Khi vô ca check-in tác phong -> 6-7h chụp FF & check date tủ OSC/bánh mì/counter -> 7-8h vệ sinh mặt tiền/tủ đông -> 11h gửi hình hủy hàng -> 13h30 dọn quầy counter -> 14h báo cáo kết ca (WC, bàn ăn, thùng rác).',
-      '• 🌤️ **Ca 2 (14h - 22h)**: Khi vô ca check-in tác phong -> 14-14h30 chụp FF bổ sung -> 14-15h check date -> 15-17h check tem giá quầy kệ -> 17h báo cáo FF & chụp đèn bảng hiệu -> 19h gửi hình hủy hàng -> 22h báo cáo kết ca.',
-      '• 🌙 **Ca 3 (22h - 6h)**: Khi vô ca check-in -> 22-23h check date & gửi hình hủy -> 24h báo cáo kết ngày -> 24-1h chụp vệ sinh thiết bị -> 4-5h chụp quầy kệ -> 5-6h chụp FF chế biến -> 6h chụp in tem HSD & báo cáo kết ca.',
-      '⚠️ *Lưu ý: Thay bao rác định kỳ 2 tiếng/lần và giữ sạch khu vực ăn uống của khách!*'
-    ].join('\n');
-  }
-
-  return null;
-}
-
-// =====================================================================
 export function tryAnswerWithData(ctx) {
   const {
     qn = '',
@@ -403,9 +225,7 @@ export function tryAnswerWithData(ctx) {
     user = null,
   } = ctx || {};
 
-  // Handbook intent check
-  const handbookAnswer = answerHandbookQuestions(qn);
-  if (handbookAnswer) return handbookAnswer;
+  // Business/SOP questions fall through to Gemini with the complete handbook.
 
   const q = ctx.q || qn;
   const storeEmps = employees.filter((e) => e.dept === storeId);

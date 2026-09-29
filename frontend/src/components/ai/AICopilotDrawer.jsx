@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check, Zap } from 'lucide-react';
+import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { askAICopilot, askGeminiCopilot } from '../../utils/aiSchedulerEngine';
+import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { inferAiIntent } from '../../utils/appLogs';
-import { isValidGeminiKey, AVAILABLE_MODELS, getActiveGeminiModel } from '../../services/geminiService';
+import { isValidGeminiKey, DEFAULT_GEMINI_MODEL } from '../../services/geminiService';
 import { useShallow } from 'zustand/react/shallow';
 import { assistantAgentPlan, assistantStoreIds, runAssistantAgents } from '../../utils/assistantAgents';
 import { requiredDecisionWeeks } from '../../utils/aiDecisionEngine';
@@ -119,9 +119,6 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [activeModel, setActiveModel] = useState(() => (localStorage.getItem('gemini_api_key') ? getActiveGeminiModel() : 'local-engine'));
-  const [selectedModel, setSelectedModel] = useState(() => getActiveGeminiModel());
-  const [modelDraft, setModelDraft] = useState(() => getActiveGeminiModel());
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -259,7 +256,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         aiReply = answerPersonalQuery(route, useStore.getState());
         model = 'local-intent-router';
         setMessages(prev => [...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]);
-      } else if (validKey) {
+      } else {
         // Tạo placeholder message để stream vào
         const streamMsgId = 'ai_' + Date.now();
         streamingMsgIdRef.current = streamMsgId;
@@ -276,15 +273,14 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             ));
           });
           if (request.signal.aborted) return;
-          model = selectedModel;
-          setActiveModel(selectedModel);
+          model = DEFAULT_GEMINI_MODEL;
         } catch (geminiErr) {
           if (request.signal.aborted) return;
-          console.warn('Gemini API call failed, falling back to local engine:', geminiErr);
-          // Xóa placeholder rỗng, dùng local engine
+          // Do not replace a failed handbook answer with a keyword-based guess.
           setMessages(prev => prev.filter(m => m.id !== streamMsgId));
-          aiReply = askAICopilot(query, contextData, chatHistory);
-          model = 'local-engine-fallback';
+          err = geminiErr.message || 'Không kết nối được trợ lý AI.';
+          aiReply = `${err}\nAnh/chị có thể mở trang Sổ tay để tra cứu hoặc thử lại sau.`;
+          model = 'gemini-error';
           const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
           setMessages(prev => [...prev, aiMsg]);
         } finally {
@@ -293,24 +289,18 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             streamingMsgIdRef.current = null;
           }
         }
-      } else {
-        aiReply = askAICopilot(query, contextData, chatHistory);
-        model = 'local-engine';
-        const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
-        setMessages(prev => [...prev, aiMsg]);
       }
     } catch (error) {
       if (request.signal.aborted) return;
       console.warn('AI error:', error);
       err = error.message || 'ai-error';
-      aiReply = askAICopilot(query, contextData, chatHistory);
+      aiReply = 'Chưa hoàn tất yêu cầu. Anh/chị vui lòng thử lại hoặc mở trang Sổ tay để tra cứu.';
       const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
       setMessages(prev => [...prev, aiMsg]);
       setIsStreaming(false);
     } finally {
       if (agentRequestRef.current === request) {
         setIsTyping(false);
-        setActiveModel(model);
       }
       if (!request.signal.aborted && sessionEpoch === useStore.getState()._sessionEpoch) useStore.getState().logAiTurn?.({
         conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
@@ -386,12 +376,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
               </div>
               <div className="text-[11px] sm:text-xs text-indigo-100 font-medium mt-0.5 flex items-center gap-1.5">
                 <span>Đệ tử ruột · {activeStoreId || '—'}</span>
-                {activeModel && activeModel.startsWith('gemini') && (
-                  <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/15 rounded-full text-[9px] font-bold tracking-wide">
-                    <Zap size={9} className="text-yellow-300" />
-                    {activeModel.includes('thinking') ? 'Gemini 2.0 Thinking' : activeModel.includes('lite') ? 'Gemini 2.0 Lite' : 'Gemini 2.0 Flash'}
-                  </span>
-                )}
+
               </div>
             </div>
           </div>
@@ -580,55 +565,15 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                 <p className="text-[11px] text-red-500 mt-1">⚠️ Key không đúng định dạng (phải bắt đầu bằng AIzaSy...)</p>
               )}
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                Key được lưu bảo mật trên trình duyệt của bạn và gọi trực tiếp tới Google AI Studio.
+                Key được lưu trên trình duyệt này và gửi qua máy chủ để kết nối Google. Không lưu key trên máy dùng chung.
               </p>
-            </div>
-
-            {/* Model Selector */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Mô hình AI (Model)
-              </label>
-              <div className="space-y-1.5">
-                {AVAILABLE_MODELS.map(m => (
-                  <label
-                    key={m.id}
-                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                      modelDraft === m.id
-                        ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500/20'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="gemini_model"
-                      value={m.id}
-                      checked={modelDraft === m.id}
-                      onChange={() => setModelDraft(m.id)}
-                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-800">{m.name}</span>
-                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-100/70 px-1.5 py-0.5 rounded-md">
-                          {m.tag}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{m.desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
             </div>
 
             <button 
               onClick={() => {
                 if (geminiKeyDraft && !isValidGeminiKey(geminiKeyDraft)) return;
                 localStorage.setItem('gemini_api_key', geminiKeyDraft);
-                localStorage.setItem('gemini_model', modelDraft);
                 setGeminiApiKey(geminiKeyDraft);
-                setSelectedModel(modelDraft);
-                if (geminiKeyDraft) setActiveModel(modelDraft);
                 setShowSettings(false);
               }}
               disabled={!!(geminiKeyDraft && !isValidGeminiKey(geminiKeyDraft))}
@@ -643,7 +588,6 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                   localStorage.removeItem('gemini_api_key');
                   setGeminiApiKey('');
                   setGeminiKeyDraft('');
-                  setActiveModel('local-engine');
                   setShowSettings(false);
                 }}
                 className="w-full text-red-500 hover:bg-red-50 font-medium py-2 rounded-xl text-sm transition-all cursor-pointer"

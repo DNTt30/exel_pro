@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { lookupFfOnsiteRecipe } from '../data/ffOnsiteRecipes';
-import { askAICopilot, askOllamaCopilot } from '../utils/aiSchedulerEngine';
+import { askAICopilot } from '../utils/aiSchedulerEngine';
 
 const ctx = { employees: [], weekSchedule: {}, storeId: 'VN0485', currentWeek: '2026-08-17' };
 
@@ -91,21 +91,6 @@ describe('FF Onsite recipes from giấy quầy counter', () => {
     expect(lookupFfOnsiteRecipe('đổi ca với đồng nghiệp')).toBeNull();
     expect(lookupFfOnsiteRecipe('Hôm nay ngày mấy?')).toBeNull();
     expect(lookupFfOnsiteRecipe('Fulltime một tuần được nghỉ mấy ngày?')).toBeNull();
-  });
-
-  it('askAICopilot serves recipe before the GS25 uniform catch-all', () => {
-    const r = askAICopilot('công thức trà tắc GS25', ctx);
-    expect(r).toContain('140ml');
-    expect(r).not.toContain('Đồng phục');
-  });
-
-  it('matches quick-prompt with emoji and skips Ollama', async () => {
-    const r = askAICopilot('🍊 Công thức trà tắc', ctx);
-    expect(r).toContain('140ml');
-    expect(r).toContain('2 trái tắc');
-    const viaOllama = await askOllamaCopilot('🍊 Công thức trà tắc', ctx);
-    expect(viaOllama).toContain('140ml');
-    expect(viaOllama).not.toContain('Trợ lý AI Cửa hàng');
   });
 
   it('askAICopilot still answers schedule after recipe wiring', () => {

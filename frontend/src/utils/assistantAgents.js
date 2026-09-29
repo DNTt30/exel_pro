@@ -15,6 +15,11 @@ export function assistantStoreIds(storeId) {
 export function assistantAgentPlan(query, context, revision) {
   const q = normalize(query), jobs = [];
   if (routePersonalQuery(query)) jobs.push('personal_schedule');
+  // Only explicit data commands enter agent readers. Free-form SOP questions
+  // (including follow-ups with no recognizable keywords) stay conversational.
+  const command = q.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const dataCommand = /^(?:quet loi (?:vi pham )?lich tuan|kiem tra lich(?: tuan)?(?: va han su dung)?|kiem tra han su dung|kiem tra date|quet lich|quet ke|uu tien kiem date)$/.test(command);
+  if (!jobs.length && !dataCommand) return null;
   if (isOpsManager(context.user) && /lich|dinh bien/.test(q) && /quet|kiem tra|vi pham|loi|danh gia|can bang/.test(q)) jobs.push('schedule_review');
   if (/han su dung|kiem date|hang het han|kiem tra date/.test(q) && /quet|kiem|uu tien|sap|tom tat/.test(q) && !/quy dinh|chinh sach|khi nao huy/.test(q)) jobs.push('shelf_review');
   if (/quy dinh|chinh sach|tu van|de xuat|nen lam/.test(q) || /\bva\b/.test(q) && jobs.length < 2) return null;

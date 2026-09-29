@@ -2,7 +2,8 @@ import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } fr
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { isNightReady, managedStoreIds, isEmployeeWeekLocked } from './employeeSkills';
 import { isWeekLocked, weekRecordKey } from './scheduleWeek';
-import { lookupFfOnsiteRecipe, stripVi } from '../data/ffOnsiteRecipes';
+import { stripVi } from '../data/ffOnsiteRecipes';
+import { GS25_HANDBOOK_DATA } from '../data/gs25HandbookData';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
 import { streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
 import { sanitizeAiInput, sanitizeEmployeesForAi, sanitizeAiOutput } from './aiGuard';
@@ -1108,17 +1109,9 @@ function answerCopilot(question, context = {}, chatHistory = []) {
 
   const storeEmps = employees.filter(e => e.dept === storeId);
 
-  // 1. INTENT SỔ TAY & DỮ LIỆU ĐẶC BIỆT (Handbook SOP, Giờ hủy, Lò vi sóng, Hồ sơ, Đổi ca, Lương cá nhân)
+  // 1. Tra cứu dữ liệu nội bộ (hồ sơ, đổi ca, lương cá nhân).
   const routedAnswer = tryAnswerWithData({ q, qn, employees, weekSchedule, stores, shiftSwaps, feedbacks, storeId, currentWeek, user });
   if (routedAnswer) return compactText(routedAnswer);
-
-  // 2. CÔNG THỨC MÓN FF ONSITE (bỏ qua nếu câu hỏi thuộc miền lịch/ca)
-  const SCHEDULE_KEYWORDS = ['doi ca', 'xep ca', 'lich ca', 'ca lam', 'cham cong', 'bu cong'];
-  const isScheduleQuestion = SCHEDULE_KEYWORDS.some((w) => qn.includes(w));
-  if (!isScheduleQuestion) {
-    const recipeReply = lookupFfOnsiteRecipe(q);
-    if (recipeReply) return recipeReply;
-  }
 
   // Lịch của tôi / gọi đúng tên mình (vd. "hôm nay Tú làm ca mấy" khi đang login là Tú)
   const selfUser = user && (employees.find(e => e.id === user.id) || user);
@@ -1745,6 +1738,8 @@ export async function askGS25HFModel(question, systemPrompt, chatHistory = [], f
 }
 
 
+const GS25_HANDBOOK_TEXT = JSON.stringify(GS25_HANDBOOK_DATA, null, 2);
+
 export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '', onChunk = null) {
   // 1. Màng lọc đầu vào: Kiểm tra an toàn, chống prompt injection & che giấu secret
   const guard = sanitizeAiInput(question);
@@ -1829,16 +1824,13 @@ HƯỚNG DẪN QUAN TRỌNG:
 - Luật Lương: ca đêm (22-6) +30%; Lễ/Tết 300%; STPT 16-23h/tuần, tối đa 91h/tháng; STFT 48h/tuần (6 ca) + 1 OFF, nghỉ giữa 2 ca ≥ 11 tiếng.
 - CHIẾN THUẬT XẾP LỊCH (Học từ dữ liệu thực tế): Với doanh thu ~18tr, ưu tiên dùng "ca gãy" (10-14, 18-22) ghép với ca chính để tối ưu quỹ lương. Part-time (STPT) lý tưởng nhất là xếp 2 ca 8h + 1 ca 4h (=20h/tuần), giúp đạt chuẩn 16-23h mà không cần tuyển quá nhiều người. Cửa hàng chỉ cần ~32h công/ngày (Sáng: 6-14 & 10-14, Chiều: 14-22 & 18-22, Đêm: 22-6).
 
-SỔ TAY GS25:
-- Hủy FF rau & tươi (Sandwich có rau, burger, gimbap, soup): 11:00 & 22:00.
-- Hủy Cơm, mì, sushi (Onigiri, bento, sandwich không rau, mì hộp, sushi): 19:00.
-- Hủy GM (bách hóa): HSD ≤7 ngày hủy trước 2h; 7 ngày–1 tháng trước 1 ngày; 1–6 tháng trước 3 ngày; 6 tháng–1 năm trước 5 ngày.
-- Lẩu chả cá cay (SOP V.06): 2000ml nước + 1 bột súp 120g, nấu 2000W 15p. 10 xiên chả cá nấu 1200W 10p. Trụng mì 2p30s. Ly lẩu bấm số 3; tô mì bấm số 5.
-- Hóa chất Saraya: Trắng (rửa tay), Đỏ đô (cồn), Xanh lá (rửa CCDC), Nâu (tẩy mỡ), Đỏ tươi (toilet), Xanh/Vàng (lau kính).
-- Thay dầu bếp chiên: Đêm Thứ 3 (Ca 3: 22h–6h).
-- Nghỉ giữa ca: Ca 8h nghỉ 30p; ca đêm nghỉ 45p. Chuyển ca ≥ 11 tiếng.
+Phong cách: Tiếng Việt tự nhiên, thân thiện, chuyên nghiệp. Dùng Markdown (in đậm **text**, danh sách). Xưng hô sếp/anh/chị–em hoặc Tú–bạn.
 
-Phong cách: Tiếng Việt tự nhiên, thân thiện, súc tích. Dùng Markdown (in đậm **text**, danh sách gạch đầu dòng). Xưng hô sếp/anh/chị–em hoặc Tú–bạn.`;
+Bạn là TÚ mini, trợ lý ảo xuất sắc của GS25. Dưới đây là Sổ tay nghiệp vụ nội bộ của GS25. Khi nhân viên hỏi về quy trình, công thức, hoặc giờ giấc hủy hàng, bạn PHẢI dựa 100% vào Sổ tay này để trả lời. Trả lời thật DÀI, CHI TIẾT TỪNG BƯỚC (Bước 1, Bước 2...). Tuyệt đối không bịa đặt thông tin ngoài sổ tay. Xưng hô thân thiện, chuyên nghiệp.
+Nếu Sổ tay không có thông tin hoặc có mâu thuẫn, nói rõ và đề nghị xác nhận với quản lý; không tự thêm định lượng, thời gian hay bước thao tác. Nêu đúng tên mục được sử dụng. Phân biệt dữ liệu lịch làm việc ở trên với quy trình trong Sổ tay.
+
+SỔ TAY NGHIỆP VỤ GS25 — TOÀN BỘ NỘI DUNG:
+${GS25_HANDBOOK_TEXT}`;
 
   // Xây dựng contents[] multi-turn chuẩn Gemini API
   // Token-aware: tối đa 10 tin nhắn, cắt nếu tổng > 8000 ký tự

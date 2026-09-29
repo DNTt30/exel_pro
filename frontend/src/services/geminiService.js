@@ -1,83 +1,72 @@
 /**
  * Service to handle Google Gemini API integration via REST
- * v2.1 — gemini-2.0-flash (default), multi-model selection, streaming, retry
+ * v3 — fixed model, handbook context, streaming, retry
  */
 
-export const AVAILABLE_MODELS = [
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    tag: 'Khuyên dùng ⭐',
-    desc: 'Thông minh vượt trội, suy luận sắc bén, phản hồi tức thì'
-  },
-  {
-    id: 'gemini-2.0-flash-thinking-exp-01-21',
-    name: 'Gemini 2.0 Flash Thinking',
-    tag: 'Tư duy sâu 🧠',
-    desc: 'Có khả năng suy nghĩ từng bước, giải quyết bài toán phức tạp'
-  },
-  {
-    id: 'gemini-2.0-flash-lite',
-    name: 'Gemini 2.0 Flash Lite',
-    tag: 'Siêu tốc độ ⚡',
-    desc: 'Bản rút gọn, siêu nhẹ, tiết kiệm tối đa quota'
-  }
-];
+import { supabase, supabaseAnonKey } from '../lib/supabase';
+import { DEFAULT_GEMINI_MODEL, COPILOT_MAX_OUTPUT_TOKENS } from '../../../supabase/functions/_shared/copilotConfig.js';
+export { DEFAULT_GEMINI_MODEL };
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
-
-export function getActiveGeminiModel() {
-  try {
-    const saved = localStorage.getItem('gemini_model');
-    if (saved && AVAILABLE_MODELS.some(m => m.id === saved)) return saved;
-  } catch {}
-  return DEFAULT_GEMINI_MODEL;
+function _getBaseUrl(action) {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (!url) throw new Error('Chưa cấu hình kết nối trợ lý AI.');
+  return `${url}/functions/v1/chat-proxy?model=${DEFAULT_GEMINI_MODEL}&action=${action}`;
 }
 
-function _getBaseUrl(modelName, action) {
-  const model = modelName || getActiveGeminiModel();
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  if (!url) throw new Error('Thiếu VITE_SUPABASE_URL để gọi Edge Function');
-  return `${url}/functions/v1/chat-proxy?model=${model}&action=${action}`;
+async function requestHeaders(apiKey) {
+  const session = await supabase?.auth.getSession();
+  if (session?.error || !session?.data?.session?.access_token) throw new Error('Vui lòng đăng nhập lại để dùng trợ lý.');
+  return { 'Content-Type': 'application/json', apikey: supabaseAnonKey,
+    Authorization: `Bearer ${session.data.session.access_token}`,
+    ...(apiKey?.trim() ? { 'x-gemini-api-key': apiKey.trim() } : {}) };
 }
 
 /**
  * Ggọi Gemini API (single-turn)
  */
-export async function generateGeminiContent(prompt, systemInstruction = '', apiKey, modelName) {
+export async function generateGeminiContent(prompt, systemInstruction = '', apiKey) {
   const contents = [{ role: 'user', parts: [{ text: prompt }] }];
-  return _callGeminiWithRetry(contents, systemInstruction, 0, modelName);
+  return _callGeminiWithRetry(contents, systemInstruction, apiKey);
 }
 
 /**
  * Gọi Gemini API với multi-turn conversation
  */
-export async function generateGeminiMultiTurn(contents, systemInstruction = '', apiKey, modelName) {
-  return _callGeminiWithRetry(contents, systemInstruction, 0, modelName);
+export async function generateGeminiMultiTurn(contents, systemInstruction = '', apiKey) {
+  return _callGeminiWithRetry(contents, systemInstruction, apiKey);
 }
 
 /**
  * Streaming multi-turn
  */
-export async function streamGeminiMultiTurn(contents, systemInstruction = '', apiKey, onChunk, modelName) {
+export async function streamGeminiMultiTurn(contents, systemInstruction = '', apiKey, onChunk) {
   const payload = _buildPayload(contents, systemInstruction);
-  const url = _getBaseUrl(modelName, 'streamGenerateContent');
+  const url = _getBaseUrl('streamGenerateContent');
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await requestHeaders(apiKey),
     body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini API lỗi ${response.status}`);
+    throw new Error(err.error?.message || err.error || `Gemini API lỗi ${response.status}`);
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let fullText = '';
   let buffer = '';
+  const consume = line => {
+    if (!line.startsWith('data:')) return;
+    const jsonStr = line.slice(5).trim();
+    if (!jsonStr || jsonStr === '[DONE]') return;
+    const chunk = JSON.parse(jsonStr);
+    if (chunk.error) throw new Error('Gemini bị gián đoạn. Vui lòng thử lại.');
+    const delta = (chunk.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
+    if (delta) { fullText += delta; onChunk?.(delta); }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -88,22 +77,10 @@ export async function streamGeminiMultiTurn(contents, systemInstruction = '', ap
     const lines = buffer.split('\n');
     buffer = lines.pop() || ''; // giữ lại dòng chưa hoàn chỉnh
 
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const jsonStr = line.slice(6).trim();
-      if (jsonStr === '[DONE]') continue;
-      try {
-        const chunk = JSON.parse(jsonStr);
-        const delta = chunk?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (delta) {
-          fullText += delta;
-          onChunk?.(delta);
-        }
-      } catch {
-        // ignore parse errors on partial chunks
-      }
-    }
+    for (const line of lines) consume(line);
   }
+  buffer += decoder.decode();
+  if (buffer.trim()) consume(buffer);
 
   return fullText || 'Không nhận được phản hồi từ Gemini.';
 }
@@ -121,8 +98,8 @@ function _buildPayload(contents, systemInstruction) {
   const payload = {
     contents,
     generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
+      temperature: 0.2,
+      maxOutputTokens: COPILOT_MAX_OUTPUT_TOKENS,
       topP: 0.9
     }
   };
@@ -135,31 +112,31 @@ function _buildPayload(contents, systemInstruction) {
   return payload;
 }
 
-async function _callGeminiWithRetry(contents, systemInstruction, attempt = 0, modelName) {
+async function _callGeminiWithRetry(contents, systemInstruction, apiKey, attempt = 0) {
   const payload = _buildPayload(contents, systemInstruction);
-  const url = _getBaseUrl(modelName, 'generateContent');
+  const url = _getBaseUrl('generateContent');
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await requestHeaders(apiKey),
     body: JSON.stringify(payload)
   });
 
   // Retry 1 lần nếu rate limit hoặc server error
   if ((response.status === 429 || response.status >= 500) && attempt === 0) {
     await new Promise(r => setTimeout(r, 1500));
-    return _callGeminiWithRetry(contents, systemInstruction, 1, modelName);
+    return _callGeminiWithRetry(contents, systemInstruction, apiKey, 1);
   }
 
   const data = await response.json();
 
   if (!response.ok) {
-    const errorMsg = data.error?.message || `Lỗi kết nối Gemini API (${response.status})`;
+    const errorMsg = data.error?.message || data.error || `Lỗi kết nối Gemini API (${response.status})`;
     throw new Error(errorMsg);
   }
 
   if (data.candidates && data.candidates.length > 0) {
-    return data.candidates[0].content.parts[0].text;
+    return (data.candidates[0].content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('') || 'Không nhận được phản hồi từ Gemini.';
   }
 
   return 'Không nhận được phản hồi từ Gemini.';

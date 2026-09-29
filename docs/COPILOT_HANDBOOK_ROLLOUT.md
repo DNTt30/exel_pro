@@ -44,3 +44,11 @@ npm.cmd run deploy
 Chỉ admin nhập key. `scripts/check_copilot_key_permissions.sql` đã kiểm tra quyền và vòng lưu/đọc/thay key trong transaction rollback trên Supabase Vault; không giữ key thử. UI test kiểm tra admin lưu dùng chung và nhân viên không có mục cài đặt trên desktop/mobile. Việc lưu xác nhận cấu hình và định dạng, chưa khẳng định key có quota/quyền model; kiểm chứng bằng hội thoại thật sau khi admin nhập key hợp lệ.
 
 Đã áp dụng migration và deploy proxy/frontend ngày 29/09/2026. Bộ kiểm tra cuối: **692 passed, 7 skipped**, lint/build/kiến trúc/guardrails đạt. Browser desktop/mobile đạt cho admin và nhân viên. Website trả HTTP 200, bundle `/exel_pro/assets/index-DXGj7_jO.js` khớp bản phát hành mới. Không cấu hình key thật trong phiên triển khai này.
+
+## Sự cố Google quá tải — tối 29/09/2026
+
+Sau khi admin lưu key, kiểm tra trực tiếp Google bằng key đã lưu (không in/ghi key ra file): Models API trả 200 và liệt kê `gemini-3.6-flash`; câu thử ngắn trả 503 `UNAVAILABLE`, thông báo model đang có nhu cầu cao. Luồng streaming qua handler đã sửa vẫn nhận ba phản hồi 503 liên tiếp. Chưa có câu trả lời thật thành công trong lượt kiểm tra này.
+
+Proxy thử lại tối đa hai lần với khoảng chờ tăng dần và jitter, chỉ cho lỗi mạng/408/500/502/503/504, trước khi chuyển tiếp stream. Không thử lại lỗi key, cấu hình, thanh toán hoặc quota. Thời gian chờ header mỗi lần tối đa 20 giây; không cắt câu trả lời dài đang stream. Frontend không nhân đôi ngân sách thử lại. Thông báo phân biệt quá tải, model không khả dụng, quyền key, quota và timeout; không đưa nội dung lỗi thô của Google ra trình duyệt. Giữ nguyên model đã chọn.
+
+Kiểm chứng: 28 test liên quan đạt, lint đạt, build/deploy thành công; website khớp bundle `/exel_pro/assets/index-CzpmmcUb.js`. Không có thay đổi giao diện nên không chạy lại kiểm tra ảnh desktop/mobile. Tình trạng quá tải phía Google còn tồn tại tại lần thử cuối.

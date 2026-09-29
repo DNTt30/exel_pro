@@ -4,6 +4,60 @@ import { DEFAULT_GEMINI_MODEL } from '../../../supabase/functions/_shared/copilo
 const key = 'AIza' + 'x'.repeat(35);
 const body = { contents: [{ role: 'user', parts: [{ text: 'Cách nấu lẩu?' }] }], systemInstruction: { parts: [{ text: 'Sổ tay' }] } };
 const req = (headers = {}, query = '') => new Request(`https://test/chat-proxy?${query}`, { method: 'POST', headers: { Authorization: 'Bearer session', 'x-gemini-api-key': key, ...headers }, body: JSON.stringify(body) });
+it('does not abort a long answer after streaming headers have arrived', async () => {
+  vi.useFakeTimers();
+  try {
+    const fetchImpl = vi.fn(async () => new Response('data: {}\n\n'));
+    const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, fetchImpl });
+    const response = await handler(req({}, 'action=streamGenerateContent'));
+    await vi.advanceTimersByTimeAsync(25000);
+    expect(fetchImpl.mock.calls[0][1].signal.aborted).toBe(false);
+    expect(await response.text()).toBe('data: {}\n\n');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  } finally { vi.useRealTimers(); }
+});
+it('recovers an overloaded streaming provider before forwarding any response', async () => {
+  const fetchImpl = vi.fn()
+    .mockResolvedValueOnce(new Response('private error', { status: 503 }))
+    .mockResolvedValueOnce(new Response('private error', { status: 503 }))
+    .mockResolvedValueOnce(new Response('data: {"ok":true}\n\n', { headers: { 'Content-Type': 'text/event-stream' } }));
+  const sleep = vi.fn();
+  const handler = createChatProxyHandler({ authorize: async () => ({ isAdmin: false }), getApiKey: async () => key, fetchImpl, sleep, random: () => 0 });
+  const response = await handler(req({}, 'action=streamGenerateContent'));
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe('data: {"ok":true}\n\n');
+  expect(fetchImpl).toHaveBeenCalledTimes(3);
+  expect(sleep.mock.calls).toEqual([[1000], [2000]]);
+  expect(new Set(fetchImpl.mock.calls.map(([url]) => url)).size).toBe(1);
+});
+it('caps overload retries and preserves 503 without leaking provider text', async () => {
+  const fetchImpl = vi.fn(async () => new Response(key, { status: 503 }));
+  const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, fetchImpl, sleep: async () => {} });
+  const response = await handler(req());
+  expect(response.status).toBe(503);
+  const result = await response.json();
+  expect(result.error).toContain('quá tải (503)');
+  expect(result.error).not.toContain(key);
+  expect(fetchImpl).toHaveBeenCalledTimes(3);
+});
+it.each([400, 401, 402, 403, 404, 429])('does not retry configuration/quota error %s', async status => {
+  const fetchImpl = vi.fn(async () => new Response(key, { status }));
+  const sleep = vi.fn();
+  const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, fetchImpl, sleep });
+  const response = await handler(req());
+  expect(response.status).toBe(status === 401 ? 403 : status);
+  expect(await response.text()).not.toContain(key);
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(sleep).not.toHaveBeenCalled();
+});
+it('bounds network retries and never leaks the thrown provider exception', async () => {
+  const fetchImpl = vi.fn().mockRejectedValue(new Error(key));
+  const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, fetchImpl, sleep: async () => {} });
+  const response = await handler(req());
+  expect(response.status).toBe(504);
+  expect(await response.text()).not.toContain(key);
+  expect(fetchImpl).toHaveBeenCalledTimes(3);
+});
 it('rejects unauthenticated users before contacting the provider', async () => {
   const fetchImpl = vi.fn();
   const handler = createChatProxyHandler({ authorize: async () => false, fetchImpl });

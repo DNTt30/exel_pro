@@ -9,6 +9,16 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => 'gemini-2.0-flash-thinking-exp-01-21' });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.clearAllMocks(); });
+it('preserves the overload explanation and does not multiply the server retry budget', async () => {
+  const message = 'Google Gemini đang quá tải (503). Hệ thống đã thử lại 2 lần.';
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: message }), { status: 503 }));
+  vi.stubGlobal('fetch', fetchMock);
+  await expect(generateGeminiMultiTurn(contents)).rejects.toThrow(message);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fetchMock.mockClear();
+  await expect(streamGeminiMultiTurn(contents)).rejects.toThrow(message);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
 it('ignores saved models and legacy personal keys, sending only session authentication', async () => {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'internal' }, { text: 'Bước 1' }, { text: ': đọc Sổ tay' }] } }] })));
   vi.stubGlobal('fetch', fetchMock);

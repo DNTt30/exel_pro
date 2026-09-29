@@ -25,14 +25,14 @@ async function requestHeaders() {
  */
 export async function generateGeminiContent(prompt, systemInstruction = '') {
   const contents = [{ role: 'user', parts: [{ text: prompt }] }];
-  return _callGeminiWithRetry(contents, systemInstruction);
+  return _callGemini(contents, systemInstruction);
 }
 
 /**
  * Gọi Gemini API với multi-turn conversation
  */
 export async function generateGeminiMultiTurn(contents, systemInstruction = '') {
-  return _callGeminiWithRetry(contents, systemInstruction);
+  return _callGemini(contents, systemInstruction);
 }
 
 /**
@@ -111,7 +111,7 @@ function _buildPayload(contents, systemInstruction) {
   return payload;
 }
 
-async function _callGeminiWithRetry(contents, systemInstruction, attempt = 0) {
+async function _callGemini(contents, systemInstruction) {
   const payload = _buildPayload(contents, systemInstruction);
   const url = _getBaseUrl('generateContent');
 
@@ -121,12 +121,7 @@ async function _callGeminiWithRetry(contents, systemInstruction, attempt = 0) {
     body: JSON.stringify(payload)
   });
 
-  // Retry 1 lần nếu rate limit hoặc server error
-  if ((response.status === 429 || response.status >= 500) && attempt === 0) {
-    await new Promise(r => setTimeout(r, 1500));
-    return _callGeminiWithRetry(contents, systemInstruction, 1);
-  }
-
+  // The proxy owns the bounded retry budget for all callers.
   const data = await response.json();
 
   if (!response.ok) {

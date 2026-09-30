@@ -65,15 +65,15 @@ export const createEmployeeSlice = (set, get) => ({
     await api.deleteEmployeeData(id);
     if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
-      employees: state.employees.filter(e => e.id !== id)
+      employees: state.employees.map(e => e.id === id ? { ...e, isActive: false } : e)
     }));
-    get().appendAdminLog('DELETE_EMPLOYEE', id, `Xóa NV ${prev.name || id}`, {
+    get().appendAdminLog('UPDATE_EMPLOYEE', id, `Ngưng hoạt động NV ${prev.name || id}`, {
       resourceType: 'employee',
       resourceId: id,
       storeId: prev.dept || get().user?.dept || '',
-      oldData: { id: prev.id, name: prev.name, dept: prev.dept, role: prev.role, type: prev.type },
-      newData: null,
-      description: `Xóa NV ${prev.name || id} (${id}) khỏi ${prev.dept || '—'}`
+      oldData: { id: prev.id, isActive: prev.isActive !== false },
+      newData: { id: prev.id, isActive: false },
+      description: `Ngưng hoạt động NV ${prev.name || id} (${id}); giữ nguyên hồ sơ và lịch sử tại ${prev.dept || '—'}`
     });
   }
 });

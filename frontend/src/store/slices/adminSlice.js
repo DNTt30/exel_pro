@@ -173,15 +173,15 @@ export const createAdminSlice = (set, get) => ({
     await api.deleteStore(id);
     if (epoch !== get()._sessionEpoch) return;
     set((state) => ({
-      stores: state.stores.filter(s => s.id !== id)
+      stores: state.stores.map(s => s.id === id ? { ...s, is_active: false } : s)
     }));
-    get().appendAdminLog('DELETE_STORE', id, `Xóa cửa hàng ${prev.name || id}`, {
+    get().appendAdminLog('UPDATE_STORE', id, `Ngưng hoạt động cửa hàng ${prev.name || id}`, {
       resourceType: 'store',
       resourceId: id,
       storeId: id,
-      oldData: { id: prev.id, name: prev.name, region: prev.region },
-      newData: null,
-      description: `Xóa cửa hàng ${id} · ${prev.name || ''}`
+      oldData: { id: prev.id, is_active: prev.is_active !== false },
+      newData: { id: prev.id, is_active: false },
+      description: `Ngưng hoạt động cửa hàng ${id} · ${prev.name || ''}; giữ nguyên dữ liệu lịch sử`
     });
   }
 });

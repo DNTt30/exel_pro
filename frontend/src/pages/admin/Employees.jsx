@@ -175,19 +175,19 @@ export default function Employees() {
     // Kiểm tra tính toàn vẹn: Không cho xóa nếu nhân viên này đang là SM
     const ownedStores = stores.filter(s => (s.sm_id || s.smId) === id);
     if (ownedStores.length > 0) {
-      return toast.error(`Không thể xóa: Nhân sự này đang là SM phụ trách cửa hàng ${ownedStores.map(s => s.id).join(', ')}. Vui lòng gán SM khác cho các cửa hàng này trước khi xóa.`);
+      return toast.error(`Nhân sự này đang là SM phụ trách cửa hàng ${ownedStores.map(s => s.id).join(', ')}. Vui lòng gán SM khác trước khi ngưng hoạt động.`);
     }
 
     setConfirmState({
       isOpen: true,
-      title: 'Xóa hồ sơ nhân sự',
-      message: 'Bạn có chắc chắn muốn xóa nhân sự này khỏi danh sách?\n\n💡 Khuyến nghị: Nên dùng nút KHÓA thay vì XÓA để bảo toàn lịch sử chấm công và xếp ca.',
-      variant: 'danger',
-      confirmText: 'Xác nhận xóa',
+      title: 'Ngưng hoạt động nhân viên',
+      message: 'Nhân viên sẽ không thể đăng nhập. Hồ sơ, lịch ca và lịch sử chấm công vẫn được giữ nguyên. Bạn có thể mở lại tài khoản khi cần.',
+      variant: 'warning',
+      confirmText: 'Xác nhận ngưng',
       onConfirm: async () => {
         try {
           await deleteEmployee(id);
-          toast.success('Đã xóa nhân sự thành công');
+          toast.success('Đã ngưng hoạt động nhân viên, giữ nguyên lịch sử');
           setConfirmState(prev => ({ ...prev, isOpen: false }));
         } catch (e) {
           toast.error('Lỗi: ' + e.message);
@@ -442,6 +442,7 @@ export default function Employees() {
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
                     ) : <button type="button" onClick={() => setProfileTarget(emp.id)} title={`Xem hồ sơ ${emp.name}`} className="text-left font-bold text-blue-700 hover:underline">{emp.name}</button>}
+                    {emp.isActive === false && <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Ngưng hoạt động</span>}
                     {editingId === emp.id ? (
                       <label className="mt-2 flex items-center gap-2 text-xs text-purple-800">
                         <input type="checkbox" checked={isNightReady(formData)}
@@ -571,8 +572,8 @@ export default function Employees() {
                         {canEditEmps && (
                         <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
                         )}
-                        {canEditEmps && (
-                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Xóa"><Trash2 size={15} /></button>
+                        {canEditEmps && emp.isActive !== false && (
+                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Ngưng hoạt động (giữ lịch sử)"><Trash2 size={15} /></button>
                         )}
                       </>
                     )}

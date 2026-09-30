@@ -9,13 +9,12 @@ import { canPickStore, isManagerFromEmp, canAssignManager } from '../../lib/auth
 import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from '../../components/ui/toastStore';
-import { updateStore as apiUpdateStore, updateEmployeeInfo } from '../../services/api';
+import { updateEmployeeInfo } from '../../services/api';
 
 export default function Stores() {
-  const { stores, employees, shelves, addStore, updateStore, deleteStore, updateEmployee, user } = useStore(useShallow((s) => ({
+  const { stores, employees, addStore, updateStore, deleteStore, updateEmployee, user } = useStore(useShallow((s) => ({
     stores: s.stores,
     employees: s.employees,
-    shelves: s.shelves,
     addStore: s.addStore,
     updateStore: s.updateStore,
     deleteStore: s.deleteStore,
@@ -159,28 +158,17 @@ export default function Stores() {
   };
 
   const handleDelete = (id) => {
-    // Kiểm tra tính toàn vẹn: Không cho xóa nếu vẫn còn nhân viên
-    const empsInStore = employees.filter(e => e.dept === id);
-    if (empsInStore.length > 0) {
-      return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${empsInStore.length} nhân viên trực thuộc. Vui lòng chuyển hoặc xóa nhân viên trước.`);
-    }
-
-    // Kiểm tra tính toàn vẹn: Không cho xóa nếu vẫn còn kệ hàng
-    const shelvesInStore = (shelves || []).filter(s => s.storeId === id);
-    if (shelvesInStore.length > 0) {
-      return toast.error(`Không thể xóa: Cửa hàng này vẫn còn ${shelvesInStore.length} kệ hàng đang theo dõi hạn sử dụng. Vui lòng xóa kệ hàng trước.`);
-    }
-
+    // Xóa mềm không cần xóa nhân viên hoặc kệ hàng đang tham chiếu cửa hàng.
     setConfirmState({
       isOpen: true,
-      title: 'Xóa cửa hàng',
-      message: `Bạn có chắc chắn muốn xóa cửa hàng ${id} khỏi hệ thống?\n\n⚠️ Lưu ý: Thao tác này sẽ xóa vĩnh viễn cấu hình cửa hàng. Nếu cửa hàng chỉ tạm dừng hoạt động, bạn nên dùng chức năng Khóa/Tạm ngừng.`,
-      variant: 'danger',
-      confirmText: 'Xác nhận xóa',
+      title: 'Ngưng hoạt động cửa hàng',
+      message: `Ngưng hoạt động cửa hàng ${id}? Cấu hình, hồ sơ nhân viên, kệ hàng và lịch sử vẫn được giữ nguyên. Bạn có thể mở lại hoạt động khi cần.`,
+      variant: 'warning',
+      confirmText: 'Xác nhận ngưng',
       onConfirm: async () => {
         try {
           await deleteStore(id);
-          toast.success('Đã xóa cửa hàng thành công');
+          toast.success('Đã ngưng hoạt động cửa hàng, giữ nguyên lịch sử');
           setConfirmState(prev => ({ ...prev, isOpen: false }));
         } catch (e) {
           toast.error('Lỗi: ' + e.message);
@@ -200,8 +188,7 @@ export default function Stores() {
         confirmText: 'Xác nhận ngừng',
         onConfirm: async () => {
           try {
-            await apiUpdateStore(st.id, { is_active: false });
-            updateStore(st.id, { is_active: false });
+            await updateStore(st.id, { is_active: false });
             toast.success(`Đã tạm ngừng hoạt động cửa hàng ${st.id}`);
             setConfirmState(prev => ({ ...prev, isOpen: false }));
           } catch (e) {
@@ -212,9 +199,8 @@ export default function Stores() {
       return;
     }
 
-    apiUpdateStore(st.id, { is_active: true })
+    updateStore(st.id, { is_active: true })
       .then(() => {
-        updateStore(st.id, { is_active: true });
         toast.success(`Đã mở lại hoạt động cửa hàng ${st.id}`);
       })
       .catch(e => toast.error('Lỗi: ' + e.message));
@@ -313,6 +299,7 @@ export default function Stores() {
                   {editingId === st.id ? (
                     <input type="text" className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs font-bold outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                   ) : st.name}
+                  {st.is_active === false && <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Ngưng hoạt động</span>}
                 </td>
                 <td className="p-3">
                   {editingId === st.id ? (
@@ -393,7 +380,7 @@ export default function Stores() {
                           {st.is_active === false ? <Unlock size={15} /> : <Lock size={15} />}
                         </button>
                       )}
-                      {pickStore && <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa"><Trash2 size={15} /></button>}
+                      {pickStore && st.is_active !== false && <button onClick={() => handleDelete(st.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Ngưng hoạt động (giữ lịch sử)"><Trash2 size={15} /></button>}
                     </>
                   )}
                 </td>

@@ -114,6 +114,8 @@ export async function updateEmployeeInfo(id, updates) {
 }
 
 export async function deleteEmployeeData(id) {
-  const { error } = await db().from('employees').delete().eq('id', id);
+  // Giữ hồ sơ và toàn bộ dữ liệu liên kết; chỉ ngưng hoạt động.
+  const { data, error } = await db().from('employees').update({ is_active: false }).eq('id', id).select('id');
   if (error) throw error;
+  if (!data?.length) throw new Error('Không thể ngưng hoạt động nhân viên: hồ sơ không tồn tại hoặc bạn không có quyền.');
 }

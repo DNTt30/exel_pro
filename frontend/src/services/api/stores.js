@@ -70,6 +70,8 @@ export async function updateStore(id, updates) {
 }
 
 export async function deleteStore(id) {
-  const { error } = await db().from('stores').delete().eq('id', id);
+  // Không xóa cửa hàng vì lịch sử nhân sự/lịch ca vẫn tham chiếu tới mã này.
+  const { data, error } = await db().from('stores').update({ is_active: false }).eq('id', id).select('id');
   if (error) throw error;
+  if (!data?.length) throw new Error('Không thể ngưng hoạt động cửa hàng: hồ sơ không tồn tại hoặc bạn không có quyền.');
 }

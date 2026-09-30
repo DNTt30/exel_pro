@@ -57,7 +57,7 @@ vi.mock('../services/api', () => {
       return mockDb.employees[idx];
     }),
     deleteEmployeeData: vi.fn(async (id) => {
-      mockDb.employees = mockDb.employees.filter(e => e.id !== id);
+      mockDb.employees = mockDb.employees.map(e => e.id === id ? { ...e, isActive: false } : e);
     }),
     // Stores
     getStores: vi.fn(async () => [...mockDb.stores]),
@@ -73,7 +73,7 @@ vi.mock('../services/api', () => {
       return mockDb.stores[idx];
     }),
     deleteStore: vi.fn(async (id) => {
-      mockDb.stores = mockDb.stores.filter(s => s.id !== id);
+      mockDb.stores = mockDb.stores.map(s => s.id === id ? { ...s, is_active: false } : s);
     }),
     // Schedules
     getSchedulesByWeek: vi.fn(async (week) => mockDb.schedules[week] || {}),
@@ -286,16 +286,21 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
       expect(api._getDb().employees[0].name).toBe('Nguyễn Văn Đã Sửa');
     });
 
-    it('DELETE: xóa nhân viên khỏi hệ thống', async () => {
+    it('SOFT DELETE: giữ hồ sơ nhân viên, lịch sử và có thể mở lại', async () => {
       store.setState({
         employees: [{ id: '260512001', name: 'A', dept: 'VN0485' }]
       });
       api._getDb().employees.push({ id: '260512001', name: 'A', dept: 'VN0485' });
+      const schedule = { '2026-09-28': { '260512001': { T2: '6-14' } } };
+      store.setState({ schedule });
 
       await store.getState().deleteEmployee('260512001');
 
-      expect(store.getState().employees).toHaveLength(0);
-      expect(api._getDb().employees).toHaveLength(0);
+      expect(store.getState().employees).toEqual([{ id: '260512001', name: 'A', dept: 'VN0485', isActive: false }]);
+      expect(api._getDb().employees).toHaveLength(1);
+      expect(store.getState().schedule).toEqual(schedule);
+      await store.getState().updateEmployee('260512001', { isActive: true });
+      expect(store.getState().employees[0].isActive).toBe(true);
     });
 
     it('GUARD: SM không được thêm/sửa/xóa nhân viên cửa hàng khác', async () => {
@@ -370,7 +375,7 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
       expect(api._getDb().stores[0].name).toBe('GS25 Mới Siêu Đẹp');
     });
 
-    it('DELETE: xóa cửa hàng thành công', async () => {
+    it('SOFT DELETE: giữ cửa hàng và có thể mở lại hoạt động', async () => {
       store.setState({
         stores: [{ id: 'VN0999', name: 'Cần Xóa' }]
       });
@@ -378,8 +383,10 @@ describe('COMPREHENSIVE CRUD TEST SUITE FOR GS25 SCHEDULE APP', () => {
 
       await store.getState().deleteStore('VN0999');
 
-      expect(store.getState().stores).toHaveLength(0);
-      expect(api._getDb().stores).toHaveLength(0);
+      expect(store.getState().stores).toEqual([{ id: 'VN0999', name: 'Cần Xóa', is_active: false }]);
+      expect(api._getDb().stores).toHaveLength(1);
+      await store.getState().updateStore('VN0999', { is_active: true });
+      expect(store.getState().stores[0].is_active).toBe(true);
     });
 
     it('GUARD: SM không được phép thêm hoặc xóa cửa hàng', async () => {

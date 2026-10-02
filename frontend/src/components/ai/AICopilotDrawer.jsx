@@ -355,12 +355,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
   return (
     <>
-      {/* Backdrop overlay - tap outside to close */}
-      <div 
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-50 transition-opacity animate-in fade-in print:hidden"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      
 
       {/* Responsive Bottom Sheet / Drawer Container */}
       <div className="fixed inset-x-0 bottom-0 sm:bottom-6 sm:right-6 sm:inset-x-auto w-full sm:w-[400px] h-[82dvh] sm:h-[560px] max-h-[85dvh] sm:max-h-[600px] bg-white shadow-2xl shadow-slate-900/30 rounded-t-3xl sm:rounded-2xl overflow-hidden z-50 flex flex-col border border-slate-200/80 print:hidden animate-in slide-in-from-bottom-6 duration-200">

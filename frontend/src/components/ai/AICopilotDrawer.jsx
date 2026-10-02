@@ -303,7 +303,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
           err = geminiErr.message || 'Không kết nối được trợ lý AI.';
           aiReply = `${err}\nAnh/chị có thể mở trang Sổ tay để tra cứu hoặc thử lại sau.`;
           model = 'gemini-error';
-          const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
+          const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true };
           setMessages(prev => [...prev, aiMsg]);
         } finally {
           if (agentRequestRef.current === request) {
@@ -317,7 +317,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       console.warn('AI error:', error);
       err = error.message || 'ai-error';
       aiReply = 'Chưa hoàn tất yêu cầu. Anh/chị vui lòng thử lại hoặc mở trang Sổ tay để tra cứu.';
-      const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply };
+      const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true };
       setMessages(prev => [...prev, aiMsg]);
       setIsStreaming(false);
     } finally {
@@ -447,8 +447,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
                 <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[82%]">
                   <div className={`p-2.5 sm:p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed ${
-                    isAI
-                      ? 'bg-white border border-slate-100 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] rounded-tl-xs'
+                    isAI ? (m.isError ? 'bg-red-50 border border-red-200 text-red-700 shadow-sm rounded-tl-xs' : 'bg-white border border-slate-100 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] rounded-tl-xs')
                       : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm rounded-tr-xs'
                   }`}>
                     {isAI ? (

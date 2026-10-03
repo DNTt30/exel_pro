@@ -1,5 +1,6 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check, Plus } from 'lucide-react';
+import { addAdminLog } from '../../services/api/logs';
 import { useStore } from '../../store/useStore';
 import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
 import { isOpsManager, canPickStore } from '../../lib/authSession';
@@ -97,6 +98,25 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
   const userName = user?.name || user?.username || 'bạn';
   const firstName = userName.split(' ').pop();
+
+  const MAX_STORED_MSGS = 50;
+
+  const trimMessagesBuffer = useCallback((list) => {
+    const welcome = list.find(m => m.id === 'welcome');
+    const nonWelcome = list.filter(m => m.id !== 'welcome');
+    const trimmed = nonWelcome.length > MAX_STORED_MSGS ? nonWelcome.slice(-MAX_STORED_MSGS) : nonWelcome;
+    return welcome ? [welcome, ...trimmed] : trimmed;
+  }, []);
+
+  const handleDeleteSingleMsg = (msgId) => {
+    setMessages(prev => prev.filter(m => m.id !== msgId));
+    toast.success('Đã xóa tin nhắn');
+  };
+
+  const handleNewChat = () => {
+    setMessages([initialWelcome]);
+    toast.info('Đã mở đoạn hội thoại mới');
+  };
 
   const initialWelcome = {
     id: 'welcome',
@@ -198,9 +218,19 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     agentRequestRef.current = request;
     let startSnapshot = useStore.getState();
     const userMsg = { id: 'user_' + Date.now(), sender: 'user', text: query };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => trimMessagesBuffer([...prev, userMsg]));
     if (!textToSend) setInputText('');
     setIsTyping(true);
+
+    try {
+      addAdminLog({
+        actorId: user?.id || 'anonymous',
+        actorName: user?.name || 'Nhân viên',
+        action: 'AI_QUERY',
+        target: activeStoreId || 'ALL',
+        detail: query.slice(0, 300)
+      });
+    } catch { /* Silent log fail */ }
 
     const pickStore = canPickStore(user);
     const scopedEmployees = isAdmin
@@ -304,7 +334,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
           aiReply = `${err}\nAnh/chị có thể mở trang Sổ tay để tra cứu hoặc thử lại sau.`;
           model = 'gemini-error';
           const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true };
-          setMessages(prev => [...prev, aiMsg]);
+          setMessages(prev => trimMessagesBuffer([...prev, aiMsg]));
         } finally {
           if (agentRequestRef.current === request) {
             setIsStreaming(false);
@@ -318,7 +348,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       err = error.message || 'ai-error';
       aiReply = 'Chưa hoàn tất yêu cầu. Anh/chị vui lòng thử lại hoặc mở trang Sổ tay để tra cứu.';
       const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => trimMessagesBuffer([...prev, aiMsg]));
       setIsStreaming(false);
     } finally {
       if (agentRequestRef.current === request) {
@@ -398,7 +428,16 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
+                    <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white/90 hover:text-white cursor-pointer flex items-center gap-1 text-xs font-bold"
+              title="Mở đoạn chat mới"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline text-xs">Mới</span>
+            </button>
             {canConfigureAi && <button
               type="button"
               onClick={openAiSettings}

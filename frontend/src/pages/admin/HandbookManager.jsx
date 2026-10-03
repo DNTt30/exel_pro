@@ -3,10 +3,12 @@ import {
   BookOpen, Plus, Search, Edit2, Trash2,
   FileText, RefreshCw, Sparkles, ChevronDown, ChevronRight,
   ShieldCheck, Utensils, Settings, Info, Users,
-  Copy, Check, Eye, EyeOff, Layers, CheckCircle2
+  Copy, Check, Layers, MessageSquareText, Sliders,
+  Clock, ArrowUpRight, RotateCcw
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { handbookApi } from '../../services/api/handbook';
+import { getAdminLogs } from '../../services/api/logs';
 import { toast } from '../../components/ui/toastStore';
 import Modal from '../../components/modals/Modal';
 import ConfirmModal from '../../components/modals/ConfirmModal';
@@ -76,7 +78,6 @@ export const CATEGORY_MAP = Object.fromEntries(
 
 /**
  * Custom hook quản lý dữ liệu Sổ tay AI
- * Hỗ trợ auto-reload khi chỉnh sửa & Realtime Supabase Channel
  */
 export function useHandbookEntries() {
   const [entries, setEntries] = useState([]);
@@ -104,7 +105,6 @@ export function useHandbookEntries() {
   useEffect(() => {
     fetchEntries(false);
 
-    // Supabase Realtime Channel: tự động đồng bộ khi DB thay đổi
     let channel = null;
     if (supabase && typeof supabase.channel === 'function') {
       try {
@@ -130,7 +130,6 @@ export function useHandbookEntries() {
     };
   }, [fetchEntries]);
 
-  // Cập nhật và load lại trang tự động ngay sau khi hoàn tất
   const addEntry = async (entryData) => {
     const created = await handbookApi.create(entryData);
     await fetchEntries(true);
@@ -173,7 +172,6 @@ function FormattedContent({ text }) {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1.5" />;
 
-        // Header Markdown: ### or ## or #
         if (trimmed.startsWith('###')) {
           return (
             <h4 key={idx} className="text-xs font-black text-slate-900 pt-1 pb-0.5 border-b border-slate-200/80">
@@ -189,7 +187,6 @@ function FormattedContent({ text }) {
           );
         }
 
-        // Bullet point
         if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
           const content = trimmed.replace(/^[-•*]\s*/, '');
           return (
@@ -200,7 +197,6 @@ function FormattedContent({ text }) {
           );
         }
 
-        // Numbered list
         const numMatch = trimmed.match(/^(\d+)\.\s*(.+)$/);
         if (numMatch) {
           return (
@@ -211,7 +207,6 @@ function FormattedContent({ text }) {
           );
         }
 
-        // Warning or Quote block
         if (trimmed.startsWith('⚠️') || trimmed.startsWith('>') || trimmed.startsWith('🔥')) {
           return (
             <div key={idx} className="p-2.5 rounded-lg bg-amber-50/80 border border-amber-200 text-amber-900 text-xs font-medium my-1">
@@ -220,7 +215,6 @@ function FormattedContent({ text }) {
           );
         }
 
-        // Table row marker (simple render)
         if (trimmed.startsWith('|')) {
           if (trimmed.includes('---')) return null;
           const cells = trimmed.split('|').filter((_, i, arr) => i > 0 && i < arr.length - 1);
@@ -267,7 +261,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
     });
   };
 
-  // Preview một dòng văn bản ngắn gọn
   const cleanSnippet = useMemo(() => {
     return (entry.content || '')
       .replace(/[#*`_>|]/g, '')
@@ -279,19 +272,15 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
     <div className={`transition-colors duration-150 border-b border-slate-100 last:border-b-0 ${
       isExpanded ? 'bg-blue-50/20' : 'hover:bg-slate-50/80 bg-white'
     }`}>
-      {/* ── Main Row Bar ── */}
       <div 
         onClick={onToggleExpand}
         className="w-full px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-start sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer select-none group"
       >
-        {/* Left: Category Icon & Title details */}
         <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-          {/* Category Icon */}
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 transition-transform group-hover:scale-105 ${cat.iconColor}`}>
             <Icon size={16} />
           </div>
 
-          {/* Title & Metadata */}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm group-hover:text-blue-700 transition-colors leading-tight">
@@ -306,7 +295,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
               )}
             </div>
 
-            {/* Snippet (hiển thị khi chưa mở rộng) */}
             {!isExpanded && (
               <p className="text-[11px] sm:text-xs text-slate-500 mt-1 line-clamp-1 leading-normal font-normal">
                 {cleanSnippet}
@@ -315,9 +303,7 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
           </div>
         </div>
 
-        {/* Right: Actions */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 mt-0.5 sm:mt-0" onClick={e => e.stopPropagation()}>
-          {/* Nút Xem / Thu gọn */}
           <button
             type="button"
             onClick={onToggleExpand}
@@ -334,7 +320,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
             </span>
           </button>
 
-          {/* Nút Copy */}
           <button
             type="button"
             onClick={handleCopy}
@@ -344,7 +329,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
             {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
           </button>
 
-          {/* Nút Sửa */}
           <button
             type="button"
             onClick={() => onEdit(entry)}
@@ -354,7 +338,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
             <Edit2 size={14} />
           </button>
 
-          {/* Nút Xóa */}
           <button
             type="button"
             onClick={() => onDelete(entry)}
@@ -366,7 +349,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
         </div>
       </div>
 
-      {/* ── Expanded Full Details Panel ── */}
       {isExpanded && (
         <div className="px-4 sm:px-6 py-4 bg-slate-50/80 border-t border-slate-100/90 animate-in fade-in duration-150">
           <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs">
@@ -393,7 +375,6 @@ function HandbookListRow({ entry, onEdit, onDelete, isExpanded, onToggleExpand }
               </div>
             </div>
 
-            {/* Nội dung markdown đã format */}
             <FormattedContent text={entry.content} />
           </div>
         </div>
@@ -445,11 +426,12 @@ export default function HandbookManager() {
     deleteEntry 
   } = useHandbookEntries();
 
+  // Navigation tab: 'handbook' | 'audit' | 'settings'
+  const [activeTab, setActiveTab] = useState('handbook');
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-
-  // Expanded entries state: lưu set các id đang được mở rộng
   const [expandedIds, setExpandedIds] = useState(new Set());
 
   // Modal State (Thêm / Sửa)
@@ -467,19 +449,70 @@ export default function HandbookManager() {
   const [deletingEntry, setDeletingEntry] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Mở modal thêm mới với category tùy chọn
-  const handleOpenAdd = (defaultCat = null) => {
+  // ── AUDIT LOGS STATE (Nhật ký câu hỏi AI) ──
+  const [aiLogs, setAiLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+
+  const fetchAiLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      const logs = await getAdminLogs();
+      const queryLogs = (logs || []).filter(l => l.action === 'AI_QUERY');
+      setAiLogs(queryLogs);
+    } catch (err) {
+      console.warn('Lỗi tải nhật ký AI:', err?.message);
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAiLogs();
+    }
+  }, [activeTab, fetchAiLogs]);
+
+  // ── CẤU HÌNH COPILOT STATE ──
+  const [copilotSettings, setCopilotSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ofc-copilot-settings');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { maxStored: 50, maxContext: 10 };
+  });
+
+  const handleSaveSettings = (updates) => {
+    const next = { ...copilotSettings, ...updates };
+    setCopilotSettings(next);
+    try {
+      localStorage.setItem('ofc-copilot-settings', JSON.stringify(next));
+      toast.success('Đã lưu cấu hình TÚ mini!');
+    } catch {
+      toast.error('Không thể lưu cấu hình vào bộ nhớ.');
+    }
+  };
+
+  const handleResetSystemChat = () => {
+    try {
+      localStorage.setItem('ofc-copilot-reset-epoch', String(Date.now()));
+      toast.success('Đã phát lệnh đặt lại hội thoại toàn hệ thống!');
+    } catch {
+      toast.error('Lỗi khi phát lệnh đặt lại.');
+    }
+  };
+
+  const handleOpenAdd = (defaultCat = null, prefillTitle = '') => {
     setEditingEntry(null);
     setFormData({
       category: defaultCat || (selectedCategory !== 'all' ? selectedCategory : 'quality'),
-      title: '',
+      title: prefillTitle || '',
       content: '',
       source_doc: ''
     });
     setIsModalOpen(true);
   };
 
-  // Mở modal chỉnh sửa
   const handleOpenEdit = (entry) => {
     setEditingEntry(entry);
     setFormData({
@@ -491,7 +524,6 @@ export default function HandbookManager() {
     setIsModalOpen(true);
   };
 
-  // Toggle expand 1 entry
   const toggleExpand = (id) => {
     setExpandedIds(prev => {
       const next = new Set(prev);
@@ -501,7 +533,6 @@ export default function HandbookManager() {
     });
   };
 
-  // Mở rộng tất cả / Thu gọn tất cả
   const handleExpandAll = (expand) => {
     if (expand) {
       setExpandedIds(new Set(entries.map(e => e.id)));
@@ -510,7 +541,6 @@ export default function HandbookManager() {
     }
   };
 
-  // Lưu entry (Thêm hoặc Sửa)
   const handleSubmit = async (e) => {
     e.preventDefault();
     const cleanTitle = formData.title.trim();
@@ -547,7 +577,6 @@ export default function HandbookManager() {
     }
   };
 
-  // Xóa entry
   const handleConfirmDelete = async () => {
     if (!deletingEntry) return;
     setIsDeleting(true);
@@ -562,7 +591,6 @@ export default function HandbookManager() {
     }
   };
 
-  // Danh sách entries đã lọc
   const filteredEntries = useMemo(() => {
     return (entries || []).filter(entry => {
       if (selectedCategory !== 'all' && entry.category !== selectedCategory) {
@@ -579,7 +607,6 @@ export default function HandbookManager() {
     });
   }, [entries, selectedCategory, searchQuery]);
 
-  // Phân nhóm theo từng đầu mục Category
   const groupedSections = useMemo(() => {
     const map = new Map();
     CATEGORY_OPTIONS.forEach(cat => {
@@ -600,9 +627,6 @@ export default function HandbookManager() {
       map.get(catKey).items.push(item);
     });
 
-    // Chỉ trả về các category:
-    // - Nếu chọn filter 'all': chỉ hiển thị những category có items (hoặc tất cả nếu chưa có filter)
-    // - Nếu chọn filter cụ thể: chỉ hiển thị category đó
     if (selectedCategory !== 'all') {
       const sec = map.get(selectedCategory);
       return sec ? [sec] : [];
@@ -611,12 +635,21 @@ export default function HandbookManager() {
     return Array.from(map.values()).filter(sec => sec.items.length > 0);
   }, [filteredEntries, selectedCategory]);
 
+  const filteredLogs = useMemo(() => {
+    if (!logSearch.trim()) return aiLogs;
+    const q = logSearch.toLowerCase().trim();
+    return aiLogs.filter(l => 
+      (l.detail || '').toLowerCase().includes(q) ||
+      (l.actorName || '').toLowerCase().includes(q) ||
+      (l.target || '').toLowerCase().includes(q)
+    );
+  }, [aiLogs, logSearch]);
+
   return (
     <div className="w-full px-3.5 sm:px-6 py-4 sm:py-5 space-y-4 animate-in fade-in duration-150">
 
-      {/* ── HEADER PANEL: Thanh lịch, cân bằng màu sắc, chuẩn phong cách GS25 ── */}
+      {/* ── HEADER PANEL: Chuẩn phong cách GS25 ── */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Tiêu đề & Giới thiệu */}
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
             <BookOpen size={22} />
@@ -642,206 +675,410 @@ export default function HandbookManager() {
           </div>
         </div>
 
-        {/* Nút hành động chính */}
+        {/* Nút thao tác chính */}
         <div className="flex items-center gap-2 self-start lg:self-auto">
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={loading || isRefreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
-            title="Tải lại dữ liệu từ máy chủ"
-          >
-            <RefreshCw size={14} className={loading || isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
-            <span className="hidden sm:inline">Làm mới</span>
-          </button>
+          {activeTab === 'handbook' && (
+            <>
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={loading || isRefreshing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
+                title="Tải lại dữ liệu"
+              >
+                <RefreshCw size={14} className={loading || isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+                <span className="hidden sm:inline">Làm mới</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => handleOpenAdd()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-          >
-            <Plus size={15} />
-            <span>Thêm quy định</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => handleOpenAdd()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Thêm quy định</span>
+              </button>
+            </>
+          )}
+
+          {activeTab === 'audit' && (
+            <button
+              type="button"
+              onClick={fetchAiLogs}
+              disabled={loadingLogs}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            >
+              <RefreshCw size={14} className={loadingLogs ? 'animate-spin text-blue-600' : 'text-slate-500'} />
+              <span>Tải lại câu hỏi</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── THANH THỐNG KÊ & BỘ LỌC ĐẦU MỤC ── */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 sm:p-3.5 space-y-3">
-        {/* Stats Row & Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {/* Nút Tất cả */}
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              selectedCategory === 'all'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'bg-slate-100/80 hover:bg-slate-200/80 text-slate-600'
-            }`}
-          >
-            <Layers size={13} />
-            <span>Tất cả ({entries.length})</span>
-          </button>
+      {/* ── 3 TABS ĐIỀU HƯỚNG QUẢN TRỊ ── */}
+      <div className="flex items-center gap-2 border-b border-slate-200/90 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('handbook')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'handbook'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <BookOpen size={14} />
+          <span>Danh mục Sổ tay & SOP ({entries.length})</span>
+        </button>
 
-          {/* Nút từng chuyên mục */}
-          {CATEGORY_OPTIONS.map(cat => {
-            const count = entries.filter(e => e.category === cat.value).length;
-            const isSelected = selectedCategory === cat.value;
-            const Icon = cat.icon;
+        <button
+          type="button"
+          onClick={() => setActiveTab('audit')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'audit'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <MessageSquareText size={14} />
+          <span>Nhật ký câu hỏi AI ({aiLogs.length})</span>
+        </button>
 
-            return (
+        <button
+          type="button"
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'settings'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Sliders size={14} />
+          <span>Cấu hình TÚ mini</span>
+        </button>
+      </div>
+
+      {/* ──────────────── TAB 1: DANH MỤC SỔ TAY (CURRENT VIEW) ──────────────── */}
+      {activeTab === 'handbook' && (
+        <div className="space-y-4">
+          {/* Thanh Thống kê & Bộ lọc đầu mục */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 sm:p-3.5 space-y-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               <button
-                key={cat.value}
                 type="button"
-                onClick={() => setSelectedCategory(cat.value)}
+                onClick={() => setSelectedCategory('all')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  isSelected
+                  selectedCategory === 'all'
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'bg-slate-100/80 hover:bg-slate-200/80 text-slate-600'
                 }`}
               >
-                <Icon size={13} className={isSelected ? 'text-white' : 'text-slate-400'} />
-                <span>{cat.shortLabel}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {count}
-                </span>
+                <Layers size={13} />
+                <span>Tất cả ({entries.length})</span>
               </button>
-            );
-          })}
-        </div>
 
-        {/* Thanh Tìm kiếm & Nút Mở rộng */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tiêu đề, nội dung quy trình, mã tài liệu SOP..."
-              className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-            />
+              {CATEGORY_OPTIONS.map(cat => {
+                const count = entries.filter(e => e.category === cat.value).length;
+                const isSelected = selectedCategory === cat.value;
+                const Icon = cat.icon;
+
+                return (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-slate-100/80 hover:bg-slate-200/80 text-slate-600'
+                    }`}
+                  >
+                    <Icon size={13} className={isSelected ? 'text-white' : 'text-slate-400'} />
+                    <span>{cat.shortLabel}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Tìm theo tiêu đề, nội dung quy trình, mã tài liệu SOP..."
+                  className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleExpandAll(true)}
+                  className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition-colors text-[11px] font-bold cursor-pointer"
+                >
+                  Mở rộng tất cả
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => handleExpandAll(false)}
+                  className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-[11px] font-bold cursor-pointer"
+                >
+                  Thu gọn
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleExpandAll(true)}
-              className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition-colors text-[11px] font-bold cursor-pointer"
-            >
-              Mở rộng tất cả
-            </button>
-            <span className="text-slate-300">|</span>
-            <button
-              type="button"
-              onClick={() => handleExpandAll(false)}
-              className="px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-[11px] font-bold cursor-pointer"
-            >
-              Thu gọn
-            </button>
-          </div>
-        </div>
-      </div>
+          {/* Danh sách các đầu mục */}
+          {loading ? (
+            <SkeletonListRows />
+          ) : filteredEntries.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-2xs">
+              <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <BookOpen size={28} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-800">
+                {searchQuery || selectedCategory !== 'all' ? 'Không tìm thấy quy trình phù hợp' : 'Chưa có quy trình nào trong Sổ tay AI'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {searchQuery || selectedCategory !== 'all'
+                  ? 'Thử thay đổi từ khóa tìm kiếm hoặc chọn chuyên mục khác.'
+                  : 'Hãy thêm quy trình đầu tiên để trang bị kiến thức nghiệp vụ cho TÚ mini AI.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedSections.map(sec => {
+                const cat = sec.category;
+                const Icon = cat.icon;
 
-      {/* ── NỘI DUNG DANH SÁCH THEO TỪNG ĐẦU MỤC ── */}
-      {loading ? (
-        <SkeletonListRows />
-      ) : filteredEntries.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-2xs">
-          <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <BookOpen size={28} />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">
-            {searchQuery || selectedCategory !== 'all' ? 'Không tìm thấy quy trình phù hợp' : 'Chưa có quy trình nào trong Sổ tay AI'}
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            {searchQuery || selectedCategory !== 'all'
-              ? 'Thử thay đổi từ khóa tìm kiếm hoặc chọn chuyên mục khác.'
-              : 'Hãy thêm quy trình đầu tiên để trang bị kiến thức nghiệp vụ cho TÚ mini AI.'}
-          </p>
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => handleOpenAdd()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
-            >
-              <Plus size={14} />
-              <span>+ Thêm quy định mới</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {groupedSections.map(sec => {
-            const cat = sec.category;
-            const Icon = cat.icon;
+                return (
+                  <div 
+                    key={cat.value} 
+                    className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
+                  >
+                    <div className="px-4 sm:px-5 py-3 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${cat.iconColor}`}>
+                          <Icon size={15} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                              {cat.label}
+                            </h2>
+                            <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full border ${cat.badgeClass}`}>
+                              {sec.items.length} quy định
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 line-clamp-1 hidden sm:block">
+                            {cat.desc}
+                          </p>
+                        </div>
+                      </div>
 
-            return (
-              <div 
-                key={cat.value} 
-                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
-              >
-                {/* ── Section Header (Đầu mục) ── */}
-                <div className="px-4 sm:px-5 py-3 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${cat.iconColor}`}>
-                      <Icon size={15} />
-                    </div>
-                    <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
-                          {cat.label}
-                        </h2>
-                        <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full border ${cat.badgeClass}`}>
-                          {sec.items.length} quy định
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAdd(cat.value)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          <Plus size={12} />
+                          <span className="hidden sm:inline">Thêm vào mục này</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="divide-y divide-slate-100">
+                      {sec.items.map(entry => (
+                        <HandbookListRow
+                          key={entry.id}
+                          entry={entry}
+                          onEdit={handleOpenEdit}
+                          onDelete={setDeletingEntry}
+                          isExpanded={expandedIds.has(entry.id)}
+                          onToggleExpand={() => toggleExpand(entry.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ──────────────── TAB 2: NHẬT KÝ CÂU HỎI NHÂN VIÊN ──────────────── */}
+      {activeTab === 'audit' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <MessageSquareText size={16} className="text-blue-600" />
+                  <span>Các câu hỏi nhân viên vừa hỏi TÚ mini</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Theo dõi nhu cầu tra cứu thực tế để kịp thời bổ sung công thức & quy định mới vào Sổ tay
+                </p>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={logSearch}
+                  onChange={e => setLogSearch(e.target.value)}
+                  placeholder="Tìm câu hỏi, người hỏi..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Bảng danh sách câu hỏi */}
+            {loadingLogs ? (
+              <div className="py-8 text-center text-xs text-slate-400">Đang tải nhật ký câu hỏi...</div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                Chưa có câu hỏi nào được ghi nhận gần đây.
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+                {filteredLogs.map(log => (
+                  <div key={log.id} className="p-3 sm:px-4 hover:bg-slate-50/80 flex items-start justify-between gap-3 transition-colors">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-slate-800">
+                          {log.actorName || 'Nhân viên'}
+                        </span>
+                        {log.target && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            {log.target}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Clock size={10} />
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString('vi-VN') : ''}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 line-clamp-1 hidden sm:block">
-                        {cat.desc}
+                      <p className="text-xs text-slate-700 font-medium break-words">
+                        "{log.detail}"
                       </p>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleOpenAdd(cat.value)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                      onClick={() => {
+                        setActiveTab('handbook');
+                        handleOpenAdd('general', log.detail);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-all cursor-pointer flex-shrink-0"
+                      title="Tạo quy định mới giải đáp câu hỏi này"
                     >
                       <Plus size={12} />
-                      <span className="hidden sm:inline">Thêm vào mục này</span>
+                      <span className="hidden sm:inline">Thêm vào Sổ tay</span>
                     </button>
                   </div>
-                </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-                {/* ── Danh sách các hàng list bên trong đầu mục ── */}
-                <div className="divide-y divide-slate-100">
-                  {sec.items.map(entry => (
-                    <HandbookListRow
-                      key={entry.id}
-                      entry={entry}
-                      onEdit={handleOpenEdit}
-                      onDelete={setDeletingEntry}
-                      isExpanded={expandedIds.has(entry.id)}
-                      onToggleExpand={() => toggleExpand(entry.id)}
-                    />
+      {/* ──────────────── TAB 3: CẤU HÌNH TÚ MINI ──────────────── */}
+      {activeTab === 'settings' && (
+        <div className="space-y-4 max-w-2xl">
+          <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs space-y-5">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Sliders size={16} className="text-blue-600" />
+                <span>Cấu hình Bộ nhớ & Quản lý Đoạn chat TÚ mini</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Thiết lập hạn mức lưu trữ tin nhắn trên thiết bị nhân viên và cơ chế gửi ngữ cảnh lên Gemini AI
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              {/* Giới hạn lưu tin trên thiết bị */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Giới hạn tin nhắn lưu trên thiết bị nhân viên (Băng chuyền FIFO)
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Khi vượt quá số lượng này, tin nhắn cũ nhất sẽ tự động được dọn dẹp dần để máy không bị lag.
+                </p>
+                <div className="flex items-center gap-2">
+                  {[30, 50, 100].map(limit => (
+                    <button
+                      key={limit}
+                      type="button"
+                      onClick={() => handleSaveSettings({ maxStored: limit })}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        copilotSettings.maxStored === limit
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {limit} tin nhắn
+                    </button>
                   ))}
                 </div>
               </div>
-            );
-          })}
 
-          {/* Footer note */}
-          <div className="flex items-center justify-between text-[11px] text-slate-400 px-2 py-1">
-            <span>
-              Hiển thị <strong className="text-slate-600">{filteredEntries.length}</strong> / <strong className="text-slate-600">{entries.length}</strong> quy định
-            </span>
-            <span>
-              Đồng bộ dữ liệu thời gian thực với TÚ mini Copilot
-            </span>
+              {/* Số tin nhắn gửi AI */}
+              <div className="pt-3 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Số tin nhắn ngữ cảnh gửi lên Gemini AI
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Số tin nhắn gần nhất được gửi kèm câu hỏi mới. Càng ít tin thì AI phản hồi càng nhanh và tiết kiệm Quota.
+                </p>
+                <div className="flex items-center gap-2">
+                  {[5, 10, 15].map(ctx => (
+                    <button
+                      key={ctx}
+                      type="button"
+                      onClick={() => handleSaveSettings({ maxContext: ctx })}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        copilotSettings.maxContext === ctx
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {ctx} tin gần nhất
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Đặt lại hội thoại toàn hệ thống */}
+              <div className="pt-4 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Đặt lại hội thoại toàn hệ thống (Reset All Sessions)
+                </label>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Khi có đợt cập nhật lớn về SOP hoặc quy chế cửa hàng, Admin có thể phát tín hiệu để thiết bị của tất cả nhân viên làm mới lại cuộc trò chuyện từ đầu.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResetSystemChat}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <RotateCcw size={14} />
+                  <span>Phát tín hiệu đặt lại toàn hệ thống</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -855,7 +1092,6 @@ export default function HandbookManager() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Category Select */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Chuyên mục (Category) <span className="text-red-500">*</span>
@@ -873,7 +1109,6 @@ export default function HandbookManager() {
               </select>
             </div>
 
-            {/* Source doc */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Mã tài liệu gốc (Source Document)
@@ -888,7 +1123,6 @@ export default function HandbookManager() {
             </div>
           </div>
 
-          {/* Title */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Tiêu đề quy trình <span className="text-red-500">*</span>
@@ -903,7 +1137,6 @@ export default function HandbookManager() {
             />
           </div>
 
-          {/* Content (Textarea - Markdown) */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-slate-700">
@@ -923,7 +1156,6 @@ export default function HandbookManager() {
             />
           </div>
 
-          {/* Modal Footer */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"

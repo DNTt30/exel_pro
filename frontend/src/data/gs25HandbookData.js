@@ -1,4 +1,4 @@
-// ==============================================================================
+﻿// ==============================================================================
 // DỮ LIỆU SỔ TAY NGHIỆP VỤ & VẬN HÀNH GS25 (GS25 HANDBOOK KNOWLEDGE BASE)
 // Trích xuất & chuẩn hóa trực tiếp từ 8 tài liệu quy trình thực tế tại cửa hàng
 // ==============================================================================
@@ -504,7 +504,7 @@ export const GS25_HANDBOOK_DATA = {
   // 7. CÁC MỤC BÁO CÁO MỖI CA TRONG NGÀY - NHÂN VIÊN
   shiftReports: {
     title: "Các Mục Báo Cáo Mỗi Ca Trong Ngày (NV)",
-    destination: "Group Zalo Cửa Hàng",
+    destination: "Group Gapo Cửa Hàng",
     cameraApp: "App TIMES (Chụp hình có watermark giờ & địa điểm)",
     ffPhotoItems: [
       "Nguyên tủ OSC (1-2 tấm)",
@@ -696,7 +696,7 @@ export const GS25_HANDBOOK_DATA = {
       filename: "bao_cao_moi_ca.png",
       url: "handbook/bao_cao_moi_ca.png",
       category: "Báo cáo & Vận hành",
-      desc: "Mốc thời gian và danh mục chụp ảnh báo cáo Zalo bằng App Times cho Ca 1, Ca 2, Ca 3"
+      desc: "Mốc thời gian và danh mục chụp ảnh báo cáo Gapo bằng App Times cho Ca 1, Ca 2, Ca 3"
     },
     {
       id: "sop_che_bien_lau",

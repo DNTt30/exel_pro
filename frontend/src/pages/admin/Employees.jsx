@@ -581,6 +581,11 @@ export default function Employees() {
                 </tr>
               );
             })}
+            {filteredEmps.length > 0 && (
+              <tr className="h-20 pointer-events-none select-none border-0">
+                <td colSpan={7} className="border-0 p-0" />
+              </tr>
+            )}
             {filteredEmps.length === 0 && !isAdding && (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-slate-400">

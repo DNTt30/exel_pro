@@ -12,6 +12,7 @@ import { AdminPageSkeleton, EmployeePageSkeleton } from '../ui/Skeleton';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
+import FloatingAITrigger from './FloatingAITrigger';
 import { usePWAInstall } from '../../utils/pwaHelper';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { requiredPasswordPath } from '../../utils/authNavigation';
@@ -188,6 +189,16 @@ export default function AppLayout() {
 
         <div className="flex items-center gap-1 sm:gap-1.5">
           <CloudSyncBadge />
+          {/* Nút Trợ lý AI trên Header - cố định, không che bất kỳ nút bấm hay hàng dữ liệu nào */}
+          <button 
+            type="button" 
+            onClick={openAI} 
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs hover:shadow-md transition-all cursor-pointer"
+            title="Mở Trợ lý ảo TÚ mini AI"
+          >
+            <Sparkles size={13} className="text-amber-300 animate-pulse" />
+            <span className="hidden sm:inline">Trợ lý AI</span>
+          </button>
           {isInstallable && (
             <button 
               type="button" 
@@ -360,14 +371,8 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* Floating AI Button - blue (above mobile bottom bar with safe-area spacing) */}
-        <button 
-          onClick={openAI} 
-          className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3.5 md:right-6 w-11 h-11 md:w-14 md:h-14 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all z-40 print:hidden focus:ring-3 focus:ring-blue-300 group cursor-pointer" 
-          title="GS25 AI Copilot"
-        >
-          <Sparkles size={18} className="md:w-[22px] md:h-[22px] group-hover:animate-pulse" />
-        </button>
+        {/* Floating AI Button - kéo thả tự do, có thể ẩn để không che nút thao tác */}
+        <FloatingAITrigger onOpen={openAI} />
 
         <Toaster />
         <HelpDrawer isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} isAdmin={isManager} />

@@ -367,7 +367,7 @@ export default function Schedule() {
   }, [groupedEmps, weekSchedule, activeDays, viewMode, cycleDates, schedule]);
 
   return (
-    <div className="space-y-4 w-full max-w-full overflow-x-hidden">
+    <div className="space-y-4 w-full max-w-full overflow-x-clip">
       {/* 1. Modal Components */}
       <Suspense fallback={null}>
         <AddEmployeeModal isOpen={showAddEmp} onClose={() => setShowAddEmp(false)} />
@@ -852,7 +852,7 @@ export default function Schedule() {
           <p className="text-xs text-slate-600 mt-1">Hệ thống Quản lý Phân ca & Chấm công OFC</p>
         </div>
 
-        <div className="overflow-x-auto excel-table-container touch-pan-x">
+        <div className="overflow-x-auto excel-table-container touch-auto">
           <table 
             className="w-full text-left border-collapse origin-top-left transition-[zoom] duration-150"
             style={{ zoom: tableZoom }}

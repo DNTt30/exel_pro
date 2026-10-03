@@ -76,6 +76,13 @@ body {
 .touch-pan-x {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  touch-action: auto;
+}
+.excel-table-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  touch-action: auto;
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;

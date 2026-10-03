@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
@@ -1042,7 +1042,7 @@ export default function EmployeeSchedule() {
       )}
 
       {displayView === 'table' && (
-        <div className="flex-1 overflow-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
+        <div className="flex-1 overflow-auto excel-table-container touch-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
           {(supportDaysThisWeek.length > 0 || swapDaysThisWeek.length > 0) && (
             <div className="print:hidden mb-2 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] flex flex-wrap gap-x-4 gap-y-1">
               {supportDaysThisWeek.map((card) => (

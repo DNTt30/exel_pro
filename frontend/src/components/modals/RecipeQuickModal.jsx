@@ -1,53 +1,105 @@
 import React, { useState, useMemo } from 'react';
 import Modal from './Modal';
-import { Search, Sparkles, Copy, Check, Clock, Utensils, Droplets, Flame } from 'lucide-react';
+import { Search, Sparkles, Copy, Check, Clock, Droplets, Flame, Utensils, X } from 'lucide-react';
 import { FF_RECIPE_GROUPS, stripVi } from '../../data/ffOnsiteRecipes';
 
 const CATEGORY_TABS = [
-  { id: 'all', label: 'Tất cả', emoji: '🌟' },
-  { id: 'mi', label: 'Mì & Tok', emoji: '🍜' },
-  { id: 'nuoc', label: 'Nước & Trà', emoji: '☕' },
-  { id: 'chien', label: 'Đồ chiên', emoji: '🍗' },
-  { id: 'banh', label: 'Bánh & Hotdog', emoji: '🥖' },
-  { id: 'tteobokki', label: 'Xốt & Tok', emoji: '🍢' },
-  { id: 'lau', label: 'Lẩu Oden', emoji: '🍲' }
+  { id: 'all',       label: 'Tất cả',      emoji: '🌟', color: 'blue'   },
+  { id: 'mi',        label: 'Mì & Tok',    emoji: '🍜', color: 'amber'  },
+  { id: 'nuoc',      label: 'Nước & Trà',  emoji: '☕', color: 'cyan'   },
+  { id: 'chien',     label: 'Đồ chiên',    emoji: '🍗', color: 'orange' },
+  { id: 'banh',      label: 'Bánh & Hotdog', emoji: '🥖', color: 'rose' },
+  { id: 'tteobokki', label: 'Xốt & Tok',  emoji: '🍢', color: 'purple' },
+  { id: 'lau',       label: 'Lẩu Oden',   emoji: '🍲', color: 'teal'   },
 ];
+
+// Màu accent theo nhóm
+const GROUP_ACCENT = {
+  nuoc:      { bg: 'bg-cyan-50',   border: 'border-cyan-200',   badge: 'bg-cyan-100 text-cyan-800',   dot: 'bg-cyan-500'   },
+  mi:        { bg: 'bg-amber-50',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500'  },
+  chien:     { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500' },
+  banh:      { bg: 'bg-rose-50',   border: 'border-rose-200',   badge: 'bg-rose-100 text-rose-800',   dot: 'bg-rose-500'   },
+  tteobokki: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-800', dot: 'bg-purple-500' },
+  lau:       { bg: 'bg-teal-50',   border: 'border-teal-200',   badge: 'bg-teal-100 text-teal-800',   dot: 'bg-teal-500'   },
+};
+const DEFAULT_ACCENT = { bg: 'bg-slate-50', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-700', dot: 'bg-slate-400' };
+
+// Inline markdown renderer: **bold**, *italic*, `code`, bullet lines
+function renderMarkdownBody(text) {
+  if (!text) return null;
+  // Bỏ dòng đầu (tên món lớn dạng "🍊 **Trà tắc**") vì đã hiển thị trong header
+  const lines = text.split('\n');
+  const bodyLines = lines[0].match(/^\S.*\*\*/) ? lines.slice(1) : lines;
+
+  return bodyLines.map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={i} className="h-1.5" />;
+
+    const isBullet = /^[•\-\*]\s/.test(trimmed);
+    const content = isBullet ? trimmed.replace(/^[•\-\*]\s/, '') : trimmed;
+
+    const parts = renderInline(content);
+
+    if (isBullet) {
+      return (
+        <div key={i} className="flex gap-2 items-baseline">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0 mt-1.5" />
+          <span className="leading-snug">{parts}</span>
+        </div>
+      );
+    }
+    return <div key={i} className="leading-snug">{parts}</div>;
+  });
+}
+
+function renderInline(text) {
+  const parts = [];
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  let last = 0, m, k = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(<span key={k++}>{text.slice(last, m.index)}</span>);
+    if (m[2] !== undefined) parts.push(<strong key={k++} className="font-black text-slate-900">{m[2]}</strong>);
+    else if (m[3] !== undefined) parts.push(<em key={k++} className="italic text-slate-700">{m[3]}</em>);
+    else if (m[4] !== undefined) parts.push(<code key={k++} className="bg-white border border-slate-200 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">{m[4]}</code>);
+    last = regex.lastIndex;
+  }
+  if (last < text.length) parts.push(<span key={k++}>{text.slice(last)}</span>);
+  return parts;
+}
+
+function extractHighlights(body) {
+  const hl = [];
+  const timeMatch = body.match(/(\d+\s*(?:phút|giây|p(?:\d+)?|s))(?:\s*[–-]\s*\d+\s*(?:phút|giây|p|s))?/i);
+  if (timeMatch) hl.push({ icon: Clock,    text: timeMatch[0].trim(), cls: 'text-amber-700 bg-amber-50 border-amber-300' });
+  const mlMatch  = body.match(/(\d+\s*(?:ml|g))/i);
+  if (mlMatch)   hl.push({ icon: Droplets, text: mlMatch[1].trim(),   cls: 'text-blue-700 bg-blue-50 border-blue-300'   });
+  const heatMatch = body.match(/(lò vi sóng|100°C|số\s*2)/i);
+  if (heatMatch) hl.push({ icon: Flame,    text: heatMatch[1].trim(), cls: 'text-rose-700 bg-rose-50 border-rose-300'   });
+  return hl;
+}
 
 export default function RecipeQuickModal({ isOpen, onClose }) {
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
-  // Gom tất cả món từ các nhóm
   const allItems = useMemo(() => {
     const list = [];
     FF_RECIPE_GROUPS.forEach(group => {
       (group.items || []).forEach(item => {
-        list.push({
-          ...item,
-          groupId: group.id,
-          groupTitle: group.title,
-          groupEmoji: group.emoji
-        });
+        list.push({ ...item, groupId: group.id, groupTitle: group.title, groupEmoji: group.emoji });
       });
     });
     return list;
   }, []);
 
-  // Lọc theo Category và Search Query
   const filteredItems = useMemo(() => {
     const qNorm = stripVi(searchQuery);
     return allItems.filter(item => {
-      // Lọc theo nhóm
-      if (selectedCat !== 'all' && item.groupId !== selectedCat) {
-        return false;
-      }
-      // Lọc theo từ khóa
+      if (selectedCat !== 'all' && item.groupId !== selectedCat) return false;
       if (!qNorm) return true;
-      const nameNorm = stripVi(item.name);
-      const bodyNorm = stripVi(item.body);
       const aliasMatch = (item.aliases || []).some(a => stripVi(a).includes(qNorm));
-      return nameNorm.includes(qNorm) || bodyNorm.includes(qNorm) || aliasMatch;
+      return stripVi(item.name).includes(qNorm) || stripVi(item.body).includes(qNorm) || aliasMatch;
     });
   }, [allItems, selectedCat, searchQuery]);
 
@@ -59,69 +111,41 @@ export default function RecipeQuickModal({ isOpen, onClose }) {
     });
   };
 
-  // Trích xuất highlight nhanh từ nội dung (thời gian, nhiệt độ, định lượng)
-  const extractHighlights = (body) => {
-    const highlights = [];
-    const timeMatch = body.match(/(\d+\s*(?:phút|giây|p|s|p\d+)(?:\s*–\s*\d+\s*(?:phút|giây|p|s))?)/i);
-    if (timeMatch) highlights.push({ icon: Clock, text: timeMatch[1].trim(), color: 'text-amber-700 bg-amber-50 border-amber-200' });
-
-    const mlMatch = body.match(/(\d+\s*ml|\d+\s*g)/i);
-    if (mlMatch) highlights.push({ icon: Droplets, text: mlMatch[1].trim(), color: 'text-blue-700 bg-blue-50 border-blue-200' });
-
-    const microwaveMatch = body.match(/(số\s*2\s*—\s*\d+\s*lần|quay lò vi sóng|100°C)/i);
-    if (microwaveMatch) highlights.push({ icon: Flame, text: microwaveMatch[1].trim(), color: 'text-rose-700 bg-rose-50 border-rose-200' });
-
-    return highlights;
-  };
-
   return (
     <Modal title="🍳 Sổ Tay Chế Biến & Pha Chế FF Onsite GS25" isOpen={isOpen} onClose={onClose}>
-      <div className="space-y-3.5 max-h-[80vh] flex flex-col -mx-1">
-        {/* Banner giới thiệu nhanh */}
-        <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">⚡</span>
-            <div>
-              <strong className="block text-[11px] uppercase tracking-wide text-blue-800">Tra cứu công thức 1-chạm</strong>
-              <p className="text-[10px] text-blue-600">Định lượng ml, gram, thời gian chiên/nấu máy quầy counter.</p>
-            </div>
-          </div>
-          <span className="text-[10px] font-mono font-bold bg-white/80 border border-blue-200 px-2 py-0.5 rounded-full text-blue-700">
-            {filteredItems.length} món
-          </span>
-        </div>
+      <div className="flex flex-col gap-3 max-h-[80vh] -mx-1">
 
-        {/* Ô Tìm Kiếm Live */}
+        {/* Search */}
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Gõ tìm nhanh: mì tương đen, trà tắc, xúc xích, bột tok, hotdog..."
+            placeholder="Tìm: mì tương đen, trà tắc, xúc xích, hotdog..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-500 rounded-xl text-xs outline-none transition-all placeholder:text-slate-400 font-medium"
+            className="w-full pl-9 pr-8 py-2.5 bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-400 focus:ring-3 focus:ring-blue-500/10 rounded-xl text-xs outline-none transition-all placeholder:text-slate-400 font-medium"
             autoFocus
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold px-1 cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
             >
-              ✕
+              <X size={12} />
             </button>
           )}
         </div>
 
-        {/* Thanh Danh Mục (Category Pills) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+        {/* Category tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
           {CATEGORY_TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setSelectedCat(tab.id)}
-              className={`px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer text-[11px] ${
+              className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer text-[11px] flex-shrink-0 ${
                 selectedCat === tab.id
-                  ? 'bg-blue-600 text-white shadow-xs'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -131,77 +155,80 @@ export default function RecipeQuickModal({ isOpen, onClose }) {
           ))}
         </div>
 
-        {/* Danh Sách Thẻ Món */}
-        <div className="flex-1 overflow-y-auto space-y-2.5 min-h-[220px] max-h-[50vh] pr-1">
+        {/* Count bar */}
+        <div className="flex items-center justify-between text-[10px] text-slate-500 px-0.5">
+          <span>Hiển thị <strong className="text-slate-800">{filteredItems.length}</strong> công thức</span>
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="text-blue-600 hover:underline font-bold cursor-pointer">
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+
+        {/* Recipe list */}
+        <div className="flex-1 overflow-y-auto space-y-2 min-h-[220px] max-h-[52vh] pr-0.5">
           {filteredItems.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 space-y-1.5">
-              <Utensils size={28} className="mx-auto text-slate-300" />
-              <div className="text-xs font-bold text-slate-600">Không tìm thấy công thức "{searchQuery}"</div>
-              <p className="text-[11px] text-slate-400">Hãy thử gõ tên không dấu, ví dụ: "mi", "tra tac", "xuc xich"</p>
+            <div className="text-center py-14 space-y-2">
+              <Utensils size={32} className="mx-auto text-slate-200" />
+              <p className="text-xs font-bold text-slate-500">Không tìm thấy "{searchQuery}"</p>
+              <p className="text-[11px] text-slate-400">Thử gõ không dấu: "mi", "tra tac", "xuc xich"</p>
             </div>
           ) : (
             filteredItems.map(item => {
-              const highlights = extractHighlights(item.body);
+              const accent  = GROUP_ACCENT[item.groupId] || DEFAULT_ACCENT;
               const isCopied = copiedId === item.id;
+              const highlights = extractHighlights(item.body);
 
               return (
                 <div
                   key={item.id}
-                  className="p-3 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-2xs transition-all space-y-2"
+                  className={`rounded-xl border ${accent.border} overflow-hidden transition-all hover:shadow-md hover:shadow-slate-200/60`}
                 >
-                  {/* Header Thẻ */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm">{item.groupEmoji}</span>
-                        <h3 className="font-extrabold text-xs text-slate-900 leading-snug">{item.name}</h3>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase tracking-wider">
-                          {item.groupTitle}
-                        </span>
-                      </div>
+                  {/* Card header */}
+                  <div className={`flex items-center justify-between gap-2 px-3.5 py-2.5 ${accent.bg}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${accent.dot}`} />
+                      <span className="text-sm leading-none">{item.groupEmoji}</span>
+                      <h3 className="font-black text-sm text-slate-900 leading-tight truncate">{item.name}</h3>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider flex-shrink-0 ${accent.badge}`}>
+                        {item.groupTitle}
+                      </span>
                     </div>
-
                     <button
                       type="button"
                       onClick={() => handleCopy(item)}
+                      className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all cursor-pointer flex-shrink-0 ${
+                        isCopied
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-white/70 text-slate-500 hover:text-blue-700 hover:bg-white border border-slate-200 hover:border-blue-300'
+                      }`}
                       title="Sao chép công thức"
-                      className="text-slate-400 hover:text-blue-600 p-1 rounded-md hover:bg-slate-100 transition-colors flex items-center gap-1 text-[10px] font-semibold flex-shrink-0 cursor-pointer"
                     >
-                      {isCopied ? (
-                        <>
-                          <Check size={12} className="text-emerald-600" />
-                          <span className="text-emerald-600 font-bold">Đã chép</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} />
-                          <span>Chép</span>
-                        </>
-                      )}
+                      {isCopied
+                        ? <><Check size={11} /><span>Đã chép</span></>
+                        : <><Copy size={11} /><span>Chép</span></>
+                      }
                     </button>
                   </div>
 
-                  {/* Highlights Bar */}
+                  {/* Highlights chips */}
                   {highlights.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {highlights.map((h, hIdx) => {
+                    <div className="flex flex-wrap gap-1.5 px-3.5 pt-2.5">
+                      {highlights.map((h, idx) => {
                         const Icon = h.icon;
                         return (
-                          <span
-                            key={hIdx}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${h.color}`}
-                          >
-                            <Icon size={10} />
-                            <span>{h.text}</span>
+                          <span key={idx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${h.cls}`}>
+                            <Icon size={9} />
+                            {h.text}
                           </span>
                         );
                       })}
                     </div>
                   )}
 
-                  {/* Nội Dung Công Thức & Bước Làm */}
-                  <div className="p-2 bg-slate-50/80 rounded-lg text-slate-700 text-[11px] leading-relaxed whitespace-pre-line font-medium border border-slate-100">
-                    {item.body.replace(/^[^\n]*\n/, '') || item.body}
+                  {/* Body */}
+                  <div className="px-3.5 py-2.5 text-[12px] text-slate-700 leading-relaxed space-y-1">
+                    {renderMarkdownBody(item.body)}
                   </div>
                 </div>
               );
@@ -210,18 +237,20 @@ export default function RecipeQuickModal({ isOpen, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="pt-2 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
-          <span className="flex items-center gap-1 text-center sm:text-left">
-            <Sparkles size={12} className="text-amber-500" /> Nguồn: Tiêu chuẩn FF Onsite GS25
+        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+          <span className="flex items-center gap-1">
+            <Sparkles size={11} className="text-amber-400" />
+            Tiêu chuẩn FF Onsite GS25
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline text-xs px-3 py-1.5 cursor-pointer font-bold w-full sm:w-auto justify-center"
+            className="btn btn-outline text-xs px-4 py-1.5 cursor-pointer font-bold"
           >
             Đóng
           </button>
         </div>
+
       </div>
     </Modal>
   );

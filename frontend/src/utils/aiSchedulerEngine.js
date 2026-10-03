@@ -1,4 +1,4 @@
-import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } from '../data/constants';
+﻿import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } from '../data/constants';
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { isNightReady, managedStoreIds, isEmployeeWeekLocked } from './employeeSkills';
 import { isWeekLocked, weekRecordKey } from './scheduleWeek';

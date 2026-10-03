@@ -561,7 +561,18 @@ export function lookupFfOnsiteRecipe(question) {
     const chosen = hits.filter(h => h.score === top);
     // Alias dài hơn = đúng món hơn (vd. "tra sua dai hong bao" thắng "tra sua")
     if (chosen.length === 1) return chosen[0].item.body;
-    return chosen.map(h => h.item.body).join('\n\n');
+
+    // Nếu nhiều món cùng điểm: ưu tiên khớp chính xác tên món
+    const exactMatch = chosen.find(h => stripVi(h.item.name) === q.trim());
+    if (exactMatch) return exactMatch.item.body;
+
+    // Lấy kết quả tốt nhất (đầu tiên sau sort) + gợi ý xem thêm
+    const best = chosen[0].item.body;
+    const others = chosen.slice(1, 3).map(h => h.item.name);
+    const hint = others.length > 0
+      ? `\n\n> 💡 Bạn cũng có thể hỏi: "${others.join('", "')}"`
+      : '';
+    return best + hint;
   }
 
   for (const group of FF_RECIPE_GROUPS) {

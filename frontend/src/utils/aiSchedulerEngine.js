@@ -2,7 +2,7 @@
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
 import { isNightReady, managedStoreIds, isEmployeeWeekLocked } from './employeeSkills';
 import { isWeekLocked, weekRecordKey } from './scheduleWeek';
-import { stripVi } from '../data/ffOnsiteRecipes';
+import { stripVi, lookupFfOnsiteRecipe } from '../data/ffOnsiteRecipes';
 import { GS25_HANDBOOK_DATA } from '../data/gs25HandbookData';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
 import { streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
@@ -1112,6 +1112,10 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   // 1. Tra cứu dữ liệu nội bộ (hồ sơ, đổi ca, lương cá nhân).
   const routedAnswer = tryAnswerWithData({ q, qn, employees, weekSchedule, stores, shiftSwaps, feedbacks, storeId, currentWeek, user });
   if (routedAnswer) return compactText(routedAnswer);
+
+  // 1b. Tra cuu cong thuc FF Onsite -- tra loi truc tiep, khong qua Gemini.
+  const recipeAnswer = lookupFfOnsiteRecipe(qn);
+  if (recipeAnswer) return compactText(recipeAnswer);
 
   // Lịch của tôi / gọi đúng tên mình (vd. "hôm nay Tú làm ca mấy" khi đang login là Tú)
   const selfUser = user && (employees.find(e => e.id === user.id) || user);

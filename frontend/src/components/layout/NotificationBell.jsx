@@ -19,7 +19,9 @@ import { collectExpiryAlerts } from '../../utils/shelfExpiry';
 import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
-export default function NotificationBell() {
+import { BellOff } from 'lucide-react';
+
+export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUnsubscribe }) {
   const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems, stores } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, schedule: s.schedule, currentWeek: s.currentWeek, employees: s.employees, shiftSwaps: s.shiftSwaps, shelves: s.shelves, shelfItems: s.shelfItems, stores: s.stores })));
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -384,6 +386,35 @@ export default function NotificationBell() {
               })
             )}
           </div>
+          {/* Push Notification Toggle Footer */}
+          {pushStatus && pushStatus !== 'unsupported' && (
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                {pushStatus === 'subscribed'
+                  ? <Bell size={13} className="text-blue-600 fill-blue-600 flex-shrink-0" />
+                  : <BellOff size={13} className="text-slate-400 flex-shrink-0" />}
+                <span>
+                  {pushStatus === 'subscribed' ? 'Thông báo push đang bật' :
+                   pushStatus === 'denied' ? 'Push bị chặn — bật trong trình duyệt' :
+                   pushStatus === 'loading' ? 'Đang xử lý...' : 'Thông báo push chưa bật'}
+                </span>
+              </div>
+              {pushStatus !== 'denied' && (
+                <button
+                  type="button"
+                  onClick={pushStatus === 'subscribed' ? onPushUnsubscribe : onPushSubscribe}
+                  disabled={pushStatus === 'loading'}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex-shrink-0 ${
+                    pushStatus === 'subscribed'
+                      ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {pushStatus === 'subscribed' ? 'Tắt' : 'Bật'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

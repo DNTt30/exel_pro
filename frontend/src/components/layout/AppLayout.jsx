@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager, canManageStoreList } from '../../lib/authSession';
-import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen, Smartphone, BellOff, Bell } from 'lucide-react';
+import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen, Smartphone } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ChangePasswordModal from '../modals/ChangePasswordModal';
 import PWAInstallModal from '../modals/PWAInstallModal';
@@ -212,30 +212,7 @@ export default function AppLayout() {
             </button>
           )}
           <button onClick={openHelp} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
-          {pushStatus !== 'unsupported' && (
-            <button
-              onClick={pushStatus === 'subscribed' ? pushUnsubscribe : pushSubscribe}
-              disabled={pushStatus === 'loading'}
-              className={`hidden sm:flex p-2 rounded-xl transition-colors ${
-                pushStatus === 'subscribed'
-                  ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-                  : pushStatus === 'denied'
-                  ? 'text-slate-300 cursor-not-allowed'
-                  : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
-              }`}
-              title={
-                pushStatus === 'subscribed' ? 'Tắt thông báo push'
-                : pushStatus === 'denied'   ? 'Thông báo bị chặn — vào cài đặt trình duyệt để bật'
-                : pushStatus === 'loading'  ? 'Đang xử lý...'
-                : 'Bật thông báo push'
-              }
-            >
-              {pushStatus === 'subscribed'
-                ? <Bell size={17} className="fill-blue-600" />
-                : <BellOff size={17} />}
-            </button>
-          )}
-          <NotificationBell />
+          <NotificationBell pushStatus={pushStatus} onPushSubscribe={pushSubscribe} onPushUnsubscribe={pushUnsubscribe} />
           <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={12} />}

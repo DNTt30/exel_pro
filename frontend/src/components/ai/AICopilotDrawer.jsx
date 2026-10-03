@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check, Plus } from 'lucide-react';
+import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check } from 'lucide-react';
 import { addAdminLog } from '../../services/api/logs';
 import { useStore } from '../../store/useStore';
 import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
@@ -108,15 +108,6 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     return welcome ? [welcome, ...trimmed] : trimmed;
   }, []);
 
-  const handleDeleteSingleMsg = (msgId) => {
-    setMessages(prev => prev.filter(m => m.id !== msgId));
-    toast.success('Đã xóa tin nhắn');
-  };
-
-  const handleNewChat = () => {
-    setMessages([initialWelcome]);
-    toast.info('Đã mở đoạn hội thoại mới');
-  };
 
   const initialWelcome = {
     id: 'welcome',
@@ -428,16 +419,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             </div>
           </div>
 
-                    <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className="p-1.5 sm:p-2 rounded-xl hover:bg-white/20 transition-all text-white/90 hover:text-white cursor-pointer flex items-center gap-1 text-xs font-bold"
-              title="Mở đoạn chat mới"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline text-xs">Mới</span>
-            </button>
+          <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
             {canConfigureAi && <button
               type="button"
               onClick={openAiSettings}

@@ -85,7 +85,7 @@ export default function AppLayout() {
         { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
         { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B', badge: pendingFeedbacksCount, badgeColor: 'bg-rose-400 text-white font-bold' },
         { to: '/admin/shelves',    icon: <Rows3 size={17} />,           label: 'Kệ & date' },
-        { to: '/admin/handbook',   icon: <BookOpen size={17} />,        label: 'Sổ tay SOP' },
+        { to: '/admin/handbook',   icon: <BookOpen size={17} />,        label: 'Sổ tay AI' },
       ]
     },
     {

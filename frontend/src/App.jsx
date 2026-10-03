@@ -21,6 +21,7 @@ const EmployeeTimesheet = lazy(() => import('./pages/employee/EmployeeTimesheet'
 const EmployeeFeedback = lazy(() => import('./pages/employee/EmployeeFeedback'));
 const ShelfDateBoard = lazy(() => import('./pages/shared/ShelfDateBoard'));
 const Handbook = lazy(() => import('./pages/shared/Handbook'));
+const HandbookManager = lazy(() => import('./pages/admin/HandbookManager'));
 const EmployeeChangePassword = lazy(() => import('./pages/employee/EmployeeChangePassword'));
 const EmployeeProfile = lazy(() => import('./pages/employee/EmployeeProfile'));
 
@@ -160,7 +161,7 @@ function App() {
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><AdminLogs /></PrivateRoute>} />
               <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
-              <Route path="admin/handbook" element={<PrivateRoute allowedRoles={['admin']}><Handbook /></PrivateRoute>} />
+              <Route path="admin/handbook" element={<PrivateRoute allowedRoles={['admin']}><HandbookManager /></PrivateRoute>} />
 
               {/* Employee Routes */}
               <Route path="employee/profile" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeProfile /></PrivateRoute>} />

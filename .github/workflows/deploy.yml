@@ -33,8 +33,10 @@ jobs:
           npm run test
       - name: Build
         working-directory: frontend
+        env:
+          VITE_BASE_PATH: /exel_pro/
         run: |
-          npm run build
+          npm run build:gh
       - name: Publish gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

@@ -24,6 +24,7 @@
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
     "three": "^0.185.1",
+    "wordcloud": "^1.2.3",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3",
     "zustand": "^5.0.15"

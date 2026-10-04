@@ -3,37 +3,89 @@ import { getAdminLogs } from '../../services/api/logs';
 import { 
   Bot, Sparkles, MessageSquare, Users, TrendingUp, Clock, 
   Search, BookOpen, RefreshCw, Calendar, ArrowUpRight, ShieldCheck,
-  ChevronRight, Utensils, AlertCircle, Award, Cloud, X
+  ChevronRight, Utensils, AlertCircle, Award, Cloud, X, Info
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import WordCloudCanvas from './WordCloudCanvas';
 
-// Bộ từ khóa nghiệp vụ đặc trưng GS25 cho biểu đồ Word Cloud
+// Bộ từ khóa nghiệp vụ đặc trưng GS25 cho biểu đồ Word Cloud mật độ cao
 const GS25_CORE_KEYWORDS = [
-  { text: 'Lịch làm việc', weight: 45, cat: 'schedule' },
-  { text: 'Đổi ca làm', weight: 38, cat: 'schedule' },
-  { text: 'Ca đêm 22-6', weight: 32, cat: 'schedule' },
-  { text: 'Hủy cơm nắm', weight: 30, cat: 'shelf' },
-  { text: 'Mì tương đen', weight: 28, cat: 'recipe' },
-  { text: 'Part-time 91h', weight: 26, cat: 'labor' },
-  { text: 'Lẩu chả cá Oden', weight: 25, cat: 'recipe' },
-  { text: 'Giờ hủy 10h/22h', weight: 23, cat: 'shelf' },
-  { text: 'Lương ca đêm +30%', weight: 22, cat: 'labor' },
-  { text: 'Sandwich rau', weight: 20, cat: 'shelf' },
-  { text: 'Nghỉ 11 tiếng', weight: 19, cat: 'schedule' },
-  { text: 'Trà đào / Trà tắc', weight: 18, cat: 'recipe' },
-  { text: 'Quên vân tay', weight: 17, cat: 'labor' },
-  { text: 'Ca sáng 6-14', weight: 16, cat: 'schedule' },
-  { text: 'Gimbap', weight: 15, cat: 'shelf' },
-  { text: 'Xúc xích nướng', weight: 14, cat: 'recipe' },
-  { text: 'Ca chiều 14-22', weight: 13, cat: 'schedule' },
-  { text: 'Bù công ezHR9', weight: 12, cat: 'labor' },
-  { text: 'Lễ tết 300%', weight: 11, cat: 'labor' },
-  { text: 'Bánh bao hấp', weight: 11, cat: 'recipe' },
-  { text: 'Đồng phục GS25', weight: 10, cat: 'other' },
-  { text: 'Hàng tươi FF', weight: 9, cat: 'shelf' },
-  { text: 'Lò vi sóng', weight: 9, cat: 'recipe' },
-  { text: 'Onigiri', weight: 8, cat: 'shelf' },
-  { text: 'Solo ca trực', weight: 7, cat: 'schedule' }
+  // ── Từ khóa trung tâm (Hero Words) ──
+  { text: 'Lịch làm việc', weight: 58, cat: 'schedule' },
+  { text: 'Hủy cơm nắm', weight: 54, cat: 'shelf' },
+  { text: 'Đổi ca làm', weight: 50, cat: 'schedule' },
+  { text: 'Part-time 91h', weight: 48, cat: 'labor' },
+  { text: 'Mì tương đen', weight: 46, cat: 'recipe' },
+  { text: 'Lẩu chả cá Oden', weight: 44, cat: 'recipe' },
+  { text: 'Lương ca đêm', weight: 42, cat: 'labor' },
+  { text: 'Nghỉ 11 tiếng', weight: 40, cat: 'schedule' },
+
+  // ── Ca trực & Chấm công ──
+  { text: 'Ca đêm 22-6', weight: 38, cat: 'schedule' },
+  { text: 'Ca sáng 6-14', weight: 36, cat: 'schedule' },
+  { text: 'Ca chiều 14-22', weight: 34, cat: 'schedule' },
+  { text: 'Quên quẹt thẻ', weight: 32, cat: 'labor' },
+  { text: 'Bù công ezHR9', weight: 30, cat: 'labor' },
+  { text: 'Lễ tết 300%', weight: 29, cat: 'labor' },
+  { text: 'Solo ca trực', weight: 28, cat: 'schedule' },
+  { text: 'Đổi ca khẩn', weight: 27, cat: 'schedule' },
+  { text: 'Ca gãy 4 tiếng', weight: 26, cat: 'schedule' },
+  { text: 'Chốt công tháng', weight: 25, cat: 'labor' },
+  { text: 'Tăng ca OT', weight: 24, cat: 'labor' },
+  { text: 'Báo ốm đột xuất', weight: 23, cat: 'schedule' },
+
+  // ── Món ăn Ready-To-Eat & Date hàng ──
+  { text: 'Giờ hủy 10h/22h', weight: 36, cat: 'shelf' },
+  { text: 'Sandwich rau', weight: 33, cat: 'shelf' },
+  { text: 'Onigiri', weight: 31, cat: 'shelf' },
+  { text: 'Gimbap', weight: 29, cat: 'shelf' },
+  { text: 'Hàng tươi FF', weight: 28, cat: 'shelf' },
+  { text: 'Bánh bao hấp', weight: 27, cat: 'recipe' },
+  { text: 'Xúc xích nướng', weight: 26, cat: 'recipe' },
+  { text: 'Trà đào cam sả', weight: 25, cat: 'recipe' },
+  { text: 'Tokpokki cay', weight: 24, cat: 'recipe' },
+  { text: 'Hotdog phô mai', weight: 23, cat: 'recipe' },
+  { text: 'Kệ cận date', weight: 22, cat: 'shelf' },
+  { text: 'Hủy hàng POS', weight: 21, cat: 'shelf' },
+
+  // ── Thiết bị & Pha chế ──
+  { text: 'Lò vi sóng', weight: 22, cat: 'recipe' },
+  { text: 'Cà phê máy', weight: 21, cat: 'recipe' },
+  { text: 'Nấu súp Oden', weight: 20, cat: 'recipe' },
+  { text: 'Bánh giò nóng', weight: 19, cat: 'recipe' },
+  { text: 'Trứng lòng đào', weight: 18, cat: 'recipe' },
+  { text: 'Trà tắc hạt chia', weight: 17, cat: 'recipe' },
+  { text: 'Cơm trộn', weight: 16, cat: 'recipe' },
+  { text: 'Cơm gà rán', weight: 15, cat: 'recipe' },
+
+  // ── Nghiệp vụ & Chuẩn cửa hàng ──
+  { text: 'Đồng phục GS25', weight: 20, cat: 'other' },
+  { text: 'Quy tắc 2S', weight: 19, cat: 'other' },
+  { text: 'Bảng tên', weight: 18, cat: 'other' },
+  { text: 'Tạp dề sạch', weight: 17, cat: 'other' },
+  { text: 'TÚ mini AI', weight: 16, cat: 'other' },
+  { text: 'Kiểm kê kho', weight: 15, cat: 'other' },
+  { text: 'Bảo quản mát', weight: 14, cat: 'shelf' },
+  { text: 'Bảo quản đông', weight: 13, cat: 'shelf' },
+  { text: 'Nhập hàng NCC', weight: 13, cat: 'other' },
+  { text: 'Order bổ sung', weight: 12, cat: 'other' },
+  { text: 'Quẹt thẻ ATM', weight: 12, cat: 'other' },
+
+  // ── Từ khóa lấp đầy mật độ (Dense Fillers) ──
+  { text: 'GS25 xin chào', weight: 11, cat: 'other' },
+  { text: 'Cảm ơn quý khách', weight: 11, cat: 'other' },
+  { text: 'Ví MoMo', weight: 10, cat: 'other' },
+  { text: 'ZaloPay', weight: 10, cat: 'other' },
+  { text: 'Tích điểm', weight: 10, cat: 'other' },
+  { text: 'Hóa đơn VAT', weight: 9, cat: 'other' },
+  { text: 'Túi tự hủy', weight: 9, cat: 'other' },
+  { text: 'Thân thiện', weight: 8, cat: 'other' },
+  { text: 'Tươi cười', weight: 8, cat: 'other' },
+  { text: 'Giao ca', weight: 8, cat: 'schedule' },
+  { text: 'Sổ tay số', weight: 7, cat: 'other' },
+  { text: 'Dọn quầy', weight: 7, cat: 'other' },
+  { text: 'Rác kho', weight: 6, cat: 'other' },
+  { text: 'Bảng giá', weight: 6, cat: 'other' }
 ];
 
 // Phân loại câu hỏi dựa trên từ khóa thực tế của nhân viên GS25
@@ -501,47 +553,15 @@ export default function AICopilotAnalyticsWidget({ filterDept = 'ALL' }) {
         </div>
 
         {/* Word Cloud Visual Canvas */}
-        <div className="pt-6 pb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 min-h-[170px] bg-gradient-to-b from-slate-50/70 via-white to-slate-50/40 rounded-xl p-4 sm:p-6 border border-slate-100">
-          {stats.wordCloudData.map((w, idx) => {
-            const isSelected = search.toLowerCase() === w.text.toLowerCase();
-            
-            // Tính toán kích thước chữ và màu sắc dựa theo activeWeight
-            let sizeClass = 'text-xs font-semibold py-1 px-2.5';
-            let colorClass = 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300';
-
-            if (w.activeWeight >= 38) {
-              sizeClass = 'text-base sm:text-xl font-black py-2 px-4 shadow-xs';
-              colorClass = 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-sm shadow-blue-500/20';
-            } else if (w.activeWeight >= 28) {
-              sizeClass = 'text-sm sm:text-base font-extrabold py-1.5 px-3.5 shadow-2xs';
-              colorClass = 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
-            } else if (w.activeWeight >= 20) {
-              sizeClass = 'text-xs sm:text-sm font-bold py-1 px-3';
-              colorClass = 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
-            } else if (w.activeWeight >= 14) {
-              sizeClass = 'text-xs sm:text-xs font-bold py-1 px-2.5';
-              colorClass = 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100';
-            }
-
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setSearch(isSelected ? '' : w.text)}
-                className={`rounded-2xl border transition-all duration-200 cursor-pointer select-none flex items-center gap-1.5 transform hover:scale-105 active:scale-95 ${sizeClass} ${colorClass} ${
-                  isSelected ? 'ring-2 ring-purple-600 ring-offset-2 scale-105 shadow-md font-black' : ''
-                }`}
-                title={`Bấm để lọc câu hỏi chứa "${w.text}" (Trọng số: ${w.activeWeight})`}
-              >
-                <span>{w.text}</span>
-                {w.realCount > 0 && (
-                  <span className="text-[10px] opacity-80 font-normal">
-                    ({w.realCount})
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="pt-3 pb-2 px-2 bg-gradient-to-b from-slate-50/50 via-white to-slate-50/30 rounded-xl border border-slate-100 flex flex-col items-center justify-center relative">
+          <WordCloudCanvas
+            words={stats.wordCloudData}
+            selectedWord={search}
+            onSelectWord={(clickedWord) => {
+              setSearch(search.toLowerCase() === clickedWord.toLowerCase() ? '' : clickedWord);
+            }}
+            height={380}
+          />
         </div>
 
         {/* Legend / Category Tags */}
@@ -554,7 +574,7 @@ export default function AICopilotAnalyticsWidget({ filterDept = 'ALL' }) {
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700"><span className="w-2 h-2 rounded-full bg-emerald-600"></span> Lương & Chế độ</span>
           </div>
           <span className="text-[11px] text-slate-400 italic">
-            * Kích cỡ chữ và màu sắc tỷ lệ thuận với tần suất tra cứu thực tế
+            * Di chuột để xem tần suất • Bấm vào từ để lọc danh sách câu hỏi
           </span>
         </div>
       </div>

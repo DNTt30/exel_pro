@@ -169,13 +169,9 @@ export default function AppLayout() {
           <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : openMobileMenu()} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          <div className="flex items-center gap-2">
-            {/* GS25 logo */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2.5 sm:px-3 py-1.5 rounded-xl shadow-md shadow-blue-500/25 font-black text-xs sm:text-sm tracking-tight select-none">DNTgs25</div>
-            <div className="hidden sm:block">
-              <h1 className="font-extrabold text-sm text-slate-800 tracking-tight leading-tight">DNTgs25</h1>
-              <p className="text-[10px] text-slate-400 font-medium">Hệ thống Xếp lịch & Vận hành</p>
-            </div>
+          {/* DNTgs25 logo badge */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-sm shadow-blue-500/25 font-black text-xs sm:text-sm tracking-tight select-none border border-white/20">
+            DNTgs25
           </div>
           
           {/* Active store context pill */}

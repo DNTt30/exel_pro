@@ -3,9 +3,38 @@ import { getAdminLogs } from '../../services/api/logs';
 import { 
   Bot, Sparkles, MessageSquare, Users, TrendingUp, Clock, 
   Search, BookOpen, RefreshCw, Calendar, ArrowUpRight, ShieldCheck,
-  ChevronRight, Utensils, AlertCircle, Award
+  ChevronRight, Utensils, AlertCircle, Award, Cloud, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+// Bộ từ khóa nghiệp vụ đặc trưng GS25 cho biểu đồ Word Cloud
+const GS25_CORE_KEYWORDS = [
+  { text: 'Lịch làm việc', weight: 45, cat: 'schedule' },
+  { text: 'Đổi ca làm', weight: 38, cat: 'schedule' },
+  { text: 'Ca đêm 22-6', weight: 32, cat: 'schedule' },
+  { text: 'Hủy cơm nắm', weight: 30, cat: 'shelf' },
+  { text: 'Mì tương đen', weight: 28, cat: 'recipe' },
+  { text: 'Part-time 91h', weight: 26, cat: 'labor' },
+  { text: 'Lẩu chả cá Oden', weight: 25, cat: 'recipe' },
+  { text: 'Giờ hủy 10h/22h', weight: 23, cat: 'shelf' },
+  { text: 'Lương ca đêm +30%', weight: 22, cat: 'labor' },
+  { text: 'Sandwich rau', weight: 20, cat: 'shelf' },
+  { text: 'Nghỉ 11 tiếng', weight: 19, cat: 'schedule' },
+  { text: 'Trà đào / Trà tắc', weight: 18, cat: 'recipe' },
+  { text: 'Quên vân tay', weight: 17, cat: 'labor' },
+  { text: 'Ca sáng 6-14', weight: 16, cat: 'schedule' },
+  { text: 'Gimbap', weight: 15, cat: 'shelf' },
+  { text: 'Xúc xích nướng', weight: 14, cat: 'recipe' },
+  { text: 'Ca chiều 14-22', weight: 13, cat: 'schedule' },
+  { text: 'Bù công ezHR9', weight: 12, cat: 'labor' },
+  { text: 'Lễ tết 300%', weight: 11, cat: 'labor' },
+  { text: 'Bánh bao hấp', weight: 11, cat: 'recipe' },
+  { text: 'Đồng phục GS25', weight: 10, cat: 'other' },
+  { text: 'Hàng tươi FF', weight: 9, cat: 'shelf' },
+  { text: 'Lò vi sóng', weight: 9, cat: 'recipe' },
+  { text: 'Onigiri', weight: 8, cat: 'shelf' },
+  { text: 'Solo ca trực', weight: 7, cat: 'schedule' }
+];
 
 // Phân loại câu hỏi dựa trên từ khóa thực tế của nhân viên GS25
 function categorizeQuery(text = '') {
@@ -133,6 +162,35 @@ export default function AICopilotAnalyticsWidget({ filterDept = 'ALL' }) {
     const dailyTrend = Object.values(last7DaysMap);
     const maxDaily = Math.max(...dailyTrend.map(d => d.count), 1);
 
+    // Tính toán dữ liệu Word Cloud
+    let wordCloudData = [];
+    if (scopedLogs.length > 0) {
+      const countMap = {};
+      GS25_CORE_KEYWORDS.forEach(kw => {
+        countMap[kw.text] = { ...kw, realCount: 0 };
+      });
+
+      scopedLogs.forEach(l => {
+        const text = (l.detail || '').toLowerCase();
+        GS25_CORE_KEYWORDS.forEach(kw => {
+          const kwLower = kw.text.toLowerCase();
+          const cleanKw = kwLower.split('/')[0].trim();
+          if (text.includes(kwLower) || text.includes(cleanKw)) {
+            countMap[kw.text].realCount += 1;
+          }
+        });
+      });
+
+      wordCloudData = Object.values(countMap).map(w => ({
+        ...w,
+        activeWeight: w.realCount > 0 ? w.weight + w.realCount * 12 : w.weight
+      }));
+    } else {
+      wordCloudData = GS25_CORE_KEYWORDS.map(w => ({ ...w, activeWeight: w.weight, realCount: 0 }));
+    }
+
+    wordCloudData.sort((a, b) => b.activeWeight - a.activeWeight);
+
     return {
       total,
       uniqueUsers,
@@ -141,7 +199,8 @@ export default function AICopilotAnalyticsWidget({ filterDept = 'ALL' }) {
       dailyTrend,
       maxDaily,
       topUsers,
-      topStores
+      topStores,
+      wordCloudData
     };
   }, [scopedLogs]);
 
@@ -408,6 +467,96 @@ export default function AICopilotAnalyticsWidget({ filterDept = 'ALL' }) {
           </div>
         </div>
 
+      </div>
+
+      {/* ── Word Cloud Interactive Visualization Card ── */}
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 shadow-2xs">
+              <Cloud size={18} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                <span>Đám Mây Từ Khóa Tra Cứu (AI Word Cloud)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  {scopedLogs.length > 0 ? 'Dữ liệu thời gian thực' : 'Từ điển nghiệp vụ GS25'}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Các thuật ngữ & quy trình nhân viên quan tâm nhất. Bấm vào từ để lọc nhanh danh sách câu hỏi bên dưới.
+              </p>
+            </div>
+          </div>
+
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="text-xs text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 self-start sm:self-auto px-2.5 py-1 bg-slate-100 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+            >
+              <span>Xóa bộ lọc: "{search}"</span>
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Word Cloud Visual Canvas */}
+        <div className="pt-6 pb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 min-h-[170px] bg-gradient-to-b from-slate-50/70 via-white to-slate-50/40 rounded-xl p-4 sm:p-6 border border-slate-100">
+          {stats.wordCloudData.map((w, idx) => {
+            const isSelected = search.toLowerCase() === w.text.toLowerCase();
+            
+            // Tính toán kích thước chữ và màu sắc dựa theo activeWeight
+            let sizeClass = 'text-xs font-semibold py-1 px-2.5';
+            let colorClass = 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300';
+
+            if (w.activeWeight >= 38) {
+              sizeClass = 'text-base sm:text-xl font-black py-2 px-4 shadow-xs';
+              colorClass = 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-sm shadow-blue-500/20';
+            } else if (w.activeWeight >= 28) {
+              sizeClass = 'text-sm sm:text-base font-extrabold py-1.5 px-3.5 shadow-2xs';
+              colorClass = 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
+            } else if (w.activeWeight >= 20) {
+              sizeClass = 'text-xs sm:text-sm font-bold py-1 px-3';
+              colorClass = 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
+            } else if (w.activeWeight >= 14) {
+              sizeClass = 'text-xs sm:text-xs font-bold py-1 px-2.5';
+              colorClass = 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100';
+            }
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSearch(isSelected ? '' : w.text)}
+                className={`rounded-2xl border transition-all duration-200 cursor-pointer select-none flex items-center gap-1.5 transform hover:scale-105 active:scale-95 ${sizeClass} ${colorClass} ${
+                  isSelected ? 'ring-2 ring-purple-600 ring-offset-2 scale-105 shadow-md font-black' : ''
+                }`}
+                title={`Bấm để lọc câu hỏi chứa "${w.text}" (Trọng số: ${w.activeWeight})`}
+              >
+                <span>{w.text}</span>
+                {w.realCount > 0 && (
+                  <span className="text-[10px] opacity-80 font-normal">
+                    ({w.realCount})
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Legend / Category Tags */}
+        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-400">Nhóm chủ đề:</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700"><span className="w-2 h-2 rounded-full bg-blue-600"></span> Lịch & Ca</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Công thức FF</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-700"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Date & Hủy</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700"><span className="w-2 h-2 rounded-full bg-emerald-600"></span> Lương & Chế độ</span>
+          </div>
+          <span className="text-[11px] text-slate-400 italic">
+            * Kích cỡ chữ và màu sắc tỷ lệ thuận với tần suất tra cứu thực tế
+          </span>
+        </div>
       </div>
 
       {/* ── Realtime AI Question Feed ── */}

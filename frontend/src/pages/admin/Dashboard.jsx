@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup, Settings } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup, Settings, Zap, Bot, BarChart3, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
@@ -14,6 +14,7 @@ import StoreBreakdownCards from '../../components/dashboard/StoreBreakdownCards'
 import EmployeeDemographicsWidget from '../../components/dashboard/EmployeeDemographicsWidget';
 import OperationsInsightsWidget from '../../components/dashboard/OperationsInsightsWidget';
 import EmployeeDetailModal from '../../components/dashboard/EmployeeDetailModal';
+import AICopilotAnalyticsWidget from '../../components/dashboard/AICopilotAnalyticsWidget';
 import { downloadOFCReportXlsx } from '../../utils/exportOFC';
 import { toast } from '../../components/ui/toastStore';
 import { downloadBackupXlsx } from '../../utils/exportBackup';
@@ -494,15 +495,34 @@ export default function Dashboard() {
     };
   }, [allPTEmployees, viewMode]);
 
+  // ── 3 PHÂN VÙNG QUẢN TRỊ: 'overview' | 'ai' | 'analytics' ──
+  const [dashboardTab, setDashboardTab] = useState(() => {
+    try {
+      return sessionStorage.getItem('ofc-admin-dash-tab') || 'overview';
+    } catch {
+      return 'overview';
+    }
+  });
+
+  const handleTabChange = (tab) => {
+    setDashboardTab(tab);
+    try {
+      sessionStorage.setItem('ofc-admin-dash-tab', tab);
+    } catch {}
+  };
+
   // Tab điều khiển biểu đồ liên thông từ KPI cards
   const [activeChartTab, setActiveChartTab] = useState('workload');
 
   const scrollToChart = (tabName) => {
+    handleTabChange('analytics');
     if (tabName) setActiveChartTab(tabName);
-    const el = document.getElementById('analytics-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    setTimeout(() => {
+      const el = document.getElementById('analytics-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   // 6a. Sao lưu toàn bộ dữ liệu ra .xlsx (SM/OFC)
@@ -680,26 +700,103 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards Grid - Responsive 6 Columns with Chart Drill-downs */}
-      <KpiCardsGrid
-        ptOvertimeList={ptOvertimeList}
-        allPTEmployees={allPTEmployees}
-        viewMode={viewMode}
-        quickStats={quickStats}
-        complianceStats={complianceStats}
-        currentDeptEmployees={currentDeptEmployees}
-        currentDeptTotalHours={currentDeptTotalHours}
-        selectedMonthCycle={selectedMonthCycle}
-        currentWeek={currentWeek}
-        filterDept={filterDept}
-        stores={visibleStores}
-        scrollToChart={scrollToChart}
-      />
+      {/* ── 3-TAB SEGMENTED NAVIGATION BAR (Sạch sẽ, Tối giản, Trực quan) ── */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/75 backdrop-blur-sm rounded-2xl w-full sm:w-fit border border-slate-300/60 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleTabChange('overview')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            dashboardTab === 'overview'
+              ? 'bg-white text-blue-700 shadow-sm shadow-slate-200 font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+          }`}
+        >
+          <Zap size={14} className={dashboardTab === 'overview' ? 'text-blue-600' : 'text-slate-400'} />
+          <span>Tổng Quan Vận Hành</span>
+        </button>
 
-      <MonthConfirmWidget />
+        <button
+          type="button"
+          onClick={() => handleTabChange('ai')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative ${
+            dashboardTab === 'ai'
+              ? 'bg-white text-purple-700 shadow-sm shadow-slate-200 font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+          }`}
+        >
+          <Bot size={14} className={dashboardTab === 'ai' ? 'text-purple-600' : 'text-slate-400'} />
+          <span>Quản Trị Trợ Lý AI</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        </button>
 
-      {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
-      <div id="analytics-section">
+        <button
+          type="button"
+          onClick={() => handleTabChange('analytics')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            dashboardTab === 'analytics'
+              ? 'bg-white text-indigo-700 shadow-sm shadow-slate-200 font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+          }`}
+        >
+          <BarChart3 size={14} className={dashboardTab === 'analytics' ? 'text-indigo-600' : 'text-slate-400'} />
+          <span>Báo Cáo & Dữ Liệu Chi Tiết</span>
+        </button>
+      </div>
+
+      {/* ── TAB 1: TỔNG QUAN VẬN HÀNH ── */}
+      {dashboardTab === 'overview' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <KpiCardsGrid
+            ptOvertimeList={ptOvertimeList}
+            allPTEmployees={allPTEmployees}
+            viewMode={viewMode}
+            quickStats={quickStats}
+            complianceStats={complianceStats}
+            currentDeptEmployees={currentDeptEmployees}
+            currentDeptTotalHours={currentDeptTotalHours}
+            selectedMonthCycle={selectedMonthCycle}
+            currentWeek={currentWeek}
+            filterDept={filterDept}
+            stores={visibleStores}
+            scrollToChart={scrollToChart}
+          />
+
+          <MonthConfirmWidget />
+
+          {/* Phân tích nhân sự & trạng thái cửa hàng */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="lg:col-span-1">
+              <EmployeeDemographicsWidget 
+                employees={employees} 
+                filterDept={filterDept} 
+              />
+            </div>
+            <div className="lg:col-span-3">
+              <StoreBreakdownCards
+                storeStats={storeStats}
+                totalSystemHours={totalSystemHours}
+                filterDept={filterDept}
+                setFilterDept={setFilterDept}
+                viewMode={viewMode}
+                selectedMonthCycle={selectedMonthCycle}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB 2: QUẢN TRỊ TRỢ LÝ AI (TÚ MINI) ── */}
+      {dashboardTab === 'ai' && (
+        <div className="animate-in fade-in duration-200">
+          <AICopilotAnalyticsWidget filterDept={filterDept} />
+        </div>
+      )}
+
+      {/* ── TAB 3: BÁO CÁO & DỮ LIỆU CHI TIẾT ── */}
+      {dashboardTab === 'analytics' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
+          <div id="analytics-section">
         <DashboardCharts
           viewMode={viewMode}
           selectedMonthCycle={selectedMonthCycle}
@@ -933,36 +1030,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Phân tích nhân sự & cửa hàng */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="lg:col-span-1">
-          <EmployeeDemographicsWidget 
+          {/* Phân tích Vắng mặt / Phép & Chi viện */}
+          <OperationsInsightsWidget 
             employees={employees} 
+            weekSchedule={weekSchedule} 
             filterDept={filterDept} 
-          />
-        </div>
-        <div className="lg:col-span-3">
-          <StoreBreakdownCards
-            storeStats={storeStats}
-            totalSystemHours={totalSystemHours}
-            filterDept={filterDept}
-            setFilterDept={setFilterDept}
             viewMode={viewMode}
+            schedule={schedule}
+            cycleDates={cycleDates}
             selectedMonthCycle={selectedMonthCycle}
           />
         </div>
-      </div>
-
-      {/* Phân tích Vắng mặt / Phép & Chi viện */}
-      <OperationsInsightsWidget 
-        employees={employees} 
-        weekSchedule={weekSchedule} 
-        filterDept={filterDept} 
-        viewMode={viewMode}
-        schedule={schedule}
-        cycleDates={cycleDates}
-        selectedMonthCycle={selectedMonthCycle}
-      />
+      )}
 
       {/* Employee Detail Drill-down Modal */}
       {selectedEmp && (

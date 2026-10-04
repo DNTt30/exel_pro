@@ -324,9 +324,32 @@ export default function Login() {
 
             {/* Error Message */}
             {error && (
-              <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in duration-200 shadow-2xs">
-                <ShieldAlert size={17} className="shrink-0 text-rose-500" />
-                <span>{error}</span>
+              <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in duration-200 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <ShieldAlert size={17} className="shrink-0 text-rose-500" />
+                  <span>{error}</span>
+                </div>
+                {error.includes('cấu hình') && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if ('caches' in window) {
+                          const keys = await caches.keys();
+                          await Promise.all(keys.map(k => caches.delete(k)));
+                        }
+                        if ('serviceWorker' in navigator) {
+                          const regs = await navigator.serviceWorker.getRegistrations();
+                          await Promise.all(regs.map(r => r.unregister()));
+                        }
+                      } catch {}
+                      window.location.reload();
+                    }}
+                    className="shrink-0 px-2.5 py-1 bg-white border border-rose-300 hover:bg-rose-100 rounded-lg text-[11px] font-bold text-rose-800 cursor-pointer shadow-xs transition-colors"
+                  >
+                    Làm mới cache
+                  </button>
+                )}
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { SHIFTS } from '../data/initialData';
 import { getRoleBadgeInfo, SCHEDULE_RULES, DEFAULT_PT_HOURLY_RATE } from '../data/constants';
 import { timesheetHours } from '../utils/timesheetValues';
@@ -10,9 +10,10 @@ import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
  * - Khi nhập '0' hoặc 'OFF': không bị rơi về placeholder số 8 của lịch
  * - Kèm chip chọn nhanh tiện lợi
  */
-function AttendanceCell({ empId, day, initial, isScheduledOff, scheduledVal, onCommit }) {
+function AttendanceCell({ empId, day, dayLabel, initial, isScheduledOff, scheduledVal, onCommit }) {
   const [val, setVal] = useState(initial ?? '');
   const [focused, setFocused] = useState(false);
+  const cancelBlur = useRef(false);
 
   useEffect(() => {
     if (!focused) setVal(initial ?? '');
@@ -51,34 +52,44 @@ function AttendanceCell({ empId, day, initial, isScheduledOff, scheduledVal, onC
     ? `Công thực tế: ${val} (đã ghi đè). Xóa ô để quay lại theo lịch.`
     : isScheduledOff
       ? 'Lịch xếp: Nghỉ (OFF). Bấm để nhập số giờ nếu đi làm.'
-      : `Lịch xếp: ${scheduledVal || 'Ca 8h'}. Bấm để nhập số giờ thực tế hoặc chọn nhanh.`;
+      : `Theo lịch: ${scheduledVal || 'Chưa xếp công'}. Nhập số giờ thực tế hoặc chọn nhanh.`;
 
   return (
     <div className="relative group/cell w-full">
+      <span className="block text-[9px] font-semibold text-slate-500 mb-0.5">{dayLabel}</span>
       <input
         type="text"
         inputMode="decimal"
         value={val}
-        placeholder=""
+        placeholder={scheduledVal || '—'}
+        aria-label={`Công thực tế ${empId} ngày ${dayLabel || day}`}
         onFocus={() => setFocused(true)}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => { 
           if (e.key === 'Enter') e.target.blur();
           if (e.key === 'Escape') {
+            cancelBlur.current = true;
             setVal(initial ?? '');
             e.target.blur();
           }
         }}
         onBlur={() => {
           setFocused(false);
+          if (cancelBlur.current) {
+            cancelBlur.current = false;
+            return;
+          }
           const trimmed = String(val).trim();
           if (trimmed !== String(initial ?? '').trim()) {
             onCommit(empId, day, trimmed);
           }
         }}
-        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase transition-all ${cellBgClass}`}
+        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase placeholder:text-slate-500 transition-all ${cellBgClass}`}
         title={tooltipText}
       />
+      <span className="block text-[9px] text-slate-500 mt-0.5" title={tooltipText}>
+        Lịch: {scheduledVal || '—'}
+      </span>
 
       {/* Quick selection chips popup when focused */}
       {focused && (
@@ -132,7 +143,7 @@ function AttendanceCell({ empId, day, initial, isScheduledOff, scheduledVal, onC
   );
 }
 
-const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
+const TimesheetRow = memo(({ emp, idx, activeDays, dayLabels = {}, getDayValue, editMode = false, getActualValue, onActualChange }) => {
   // Tính toán Auto-sum — ưu tiên CÔNG THỰC TẾ (ezHR) khi có override
   let totalPT = 0;
   let totalFT = 0;
@@ -202,13 +213,14 @@ const TimesheetRow = memo(({ emp, idx, activeDays, getDayValue, editMode = false
           const raw = getActualValue ? getActualValue(emp.id, day) : '';
           const initial = (raw === null || raw === undefined) ? '' : String(raw);
           return (
-            <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center">
+            <td key={day} className="min-w-[64px] w-[64px] p-0.5 border-r border-slate-200 text-center">
               <AttendanceCell
                 empId={emp.id}
                 day={day}
+                dayLabel={dayLabels[day]}
                 initial={initial}
                 isScheduledOff={isOff}
-                scheduledVal={isOff ? 'OFF' : String(val)}
+                scheduledVal={isOff ? 'OFF' : String(val || '')}
                 onCommit={onActualChange}
               />
             </td>

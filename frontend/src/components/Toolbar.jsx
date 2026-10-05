@@ -18,7 +18,7 @@ export default function Toolbar({
   const pickStore = canPickStore(user);
   const allowedDepts = new Set(visibleDeptIds(user, stores));
   // Chỉ liệt kê các phòng ban mà user có quyền truy cập
-  const depts = [...new Set(employees.map(e => e.dept))].filter(d => d && allowedDepts.has(d)).sort();
+  const depts = [...allowedDepts].filter(Boolean).sort();
   const roles = [...new Set(employees.filter(e => !e.dept || allowedDepts.has(e.dept)).map(e => e.role || e.type))].sort();
 
   return (
@@ -52,6 +52,7 @@ export default function Toolbar({
           <div className="flex items-center gap-1.5">
             <Filter size={13} className="text-slate-400 hidden sm:block" />
             <select 
+              aria-label="Cửa hàng"
               value={filterDept}
               onChange={e => setFilterDept(e.target.value)}
               className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 transition-colors outline-none focus:ring-2 focus:ring-blue-500"
@@ -95,6 +96,7 @@ export default function Toolbar({
             
             <div className="relative flex items-center">
               <select 
+                aria-label="Tuần"
                 value={currentWeek}
                 onChange={e => setCurrentWeek(e.target.value)}
                 className="border border-blue-200 text-blue-700 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-blue-50/80 hover:bg-blue-100/80 font-bold outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-colors"

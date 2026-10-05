@@ -17,7 +17,6 @@ const ImportAttendanceModal = React.lazy(() => import('../../components/modals/I
 
 export default function Timesheet() {
   const { user, currentWeek, employees } = useStore(useShallow((s) => ({ user: s.user, currentWeek: s.currentWeek, employees: s.employees })));
-  const attendance = useStore((s) => s.attendance);
   const schedule = useStore((s) => s.schedule);
   const saveAttendanceCell = useStore((s) => s.saveAttendanceCell);
 
@@ -76,7 +75,9 @@ export default function Timesheet() {
   const handlePrevMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, -1));
   const handleNextMonth = () => setPayrollCycle(cycle => movePayrollCycle(cycle, 1));
 
-  const overrideCount = Object.keys(attendance).filter(k => attendance[k] && attendance[k].actualHours > 0).length;
+  const overrideCount = Object.values(groupedEmps).flat().reduce((count, emp) => (
+    count + activeDays.filter(day => getActualValue(emp.id, day) !== '').length
+  ), 0);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">
@@ -137,6 +138,8 @@ export default function Timesheet() {
               </button>
               <button
                 onClick={() => setEditMode(v => !v)}
+                aria-label="Sửa công thực tế"
+                aria-pressed={editMode}
                 className={`text-xs py-1.5 px-3 rounded-lg font-bold border flex items-center gap-1.5 transition-colors cursor-pointer ${
                   editMode
                     ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
@@ -185,7 +188,7 @@ export default function Timesheet() {
           <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> Ô vàng: Công thực tế</span>
             <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-400"></span> Ô xám: Chấm 0h / OFF</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-white border border-slate-300"></span> Ô trắng: Theo lịch</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-white border border-slate-300"></span> Chữ mờ: Giờ theo lịch, chưa ghi đè</span>
           </div>
         </div>
       )}

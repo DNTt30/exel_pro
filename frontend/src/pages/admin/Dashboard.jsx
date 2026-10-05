@@ -20,7 +20,8 @@ import { toast } from '../../components/ui/toastStore';
 import { downloadBackupXlsx } from '../../utils/exportBackup';
 import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
-import { WEEK_DAYS } from '../../data/constants';
+import { WEEK_DAYS, formatISODate } from '../../data/constants';
+import { dashboardCycleDates, dashboardWeekOptions, payrollMonthKey, switchDashboardPeriod } from '../../utils/dashboardPeriod';
 import AutoBackupModal from '../../components/modals/AutoBackupModal';
 import { checkAndRunScheduledBackup } from '../../utils/autoBackupService';
 
@@ -31,7 +32,6 @@ export default function Dashboard() {
   const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems, ensureWeeksLoaded } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, stores: s.stores, user: s.user, shelves: s.shelves, shelfItems: s.shelfItems, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   const pickStore = canPickStore(user);
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
-  const availableWeeks = Object.keys(schedule).sort();
 
   // Chế độ xem: 'month' (Chu kỳ 26-25 / 31 ngày) hoặc 'week' (7 ngày)
   const [viewMode, setViewMode] = useState('month'); 
@@ -42,26 +42,21 @@ export default function Dashboard() {
   }, []); 
 
   // Chọn chu kỳ tháng (YYYY-MM)
-  const [selectedMonthCycle, setSelectedMonthCycle] = useState(() => {
-    const parts = (currentWeek || '').split('-').map(Number);
-    const y = parts[0] || new Date().getFullYear();
-    const m = parts[1] || (new Date().getMonth() + 1);
-    const d = parts[2] || 1;
-    if (d >= 26) {
-      let nextM = m + 1;
-      let nextY = y;
-      if (nextM > 12) { nextM = 1; nextY++; }
-      return `${nextY}-${String(nextM).padStart(2, '0')}`;
-    }
-    return `${y}-${String(m).padStart(2, '0')}`;
-  });
+  const [selectedMonthCycle, setSelectedMonthCycle] = useState(() => payrollMonthKey(currentWeek));
+  const availableWeeks = useMemo(() => dashboardWeekOptions(selectedMonthCycle, currentWeek), [selectedMonthCycle, currentWeek]);
+  const handleViewModeChange = (mode) => {
+    if (mode === viewMode) return;
+    const next = switchDashboardPeriod(mode, selectedMonthCycle, currentWeek);
+    setSelectedMonthCycle(next.month);
+    if (next.week !== currentWeek) setCurrentWeek(next.week);
+    setViewMode(mode);
+  };
 
   const availableMonths = useMemo(() => {
     const [y, m] = selectedMonthCycle.split('-').map(Number);
     const list = [];
     const now = new Date();
-    const currentRealYear = now.getFullYear();
-    const currentRealMonth = now.getMonth() + 1;
+    const [currentRealYear, currentRealMonth] = payrollMonthKey(formatISODate(now)).split('-').map(Number);
 
     // Hiển thị danh sách 13 tháng xoay quanh tháng đang chọn
     for (let i = -6; i <= 6; i++) {
@@ -130,70 +125,15 @@ export default function Dashboard() {
   const [selectedEmp, setSelectedEmp] = useState(null);
 
   // 1. Tính toán 31 ngày theo chu kỳ lương 26 tháng trước -> 25 tháng này
-  const cycleDates = useMemo(() => {
-    const [selY, selM] = selectedMonthCycle.split('-').map(Number);
-    
-    let prevM = selM - 1;
-    let prevY = selY;
-    let curM = selM;
-    let curY = selY;
-    
-    if (prevM < 1) { prevM = 12; prevY--; }
-    
-    const dates = [];
-    const daysInPrevMonth = new Date(prevY, prevM, 0).getDate();
-    for (let day = 26; day <= daysInPrevMonth; day++) {
-      const dateObj = new Date(prevY, prevM - 1, day);
-      const dOfWeek = dateObj.getDay();
-      const dayKey = WEEK_DAYS[dOfWeek === 0 ? 6 : dOfWeek - 1];
-
-      const monDiff = dateObj.getDate() - dOfWeek + (dOfWeek === 0 ? -6 : 1);
-      const monDate = new Date(dateObj);
-      monDate.setDate(monDiff);
-      const weekKey = `${monDate.getFullYear()}-${String(monDate.getMonth() + 1).padStart(2, '0')}-${String(monDate.getDate()).padStart(2, '0')}`;
-
-      dates.push({
-        key: `prev_${day}`,
-        display: `${day}/${prevM}/${prevY}`,
-        shortDisplay: `${day}/${prevM}`,
-        dayNum: `${day}`,
-        monthNum: `${prevM}`,
-        dayKey,
-        weekKey,
-        dateObj
-      });
-    }
-    for (let day = 1; day <= 25; day++) {
-      const dateObj = new Date(curY, curM - 1, day);
-      const dOfWeek = dateObj.getDay();
-      const dayKey = WEEK_DAYS[dOfWeek === 0 ? 6 : dOfWeek - 1];
-
-      const monDiff = dateObj.getDate() - dOfWeek + (dOfWeek === 0 ? -6 : 1);
-      const monDate = new Date(dateObj);
-      monDate.setDate(monDiff);
-      const weekKey = `${monDate.getFullYear()}-${String(monDate.getMonth() + 1).padStart(2, '0')}-${String(monDate.getDate()).padStart(2, '0')}`;
-
-      dates.push({
-        key: `cur_${day}`,
-        display: `${day}/${curM}/${curY}`,
-        shortDisplay: `${day}/${curM}`,
-        dayNum: `${day}`,
-        monthNum: `${curM}`,
-        dayKey,
-        weekKey,
-        dateObj
-      });
-    }
-    return dates;
-  }, [selectedMonthCycle]);
+  const cycleDates = useMemo(() => dashboardCycleDates(selectedMonthCycle), [selectedMonthCycle]);
 
   // Tự động tải dữ liệu các tuần thuộc chu kỳ tháng được chọn từ CSDL Supabase
   useEffect(() => {
-    if (viewMode === 'month' && cycleDates.length > 0 && ensureWeeksLoaded) {
-      const neededWeeks = Array.from(new Set(cycleDates.map(d => d.weekKey)));
+    if (ensureWeeksLoaded) {
+      const neededWeeks = viewMode === 'month' ? [...new Set(cycleDates.map(d => d.weekKey))] : [currentWeek];
       ensureWeeksLoaded(neededWeeks).catch(console.error);
     }
-  }, [viewMode, cycleDates, ensureWeeksLoaded]);
+  }, [viewMode, cycleDates, currentWeek, ensureWeeksLoaded]);
 
   // 2. Tính toán 7 ngày trong tuần
   const weekDaysInfo = useMemo(() => {
@@ -600,10 +540,11 @@ export default function Dashboard() {
           )}
 
           {/* Unified Mode + Date Navigator */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-y-1 max-w-full bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
             <div className="flex items-center">
               <button
-                onClick={() => setViewMode('month')}
+                onClick={() => handleViewModeChange('month')}
+                aria-pressed={viewMode === 'month'}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'month' 
                     ? 'bg-white shadow-xs text-blue-700 font-extrabold' 
@@ -614,7 +555,8 @@ export default function Dashboard() {
                 <span>Tháng (26-25)</span>
               </button>
               <button
-                onClick={() => setViewMode('week')}
+                onClick={() => handleViewModeChange('week')}
+                aria-pressed={viewMode === 'week'}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'week' 
                     ? 'bg-white shadow-xs text-blue-700 font-extrabold' 
@@ -626,9 +568,9 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="w-[1px] h-5 bg-slate-300 mx-1.5 shrink-0"></div>
+            <div className="hidden sm:block w-px h-5 bg-slate-300 mx-1.5 shrink-0"></div>
 
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0 max-w-full">
               <button 
                 onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
                 className="p-1 hover:bg-slate-200/80 rounded-md text-slate-600 transition-colors cursor-pointer"
@@ -639,6 +581,7 @@ export default function Dashboard() {
 
               {viewMode === 'month' ? (
                 <select 
+                  aria-label="Kỳ công Dashboard"
                   value={selectedMonthCycle}
                   onChange={e => setSelectedMonthCycle(e.target.value)}
                   className="border-none bg-transparent text-blue-700 font-bold text-xs outline-none px-2 cursor-pointer max-w-[210px] sm:max-w-none"
@@ -649,14 +592,12 @@ export default function Dashboard() {
                 </select>
               ) : (
                 <select 
+                  aria-label="Tuần Dashboard"
                   value={currentWeek}
                   onChange={e => setCurrentWeek(e.target.value)}
-                  className="border-none bg-transparent text-blue-700 font-bold text-xs outline-none px-2 cursor-pointer"
+                  className="min-w-0 border-none bg-transparent text-blue-700 font-bold text-xs outline-none px-2 cursor-pointer"
                 >
-                  {availableWeeks.map(w => {
-                    const parts = w.split('-');
-                    return <option key={w} value={w}>Tuần: {parts[2]}/{parts[1]}/{parts[0]}</option>;
-                  })}
+                  {availableWeeks.map(w => <option key={w.key} value={w.key}>{w.label}</option>)}
                 </select>
               )}
 

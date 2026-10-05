@@ -1,9 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import TimesheetRow from '../TimesheetRow';
 
 const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
   const deptKeys = Object.keys(groupedEmps);
   const totalEmployees = deptKeys.reduce((sum, dept) => sum + (groupedEmps[dept]?.length || 0), 0);
+  const dayLabels = useMemo(() => Object.fromEntries(cycleDates.map(d => [d.key, `${d.dayKey} ${d.shortDisplay || d.display}`])), [cycleDates]);
 
   if (totalEmployees === 0) {
     return (
@@ -15,11 +16,11 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-100 p-2 sm:p-4 print:p-0 print:bg-white print:overflow-visible">
-      <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden min-w-full">
-        <div className="overflow-x-auto print:overflow-visible">
+    <div className="flex-1 min-h-0 overflow-auto bg-slate-100 p-2 sm:p-4 print:p-0 print:bg-white print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-xs border border-slate-200 min-w-full w-max">
+        <div className="print:overflow-visible">
           <table className="excel-table whitespace-nowrap text-xs border-collapse min-w-full">
-            <thead>
+            <thead className="sticky top-0 z-30">
               <tr className="bg-slate-200 border-b border-slate-300 font-bold text-slate-700">
                 <th className="p-2 border-r border-slate-300 w-10 min-w-[40px] text-center md:sticky left-0 z-20 bg-slate-200">
                   STT
@@ -102,6 +103,7 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
                       emp={emp}
                       idx={idx}
                       activeDays={activeDays}
+                      dayLabels={dayLabels}
                       getDayValue={getDayValue}
                       editMode={editMode}
                       getActualValue={getActualValue}

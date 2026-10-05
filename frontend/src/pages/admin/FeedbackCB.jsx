@@ -4,8 +4,8 @@ import { CheckCircle2, XCircle, Image as ImageIcon } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { SHIFTS } from '../../data/initialData';
-import { getRoleBadgeInfo, WEEK_DAYS } from '../../data/constants';
-import { canPickStore } from '../../lib/authSession';
+import { getRoleBadgeInfo, WEEK_DAYS, formatISODate } from '../../data/constants';
+import { canPickStore, isBuiltinStoreManager, isAreaManagerFromEmp } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { parseDateDetails } from '../../utils/dateHelper';
 import { useShallow } from 'zustand/react/shallow';
@@ -176,28 +176,40 @@ const FeedbackRow = ({ fb, idx, resolveFeedback, employees, currentWeek, user })
 export default function FeedbackCB() {
   const { feedbacks, resolveFeedback, user, stores, employees, currentWeek } = useStore(useShallow((s) => ({ feedbacks: s.feedbacks, resolveFeedback: s.resolveFeedback, user: s.user, stores: s.stores, employees: s.employees, currentWeek: s.currentWeek })));
   const pickStore = canPickStore(user);
+  const restrictStores = !isBuiltinStoreManager(user) && !isAreaManagerFromEmp(user);
 
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [search, setSearch] = useState('');
 
   // SM nhieu cua hang: cho phep chuyen trong pham vi sm_id thay vi ep CH goc
   const allowedDepts = useMemo(() => new Set(visibleDeptIds(user, stores)), [user, stores]);
   const effectiveFilterDept = pickStore
-    ? filterDept
-    : (filterDept && allowedDepts.has(filterDept) ? filterDept : user?.dept);
+    ? (filterDept === 'ALL' || allowedDepts.has(filterDept) ? filterDept : 'ALL')
+    : (allowedDepts.has(filterDept) ? filterDept : [...allowedDepts][0] || '');
 
   // Khong tu duyet: an yeu cau do chinh minh gui khoi hang doi
   const ownPendingCount = feedbacks.filter(fb => fb.empId === user?.id && fb.status === 'pending').length;
   const filteredFeedbacks = feedbacks.filter(fb => {
+    const emp = employees.find(e => e.id === fb.empId);
+    const dept = fb.dept || emp?.dept || '';
     if (fb.empId === user?.id && fb.status === 'pending') return false;
-    if (effectiveFilterDept !== 'ALL' && fb.dept !== effectiveFilterDept) return false;
+    if (restrictStores && !allowedDepts.has(dept)) return false;
+    if (effectiveFilterDept !== 'ALL' && dept !== effectiveFilterDept) return false;
     if (filterStatus !== 'ALL' && fb.status !== filterStatus) return false;
-    if (search) {
-      const s = search.toLowerCase();
-      const emp = employees.find(e => e.id === fb.empId);
+    if (fromDate || toDate) {
+      const date = parseDateDetails(fb.date).dateObj;
+      if (!date) return false;
+      const dateKey = formatISODate(date);
+      if (fromDate && dateKey < fromDate) return false;
+      if (toDate && dateKey > toDate) return false;
+    }
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
       const name = fb.empName || fb.name || emp?.name || '';
-      if (!name.toLowerCase().includes(s) && !fb.empId.toLowerCase().includes(s)) return false;
+      if (!name.toLowerCase().includes(s) && !String(fb.empId || '').toLowerCase().includes(s)) return false;
     }
     return true;
   });
@@ -211,12 +223,14 @@ export default function FeedbackCB() {
       )}
       <Toolbar 
         search={search} setSearch={setSearch}
-        filterDept={filterDept} setFilterDept={setFilterDept}
+        filterDept={effectiveFilterDept} setFilterDept={setFilterDept}
+        showWeekPicker={false}
         disableDeptFilter={false}
         rightActions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Trạng thái:</span>
             <select 
+              aria-label="Trạng thái bù công"
               className="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white cursor-pointer"
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
@@ -229,6 +243,29 @@ export default function FeedbackCB() {
           </div>
         }
       />
+
+      <div className="flex flex-wrap items-end gap-3 px-3 py-3 bg-white border-b border-slate-200">
+        <label className="text-xs text-slate-600 font-semibold">
+          Từ ngày
+          <input type="date" lang="vi" aria-label="Bù công từ ngày" value={fromDate} max={toDate || undefined}
+            onChange={e => setFromDate(e.target.value)} className="block mt-1 border border-slate-300 rounded-lg px-2 py-1.5 bg-white" />
+        </label>
+        <label className="text-xs text-slate-600 font-semibold">
+          Đến ngày
+          <input type="date" lang="vi" aria-label="Bù công đến ngày" value={toDate} min={fromDate || undefined}
+            onChange={e => setToDate(e.target.value)} className="block mt-1 border border-slate-300 rounded-lg px-2 py-1.5 bg-white" />
+        </label>
+        {(fromDate || toDate) && (
+          <button type="button" onClick={() => { setFromDate(''); setToDate(''); }}
+            className="text-xs font-semibold text-blue-700 px-2 py-2 hover:bg-blue-50 rounded-lg">Bỏ lọc ngày</button>
+        )}
+        <span className="text-xs text-slate-500 py-2" aria-live="polite">
+          {filteredFeedbacks.length} đơn · {fromDate || toDate
+            ? `Ngày cần bù công: ${fromDate ? parseDateDetails(fromDate).formattedDate : 'Trước đây'} → ${toDate ? parseDateDetails(toDate).formattedDate : 'Về sau'}`
+            : 'Tất cả ngày cần bù công'}
+        </span>
+        {fromDate && toDate && fromDate > toDate && <span role="alert" className="text-xs text-red-600">Ngày kết thúc phải từ ngày bắt đầu trở đi.</span>}
+      </div>
 
       <div className="bg-red-50 text-red-700 p-2 text-xs text-center border-b border-red-200 shadow-xs flex flex-col items-center justify-center">
         <span className="font-bold flex items-center gap-1"><XCircle size={14} /> CHÚ Ý QUAN TRỌNG:</span>

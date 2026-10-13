@@ -1,7 +1,7 @@
 {
-  "name": "DNTgs25 - Hệ Thống Xếp Lịch & Chấm Công",
-  "short_name": "DNTgs25",
-  "description": "Ứng dụng xếp lịch làm việc, đối soát chấm công ezHR9 và vận hành GS25",
+  "name": "Lịch Ca - Hệ Thống Xếp Lịch & Chấm Công",
+  "short_name": "Lịch Ca",
+  "description": "Ứng dụng xếp lịch làm việc, đối soát chấm công ezHR9 và quản lý cửa hàng",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

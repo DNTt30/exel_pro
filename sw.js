@@ -1,5 +1,5 @@
-// DNTgs25 Service Worker
-const CACHE_NAME = 'dntgs25-v2';
+// Lịch Ca Service Worker
+const CACHE_NAME = 'lichca-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -8,14 +8,14 @@ const STATIC_ASSETS = [
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
-  './tu_mini_avatar.jpg'
+  './assistant-avatar.svg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[DNTgs25 SW] Precache partial error:', err);
+        console.warn('[Lịch Ca SW] Precache partial error:', err);
       });
     }).then(() => self.skipWaiting())
   );
@@ -70,9 +70,9 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   let data = {};
-  try { data = event.data.json(); } catch { data = { title: 'DNTgs25', body: event.data.text() }; }
+  try { data = event.data.json(); } catch { data = { title: 'Lịch Ca', body: event.data.text() }; }
 
-  const title   = data.title || 'DNTgs25 Thông báo';
+  const title   = data.title || 'Lịch Ca Thông báo';
   const options = {
     body:    data.body    || '',
     icon:    data.icon    || './icon-192.png',

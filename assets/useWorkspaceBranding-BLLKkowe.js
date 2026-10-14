@@ -1,0 +1,1 @@
+import{i as e,x as t}from"./index-CBTBBq3B.js";function n(){return e(e=>e.workspaceBranding)||t}export{n as t};

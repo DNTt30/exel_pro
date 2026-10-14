@@ -1,1 +1,0 @@
-import{i as e,v as t}from"./index-B99IdaiL.js";function n(){return e(e=>e.workspaceBranding)||t}export{n as t};

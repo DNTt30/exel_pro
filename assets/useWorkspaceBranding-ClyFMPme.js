@@ -1,1 +1,0 @@
-import{i as e,v as t}from"./index-DoCMtgt5.js";function n(){return e(e=>e.workspaceBranding)||t}export{n as t};

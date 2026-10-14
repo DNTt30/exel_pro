@@ -1,0 +1,1 @@
+import{h as e,i as t}from"./index-CXO4Wd36.js";function n(n){return t(t=>e(t.employees.find(e=>e.id===n?.id)||n,t.workspaceRoles))}export{n as t};

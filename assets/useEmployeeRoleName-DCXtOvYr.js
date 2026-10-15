@@ -1,1 +1,0 @@
-import{b as e,o as t}from"./index-BDmec_m_.js";function n(n){return t(t=>e(t.employees.find(e=>e.id===n?.id)||n,t.workspaceRoles))}export{n as t};

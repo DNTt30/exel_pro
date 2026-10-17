@@ -1,0 +1,1 @@
+import{C as e,o as t}from"./index-B9qW6kzz.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

@@ -3,8 +3,6 @@ import {
   DEFAULT_DEADLINE_CONFIG,
   calculateWeekDeadline,
   extendDeadlineHours,
-  getStoreDeadlineConfig,
-  saveStoreDeadlineConfig,
   formatFriendlyDeadline
 } from '../utils/deadlineHelper';
 
@@ -137,73 +135,6 @@ describe('deadlineHelper', () => {
       expect(reevaluated.isExpired).toBe(false);
       expect(reevaluated.deadlineDate.getDate()).toBe(18); // Từ 17 nhảy sang 18
       expect(reevaluated.deadlineDate.getHours()).toBe(18);
-    });
-  });
-
-  describe('Store Config Persistence & Fallback', () => {
-    const storeId = 'VN0485';
-    const weekDate = '2026-09-21';
-
-    it('trả về mặc định khi chưa có cấu hình', () => {
-      const cfg = getStoreDeadlineConfig(storeId, weekDate, []);
-      expect(cfg.enabled).toBe(true);
-      expect(cfg.dayKey).toBe('T5');
-      expect(cfg.time).toBe('18:00');
-    });
-
-    it('lấy cấu hình từ store object trong Zustand', () => {
-      const mockStores = [
-        {
-          id: storeId,
-          name: 'GS25 Landmark',
-          registration_deadline: { enabled: true, dayKey: 'T6', time: '20:00' }
-        }
-      ];
-      const cfg = getStoreDeadlineConfig(storeId, weekDate, mockStores);
-      expect(cfg.dayKey).toBe('T6');
-      expect(cfg.time).toBe('20:00');
-    });
-
-    it('lưu và đọc cấu hình riêng cho tuần (week override)', async () => {
-      const weekSpecificConfig = { enabled: true, dayKey: 'T7', time: '22:00' };
-      await saveStoreDeadlineConfig({
-        storeId,
-        weekDate,
-        config: weekSpecificConfig,
-        applyToAllWeeks: false
-      });
-
-      const cfg = getStoreDeadlineConfig(storeId, weekDate, []);
-      expect(cfg.dayKey).toBe('T7');
-      expect(cfg.time).toBe('22:00');
-
-      // Tuần khác không bị ảnh hưởng
-      const otherWeekCfg = getStoreDeadlineConfig(storeId, '2026-09-28', []);
-      expect(otherWeekCfg.dayKey).toBe('T5');
-    });
-
-    it('lưu cấu hình chung cho toàn cửa hàng và gọi updateStore nếu có', async () => {
-      let updatedStorePayload = null;
-      const mockUpdateStore = async (id, payload) => {
-        updatedStorePayload = payload;
-      };
-
-      const allWeeksConfig = { enabled: true, dayKey: 'T4', time: '17:00' };
-      await saveStoreDeadlineConfig({
-        storeId,
-        weekDate,
-        config: allWeeksConfig,
-        applyToAllWeeks: true,
-        updateStore: mockUpdateStore
-      });
-
-      expect(updatedStorePayload).toEqual({
-        registration_deadline: expect.objectContaining({ dayKey: 'T4', time: '17:00' })
-      });
-
-      const cfg = getStoreDeadlineConfig(storeId, '2026-10-05', []);
-      expect(cfg.dayKey).toBe('T4');
-      expect(cfg.time).toBe('17:00');
     });
   });
 

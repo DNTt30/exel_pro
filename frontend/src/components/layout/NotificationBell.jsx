@@ -20,19 +20,38 @@ import { canPickStore, isOpsManager } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 
 import { BellOff } from 'lucide-react';
+import { getEmployeeNotifications, getReadNotificationIds, markNotificationsRead } from '../../services/api';
+import { toast } from '../ui/toastStore';
 
-export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUnsubscribe }) {
+export default function NotificationBell(props) {
+  const user = useStore(s => s.user);
+  return <NotificationBellContent key={`${user?.id}:${user?.role}:${user?.dept}`} {...props} />;
+}
+function NotificationBellContent({ pushStatus, onPushSubscribe, onPushUnsubscribe }) {
   const { user, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems, stores } = useStore(useShallow((s) => ({ user: s.user, feedbacks: s.feedbacks, schedule: s.schedule, currentWeek: s.currentWeek, employees: s.employees, shiftSwaps: s.shiftSwaps, shelves: s.shelves, shelfItems: s.shelfItems, stores: s.stores })));
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [readIds, setReadIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`read_notifs_${user?.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [serverNotifications, setServerNotifications] = useState([]);
+  const [readIds, setReadIds] = useState([]);
+  const [inboxError, setInboxError] = useState('');
+  const [inboxLoading, setInboxLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
+  const identity = useRef(user?.id);
+  identity.current = user?.id;
+  useEffect(() => {
+    let active = true;
+    setReadIds([]); setServerNotifications([]); setInboxError(''); setInboxLoading(true);
+    const load = async () => {
+      if (!user?.id) { setInboxLoading(false); return; }
+      try {
+        const [rows, ids] = await Promise.all([getEmployeeNotifications(), getReadNotificationIds()]);
+        if (active) { setServerNotifications(rows); setReadIds(ids); setInboxError(''); }
+      } catch { if (active) setInboxError('Chưa đồng bộ được thông báo. Kiểm tra kết nối và mở lại bảng này.'); }
+      finally { if (active) setInboxLoading(false); }
+    };
+    load(); window.addEventListener('focus', load);
+    return () => { active = false; window.removeEventListener('focus', load); };
+  }, [user?.id, isOpen]);
 
   const dropdownRef = useRef(null);
 
@@ -55,7 +74,7 @@ export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUn
 
   // Tính toán danh sách thông báo thông minh
   const notifications = useMemo(() => {
-    const list = [];
+    const list = serverNotifications.map(n => ({ ...n, type: 'schedule_update', icon: <CalendarDays size={16} className="text-blue-600" />, bgColor: 'bg-blue-50 border-blue-200', link: isManager ? '/admin/schedule' : '/employee/schedule', time: n.week }));
     if (!user) return list;
 
     if (isAdmin || isManager) {
@@ -247,34 +266,30 @@ export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUn
     }
 
     return list;
-  }, [user, isAdmin, isManager, pickStore, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems]);
+  }, [user, isAdmin, isManager, pickStore, feedbacks, schedule, currentWeek, employees, shiftSwaps, shelves, shelfItems, serverNotifications]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !readIds.includes(n.id)).length;
   }, [notifications, readIds]);
 
-  const handleMarkAllRead = () => {
-    const allIds = notifications.map(n => n.id);
-    setReadIds(allIds);
+  const markRead = async ids => {
+    if (marking || inboxLoading) return;
+    const actor = user?.id;
+    setMarking(true);
     try {
-      localStorage.setItem(`read_notifs_${user?.id}`, JSON.stringify(allIds));
-    } catch (e) {
-      console.warn(e);
-    }
+      await markNotificationsRead(ids);
+      if (identity.current === actor) setReadIds(previous => [...new Set([...previous, ...ids])]);
+    } catch { toast.error('Chưa lưu được trạng thái đã đọc. Vui lòng thử lại.'); }
+    finally { if (identity.current === actor) setMarking(false); }
   };
-
-  const handleItemClick = (notif) => {
-    if (!readIds.includes(notif.id)) {
-      const updated = [...readIds, notif.id];
-      setReadIds(updated);
-      try {
-        localStorage.setItem(`read_notifs_${user?.id}`, JSON.stringify(updated));
-      } catch (e) {
-        console.warn(e);
-      }
-    }
+  const handleMarkAllRead = () => markRead(notifications.map(n => n.id));
+  const handleItemClick = async notif => {
+    const actor = user?.id;
+    if (!readIds.includes(notif.id)) await markRead([notif.id]);
+    if (identity.current !== actor) return;
     setIsOpen(false);
     if (notif.link) {
+      if (notif.week) void useStore.getState().setCurrentWeek(notif.week);
       navigate(notif.link);
     }
   };
@@ -330,6 +345,7 @@ export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUn
               <button
                 type="button"
                 onClick={handleMarkAllRead}
+                disabled={marking || inboxLoading || !!inboxError}
                 className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors cursor-pointer"
               >
                 <CheckCheck size={13} />
@@ -340,7 +356,7 @@ export default function NotificationBell({ pushStatus, onPushSubscribe, onPushUn
 
           {/* Notification List */}
           <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
-            {notifications.length === 0 ? (
+            {inboxError ? <p role="alert" className="p-4 text-sm text-red-700">{inboxError}</p> : inboxLoading ? <p role="status" className="p-4 text-sm">Đang đồng bộ thông báo…</p> : notifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 <Sparkles size={24} className="mx-auto mb-2 text-slate-300" />
                 <div className="text-xs font-bold text-slate-600">Bạn đã cập nhật mọi thông tin!</div>

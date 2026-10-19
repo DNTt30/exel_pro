@@ -38,7 +38,7 @@ export default function EmployeeDetailModal({
       bodyClassName="p-0 flex flex-col max-h-[85vh]"
     >
       {/* Modal Header */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white flex items-center justify-between flex-shrink-0">
+      <div className="p-4 sm:p-5 bg-slate-800 text-white flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center font-bold text-lg shadow-inner">
             👤

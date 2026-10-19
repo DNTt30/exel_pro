@@ -1,6 +1,7 @@
 export function emptySessionData() {
   return {
     employees: [], stores: [], schedule: {}, scheduleWeeks: {}, attendance: {},
+    workspaceRoles: [], rolesStatus: 'idle', rolesError: '',
     feedbacks: [], shiftSwaps: [], shelves: [], shelfItems: [],
     adminLogs: [], activityLogs: [], auditLogs: [], aiConversations: [],
     authWarning: null, syncStatus: 'idle', lastSyncedAt: null,

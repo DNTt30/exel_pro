@@ -1,592 +1,135 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { ImagePlus, Sparkles, X, Loader2, Check, AlertTriangle, Trash2, MessageSquare, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, Check } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/useStore';
-import { WEEK_DAYS, buildStaffingByDay, suggestStaffingFromDemand, normalizeStoreDemand } from '../../data/constants';
-import { generateAISchedule, auditSchedule } from '../../utils/aiSchedulerEngine';
+import { WEEK_DAYS, buildStaffingByDay, normalizeStoreDemand } from '../../data/constants';
+import { generateAISchedule } from '../../utils/aiSchedulerEngine';
+import { schedulerDemandByDay, demandBreakdown, demandLabel } from '../../utils/registeredScheduler';
 import { parseSmInstructions } from '../../utils/smInstructionParser';
 import { demandToMatrices } from '../../utils/revenueDemand';
-import { analyzeSalesImages } from '../../utils/salesImageAnalyzer';
 import { normalizeShift } from '../../utils/shiftHelper';
-import { useShallow } from 'zustand/react/shallow';
 import { getSchedulesByWeeks } from '../../services/api';
 import { managedStoreIds, offsetWeek } from '../../utils/employeeSkills';
 
-function fmtVnd(n) {
-  const v = Number(n) || 0;
-  if (!v) return '';
-  if (v >= 1_000_000) {
-    const tr = v / 1_000_000;
-    return `${tr % 1 === 0 ? tr : tr.toFixed(1)}tr`;
-  }
-  return v.toLocaleString('vi-VN');
-}
+import Modal from './Modal';
+import Button from '../ui/Button';
+import StoreDemandFields from '../StoreDemandFields';
+import SchedulerResults from '../schedule/SchedulerResults';
 
-function DemandField({ label, customers, sales, onCustomers, onSales }) {
-  return (
-    <div className="grid grid-cols-[4.5rem_1fr_1fr] gap-2 items-center">
-      <span className="text-[11px] font-bold text-slate-500">{label}</span>
-      <input
-        type="number"
-        min="0"
-        placeholder="Lượt khách"
-        className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono"
-        value={customers || ''}
-        onChange={e => onCustomers(e.target.value)}
-      />
-      <input
-        type="number"
-        min="0"
-        placeholder="Doanh số (đ)"
-        className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono"
-        value={sales || ''}
-        onChange={e => onSales(e.target.value)}
-      />
-    </div>
-  );
-}
-
-// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
+const inputClass = 'mt-1 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm';
 
 export default function AISchedulerModal({ isOpen, onClose, currentWeek, storeId }) {
-  const { employees, schedule, scheduleWeeks, applyAiSchedule, user, stores } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, scheduleWeeks: s.scheduleWeeks, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
+  const { employees, schedule, scheduleWeeks, applyAiSchedule, user, stores } = useStore(useShallow(s => ({ employees: s.employees, schedule: s.schedule, scheduleWeeks: s.scheduleWeeks, applyAiSchedule: s.applyAiSchedule, user: s.user, stores: s.stores })));
   const weekSched = schedule[currentWeek] || EMPTY_SCHED;
   const allowedIds = managedStoreIds(user, stores);
-  const manageableStores = stores.filter(s => allowedIds.includes(s.id));
   const defaultStoreId = allowedIds.includes(storeId) ? storeId : (allowedIds[0] || '');
-
   const [selectedStoreId, setSelectedStoreId] = useState(defaultStoreId);
-
-  const activeStoreId = selectedStoreId;
-  const activeStore = stores.find(s => s.id === activeStoreId);
-  const fileRef = useRef(null);
-
+  const activeStore = stores.find(s => s.id === selectedStoreId);
   const [demand, setDemand] = useState(() => normalizeStoreDemand(activeStore?.demand));
-  const [previews, setPreviews] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [reading, setReading] = useState(false);
+  const [smText, setSmText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [aiResult, setAiResult] = useState(null);
-  const [showAudit, setShowAudit] = useState(false);
   const [error, setError] = useState('');
-  const [smText, setSmText] = useState('');
-  const [smConstraints, setSmConstraints] = useState(null);
-  const [respectAvailability, setRespectAvailability] = useState(true);
-  const [respectOffRequests, setRespectOffRequests] = useState(true);
-  const smDebounceRef = useRef(null);
   const runRef = useRef(0);
-  useEffect(() => {
-    runRef.current++;
-    setAiResult(null);
-    setGenerating(false);
-    return () => { runRef.current++; };
-  }, [isOpen, selectedStoreId, currentWeek, user, employees, weekSched, scheduleWeeks, demand, smText, respectAvailability, respectOffRequests]);
-
-  const storeEmps = useMemo(
-    () => employees.filter(e => e.dept === activeStoreId && e.isActive !== false),
-    [employees, activeStoreId]
-  );
-
-  // Auto-parse SM instructions sau 700ms debounce
-  const handleSmTextChange = useCallback((text) => {
-    setSmText(text);
-    setSmConstraints(null);
-    setAiResult(null);
-    if (smDebounceRef.current) clearTimeout(smDebounceRef.current);
-    if (!text.trim()) { setSmConstraints(null); return; }
-    smDebounceRef.current = setTimeout(() => {
-      const parsed = parseSmInstructions(text, currentWeek, storeEmps);
-      setSmConstraints(parsed.appliedRules.length > 0 ? parsed : null);
-    }, 700);
-  }, [currentWeek, storeEmps]);
-
-  // Thống kê tình trạng đăng ký lịch rảnh của nhân sự trong tuần
-  const availabilityStats = useMemo(() => {
-    let registeredEmpCount = 0;
-    let totalShifts = 0;
-    let totalOff = 0;
-    const details = [];
-
-    storeEmps.forEach(emp => {
-      const empSched = weekSched[emp.id] || {};
-      let shiftsCount = 0;
-      let offCount = 0;
-      WEEK_DAYS.forEach(d => {
-        const raw = empSched[d];
-        if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
-          const { shift } = normalizeShift(raw);
-          if (shift === 'off') offCount++;
-          else if (shift) shiftsCount++;
-        }
+  const storeEmps = useMemo(() => employees.filter(e => e.dept === selectedStoreId && e.isActive !== false), [employees, selectedStoreId]);
+  const constraints = useMemo(() => parseSmInstructions(smText, currentWeek, storeEmps), [smText, currentWeek, storeEmps]);
+  const demandOptions = useMemo(() => {
+    const baseline = buildStaffingByDay(activeStore);
+    const baseMatrixByDay = structuredClone(baseline);
+    if (Object.values(demand).some(bucket => bucket.sales || bucket.customers)) {
+      const predicted = demandToMatrices(demand);
+      WEEK_DAYS.forEach(day => {
+        const extra = predicted[day === 'T7' || day === 'CN' ? 'weekend' : 'weekday'];
+        // Revenue estimates cannot silently remove the store's minimum night staffing.
+        Object.entries(extra).forEach(([code, n]) => { baseline[day][code] = Math.max(baseline[day][code] || 0, n); });
       });
-      if (shiftsCount > 0 || offCount > 0) {
-        registeredEmpCount++;
-        totalShifts += shiftsCount;
-        totalOff += offCount;
-        details.push({ emp, shiftsCount, offCount });
-      }
+    }
+    return { baseMatrixByDay, requiredMatrixByDay: baseline, smOverrides: constraints.dayOverrides, demandFactor: constraints.demandFactor ?? 1 };
+  }, [activeStore, demand, constraints]);
+  const effectiveDemand = useMemo(() => schedulerDemandByDay(demandOptions), [demandOptions]);
+  const registrationStats = useMemo(() => {
+    let total = 0;
+    let people = 0;
+    storeEmps.forEach(emp => {
+      const count = WEEK_DAYS.filter(day => {
+        const c = normalizeShift(weekSched[emp.id]?.[day]);
+        return c.registered && !c.confirmed && c.shift && c.shift !== 'off';
+      }).length;
+      total += count;
+      if (count) people++;
     });
-
-    return {
-      registeredEmpCount,
-      totalStoreEmps: storeEmps.length,
-      totalShifts,
-      totalOff,
-      details
-    };
+    return { total, people };
   }, [storeEmps, weekSched]);
-
-  const auditResult = useMemo(
-    () => auditSchedule(employees, weekSched, activeStoreId),
-    [employees, weekSched, activeStoreId]
-  );
-
-  const staffing = useMemo(() => suggestStaffingFromDemand(demand), [demand]);
-  const hasDemand = !!(demand.weekday.sales || demand.weekday.customers || demand.weekend.sales || demand.weekend.customers);
-
-  const weekDayDates = useMemo(() => {
-    if (!currentWeek) return {};
-    const parts = currentWeek.split('-').map(Number);
-    if (parts.length !== 3) return {};
-    const start = new Date(parts[0], parts[1] - 1, parts[2]);
-    const map = {};
-    WEEK_DAYS.forEach((d, idx) => {
-      const dt = new Date(start);
-      dt.setDate(start.getDate() + idx);
-      map[d] = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
-    });
-    return map;
-  }, [currentWeek]);
-
+  const dates = useMemo(() => Object.fromEntries(WEEK_DAYS.map((day, index) => {
+    const date = new Date(`${currentWeek}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + index);
+    return [day, `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`];
+  })), [currentWeek]);
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedStoreId(defaultStoreId);
-    setDemand(normalizeStoreDemand(stores.find(s => s.id === defaultStoreId)?.demand));
-    setPreviews([]);
-    setNotes([]);
-    setAiResult(null);
-    setError('');
-    setShowAudit(false);
-    setSmText('');
-    setSmConstraints(null);
-  }, [isOpen, defaultStoreId, stores]);
-
-  // Khi đổi cửa hàng → reset demand
+    setSelectedStoreId(defaultStoreId); setSmText(''); setError(''); setAiResult(null);
+  }, [isOpen, defaultStoreId]);
+  useEffect(() => { setDemand(normalizeStoreDemand(activeStore?.demand)); setSmText(''); }, [selectedStoreId, activeStore?.demand]);
   useEffect(() => {
-    setDemand(normalizeStoreDemand(activeStore?.demand));
-    setAiResult(null);
-    setError('');
-  }, [selectedStoreId, activeStore?.demand]);
-
-  const patchDemand = (bucket, field, value) => {
-    const n = Math.max(0, Number(String(value).replace(/[^\d]/g, '')) || 0);
-    setDemand(d => ({ ...d, [bucket]: { ...d[bucket], [field]: n } }));
-    setAiResult(null);
-  };
-
-  const handleFiles = async (fileList) => {
-    const files = [...(fileList || [])].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp|heic)$/i.test(f.name));
-    if (!files.length) return;
-    setReading(true);
-    setError('');
+    runRef.current++;
+    setAiResult(null); setGenerating(false);
+    return () => { runRef.current++; };
+  }, [isOpen, selectedStoreId, currentWeek, user, employees, weekSched, scheduleWeeks, stores, demand, smText]);
+  const run = async () => {
+    const version = ++runRef.current;
+    setGenerating(true); setAiResult(null); setError('');
     try {
-      const result = await analyzeSalesImages(files);
-      setPreviews(result.previews);
-      setNotes(result.notes);
-      if (result.found) {
-        setDemand(result.demand);
-        setAiResult(null);
-      } else if (!result.model) {
-        setError('Đã nhận ảnh. Nhập lượt khách / doanh số bên dưới rồi xếp lịch (hoặc cài model vision Ollama để đọc tự động).');
-      } else {
-        setError('Không đọc được số trên ảnh. Nhập tay T2–T6 / T7–CN rồi xếp lịch.');
-      }
-    } catch (e) {
-      setError(e.message || 'Không phân tích được ảnh.');
-    } finally {
-      setReading(false);
-    }
-  };
-
-  const handleRun = async () => {
-    const run = ++runRef.current;
-    setGenerating(true);
-    setAiResult(null);
-    setError('');
-    try {
-      if (!allowedIds.includes(activeStoreId)) throw new Error('Không có quyền xếp lịch cửa hàng này.');
+      if (!allowedIds.includes(selectedStoreId)) throw new Error('Không có quyền xếp lịch cửa hàng này.');
       const previousWeek = offsetWeek(currentWeek, -1);
       const nextWeek = offsetWeek(currentWeek, 1);
       const adjacent = await getSchedulesByWeeks([previousWeek, nextWeek]);
-      if (run !== runRef.current) return;
-      let opts;
-      if (hasDemand) {
-        // Doanh thu -> nhu cau theo gio -> ma tran ca (co ca ngan cho PT gio vang)
-        const { weekday, weekend } = demandToMatrices(demand);
-        const byDay = {};
-        WEEK_DAYS.forEach(d => { byDay[d] = (d === 'T7' || d === 'CN') ? weekend : weekday; });
-        opts = { requiredMatrixByDay: byDay };
-      } else {
-        opts = { requiredMatrixByDay: buildStaffingByDay(activeStore) };
-      }
-
-      // Tích hợp Lịch rảnh đã đăng ký của nhân viên
-      opts.existingSchedule = weekSched;
-      opts.respectAvailability = respectAvailability;
-      opts.respectOffRequests = respectOffRequests;
-      opts.user = user;
-      opts.stores = stores;
-      opts.currentWeek = currentWeek;
-      opts.scheduleWeeks = scheduleWeeks;
-      opts.previousWeekSchedule = adjacent[previousWeek] || {};
-      opts.nextWeekSchedule = adjacent[nextWeek] || {};
-
-      // Áp dụng ràng buộc từ lệnh / ghi chú của Cửa hàng trưởng (SM)
-      const effectiveSm = smConstraints || (smText.trim() ? parseSmInstructions(smText, currentWeek, storeEmps) : null);
-      if (effectiveSm) {
-        opts.smOverrides = effectiveSm.dayOverrides || {};
-        opts.employeeOverrides = effectiveSm.employeeOverrides || {};
-        opts.nightShiftVolunteers = effectiveSm.nightVolunteers || [];
-        opts.demandFactor = effectiveSm.demandFactor ?? 1.0;
-        opts.smNotes = smText.trim();
-      }
-
-      const result = generateAISchedule(employees, activeStoreId, opts);
-      result.sourceSchedule = weekSched;
-      if (hasDemand) {
-        const wdM = demandToMatrices(demand).weekday;
-        const weM = demandToMatrices(demand).weekend;
-        const fmtM = m => Object.keys(m).map(c => `${c}x${m[c]}`).join(' + ');
-        result.insights = [
-          `Theo doanh số ${fmtVnd(demand.weekday.sales) || '—'} (T2–T6) / ${fmtVnd(demand.weekend.sales) || '—'} (T7–CN). FT gánh khung xương ca dài; PT lấp giờ vàng bằng ca ngắn.`,
-          `🧮 Định biên sinh tự động — thường: ${fmtM(wdM)} · cuối tuần: ${fmtM(weM)}.`,
-          ...result.insights
-        ];
-      }
-      setAiResult(result);
-    } catch (e) {
-      if (run !== runRef.current) return;
-      setError(e.message || 'Không sinh được lịch.');
-    } finally {
-      if (run === runRef.current) setGenerating(false);
-    }
+      if (version !== runRef.current) return;
+      const result = generateAISchedule(employees, selectedStoreId, {
+        ...demandOptions, existingSchedule: weekSched, currentWeek, scheduleWeeks, user, stores,
+        employeeOverrides: constraints.employeeOverrides, nightShiftVolunteers: constraints.nightVolunteers,
+        smNotes: smText.trim(), previousWeekSchedule: adjacent[previousWeek] || {}, nextWeekSchedule: adjacent[nextWeek] || {},
+      });
+      setAiResult({ ...result, sourceSchedule: weekSched });
+    } catch (e) { if (version === runRef.current) setError(e.message || 'Không tạo được đề xuất.'); }
+    finally { if (version === runRef.current) setGenerating(false); }
   };
-
-  const handleApply = async () => {
-    if (!aiResult) return;
-    setApplying(true);
+  const apply = async () => {
+    if (!aiResult?.newAssignments || applying) return;
+    setApplying(true); setError('');
     try {
-      await applyAiSchedule(currentWeek, aiResult.schedule, activeStoreId, aiResult.sourceSchedule);
+      await applyAiSchedule(currentWeek, aiResult.schedule, selectedStoreId, aiResult.sourceSchedule);
       onClose();
-    } catch (e) {
-      setError(e.message || 'Không lưu được lịch.');
-    } finally {
-      setApplying(false);
-    }
+    } catch (e) { setError(e.message || 'Không lưu được lịch.'); }
+    finally { setApplying(false); }
   };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3.5 sm:p-4 animate-in fade-in duration-150 overflow-y-auto" onClick={onClose}>
-      <div
-        className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col border border-slate-200 animate-in zoom-in-95 duration-150 my-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div className="flex-1 min-w-0 mr-2">
-            <div className="text-sm font-black text-slate-800">AI xếp lịch</div>
-            <div className="text-[11px] text-slate-500">tuần {currentWeek} · {storeEmps.length} NV</div>
-          </div>
-
-          {/* Dropdown chọn cửa hàng */}
-          {(storeId === 'ALL' || stores.length > 1) && (
-            <select
-              value={selectedStoreId}
-              onChange={e => setSelectedStoreId(e.target.value)}
-              className="mr-2 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-indigo-400 outline-none cursor-pointer"
-            >
-              {manageableStores.map(s => (
-                <option key={s.id} value={s.id}>{s.id} — {s.name || s.id}</option>
-              ))}
-            </select>
-          )}
-
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          <label
-            className="block border border-dashed border-slate-300 rounded-xl p-3 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/40"
-            onDragOver={e => { e.preventDefault(); }}
-            onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
-            />
-            {reading ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700">
-                <Loader2 size={14} className="animate-spin" /> Đang đọc ảnh doanh số…
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                <ImagePlus size={14} /> Ảnh Direct / doanh số — thả hoặc chọn
-              </span>
-            )}
-            <div className="text-[10px] text-slate-400 mt-1">PNG, JPG. Có thể gửi 2 ảnh T2–T6 và T7–CN.</div>
-          </label>
-
-          {previews.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto">
-              {previews.map(p => (
-                <div key={p.url} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0">
-                  <img src={p.url} alt="" className="w-full h-full object-cover" />
-                </div>
-              ))}
-              <button type="button" className="text-slate-400 hover:text-red-600 px-1" onClick={() => { setPreviews([]); setNotes([]); }} title="Xóa ảnh">
-                <Trash2 size={14} />
-              </button>
+  return <Modal isOpen={isOpen} onClose={onClose} title="Gợi ý xếp lịch" titleId="ai-scheduler-title"
+    description={`Tuần ${dates.T2} – ${dates.CN} · Chỉ chọn ca đã đăng ký`} maxWidth="max-w-2xl"
+    closeDisabled={applying} bodyClassName="space-y-4 p-4 sm:p-5"
+    footer={<>
+      <Button disabled={applying} onClick={onClose}>Đóng</Button>
+      <Button variant={aiResult ? 'secondary' : 'primary'} disabled={applying || !storeEmps.length} busy={generating} onClick={run}>
+        {!generating && <Sparkles size={16} />}{aiResult ? 'Xếp lại' : 'Xếp lịch'}
+      </Button>
+      {aiResult && <Button variant="primary" disabled={!aiResult.newAssignments} busy={applying} onClick={apply}>
+        {!applying && <Check size={16} />}Áp dụng {aiResult.newAssignments} ca
+      </Button>}
+    </>}>
+        {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+        <fieldset disabled={generating || applying} className="space-y-4 disabled:opacity-60">
+          <label className="block text-sm font-medium text-slate-700">Cửa hàng<select aria-label="Cửa hàng xếp lịch" value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)} className={inputClass}>{stores.filter(s => allowedIds.includes(s.id)).map(store => <option key={store.id} value={store.id}>{store.id} · {store.name || store.id}</option>)}</select></label>
+          <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-800">{registrationStats.total} ca đăng ký · {registrationStats.people}/{storeEmps.length} nhân viên</p><p className="mt-1 text-sm leading-relaxed text-slate-600">{registrationStats.total ? 'Giữ ca đã chốt, ngày OFF và ngày trống. Đăng ký chưa chọn vẫn được giữ lại.' : 'Chưa có ca đăng ký để chọn. Hệ thống chỉ báo phần thiếu; hãy nhắc nhân viên đăng ký.'}</p></div>
+          <details className="rounded-xl border border-slate-200">
+            <summary className="cursor-pointer p-3.5 text-sm font-medium text-slate-600">Nhu cầu nhân sự & ghi chú</summary>
+            <div className="space-y-4 px-3.5 pb-4">
+              <p className="text-sm leading-relaxed text-slate-600">Dùng định biên cửa hàng. Doanh số có thể tăng nhu cầu giờ cao điểm. Ghi chú điều chỉnh nhu cầu nhưng không cho phép xếp ngoài đăng ký.</p>
+          <StoreDemandFields demand={demand} onChange={setDemand} />
+              <label className="block text-sm font-medium text-slate-600">Ghi chú của quản lý<textarea aria-label="Ghi chú xếp lịch" rows={2} value={smText} onChange={e => setSmText(e.target.value)} placeholder="Ví dụ: ca đêm thứ 5 cần 2 người" className={inputClass} /></label>
+              <details><summary className="cursor-pointer text-sm font-semibold text-slate-600">Xem nhu cầu từng ngày</summary><div className="mt-2 space-y-2 text-sm text-slate-600">{WEEK_DAYS.map(day => <div key={day}><b>{day}:</b> {Object.entries(effectiveDemand[day]).filter(([, n]) => n > 0).map(([code, n]) => <p key={code}>{code}: {demandLabel(demandBreakdown(demandOptions, day, code, n))}</p>)}</div>)}</div></details>
             </div>
-          )}
-
-          {notes.map((n, i) => (
-            <p key={i} className="text-[11px] text-slate-500">{n}</p>
-          ))}
-          {error && <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">{error}</p>}
-
-          <DemandField
-            label="T2–T6"
-            customers={demand.weekday.customers}
-            sales={demand.weekday.sales}
-            onCustomers={v => patchDemand('weekday', 'customers', v)}
-            onSales={v => patchDemand('weekday', 'sales', v)}
-          />
-          <DemandField
-            label="T7–CN"
-            customers={demand.weekend.customers}
-            sales={demand.weekend.sales}
-            onCustomers={v => patchDemand('weekend', 'customers', v)}
-            onSales={v => patchDemand('weekend', 'sales', v)}
-          />
-
-          {/* Lịch đăng ký rảnh của nhân sự (Employee Availability) */}
-          <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-950 inline-flex items-center gap-1.5">
-                <Users size={13} className="text-emerald-600" />
-                Lịch rảnh nhân viên tự đăng ký tuần này
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                availabilityStats.registeredEmpCount > 0
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  : 'bg-slate-100 text-slate-500'
-              }`}>
-                {availabilityStats.registeredEmpCount} / {availabilityStats.totalStoreEmps} nhân sự đã đăng ký
-              </span>
-            </div>
-
-            {availabilityStats.registeredEmpCount > 0 ? (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                  <span className="font-semibold text-emerald-800">✓ {availabilityStats.totalShifts} ca rảnh</span>
-                  <span>•</span>
-                  <span className="font-semibold text-slate-600">🛡️ {availabilityStats.totalOff} lượt xin nghỉ (OFF)</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-0.5 max-h-24 overflow-y-auto">
-                  {availabilityStats.details.map(({ emp, shiftsCount, offCount }) => (
-                    <span key={emp.id} className="inline-flex items-center gap-1 text-[10px] bg-white px-2 py-0.5 rounded-md border border-emerald-200 font-medium text-slate-700 shadow-2xs">
-                      <strong>{emp.name}</strong>
-                      <span className="text-emerald-700 font-bold">{shiftsCount} ca</span>
-                      {offCount > 0 && <span className="text-slate-400">({offCount} off)</span>}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-500 italic">
-                Chưa có nhân viên nào gửi lịch rảnh trước cho tuần này. AI sẽ tự động phân ca tối ưu theo định biên & doanh thu.
-              </p>
-            )}
-
-            {/* Checkboxes cho SM điều khiển */}
-            <div className="pt-1.5 border-t border-emerald-100 flex flex-col gap-1.5 text-[11px] text-slate-700 font-medium">
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={respectAvailability}
-                  onChange={e => setRespectAvailability(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
-                />
-                <span>Ưu tiên xếp theo <strong>lịch rảnh & ca mong muốn</strong> của nhân viên</span>
-              </label>
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={respectOffRequests}
-                  onChange={e => setRespectOffRequests(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
-                />
-                <span>Bảo vệ <strong>ngày xin nghỉ (OFF)</strong> của nhân sự (không xếp đè)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Lệnh / Ghi chú của Cửa hàng trưởng (SM) */}
-          <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-indigo-900 inline-flex items-center gap-1.5">
-                <MessageSquare size={13} className="text-indigo-600" />
-                Lệnh / Ghi chú xếp ca của SM (tự nhiên)
-              </span>
-              {smConstraints?.appliedRules?.length > 0 && (
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-md">
-                  ✓ Nhận diện {smConstraints.appliedRules.length} yêu cầu
-                </span>
-              )}
-            </div>
-
-            <textarea
-              rows={2}
-              placeholder="VD: Ca đêm ngày 15 18 19 xếp 2 người vì hàng về nhiều. Trời mưa nên giảm nhân sự..."
-              value={smText}
-              onChange={e => handleSmTextChange(e.target.value)}
-              className="w-full text-xs border border-indigo-200/80 rounded-lg p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white placeholder:text-slate-400"
-            />
-
-            {smConstraints?.appliedRules?.length > 0 && (
-              <div className="bg-white/90 border border-indigo-100 rounded-lg p-2 space-y-1">
-                <div className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">
-                  🔍 AI đã phân tích:
-                </div>
-                {smConstraints.appliedRules.map((rule, idx) => (
-                  <div key={idx} className="text-[11px] text-slate-700 flex items-start gap-1">
-                    <span className="text-indigo-500 font-bold">•</span>
-                    <span>{rule.replace(/\*\*(.*?)\*\*/g, '$1')}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="text-[11px] text-slate-500">
-            Định biên {hasDemand ? 'theo ảnh/số liệu' : 'theo cửa hàng'}:
-            {' '}sáng {staffing.weekday['6-14']} · chiều {staffing.weekday['14-22']} · đêm {staffing.weekday['22-6']}
-            {' '}(cuối tuần {staffing.weekend['6-14']}/{staffing.weekend['14-22']}/{staffing.weekend['22-6']})
-          </div>
-
-          {auditResult.totalIssues > 0 && (
-            <button type="button" onClick={() => setShowAudit(v => !v)} className="text-[11px] font-semibold text-amber-800">
-              <AlertTriangle size={12} className="inline mr-1" />
-              Lịch hiện tại {auditResult.totalIssues} lỗi {showAudit ? '▴' : '▾'}
-            </button>
-          )}
-          {showAudit && auditResult.issues.slice(0, 6).map(issue => (
-            <div key={issue.id} className="text-[11px] text-slate-600 pl-2 border-l-2 border-amber-300">
-              {issue.title} · {issue.empName}
-            </div>
-          ))}
-
-          {aiResult && (
-            <div className="space-y-2">
-              <div className="flex gap-3 text-[11px] text-slate-600">
-                <span><b className="text-slate-900">{aiResult.stats.totalShifts}</b> ca</span>
-                <span><b className="text-slate-900">{aiResult.stats.totalHours}</b>h</span>
-                <span>FT {aiResult.stats.compliantFTPercent}%</span>
-                <span>PT {aiResult.stats.compliantPTPercent}%</span>
-              </div>
-              {Array.isArray(aiResult.insights) && aiResult.insights.length > 0 && (
-                <div className="space-y-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                  {aiResult.insights.filter(ins => !aiResult.criticalInsights.includes(ins)).slice(0, 4).map((ins, i) => (
-                    <p key={i} className="text-[11px] text-slate-600 leading-snug">{ins}</p>
-                  ))}
-                </div>
-              )}
-              {!!aiResult.criticalInsights.length && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 space-y-1">
-                {aiResult.criticalInsights.map(ins => <p key={ins}>{ins}</p>)}
-              </div>}
-              {!!aiResult.borrowedAssignments.length && <div className="rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs text-orange-900">
-                <p className="font-bold">Chi viện đề xuất — giữ nguyên cửa hàng gốc</p>
-                {aiResult.borrowedAssignments.map(row => <p key={`${row.empId}:${row.day}`}>{row.name} · {row.fromStore} → {activeStoreId} · {row.day} ca {row.shift}</p>)}
-              </div>}
-              {Array.isArray(aiResult.warnings) && aiResult.warnings.length > 0 && (
-                <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 space-y-0.5">
-                  <p className="text-[11px] font-bold text-amber-800">⚠️ Cần SM bổ sung tay ({aiResult.warnings.length}):</p>
-                  {aiResult.warnings.map((w, i) => (
-                    <p key={i} className="text-[11px] text-amber-700">• {w}</p>
-                  ))}
-                </div>
-              )}
-              <div className="overflow-auto max-h-48 border border-slate-200 rounded-xl">
-                <table className="w-full text-[11px]">
-                  <thead className="bg-slate-50 sticky top-0">
-                    <tr>
-                      <th className="text-left p-1.5 font-semibold">NV</th>
-                      {WEEK_DAYS.map(d => (
-                        <th key={d} className="p-1 text-center font-mono">
-                          <div className="font-bold">{d}</div>
-                          {weekDayDates[d] && <div className="text-[9px] font-normal text-slate-400">{weekDayDates[d]}</div>}
-                        </th>
-                      ))}
-                      <th className="p-1.5">h</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.filter(emp => aiResult.schedule[emp.id]).map(emp => {
-                      const sched = aiResult.schedule[emp.id] || {};
-                      return (
-                        <tr key={emp.id} className="border-t border-slate-100">
-                          <td className="p-1.5 font-semibold text-slate-800 whitespace-nowrap">{emp.name}{emp.dept !== activeStoreId && <span className="ml-1 text-orange-700">(Hỗ trợ · {emp.dept})</span>}</td>
-                          {WEEK_DAYS.map(d => {
-                            const { shift, covering_store, confirmed } = normalizeShift(sched[d]);
-                            return (
-                              <td key={d} className={`p-1 text-center font-mono ${shift === 'off' ? 'text-slate-300' : 'text-blue-700'}`}>
-                                {shift === 'off' ? 'OFF' : (shift || '—')}{covering_store ? ` ${covering_store}` : ''}{shift && shift !== 'off' && !confirmed ? ' (đăng ký)' : ''}
-                              </td>
-                            );
-                          })}
-                          <td className="p-1.5 text-center font-bold">{aiResult.employeeHours[emp.id] || 0}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Hủy</button>
-          <button
-            type="button"
-            onClick={handleRun}
-            disabled={generating || !storeEmps.length}
-            className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 text-white disabled:opacity-50 inline-flex items-center gap-1.5"
-          >
-            {generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-            Xếp lịch
-          </button>
-          {aiResult && (
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={applying}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-emerald-600 text-white disabled:opacity-50 inline-flex items-center gap-1.5"
-            >
-              {applying ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-              Áp dụng
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+          </details>
+        </fieldset>
+    {aiResult && <SchedulerResults result={aiResult} dates={dates} employees={storeEmps} source={weekSched} />}
+  </Modal>;
 }

@@ -31,7 +31,7 @@ describe('engine theo doanh thu - phan vai PT/FT', () => {
     const emps = [mkEmp('f1', 'STFT'), mkEmp('p1', 'STPT'), mkEmp('p2', 'STPT')];
     const byDay = {};
     ['T2','T3','T4','T5','T6','T7','CN'].forEach(d => { byDay[d] = matrixFromPeak(4); });
-    const r = generateAISchedule(emps, 'VN0485', { requiredMatrixByDay: byDay });
+    const r = generateAISchedule(emps, 'VN0485', { requiredMatrixByDay: byDay, existingSchedule: Object.fromEntries(emps.map(e => [e.id, Object.fromEntries(['T2','T3','T4','T5','T6','T7','CN'].map(d => [d, { shift: e.type === 'STFT' ? '6-14' : '10-14', registered: true, confirmed: false }]))])) });
     const SHORT = ['6-10', '10-14', '14-18', '18-22'];
     let ptShort = 0;
     ['p1', 'p2'].forEach(id => Object.values(r.schedule[id]).forEach(v => {
@@ -39,7 +39,7 @@ describe('engine theo doanh thu - phan vai PT/FT', () => {
     }));
     expect(ptShort).toBeGreaterThanOrEqual(2);
     Object.values(r.schedule.f1).forEach(s => {
-      if (s && s !== 'off') expect(['6-14','14-22','22-6','10-18']).toContain(s);
+      if (typeof s === 'string' && s !== 'off') expect(['6-14','14-22','22-6','10-18']).toContain(s);
     });
   });
 });

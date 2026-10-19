@@ -16,3 +16,14 @@ k6_bin/
 /artifacts/
 __pycache__/
 *.pyc
+
+# Local databases and dumps; keep versioned SQL migrations.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.dump
+*.backup
+/local-db/

@@ -1,11 +1,11 @@
 // Supabase Edge Function: proxy gửi Telegram an toàn.
 // Token bot KHÔNG còn nằm trong bundle client — lưu bằng secrets của Function:
-//   supabase secrets set TELEGRAM_BOT_TOKEN=xxx TELEGRAM_CHAT_ID=yyy NOTIFY_SECRET=z
+//   supabase secrets set TELEGRAM_BOT_TOKEN=xxx TELEGRAM_CHAT_ID=yyy
 // Deploy:
 //   supabase functions deploy telegram-notify --project-ref <ref>
 // Frontend cấu hình .env:
 //   VITE_TELEGRAM_PROXY_URL=https://<ref>.functions.supabase.co/telegram-notify
-//   VITE_TELEGRAM_PROXY_SECRET=z   (khớp NOTIFY_SECRET)
+// Client gửi JWT phiên đăng nhập; không đặt shared secret trong biến VITE_*.
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 

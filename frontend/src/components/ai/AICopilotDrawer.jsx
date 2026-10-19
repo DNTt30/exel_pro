@@ -1,15 +1,18 @@
+import { renderMarkdown } from '../ui/MarkdownText';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, X, User, Trash2, Settings, KeyRound, ChevronDown, Copy, Check } from 'lucide-react';
 import { addAdminLog } from '../../services/api/logs';
 import { useStore } from '../../store/useStore';
 import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
-import { isOpsManager, canPickStore } from '../../lib/authSession';
-import { visibleDeptIds } from '../../utils/dataScope';
+import { answerClockQuery } from '../../utils/copilotClock';
+import { answerUsageQuery, routeUsageQuery } from '../../utils/copilotUsage';
+import { isOpsManager } from '../../lib/authSession';
+import { scopeCopilotContext, copilotScopeKey } from '../../utils/copilotScope';
 import { inferAiIntent } from '../../utils/appLogs';
 import { isValidGeminiKey, DEFAULT_GEMINI_MODEL } from '../../services/geminiService';
 import { getCopilotConfiguration, saveCopilotConfiguration } from '../../services/api';
 import { useShallow } from 'zustand/react/shallow';
-import { assistantAgentPlan, assistantStoreIds, runAssistantAgents } from '../../utils/assistantAgents';
+import { assistantAgentPlan, runAssistantAgents } from '../../utils/assistantAgents';
 import { requiredDecisionWeeks } from '../../utils/aiDecisionEngine';
 import { decideAssistantAgent } from '../../services/api';
 import { routePersonalQuery, answerPersonalQuery } from '../../utils/decisionRouting';
@@ -20,75 +23,13 @@ import ConfirmModal from '../modals/ConfirmModal';
  * Simple inline Markdown renderer — hỗ trợ **bold**, *italic*, `code`, bullet lists và newlines.
  * Không cần thư viện ngoài.
  */
-function renderMarkdown(text) {
-  if (!text) return null;
-  const lines = text.split('\n');
-  const elements = [];
-  let key = 0;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    // Bullet list line
-    if (/^[-*•]\s/.test(trimmed)) {
-      elements.push(
-        <div key={key++} className="flex gap-1.5 items-start">
-          <span className="text-indigo-400 mt-0.5 flex-shrink-0">•</span>
-          <span>{inlineMarkdown(trimmed.replace(/^[-*•]\s/, ''))}</span>
-        </div>
-      );
-    }
-    // Numbered list
-    else if (/^\d+\.\s/.test(trimmed)) {
-      const numMatch = trimmed.match(/^(\d+)\.\s(.*)/);
-      elements.push(
-        <div key={key++} className="flex gap-1.5 items-start">
-          <span className="text-indigo-400 font-bold mt-0.5 flex-shrink-0 min-w-[14px]">{numMatch[1]}.</span>
-          <span>{inlineMarkdown(numMatch[2])}</span>
-        </div>
-      );
-    }
-    // Empty line → spacer
-    else if (trimmed === '') {
-      if (elements.length > 0) elements.push(<div key={key++} className="h-1" />);
-    }
-    // Normal line
-    else {
-      elements.push(<div key={key++}>{inlineMarkdown(line)}</div>);
-    }
-  }
-  return elements;
-}
-
-function inlineMarkdown(text) {
-  // Parse **bold**, *italic*, `code` với React elements
-  const parts = [];
-  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
-  let last = 0;
-  let match;
-  let k = 0;
-
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > last) parts.push(text.slice(last, match.index));
-    if (match[2] !== undefined) {
-      parts.push(<strong key={k++} className="font-bold">{match[2]}</strong>);
-    } else if (match[3] !== undefined) {
-      parts.push(<em key={k++} className="italic">{match[3]}</em>);
-    } else if (match[4] !== undefined) {
-      parts.push(<code key={k++} className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded text-[11px] font-mono">{match[4]}</code>);
-    }
-    last = regex.lastIndex;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length === 0 ? text : parts;
-}
 
 
 
 export default function AICopilotDrawer(props) {
-  const userId = useStore(s => s.user?.id || 'anonymous');
-  return <CopilotConversation key={`${userId}:${props.storeId || ''}`} {...props} />;
+  const scopeKey = useStore(s => copilotScopeKey(s.user));
+  return <CopilotConversation key={`${scopeKey}:${props.storeId || ''}`} {...props} />;
 }
 
 function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
@@ -112,12 +53,12 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const initialWelcome = {
     id: 'welcome',
     sender: 'bot',
-    text: `Chào ${firstName}! Mình là TÚ mini 🤖 — Trợ lý GS25.\nBạn có thể hỏi mình về ca làm việc, chấm công, hạn sử dụng món ăn, hoặc quy định OFC.`
+    text: `Chào ${firstName}! Mình là TÚ mini 🤖 — Trợ lý Lịch Ca.\nBạn có thể hỏi mình về ca làm việc, chấm công, hạn sử dụng món ăn, hoặc quy định OFC.`
   };
 
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = localStorage.getItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`);
+      const saved = localStorage.getItem(`ai_chat_rag_v1_${copilotScopeKey(user)}_${activeStoreId}`);
       if (saved) return JSON.parse(saved);
     } catch (err) {
       console.warn('[AICopilot] Không đọc được lịch sử chat — dùng mặc định:', err?.message);
@@ -126,7 +67,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   });
 
   useEffect(() => {
-    try { localStorage.setItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`, JSON.stringify(messages)); } catch { /* Chat remains usable when storage is unavailable. */ }
+    try { localStorage.setItem(`ai_chat_rag_v1_${copilotScopeKey(user)}_${activeStoreId}`, JSON.stringify(messages)); } catch { /* Chat remains usable when storage is unavailable. */ }
   }, [messages, activeStoreId, user?.id]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -160,11 +101,13 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     finally { setConfigBusy(false); }
   };
   const agentRequestRef = useRef(null);
+  const nextSendAtRef = useRef(0);
+  const [sendNotice, setSendNotice] = useState('');
   useEffect(() => {
     setIsTyping(false);
     setIsStreaming(false);
     return () => agentRequestRef.current?.abort();
-  }, [currentWeek, activeStoreId, user?.id]);
+  }, [currentWeek, activeStoreId, user?.id, isOpen]);
   const streamingMsgIdRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -189,7 +132,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
   const quickPrompts = isAdmin ? [
     '🔍 Quét lỗi & vi phạm lịch tuần',
     '📋 Kiểm tra lịch và hạn sử dụng',
-    '🕒 Giờ hủy hàng FF & GM GS25',
+    '🕒 Giờ hủy hàng FF & GM',
     '🔄 Có đơn đổi ca nào đang chờ?',
     '🧪 Hóa chất Saraya 6 mã màu'
   ] : [
@@ -199,17 +142,24 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     '🍲 Công thức nấu súp chả cá cay'
   ];
 
-  const handleSend = async (textToSend = null) => {
+  const handleSend = async (textToSend = null, retryMessageId = null) => {
     const query = (textToSend || inputText).trim();
-    if (!query || isTyping || isStreaming) return;
+    if (!query || isTyping || isStreaming || (agentRequestRef.current && !agentRequestRef.current.signal.aborted)) return;
+    if (Date.now() < nextSendAtRef.current) {
+      setSendNotice(`Vui lòng chờ ${Math.ceil((nextSendAtRef.current - Date.now()) / 1000)} giây rồi gửi tiếp.`);
+      return;
+    }
+    nextSendAtRef.current = Date.now() + 3000;
+    setSendNotice('');
 
     const sessionEpoch = useStore.getState()._sessionEpoch;
     agentRequestRef.current?.abort();
     const request = new AbortController();
     agentRequestRef.current = request;
     let startSnapshot = useStore.getState();
+    const retrying = retryMessageId && messages.at(-1)?.id === retryMessageId;
     const userMsg = { id: 'user_' + Date.now(), sender: 'user', text: query };
-    setMessages(prev => trimMessagesBuffer([...prev, userMsg]));
+    setMessages(prev => retrying ? prev.filter(m => m.id !== retryMessageId) : trimMessagesBuffer([...prev, userMsg]));
     if (!textToSend) setInputText('');
     setIsTyping(true);
 
@@ -223,43 +173,16 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       });
     } catch { /* Silent log fail */ }
 
-    const pickStore = canPickStore(user);
-    const scopedEmployees = isAdmin
-      ? (pickStore || !user?.dept ? employees : employees.filter(e => e.dept === user.dept))
-      : employees.filter(e => e.dept === activeStoreId || e.id === user?.id);
-    const scopedSchedule = {};
-    scopedEmployees.forEach(e => {
-      if (weekSched[e.id]) scopedSchedule[e.id] = weekSched[e.id];
+    const contextData = scopeCopilotContext({
+      employees, weekSchedule: weekSched, schedule: { [currentWeek]: weekSched },
+      stores, shiftSwaps, feedbacks, shelves: startSnapshot.shelves || [],
+      shelfItems: startSnapshot.shelfItems || [], storeId: activeStoreId, currentWeek, user,
     });
-    const scopedFeedbacks = isAdmin
-      ? feedbacks
-      : feedbacks.filter(f => f.empId === user?.id || f.dept === user?.dept);
-    const scopedSwaps = isAdmin
-      ? shiftSwaps
-      : (shiftSwaps || []).filter(s => s.fromEmpId === user?.id || s.toEmpId === user?.id || s.store === user?.dept);
-
-    const shelfScope = new Set(visibleDeptIds(user, stores));
-    const selectedStoreIds = assistantStoreIds(activeStoreId);
-    const scopedShelves = (startSnapshot.shelves || []).filter(s =>
-      shelfScope.has(s.storeId) && (!selectedStoreIds || selectedStoreIds.has(s.storeId)) &&
-      (isAdmin || String(s.assigneeId).split(',').map(id => id.trim()).includes(user?.id)));
-    const scopedShelfIds = new Set(scopedShelves.map(s => s.id));
-    const contextData = {
-      employees: scopedEmployees,
-      weekSchedule: scopedSchedule,
-      schedule: { [currentWeek]: scopedSchedule },
-      stores: isAdmin ? stores : (() => { const ok = new Set(visibleDeptIds(user, stores)); if (activeStoreId) ok.add(activeStoreId); return stores.filter(s => ok.has(s.id)); })(),
-      shiftSwaps: scopedSwaps,
-      feedbacks: scopedFeedbacks,
-      shelves: scopedShelves,
-      shelfItems: (startSnapshot.shelfItems || []).filter(i => scopedShelfIds.has(i.shelfId)),
-      storeId: activeStoreId,
-      currentWeek,
-      user
-    };
 
     // Lọc lịch sử chat (bỏ tin nhắn chào mừng)
-    const chatHistory = messages.filter(m => m.id !== 'welcome');
+    const chatHistory = messages.filter(m => m.id !== 'welcome' && !m.isError && !m.isIncomplete);
+    // Retrying replaces the failed answer, without sending the same user turn twice.
+    if (retrying && chatHistory.at(-1)?.sender === 'user' && chatHistory.at(-1)?.text === query) chatHistory.pop();
 
     const t0 = Date.now();
     let model = 'local-engine';
@@ -267,6 +190,21 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     let err = '';
 
     try {
+      const clockAnswer = answerClockQuery(query);
+      if (clockAnswer) {
+        aiReply = clockAnswer;
+        model = 'local-clock';
+        setMessages(prev => trimMessagesBuffer([...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]));
+        return; // finally still records this answer, with no LLM/handbook call.
+      }
+      const usageRoute = routeUsageQuery(query, chatHistory);
+      if (usageRoute) {
+        aiReply = await answerUsageQuery(usageRoute, { ...contextData, storeId: activeStoreId || 'ALL' });
+        if (request.signal.aborted || sessionEpoch !== useStore.getState()._sessionEpoch || user !== useStore.getState().user) return;
+        model = 'local-usage-analytics';
+        setMessages(prev => trimMessagesBuffer([...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]));
+        return;
+      }
       const route = routePersonalQuery(query);
       const agentEvents = [];
       const revision = `${sessionEpoch}:${user?.id}:${activeStoreId}:${currentWeek}:${t0}`;
@@ -303,7 +241,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         // Tạo placeholder message để stream vào
         const streamMsgId = 'ai_' + Date.now();
         streamingMsgIdRef.current = streamMsgId;
-        setMessages(prev => [...prev, { id: streamMsgId, sender: 'ai', text: '' }]);
+        setMessages(prev => [...prev, { id: streamMsgId, sender: 'ai', text: '', isIncomplete: true }]);
         setIsTyping(false);
         setIsStreaming(true);
 
@@ -314,18 +252,26 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             setMessages(prev => prev.map(m =>
               m.id === streamMsgId ? { ...m, text: m.text + delta } : m
             ));
-          });
+          }, { signal: request.signal });
           if (request.signal.aborted) return;
           model = DEFAULT_GEMINI_MODEL;
+          setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, text: aiReply, isIncomplete: false } : m));
         } catch (geminiErr) {
           if (request.signal.aborted) return;
           // Do not replace a failed handbook answer with a keyword-based guess.
-          setMessages(prev => prev.filter(m => m.id !== streamMsgId));
           err = geminiErr.message || 'Không kết nối được trợ lý AI.';
-          aiReply = `${err}\nAnh/chị có thể mở trang Sổ tay để tra cứu hoặc thử lại sau.`;
+          if (geminiErr.retryAfter) nextSendAtRef.current = Date.now() + geminiErr.retryAfter * 1000;
+          const temporary = [408, 429, 500, 502, 503, 504].includes(geminiErr.status) && !/chưa.*cấu hình/i.test(err);
+          aiReply = geminiErr.status === 503 && temporary && /Gemini/i.test(err)
+            ? 'Gemini tạm thời không khả dụng (503). Anh/chị có thể thử lại sau hoặc tra trực tiếp trong Sổ tay.'
+            : err;
           model = 'gemini-error';
-          const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true };
-          setMessages(prev => trimMessagesBuffer([...prev, aiMsg]));
+          const aiMsg = { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply, isError: true, retryQuery: temporary ? query : null };
+          setMessages(prev => {
+            const partial = prev.find(m => m.id === streamMsgId)?.text;
+            return trimMessagesBuffer([...prev.filter(m => m.id !== streamMsgId), { ...aiMsg,
+              text: partial ? `${partial}\n\n⚠️ Câu trả lời chưa hoàn tất. ${aiReply}` : aiReply }]);
+          });
         } finally {
           if (agentRequestRef.current === request) {
             setIsStreaming(false);
@@ -343,9 +289,10 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       setIsStreaming(false);
     } finally {
       if (agentRequestRef.current === request) {
+        agentRequestRef.current = null;
         setIsTyping(false);
       }
-      if (!request.signal.aborted && sessionEpoch === useStore.getState()._sessionEpoch) useStore.getState().logAiTurn?.({
+      if (!request.signal.aborted && sessionEpoch === useStore.getState()._sessionEpoch && user === useStore.getState().user) useStore.getState().logAiTurn?.({
         conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
         storeId: activeStoreId,
         userMessage: query,
@@ -353,7 +300,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         intent: inferAiIntent(query),
         model,
         latencyMs: Date.now() - t0,
-        contextUsed: { storeId: activeStoreId, currentWeek, empCount: scopedEmployees.length },
+        contextUsed: { storeId: activeStoreId, currentWeek, empCount: contextData.employees.length },
         error: err || null
 
       });
@@ -376,13 +323,13 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
   return (
     <>
-      
+
 
       {/* Responsive Bottom Sheet / Drawer Container */}
       <div className="fixed inset-x-0 bottom-0 sm:bottom-6 sm:right-6 sm:inset-x-auto w-full sm:w-[400px] h-[82dvh] sm:h-[560px] max-h-[85dvh] sm:max-h-[600px] bg-white shadow-2xl shadow-slate-900/30 rounded-t-3xl sm:rounded-2xl overflow-hidden z-50 flex flex-col border border-slate-200/80 print:hidden animate-in slide-in-from-bottom-6 duration-200">
-        
+
         {/* Mobile Pull Handle Bar */}
-        <div 
+        <div
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onClick={onClose}
@@ -393,17 +340,17 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         </div>
 
         {/* Header */}
-        <div 
+        <div
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           className="px-4 py-3 sm:p-5 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 text-white flex items-center justify-between shadow-md relative overflow-hidden flex-shrink-0"
         >
           {/* Glass effect */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl pointer-events-none" />
-          
+
           <div className="flex items-center gap-2.5 sm:gap-3 relative z-10">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/20 overflow-hidden flex-shrink-0">
-              <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" />
+              <img src={`${import.meta.env.BASE_URL}assistant-avatar.svg`} alt="Tú mini" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="font-extrabold text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
@@ -419,7 +366,8 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
+          <div className="flex items-center gap-1 sm:gap-1.5 relative z-10">
+
             {canConfigureAi && <button
               type="button"
               onClick={openAiSettings}
@@ -458,7 +406,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                 <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm overflow-hidden ${
                   isAI ? 'bg-indigo-50 border border-indigo-200 shadow-xs' : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-xs'
                 }`}>
-                  {isAI ? <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" /> : <User size={15} />}
+                  {isAI ? <img src={`${import.meta.env.BASE_URL}assistant-avatar.svg`} alt="Tú mini" className="w-full h-full object-cover" /> : <User size={15} />}
                 </div>
 
                 <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[82%]">
@@ -477,6 +425,13 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                       <div className="font-normal">{m.text}</div>
                     )}
                   </div>
+                  {isAI && m.isError && <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {m.retryQuery && m.id === messages.at(-1)?.id && <button type="button" disabled={isTyping || isStreaming}
+                      onClick={() => handleSend(m.retryQuery, m.id)}
+                      className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-slate-700 disabled:opacity-50">Thử lại câu hỏi</button>}
+                    <a href={`${import.meta.env.BASE_URL}employee/handbook`} onClick={onClose}
+                      className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 text-slate-700">Mở Sổ tay</a>
+                  </div>}
                   {/* Copy button for AI messages */}
                   {isAI && m.text && !isStreamingThis && (
                     <button
@@ -497,7 +452,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
           {isTyping && (
             <div className="flex items-center gap-2.5 text-xs text-slate-500 italic">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden shadow-xs animate-bounce border border-indigo-100">
-                <img src={`${import.meta.env.BASE_URL}tu_mini_avatar.jpg`} alt="Tú mini" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assistant-avatar.svg`} alt="Tú mini" className="w-full h-full object-cover" />
               </div>
               <span className="bg-slate-200/50 px-2.5 py-1 rounded-full text-[11px] sm:text-xs">TÚ mini đang lục lọi dữ liệu...</span>
             </div>
@@ -520,6 +475,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
               key={idx}
               type="button"
               onClick={() => handleSend(prompt)}
+              disabled={isTyping || isStreaming}
               className="whitespace-nowrap px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-full font-medium text-slate-700 hover:text-indigo-700 transition-all duration-200 shadow-2xs cursor-pointer flex-shrink-0"
             >
               {prompt}
@@ -556,13 +512,14 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
             <button
               type="submit"
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isTyping || isStreaming}
               className="p-2.5 sm:p-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-full disabled:opacity-40 transition-all cursor-pointer shadow-md hover:shadow-lg transform active:scale-95 group flex-shrink-0"
               title="Gửi câu hỏi"
             >
               <Send size={16} className="sm:w-[17px] sm:h-[17px] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </button>
           </form>
+          {sendNotice && <p role="status" className="mt-1 text-xs text-slate-500">{sendNotice}</p>}
         </div>
 
       {/* Settings Overlay */}
@@ -576,7 +533,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
               <X size={18} />
             </button>
           </div>
-          
+
           <div className="space-y-4">
             <p role="status" className="text-sm text-slate-600">{configBusy ? 'Đang xử lý cấu hình…' : configStatus === true ? 'Đã cấu hình cho toàn ứng dụng. Nhân viên có thể dùng trợ lý.' : configStatus === false ? 'Chưa cấu hình. Admin nhập key để kích hoạt trợ lý.' : 'Chưa đọc được trạng thái cấu hình.'}</p>
             {configError && <p role="alert" className="text-sm text-red-600">{configError}</p>}
@@ -587,8 +544,8 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                   <span className="ml-2 text-emerald-600 text-xs font-semibold">✓ Đúng định dạng</span>
                 )}
               </label>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 autoComplete="new-password"
                 disabled={configBusy}
                 value={geminiKeyDraft}
@@ -610,7 +567,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
               </p>
             </div>
 
-            <button 
+            <button
               onClick={saveAiSettings}
               disabled={configBusy || !isValidGeminiKey(geminiKeyDraft)}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-md transition-all cursor-pointer"
@@ -623,9 +580,9 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
       )}
 
 
-      <RecipeQuickModal 
-        isOpen={showRecipeModal} 
-        onClose={() => setShowRecipeModal(false)} 
+      <RecipeQuickModal
+        isOpen={showRecipeModal}
+        onClose={() => setShowRecipeModal(false)}
       />
 
       <ConfirmModal
@@ -637,7 +594,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         confirmText="Xác nhận xóa"
         onConfirm={() => {
           setMessages([initialWelcome]);
-          localStorage.removeItem(`ai_chat_history_${user?.id || 'anonymous'}_${activeStoreId}`);
+          localStorage.removeItem(`ai_chat_rag_v1_${copilotScopeKey(user)}_${activeStoreId}`);
           setShowConfirmClear(false);
         }}
       />

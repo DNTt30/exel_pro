@@ -17,6 +17,7 @@ export default function CloudSyncBadge() {
   const realtimeStatus = useStore(s => s.realtimeStatus);
   const lastSyncedAt = useStore(s => s.lastSyncedAt);
   const initializeData = useStore(s => s.initializeData);
+  const authWarning = useStore(s => s.authWarning);
 
   const [, setTick] = useState(0);
 
@@ -26,26 +27,26 @@ export default function CloudSyncBadge() {
     return () => clearInterval(timer);
   }, []);
 
-  if (syncStatus === 'loading') {
+  if (syncStatus === 'loading' || syncStatus === 'saving') {
     return (
       <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 shadow-2xs" title="Đang đồng bộ dữ liệu từ Supabase...">
         <Loader2 size={11} className="animate-spin text-blue-600" />
-        <span className="hidden sm:inline">Đang đồng bộ</span>
+        <span className="hidden sm:inline">{syncStatus === 'saving' ? 'Đang lưu' : 'Đang đồng bộ'}</span>
       </span>
     );
   }
 
-  if (syncStatus === 'error' || realtimeStatus === 'error') {
+  if (authWarning || syncStatus === 'error' || realtimeStatus === 'error') {
     return (
       <button 
         type="button" 
         onClick={() => initializeData()} 
         className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1 hover:bg-rose-100 transition-all cursor-pointer shadow-2xs" 
-        title="Mất kết nối Supabase — Bấm để kết nối lại"
+        title={authWarning || (syncStatus === 'error' ? 'Có dữ liệu chưa tải hoặc chưa lưu được. Bấm để tải lại; xem thông báo lỗi của thao tác vừa thực hiện.' : 'Cập nhật trực tiếp đang gián đoạn. Bấm để tải lại dữ liệu và kết nối Live.')}
       >
         <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-        <span>Offline</span>
-        <span className="hidden sm:inline text-[10px] text-rose-600 underline font-normal">(Kết nối lại)</span>
+        <span>{authWarning ? 'Kiểm tra đăng nhập' : syncStatus === 'error' ? 'Lỗi đồng bộ' : 'Live gián đoạn'}</span>
+        <span className="hidden sm:inline text-[10px] text-rose-600 underline font-normal">(Thử lại)</span>
       </button>
     );
   }
@@ -64,13 +65,21 @@ export default function CloudSyncBadge() {
     );
   }
 
-  // Trạng thái Connected: Live Pulse Pill (🟢 Nhịp tim WebSocket)
+  if (realtimeStatus !== 'connected') {
+    return <button type="button" onClick={() => initializeData()}
+      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+      title="Kênh cập nhật trực tiếp chưa kết nối. Bấm để tải lại dữ liệu.">
+      <RefreshCw size={11} />{lastSyncedAt ? 'Đã tải dữ liệu' : 'Chưa đồng bộ'}
+    </button>;
+  }
+
+  // Chỉ báo Live khi WebSocket thực sự đã đăng ký thành công.
   return (
     <button 
       type="button" 
       onClick={() => initializeData()} 
       className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50/90 border border-emerald-200/90 rounded-full px-2.5 py-1 hover:bg-emerald-100 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs group" 
-      title="🟢 Đang kết nối Realtime trực tiếp (Supabase WebSocket). Mọi thay đổi sẽ cập nhật 0s. Bấm để tải lại toàn bộ."
+      title="Đã kết nối cập nhật trực tiếp. Bấm để tải lại dữ liệu."
     >
       <span className="relative flex h-2 w-2">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />

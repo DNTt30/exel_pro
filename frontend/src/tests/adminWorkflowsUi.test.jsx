@@ -75,14 +75,16 @@ it('keeps multi-store SM filters within assigned stores, including the all-store
   expect(container.textContent).toContain('Công cửa hàng B');
   expect(container.textContent).not.toContain('Quên chấm tháng trước');
 });
-it('shows scheduled hours and dates while editing, saves the exact date, and Escape cancels', async () => {
+it('keeps scheduled hours as a placeholder without repeated cell labels, saves the exact date, and Escape cancels', async () => {
   await mount(<Timesheet />);
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Sửa công thực tế').click());
   const input = container.querySelector('[aria-label="Công thực tế 260000001 ngày T2 28/09"]');
   expect(input).not.toBeNull();
   expect(input.placeholder).toBe('8');
   expect(input.value).toBe('');
-  expect(input.parentElement.textContent).toContain('Lịch: 8');
+  expect(input.parentElement.textContent.trim()).toBe('');
+  expect(input.title).toContain('T2 28/09');
+  expect(input.title).toContain('Theo lịch: 8');
   await act(async () => input.focus());
   await fill(input, '7,84');
   await act(async () => input.blur());
@@ -103,4 +105,18 @@ it('preserves 0/OFF and counts only overrides in the visible month', async () =>
   expect(container.textContent).toContain('Đang sửa công (2 ô)');
   expect(container.querySelector('[aria-label="Công thực tế 260000001 ngày T2 28/09"]').value).toBe('0');
   expect(container.querySelector('[aria-label="Công thực tế 260000001 ngày T3 29/09"]').value).toBe('OFF');
+});
+
+it('keeps the compact total consistent with actual hours, OFF and unscheduled days', async () => {
+  useStore.setState({
+    schedule: { '2026-09-28': { '260000001': { T2: '6-14', T3: '6-14', T4: '6-14', T5: 'off' } } },
+    attendance: { '260000001|2026-09-28': { actualHours: 7.84 }, '260000001|2026-09-29': { actualHours: 0 } },
+  });
+  await mount(<Timesheet />);
+  const row = container.querySelector('tbody th[scope="row"]').parentElement;
+  expect(row.querySelector('td').textContent).toBe('15,84');
+  expect(row.textContent).toContain('OFF');
+  expect(row.textContent).toContain('—');
+  expect(container.querySelector('thead').textContent).not.toMatch(/Giờ FT|Giờ PT|Lương/);
+  expect(container.querySelector('details').open).toBe(false);
 });

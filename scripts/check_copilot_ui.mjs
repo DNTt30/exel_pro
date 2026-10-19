@@ -134,8 +134,8 @@ try {
   await evaluate("window.testStore.setState({user:{id:'260512001',role:'employee',dept:'VN0485',name:'NV thử',loginAt:Date.now()}});history.pushState({}, '', '/employee/home');dispatchEvent(new PopStateEvent('popstate'));");
   for (const [device,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:device==='mobile'});
-    await waitFor("document.querySelector('[title=\"GS25 AI Copilot\"]')");
-    await evaluate("document.querySelector('[title=\"GS25 AI Copilot\"]').click()");
+    await waitFor("document.querySelector('[title=\"Mở Trợ lý ảo TÚ mini AI\"]')");
+    await evaluate("document.querySelector('[title=\"Mở Trợ lý ảo TÚ mini AI\"]').click()");
     await waitFor("document.querySelector('input[placeholder^=\"Hỏi công thức\"]')");
     assert.equal(await evaluate("!!document.querySelector('[title=\"Cài đặt AI\"]')"),false);
     assert.equal(await evaluate("!!document.querySelector('input[type=password]')"),false);
@@ -144,13 +144,17 @@ try {
     await evaluate("document.querySelector('[title=\"Đóng trợ lý\"]').click()");
   }
   assert.equal(requests.length,2);
-  const {GS25_HANDBOOK_DATA}=await import('../frontend/src/data/gs25HandbookData.js');
   for (const request of requests) {
     assert.equal(new URL(request.url).searchParams.get('model'),'gemini-3.6-flash');
-    assert.deepEqual(JSON.parse(request.body.systemInstruction.parts[0].text.split('SỔ TAY NGHIỆP VỤ GS25 — TOÀN BỘ NỘI DUNG:\n')[1]),GS25_HANDBOOK_DATA);
+    const prompt = request.body.systemInstruction.parts[0].text;
+    assert.ok(prompt.includes('TRÍCH ĐOẠN SỔ TAY LIÊN QUAN:'));
+    assert.ok(prompt.includes('[hotpot]'));
+    assert.ok(!prompt.includes('TOÀN BỘ NỘI DUNG'));
+    assert.equal(request.body.generationConfig.maxOutputTokens, 2048);
+    assert.deepEqual(request.body.copilotScope, { kind: 'handbook', storeIds: [], employeeIds: [] });
   }
   assert.deepEqual(errors,[]);
-  console.log('PASS desktop/mobile admin shared configuration, employee settings hidden, streaming chat, full handbook and fixed model (mock provider).');
+  console.log('PASS desktop/mobile admin configuration, employee settings hidden, streaming RAG and bounded output (mock provider).');
 } catch (error) {
   console.error(await evaluate('document.body.innerText.slice(-1600)'),errors);
   throw error;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { appRoleLabel, appRoleOf, isOpsManager, isBuiltinStoreManager, canManageStoreList } from '../../lib/authSession';
 import { CalendarDays, Clock, FileText, LogOut, KeyRound, LayoutDashboard, User, Users, Store, Menu, X, Sparkles, ScrollText, HelpCircle, Home, Rows3, ChevronRight, BookOpen, Smartphone } from 'lucide-react';
@@ -12,12 +12,14 @@ import { AdminPageSkeleton, EmployeePageSkeleton } from '../ui/Skeleton';
 import CloudSyncBadge from './CloudSyncBadge';
 import AICopilotDrawer from '../ai/AICopilotDrawer';
 import HelpDrawer from '../HelpDrawer';
-import FloatingAITrigger from './FloatingAITrigger';
 import { usePWAInstall } from '../../utils/pwaHelper';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { requiredPasswordPath } from '../../utils/authNavigation';
+import { useWorkspaceBranding } from '../../hooks/useWorkspaceBranding';
+import { canConfigureWorkspace } from '../../utils/workspaceBranding';
 
 export default function AppLayout() {
+  const branding = useWorkspaceBranding();
   const user = useStore(state => state.user);
   const logout = useStore(state => state.logout);
   const [showPw, setShowPw] = useState(false);
@@ -25,6 +27,8 @@ export default function AppLayout() {
   const isInitializing = useStore(state => state.isInitializing);
   const authWarning = useStore(state => state.authWarning);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isNavActive = (link, isActive) => isActive || (link.to === '/admin/settings' && pathname === '/admin/roles');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -95,7 +99,8 @@ export default function AppLayout() {
         ...(user?.id !== 'admin' ? [{ to: '/employee/profile', icon: <User size={17} />, label: 'Hồ sơ của tôi' }] : []),
         { to: '/admin/employees',  icon: <Users size={17} />,           label: 'Nhân viên' },
         ...(canManageStoreList(user) ? [{ to: '/admin/stores', icon: <Store size={17} />, label: 'Cửa hàng' }] : []),
-        ...(isFullAdmin ? [{ to: '/admin/logs', icon: <ScrollText size={17} />, label: 'Nhật ký' }] : [])
+        ...(isFullAdmin ? [{ to: '/admin/logs', icon: <ScrollText size={17} />, label: 'Nhật ký' }] : []),
+        ...(canConfigureWorkspace(user) ? [{ to: '/admin/settings', icon: <Store size={17} />, label: 'Cài đặt đơn vị' }] : [])
       ]
     }
   ];
@@ -110,7 +115,7 @@ export default function AppLayout() {
         { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
         { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
         { to: '/employee/shelves',   icon: <Rows3 size={17} />,        label: 'Kệ của tôi' },
-        { to: '/employee/handbook',  icon: <BookOpen size={17} />,     label: 'Sổ tay GS25' },
+        { to: '/employee/handbook',  icon: <BookOpen size={17} />,     label: 'Sổ tay nội bộ' },
       ]
     }
   ];
@@ -149,7 +154,7 @@ export default function AppLayout() {
     return (
       <div className="min-h-screen bg-slate-50">
         <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
-          <span className="text-sm font-bold text-blue-600">GS25 · Bảo mật tài khoản</span>
+          <span className="text-sm font-bold" style={{ color: branding.primaryColor }}>{branding.appName} · Bảo mật tài khoản</span>
           <button type="button" onClick={handleLogout} className="flex items-center gap-1 text-xs font-semibold text-slate-600">
             <LogOut size={16} /> Đăng xuất
           </button>
@@ -169,9 +174,10 @@ export default function AppLayout() {
           <button onClick={() => mobileMenuOpen ? setMobileMenuOpen(false) : openMobileMenu()} className="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          {/* DNTgs25 logo badge */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1.5 rounded-xl shadow-sm shadow-blue-500/25 font-black text-xs sm:text-sm tracking-tight select-none border border-white/20">
-            DNTgs25
+          {/* Lịch Ca logo badge */}
+          <div title={branding.organizationName || branding.appName} style={{ backgroundColor: branding.primaryColor }} className="flex items-center gap-2 min-w-0 max-w-[140px] sm:max-w-[240px] text-white px-3 py-1.5 rounded-xl shadow-sm font-black text-xs sm:text-sm tracking-tight select-none border border-white/20">
+            {branding.logoDataUrl && <img src={branding.logoDataUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white object-contain" />}
+            <span className="truncate">{branding.appName}</span>
           </div>
           
           {/* Active store context pill */}
@@ -189,18 +195,18 @@ export default function AppLayout() {
           <button 
             type="button" 
             onClick={openAI} 
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs hover:shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs shadow-xs hover:shadow-md transition-all cursor-pointer"
             title="Mở Trợ lý ảo TÚ mini AI"
           >
-            <Sparkles size={13} className="text-amber-300 animate-pulse" />
+            <Sparkles size={13} className="text-white" />
             <span className="hidden sm:inline">Trợ lý AI</span>
           </button>
           {isInstallable && (
             <button 
               type="button" 
               onClick={() => setShowInstallModal(true)} 
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer animate-[pulse_3s_ease-in-out_infinite]"
-              title="Cài đặt App DNTgs25 về điện thoại"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer"
+              title="Cài đặt App Lịch Ca về điện thoại"
             >
               <Smartphone size={13} className="text-amber-300" />
               <span className="hidden sm:inline">Cài App</span>
@@ -210,7 +216,7 @@ export default function AppLayout() {
           <button onClick={openHelp} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell pushStatus={pushStatus} onPushSubscribe={pushSubscribe} onPushUnsubscribe={pushUnsubscribe} />
           <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
+            <div className="w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={12} />}
             </div>
             <span className="text-xs font-bold text-slate-700 hidden min-[390px]:inline max-w-[65px] sm:max-w-[150px] truncate">{user?.name}</span>
@@ -234,7 +240,7 @@ export default function AppLayout() {
         {mobileMenuOpen && (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} />)}
 
         {/* ── Sidebar (blue gradient) ── */}
-        <aside className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto w-60 flex flex-col print:hidden bg-gradient-to-b from-blue-600 via-blue-700 to-indigo-900 border-r border-blue-950/30 transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}>
+        <aside style={{ background: `linear-gradient(180deg, ${branding.primaryColor}, #0f172a)` }} className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto w-60 flex flex-col print:hidden border-r border-blue-950/30 transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`}>
 
           <div className="px-4 py-3 md:hidden flex items-center justify-between border-b border-white/10">
             <span className="font-bold text-sm text-white/80">Menu</span>
@@ -261,17 +267,17 @@ export default function AppLayout() {
                 </div>
                 {section.items.map((link) => (
                   <NavLink key={link.to} to={link.to} onClick={() => setMobileMenuOpen(false)}
-                    className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all group ${isActive ? 'bg-white text-blue-700 shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                    className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all group ${isNavActive(link, isActive) ? 'bg-white text-blue-700 shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                   >
                     {({ isActive }) => (<>
-                      <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-white/50 group-hover:text-white/90'}`}>{link.icon}</span>
+                      <span className={`flex-shrink-0 transition-colors ${isNavActive(link, isActive) ? 'text-blue-600' : 'text-white/50 group-hover:text-white/90'}`}>{link.icon}</span>
                       <span className="truncate flex-1">{link.label}</span>
                       {link.badge > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 shadow-2xs ${link.badgeColor || 'bg-amber-400 text-slate-950 font-bold'}`}>
                           {link.badge}
                         </span>
                       )}
-                      {isActive && <ChevronRight size={13} className="text-blue-400 flex-shrink-0" />}
+                      {isNavActive(link, isActive) && <ChevronRight size={13} className="text-blue-400 flex-shrink-0" />}
                     </>)}
                   </NavLink>
                 ))}
@@ -287,7 +293,7 @@ export default function AppLayout() {
                 onClick={() => { setMobileMenuOpen(false); setShowInstallModal(true); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-all text-xs font-bold cursor-pointer mb-1 shadow-2xs"
               >
-                <Smartphone size={14} className="text-amber-300" /> Cài đặt App DNTgs25
+                <Smartphone size={14} className="text-amber-300" /> Cài đặt App Lịch Ca
               </button>
             )}
             <button 
@@ -307,7 +313,7 @@ export default function AppLayout() {
             <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/50 hover:text-red-300 hover:bg-white/10 transition-all text-xs font-semibold cursor-pointer">
               <LogOut size={14} /> Đăng xuất
             </button>
-            <p className="text-white/20 text-[10px] text-center mt-2">© 2026 DNTgs25 System</p>
+            <p className="text-white/60 text-[10px] text-center mt-2 break-words">{branding.organizationName || branding.appName}</p>
           </div>
         </aside>
 
@@ -343,9 +349,6 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-
-        {/* Floating AI Button - kéo thả tự do, có thể ẩn để không che nút thao tác */}
-        <FloatingAITrigger onOpen={openAI} />
 
         <Toaster />
         <HelpDrawer isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} isAdmin={isManager} />

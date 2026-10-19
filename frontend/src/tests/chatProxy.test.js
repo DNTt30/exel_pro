@@ -1,9 +1,44 @@
 import { expect, it, vi } from 'vitest';
-import { createChatProxyHandler } from '../../../supabase/functions/chat-proxy/handler.js';
+import { createChatProxyHandler as createHandler } from '../../../supabase/functions/chat-proxy/handler.js';
+const createChatProxyHandler = options => createHandler({ consumeRequest: async () => ({ allowed: true }), ...options });
 import { DEFAULT_GEMINI_MODEL } from '../../../supabase/functions/_shared/copilotConfig.js';
 const key = 'AIza' + 'x'.repeat(35);
-const body = { contents: [{ role: 'user', parts: [{ text: 'Cách nấu lẩu?' }] }], systemInstruction: { parts: [{ text: 'Sổ tay' }] } };
+const body = { copilotScope: { kind: 'handbook', storeIds: [], employeeIds: [] }, contents: [{ role: 'user', parts: [{ text: 'Cách nấu lẩu?' }] }], systemInstruction: { parts: [{ text: 'Sổ tay' }] } };
 const req = (headers = {}, query = '') => new Request(`https://test/chat-proxy?${query}`, { method: 'POST', headers: { Authorization: 'Bearer session', 'x-gemini-api-key': key, ...headers }, body: JSON.stringify(body) });
+it.each(['generateContent', 'streamGenerateContent'])('rejects spam before contacting Gemini for %s', async action => {
+  const identity = { employeeId: '100000001', isAdmin: false };
+  const consumeRequest = vi.fn(async () => ({ allowed: false, retryAfter: 12 }));
+  const fetchImpl = vi.fn(), sleep = vi.fn();
+  const handler = createChatProxyHandler({ authorize: async () => identity, getApiKey: async () => key, consumeRequest, fetchImpl, sleep });
+  const response = await handler(req({}, `action=${action}`));
+  expect(response.status).toBe(429);
+  expect(response.headers.get('Retry-After')).toBe('12');
+  expect(await response.json()).toMatchObject({ code: 'COPILOT_RATE_LIMITED', retryAfter: 12 });
+  expect(consumeRequest).toHaveBeenCalledWith(identity);
+  expect(fetchImpl).not.toHaveBeenCalled(); expect(sleep).not.toHaveBeenCalled();
+});
+it.each([undefined, async () => { throw new Error('private'); }, async () => null, async () => ({ allowed: false, retryAfter: -1 })])('fails closed when the database budget is unavailable', async consumeRequest => {
+  const fetchImpl = vi.fn();
+  const handler = createChatProxyHandler({ authorize: async () => ({ employeeId: '100000001' }), getApiKey: async () => key, consumeRequest, fetchImpl });
+  const response = await handler(req());
+  expect(response.status).toBe(503); expect(await response.text()).not.toContain('private');
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+it('consumes one budget slot for the bounded upstream retry sequence', async () => {
+  const consumeRequest = vi.fn(async () => ({ allowed: true }));
+  const fetchImpl = vi.fn(async () => new Response('', { status: 503 }));
+  const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, consumeRequest, fetchImpl, sleep: async () => {} });
+  await handler(req());
+  expect(consumeRequest).toHaveBeenCalledTimes(1);
+  expect(fetchImpl).toHaveBeenCalledTimes(3);
+});
+it.each([[2048, 2048], [99999, 2048], [-1, 1024], ['8192', 1024], [null, 1024]])('enforces server output budget for %s', async (requested, expected) => {
+  const fetchImpl = vi.fn(async () => new Response('{}'));
+  const handler = createChatProxyHandler({ authorize: async () => true, getApiKey: async () => key, fetchImpl });
+  const request = new Request('https://test/chat-proxy', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: JSON.stringify({ ...body, generationConfig: { maxOutputTokens: requested, temperature: 9 } }) });
+  expect((await handler(request)).status).toBe(200);
+  expect(JSON.parse(fetchImpl.mock.calls[0][1].body).generationConfig).toMatchObject({ maxOutputTokens: expected, temperature: 0.2 });
+});
 it('does not abort a long answer after streaming headers have arrived', async () => {
   vi.useFakeTimers();
   try {
@@ -72,7 +107,11 @@ it('pins model on the server, uses SSE and sends the key only as a header', asyn
   expect(url).toBe(`https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_GEMINI_MODEL}:streamGenerateContent?alt=sse`);
   expect(url).not.toContain(key);
   expect(init.headers['x-goog-api-key']).toBe(key);
-  expect(JSON.parse(init.body)).toMatchObject({ ...body, generationConfig: { maxOutputTokens: 8192 } });
+  const payload = JSON.parse(init.body);
+  expect(payload).toMatchObject({ contents: body.contents, generationConfig: { maxOutputTokens: 1024 } });
+  expect(payload.systemInstruction.parts).toEqual(expect.arrayContaining(body.systemInstruction.parts));
+  expect(payload.systemInstruction.parts[0].text).toContain('staff');
+  expect(payload).not.toHaveProperty('copilotScope');
 });
 it.each(['configure', 'config_status'])('denies employee and manager access to %s before reading or writing secrets', async action => {
   const getApiKey = vi.fn(), saveApiKey = vi.fn(), fetchImpl = vi.fn();

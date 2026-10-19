@@ -65,7 +65,7 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply, cu
       <div className="space-y-4 text-slate-700">
         
         {/* Intro banner */}
-        <div className="p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200/80 rounded-xl text-xs flex items-start gap-2.5">
+        <div className="p-3 bg-slate-50 border border-blue-200/80 rounded-xl text-xs flex items-start gap-2.5">
           <div className="p-1.5 bg-blue-600 text-white rounded-lg flex-shrink-0">
             <Sparkles size={14} />
           </div>
@@ -211,7 +211,7 @@ export default function ShiftSuggestionModal({ isOpen, onClose, emp, onApply, cu
             type="button"
             onClick={handleConfirm}
             disabled={isApplying}
-            className="w-full sm:w-auto px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <Sparkles size={13} className="text-amber-300" />
             <span>{isApplying ? 'Đang áp dụng...' : 'Áp Dụng Lịch Này'}</span>

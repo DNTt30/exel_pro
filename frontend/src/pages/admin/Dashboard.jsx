@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { getShiftCode } from '../../utils/shiftHelper';
 import ManagerActionList from '../../components/ManagerActionList';
-import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup, Settings, Zap, Bot, BarChart3, Sparkles } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Download, Search, FileSpreadsheet, ArrowRight, TrendingUp, Calendar, ChevronLeft, ChevronRight, Eye, X, DatabaseBackup, Zap, Bot, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardCharts from '../../components/DashboardCharts';
 import StaffingGapChart from '../../components/charts/StaffingGapChart';
@@ -22,24 +22,21 @@ import { canPickStore } from '../../lib/authSession';
 import { useShallow } from 'zustand/react/shallow';
 import { WEEK_DAYS, formatISODate } from '../../data/constants';
 import { dashboardCycleDates, dashboardWeekOptions, payrollMonthKey, switchDashboardPeriod } from '../../utils/dashboardPeriod';
-import AutoBackupModal from '../../components/modals/AutoBackupModal';
-import { checkAndRunScheduledBackup } from '../../utils/autoBackupService';
+import { useWorkspaceBranding } from '../../hooks/useWorkspaceBranding';
 
 // Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
 
 export default function Dashboard() {
+  const branding = useWorkspaceBranding();
   const { employees, schedule, currentWeek, setCurrentWeek, stores, user, shelves, shelfItems, ensureWeeksLoaded } = useStore(useShallow((s) => ({ employees: s.employees, schedule: s.schedule, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, stores: s.stores, user: s.user, shelves: s.shelves, shelfItems: s.shelfItems, ensureWeeksLoaded: s.ensureWeeksLoaded })));
   const pickStore = canPickStore(user);
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   // Chế độ xem: 'month' (Chu kỳ 26-25 / 31 ngày) hoặc 'week' (7 ngày)
-  const [viewMode, setViewMode] = useState('month'); 
-  const [showAutoBackupModal, setShowAutoBackupModal] = useState(false);
+  const [viewMode, setViewMode] = useState('month');
 
-  useEffect(() => {
-    checkAndRunScheduledBackup(useStore.getState());
-  }, []); 
+
 
   // Chọn chu kỳ tháng (YYYY-MM)
   const [selectedMonthCycle, setSelectedMonthCycle] = useState(() => payrollMonthKey(currentWeek));
@@ -63,21 +60,21 @@ export default function Dashboard() {
       const d = new Date(y, (m - 1) + i, 1);
       const curY = d.getFullYear();
       const curM = d.getMonth() + 1;
-      
+
       let prevM = curM - 1;
       let prevY = curY;
       if (prevM < 1) { prevM = 12; prevY--; }
-      
+
       const prevMStr = prevM.toString().padStart(2, '0');
       const curMStr = curM.toString().padStart(2, '0');
       const key = `${curY}-${curMStr}`; // Đồng bộ YYYY-MM
-      
+
       const isCurrent = curY === currentRealYear && curM === currentRealMonth;
       let label = `Tháng ${curMStr}/${curY} (26/${prevMStr} → 25/${curMStr})`;
       if (isCurrent) {
         label = `📍 Tháng ${curMStr}/${curY} (26/${prevMStr} → 25/${curMStr}) [Hiện tại]`;
       }
-      
+
       list.push({ key, label, year: curY, month: curM });
     }
     return list;
@@ -139,7 +136,7 @@ export default function Dashboard() {
   const weekDaysInfo = useMemo(() => {
     const parts = currentWeek.split('-');
     const weekStartDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    
+
     return WEEK_DAYS.map((day, idx) => {
       const dateObj = new Date(weekStartDate);
       dateObj.setDate(weekStartDate.getDate() + idx);
@@ -187,7 +184,7 @@ export default function Dashboard() {
 
     return ptEmps.map(emp => {
       const empWeekSched = weekSchedule[emp.id] || {};
-      
+
       // Giờ theo tháng (31 ngày của chu kỳ 26 -> 25)
       let monthTotalHours = 0;
       const monthShifts = {};
@@ -261,7 +258,7 @@ export default function Dashboard() {
   // 4. Lọc danh sách theo Search, Cửa hàng và Toggle
   const filteredPTList = useMemo(() => {
     let list = allPTEmployees;
-    
+
     if (search) {
       const s = search.toLowerCase();
       list = list.filter(e => e.name.toLowerCase().includes(s) || e.id.toLowerCase().includes(s));
@@ -292,10 +289,10 @@ export default function Dashboard() {
       map[emp.dept].totalEmps++;
       const isPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
       if (isPT) map[emp.dept].ptEmps++;
-      
+
       const empSched = weekSchedule[emp.id] || {};
       let empHours = 0;
-      
+
       if (viewMode === 'month') {
         cycleDates.forEach(({ weekKey, dayKey }) => {
           const s = schedule[weekKey]?.[emp.id]?.[dayKey];
@@ -362,12 +359,12 @@ export default function Dashboard() {
     const today = new Date();
     const dOfWeek = today.getDay();
     const dayKey = WEEK_DAYS[dOfWeek === 0 ? 6 : dOfWeek - 1];
-    
+
     let empsWorkingToday = 0;
     employees.forEach(emp => {
       if (!pickStore && allowedDepts.size > 0 && !allowedDepts.has(emp.dept)) return;
       if (filterDept !== 'ALL' && emp.dept !== filterDept) return;
-      
+
       const s = weekSchedule[emp.id]?.[dayKey];
       const actual = getShiftCode(s);
       if (actual && actual !== 'off') empsWorkingToday++;
@@ -378,10 +375,10 @@ export default function Dashboard() {
       storeShelves = storeShelves.filter(s => allowedDepts.has(s.storeId));
     }
     if (filterDept !== 'ALL') storeShelves = storeShelves.filter(s => s.storeId === filterDept);
-    
+
     let pendingShelves = 0;
     let warningShelves = 0;
-    
+
     storeShelves.forEach(s => {
       const items = (shelfItems || []).filter(i => i.shelfId === s.id);
       if (items.length === 0) {
@@ -468,18 +465,18 @@ export default function Dashboard() {
   // 6a. Sao lưu toàn bộ dữ liệu ra .xlsx (SM/OFC)
   const handleBackupXlsx = async () => {
     try {
-      toast.info('Đang tổng hợp dữ liệu sao lưu...');
+      toast.info('Đang lấy dữ liệu để xuất Excel…');
       const fileName = await downloadBackupXlsx(useStore.getState());
       useStore.getState().appendAdminLog('DATA_BACKUP', fileName, 'admin', {
         category: 'security',
         entityType: 'backup',
         entityId: fileName,
-        description: 'Sao lưu dữ liệu ra Excel: ' + fileName
+        description: 'Xuất dữ liệu trong quyền truy cập và các tuần đã tải: ' + fileName
       });
       toast.success('Đã tải ' + fileName);
     } catch (e) {
       console.error('Lỗi sao lưu:', e);
-      toast.error('Lỗi sao lưu: ' + e.message);
+      toast.error('Chưa xuất được dữ liệu: ' + e.message);
     }
   };
 
@@ -498,7 +495,7 @@ export default function Dashboard() {
   return (
     <div className="w-full min-h-full bg-slate-100/90 p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in duration-200">
       <ManagerActionList storeId={filterDept} />
-      
+
       {/* Modern Full-width Header & Command Bar */}
       <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -508,7 +505,7 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Dashboard GS25 — Tổng Quan Quản Trị
+                {branding.appName} — Tổng Quan Quản Trị
               </h1>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[11px] font-bold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Hệ Thống Trực Tuyến
@@ -546,8 +543,8 @@ export default function Dashboard() {
                 onClick={() => handleViewModeChange('month')}
                 aria-pressed={viewMode === 'month'}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'month' 
-                    ? 'bg-white shadow-xs text-blue-700 font-extrabold' 
+                  viewMode === 'month'
+                    ? 'bg-white shadow-xs text-blue-700 font-extrabold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -558,8 +555,8 @@ export default function Dashboard() {
                 onClick={() => handleViewModeChange('week')}
                 aria-pressed={viewMode === 'week'}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'week' 
-                    ? 'bg-white shadow-xs text-blue-700 font-extrabold' 
+                  viewMode === 'week'
+                    ? 'bg-white shadow-xs text-blue-700 font-extrabold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -571,7 +568,7 @@ export default function Dashboard() {
             <div className="hidden sm:block w-px h-5 bg-slate-300 mx-1.5 shrink-0"></div>
 
             <div className="flex items-center min-w-0 max-w-full">
-              <button 
+              <button
                 onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
                 className="p-1 hover:bg-slate-200/80 rounded-md text-slate-600 transition-colors cursor-pointer"
                 title={viewMode === 'month' ? 'Tháng trước' : 'Tuần trước'}
@@ -580,7 +577,7 @@ export default function Dashboard() {
               </button>
 
               {viewMode === 'month' ? (
-                <select 
+                <select
                   aria-label="Kỳ công Dashboard"
                   value={selectedMonthCycle}
                   onChange={e => setSelectedMonthCycle(e.target.value)}
@@ -591,7 +588,7 @@ export default function Dashboard() {
                   ))}
                 </select>
               ) : (
-                <select 
+                <select
                   aria-label="Tuần Dashboard"
                   value={currentWeek}
                   onChange={e => setCurrentWeek(e.target.value)}
@@ -601,7 +598,7 @@ export default function Dashboard() {
                 </select>
               )}
 
-              <button 
+              <button
                 onClick={viewMode === 'month' ? handleNextMonth : handleNextWeek}
                 className="p-1 hover:bg-slate-200/80 rounded-md text-slate-600 transition-colors cursor-pointer"
                 title={viewMode === 'month' ? 'Tháng sau' : 'Tuần sau'}
@@ -611,22 +608,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Full-data Backup (.xlsx) & Auto-Backup */}
+          {/* Scoped Excel export */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleBackupXlsx}
               className="btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs py-2 px-3 rounded-xl font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer transition-all"
-              title="Tải toàn bộ dữ liệu (nhân viên, lịch mọi tuần đã tải, feedback, đổi ca, kệ) ra file Excel"
+              title="Xuất dữ liệu được phép xem và các tuần đã tải. File có ghi phạm vi, không phải bản sao lưu database."
             >
-              <DatabaseBackup size={14} /> Sao lưu .xlsx
+              <DatabaseBackup size={14} /> Xuất dữ liệu Excel
             </button>
-            <button
-              onClick={() => setShowAutoBackupModal(true)}
-              className="btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs p-2 rounded-xl font-bold shadow-xs flex items-center justify-center cursor-pointer transition-all hover:border-emerald-400 hover:text-emerald-700"
-              title="Cài đặt tự động gửi bản sao lưu định kỳ qua Telegram / Webhook"
-            >
-              <Settings size={14} />
-            </button>
+
           </div>
 
           {/* Export Button */}
@@ -667,7 +658,6 @@ export default function Dashboard() {
         >
           <Bot size={14} className={dashboardTab === 'ai' ? 'text-purple-600' : 'text-slate-400'} />
           <span>Quản Trị Trợ Lý AI</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         </button>
 
         <button
@@ -707,9 +697,9 @@ export default function Dashboard() {
           {/* Phân tích nhân sự & trạng thái cửa hàng */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="lg:col-span-1">
-              <EmployeeDemographicsWidget 
-                employees={employees} 
-                filterDept={filterDept} 
+              <EmployeeDemographicsWidget
+                employees={employees}
+                filterDept={filterDept}
               />
             </div>
             <div className="lg:col-span-3">
@@ -767,7 +757,7 @@ export default function Dashboard() {
 
       {/* Main Table Container */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        
+
         {/* Table Header Filter Toolbar */}
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
           <div>
@@ -778,7 +768,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              {viewMode === 'month' 
+              {viewMode === 'month'
                 ? 'Tự động kiểm tra và gắn cờ đỏ khi nhân sự Part-time vượt quá 91 giờ trong chu kỳ tháng'
                 : 'Xem chi tiết 7 ngày trong tuần, cảnh báo khi vượt 23h/tuần hoặc thiếu 16h/tuần'}
             </p>
@@ -820,8 +810,8 @@ export default function Dashboard() {
             <button
               onClick={() => setFilterOnlyOvertime(!filterOnlyOvertime)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
-                filterOnlyOvertime 
-                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs' 
+                filterOnlyOvertime
+                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 shadow-2xs'
               }`}
             >
@@ -843,7 +833,7 @@ export default function Dashboard() {
                 <th className="p-2 border-r border-slate-300 min-w-[160px] text-left sticky z-20 bg-slate-200 px-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]" style={{ left: '224px' }}>
                   Họ và Tên
                 </th>
-                
+
                 {/* Dynamic Columns: 31 Ngày (Tháng) hoặc 7 Ngày (Tuần) */}
                 {viewMode === 'month' ? (
                   cycleDates.map(d => (
@@ -876,8 +866,8 @@ export default function Dashboard() {
                     <div className="flex flex-col items-center justify-center gap-1.5">
                       <span className="text-2xl">📋</span>
                       <span className="font-bold text-slate-600 text-xs">
-                        {filterOnlyOvertime 
-                          ? `Không có nhân viên Part-time nào vượt quá hạn mức ${viewMode === 'month' ? '91h/tháng' : '23h/tuần'}.` 
+                        {filterOnlyOvertime
+                          ? `Không có nhân viên Part-time nào vượt quá hạn mức ${viewMode === 'month' ? '91h/tháng' : '23h/tuần'}.`
                           : 'Không tìm thấy dữ liệu nhân viên Part-time phù hợp.'}
                       </span>
                     </div>
@@ -920,8 +910,8 @@ export default function Dashboard() {
 
                       {/* Tổng giờ làm */}
                       <td className={`p-2 text-center font-black border-l sticky z-10 text-xs min-w-[90px] w-[90px] border-r border-slate-300 ${
-                        emp.isOvertime 
-                          ? 'text-red-700 bg-red-100 border-red-200 font-black' 
+                        emp.isOvertime
+                          ? 'text-red-700 bg-red-100 border-red-200 font-black'
                           : 'text-slate-800 bg-slate-50 border-slate-200'
                       }`} style={{ right: '56px' }}>
                         <span className="flex items-center justify-center gap-1">
@@ -972,10 +962,10 @@ export default function Dashboard() {
       </div>
 
           {/* Phân tích Vắng mặt / Phép & Chi viện */}
-          <OperationsInsightsWidget 
-            employees={employees} 
-            weekSchedule={weekSchedule} 
-            filterDept={filterDept} 
+          <OperationsInsightsWidget
+            employees={employees}
+            weekSchedule={weekSchedule}
+            filterDept={filterDept}
             viewMode={viewMode}
             schedule={schedule}
             cycleDates={cycleDates}
@@ -996,11 +986,8 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Auto Backup Configuration Modal */}
-      <AutoBackupModal
-        isOpen={showAutoBackupModal}
-        onClose={() => setShowAutoBackupModal(false)}
-      />
+
+
 
     </div>
   );

@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/modals/ConfirmModal';
 import EmployeeProfileModal from '../../components/modals/EmployeeProfileModal';
 import { workPlanReminder } from '../../utils/employeeProfile';
 import { MA_RE, STANDARD_ROLES, getRoleBadgeInfo } from '../../data/constants';
+import { customRoleName } from '../../utils/workspaceRoles';
 import { canPickStore, isManagerFromEmp, isOpsManager, canAssignManager } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import { useShallow } from 'zustand/react/shallow';
@@ -19,6 +20,7 @@ export default function Employees() {
   const { employees, stores, addEmployee, updateEmployee, deleteEmployee, user } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, addEmployee: s.addEmployee, updateEmployee: s.updateEmployee, deleteEmployee: s.deleteEmployee, user: s.user })));
   const pickStore = canPickStore(user);
   const canPromote = canAssignManager(user);
+  const workspaceRoles = useStore(s => s.workspaceRoles);
   const canEditEmps = pickStore || isOpsManager(user);
   const allowedDepts = new Set(visibleDeptIds(user, stores));
   const visibleStores = pickStore ? stores : stores.filter(s => allowedDepts.has(s.id));
@@ -89,7 +91,7 @@ export default function Employees() {
   }, [employees, pickStore, user?.dept]);
 
   const handleCopyReminder = () => {
-    const text = `📢 [THÔNG BÁO QUAN TRỌNG GS25]\nHiện tại hệ thống phân ca đã kích hoạt chính sách bảo mật bắt buộc. Yêu cầu tất cả nhân viên (${securityStats.unchanged} bạn chưa đổi mật khẩu) đăng nhập vào ứng dụng và đổi mật khẩu riêng ngay trong hôm nay để bảo vệ quyền lợi chấm công & lịch làm việc của mình!`;
+    const text = `📢 [THÔNG BÁO BẢO MẬT LỊCH CA]\nHiện tại hệ thống phân ca đã kích hoạt chính sách bảo mật bắt buộc. Yêu cầu tất cả nhân viên (${securityStats.unchanged} bạn chưa đổi mật khẩu) đăng nhập vào ứng dụng và đổi mật khẩu riêng ngay trong hôm nay để bảo vệ quyền lợi chấm công & lịch làm việc của mình!`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       toast.success('Đã sao chép nội dung nhắc nhở để dán vào nhóm Zalo/Telegram!');
@@ -474,16 +476,19 @@ export default function Employees() {
                     {editingId === emp.id ? (
                       <select 
                         className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs font-bold text-slate-700" 
-                        value={formData.role} 
+                        value={formData.role}
+                        disabled={Boolean(emp.workspaceRoleId)}
+                        title={emp.workspaceRoleId ? 'Đổi vai trò tại Cài đặt đơn vị → Vai trò' : ''}
                         onChange={e => handleRoleChange(e.target.value)}
                       >
-                        {availableRoles.map(r => (
+                        {emp.workspaceRoleId && <option value={formData.role}>{customRoleName(emp, workspaceRoles) || formData.role}</option>}
+                        {!emp.workspaceRoleId && availableRoles.map(r => (
                           <option key={r.id} value={r.id}>{r.label}</option>
                         ))}
                       </select>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${badgeInfo.badgeCls}`}>
-                        {badgeInfo.label || emp.role || emp.type}
+                        {customRoleName(emp, workspaceRoles) || badgeInfo.label || emp.role || emp.type}
                       </span>
                     )}
                   </td>
@@ -546,7 +551,7 @@ export default function Employees() {
                       </>
                     ) : (
                       <>
-                        {canPromote && emp.id !== user?.id && (
+                        {canPromote && !emp.workspaceRoleId && emp.id !== user?.id && (
                         <button
                           onClick={async () => {
                             const next = isManagerFromEmp(emp) ? '' : 'Cửa hàng trưởng';

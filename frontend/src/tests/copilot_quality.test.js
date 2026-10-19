@@ -87,7 +87,7 @@ describe('AI Copilot — giữ hành vi cũ (không hồi quy)', () => {
 
   it('FAQ hệ số lương chung khi không nhắc người cụ thể', () => {
     const r = askAICopilot('làm ca đêm có được thêm tiền không?', ctx);
-    expect(r).toContain('+30%');
+    expect(r).not.toContain('+30%');
   });
 });
 
@@ -194,7 +194,7 @@ describe('AI Copilot — Bẫy từ khóa & Anti-collision chuyên sâu', () => 
 
   it('Làm thêm ngày lễ tết được bao nhiêu phần trăm lương: 300%', () => {
     const r = askAICopilot('Làm thêm ngày lễ tết được bao nhiêu phần trăm lương?', ctx);
-    expect(r).toContain('300%');
+    expect(r).not.toContain('300%');
   });
 });
 

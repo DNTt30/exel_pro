@@ -1,18 +1,18 @@
-# GS25 Schedule & Store Operations Platform (OFC)
+# Lịch Ca — Quản lý lịch & vận hành cửa hàng
 
-> Hệ thống Quản lý Phân ca Thông minh, Chấm công Thực tế và Quản lý Kệ hàng Cận Date cho Hệ thống Cửa hàng Tiện lợi GS25.
+> Hệ thống quản lý phân ca, chấm công thực tế và quản lý kệ hàng cận date cho cửa hàng tiện lợi.
 
 [![Continuous Integration (CI)](https://github.com/DNTt30/exel_pro/actions/workflows/ci.yml/badge.svg)](https://github.com/DNTt30/exel_pro/actions/workflows/ci.yml)
 [![Deploy GitHub Pages](https://github.com/DNTt30/exel_pro/actions/workflows/deploy.yml/badge.svg)](https://github.com/DNTt30/exel_pro/actions/workflows/deploy.yml)
-[![Eval Score](https://img.shields.io/badge/Eval%20Score-100%2F100-brightgreen)](https://dntt30.github.io/exel_pro/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Tài liệu nghiệp vụ của bên thứ ba chỉ được phép dùng nội bộ theo xác nhận của chủ dự án. Không suy ra quyền phát hành lại từ mã nguồn này. Xem [rà soát nhận diện và quyền sử dụng](docs/BRANDING_RIGHTS_REVIEW.md).
 
 ---
 
 ## 📖 1. Giới Thiệu Dự Án
 
-Ứng dụng phục vụ việc quản lý điều phối nhân sự và vận hành chuỗi cửa hàng tiện lợi **GS25**:
-- **Xếp lịch tuần tự động & AI Copilot:** Hỗ trợ Cửa hàng trưởng (SM) phân ca chuẩn GS25 (ca 4 tiếng, 8 tiếng), đảm bảo tuân thủ luật lao động (nghỉ giữa ca $\ge 11$h, giới hạn Part-time $\le 23$h hoặc $\le 91$h/chu kỳ), kiểm soát thiếu/thừa nhân sự theo định biên doanh thu.
+Ứng dụng phục vụ việc quản lý điều phối nhân sự và vận hành chuỗi cửa hàng tiện lợi:
+- **Xếp lịch tuần tự động & AI Copilot:** Hỗ trợ Cửa hàng trưởng (SM) phân ca theo cấu hình nội bộ (ca 4 tiếng, 8 tiếng), cảnh báo các ngưỡng đang cấu hình (nghỉ giữa ca $\ge 11$h, giới hạn Part-time $\le 23$h hoặc $\le 91$h/chu kỳ), kiểm soát thiếu/thừa nhân sự theo định biên doanh thu.
 - **Hạn chót nộp lịch tuần:** SM thiết lập hạn nộp lịch trước ngày/giờ chỉ định, hệ thống tự động khóa ô đăng ký ca đối với nhân viên khi hết hạn.
 - **Quản lý hạn dùng kệ hàng (Shelf Expiry & Date):** Giao kệ cho nhân sự phụ trách, ghi nhận date hàng hóa cận hạn và cảnh báo tự động trước $N$ ngày.
 - **Đối soát chấm công thực tế (ezHR9):** Nhập file Excel bảng công thực tế từ máy chấm công vân tay ezHR9, đối soát chênh lệch giờ công và hỗ trợ quy trình khiếu nại/bù công C&B.
@@ -40,19 +40,20 @@
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # UI Components, Modals, Layouts, Visual Charts
-│   │   ├── data/           # Constants chuẩn GS25, công thức, định biên
+│   │   ├── data/           # Cấu hình nội bộ, công thức, định biên
 │   │   ├── lib/            # Supabase Client, Auth Session, Throttle
 │   │   ├── pages/          # Admin & Employee Views (Schedule, Timesheet, Stores...)
 │   │   ├── services/api/   # Lớp API gọi CSDL đóng gói chuẩn theo từng thực thể
 │   │   ├── store/slices/   # Zustand State Slices
-│   │   ├── tests/          # 42+ Unit & Integration Test Suites
+│   │   ├── tests/          # Unit & Integration Tests
 │   │   └── utils/          # Bộ engine AI xếp lịch, xử lý ca, đối soát ezHR9
 │   ├── package.json
 │   └── vite.config.js
 ├── supabase/
 │   ├── functions/          # Edge Functions (telegram-notify, admin-otp, reset-password)
 │   └── migrations/         # Baseline Schema & CSDL migrations có version
-├── sql_missing_indexes_audit.sql # Script SQL tối ưu hóa chỉ mục hiệu năng cao
+├── scripts/                # Kiểm thử, công cụ local, dữ liệu giả lập
+├── legacy_sql_scripts/     # SQL lịch sử, không dùng cài mới
 └── README.md
 ```
 
@@ -61,7 +62,7 @@
 ## 🚀 4. Hướng Dẫn Cài Đặt & Chạy Môi Trường Local
 
 ### Yêu cầu tiên quyết:
-- **Node.js:** $\ge 20.x$ (Khuyên dùng Node 22 LTS)
+- **Node.js:** 22.12+ (khớp môi trường CI)
 - **npm:** $\ge 10.x$
 
 ### Các bước thực hiện:
@@ -71,7 +72,7 @@ git clone https://github.com/DNTt30/exel_pro.git
 cd exel_pro/frontend
 
 # 2. Cài đặt thư viện phụ thuộc
-npm install
+npm ci
 
 # 3. Tạo file cấu hình môi trường
 cp .env.example .env
@@ -82,6 +83,8 @@ npm run dev
 ```
 Ứng dụng sẽ khả dụng tại: `http://localhost:5173`
 
+Entry point của app là `frontend/index.html`. Thư mục `schedule-app/` là prototype cũ, không dùng để phát hành. Prisma chạy ở root repo; không import Prisma vào frontend vì sẽ bỏ qua RLS. File `.env.example` ở root chỉ dành cho công cụ database, còn frontend dùng `frontend/.env.example`.
+
 ---
 
 ## 🧪 5. Kiểm Thử & Kiểm Soát Chất Lượng (Quality Gates)
@@ -89,7 +92,7 @@ npm run dev
 Dự án áp dụng cổng kiểm soát chất lượng tự động nghiêm ngặt:
 
 ```bash
-# Chạy toàn bộ 42 test suites kiểm tra logic nghiệp vụ và bảo mật
+# Chạy toàn bộ test suites kiểm tra logic nghiệp vụ và bảo mật
 npm test
 
 # Kiểm tra cú pháp và chất lượng mã nguồn bằng oxlint
@@ -110,9 +113,14 @@ npm run build
 - **Bảo mật xác thực:** Chống brute-force đăng nhập với cơ chế throttle lũy tiến, mã hóa mật khẩu qua Supabase Auth, hỗ trợ xác thực mã OTP quản trị viên.
 - **Không hardcode Secrets:** Tuyệt đối không lưu trữ Secret token hoặc Service Role key ở client bundle.
 
-### 6.1 Cập nhật trạng thái Security Audit (21/09)
-*   **P0-3 (Quyền Role phụ thuộc Metadata client):** 🔶 Đã được ngăn chặn (Mitigated) ở Frontend. Giải pháp triệt để đã được khởi thảo qua script `20260921000000_p03_custom_jwt_hook.sql` (Custom Access Token Hook của Supabase) chờ kích hoạt trên dashboard.
-*   **P0-2 (Mật khẩu mặc định suy diễn được):** ⚠️ Vẫn đang được cấu hình có chủ đích trong giai đoạn chuyển tiếp. Frontend đã vá lỗ hổng `password === '1'`, bắt buộc nhân viên nhập password thật. Việc xóa bỏ công thức gen password tĩnh sẽ được thực hiện khi tính năng **Đăng nhập OTP (Telegram/Email)** hoàn thiện ở Sprint tiếp theo.
+### 6.1 Rollout
+
+- [Database catchup](docs/DATABASE_CATCHUP_20260928.md)
+- [Password recovery](docs/PASSWORD_RECOVERY_ROLLOUT.md)
+- [Workspace settings](docs/WORKSPACE_SETTINGS_ROLLOUT.md)
+- [Workspace roles](docs/WORKSPACE_ROLES_ROLLOUT.md)
+- [Operational hardening](docs/OPERATIONAL_HARDENING.md)
+
 
 ---
 

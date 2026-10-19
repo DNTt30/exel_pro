@@ -1,14 +1,15 @@
+import Button from '../../components/ui/Button';
 import React, { useState, useMemo, useCallback, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek, getStaffingMatrix } from '../../data/constants';
-import { 
-  Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock, 
-  UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck, 
-  AlertTriangle, ZoomIn, ZoomOut, Maximize2, AlertCircle, 
-  CheckCircle2, FileText 
+import {
+  Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock,
+  UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck,
+  AlertTriangle, ZoomIn, ZoomOut, Maximize2, AlertCircle,
+  CheckCircle2, FileText
 } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import ConfirmModal from '../../components/modals/ConfirmModal';
@@ -47,12 +48,12 @@ const EMPTY_SCHED = {};
 export default function Schedule() {
   const { employees, stores, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks, syncStatus } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks, syncStatus: s.syncStatus })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
-  
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isManager = isOpsManager(user);
   const pickStore = canPickStore(user);
-  
+
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState(pickStore ? 'ALL' : user?.dept);
   // SM da-CH: nhan CH dang chon neu no nam trong pham vi sm_id
@@ -228,7 +229,7 @@ export default function Schedule() {
     const curRange = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')} → ${String(curSun.getDate()).padStart(2, '0')}/${String(curSun.getMonth() + 1).padStart(2, '0')}`;
 
     if (weekLocked) return toast.error('Tuần đang chờ duyệt hoặc đã duyệt — không copy đè.');
-    
+
     setCopyPlan({
       prevWeekKey,
       prevRange,
@@ -413,12 +414,12 @@ export default function Schedule() {
 
       {/* 2. Top Toolbar */}
       <div className="print:hidden">
-        <Toolbar 
-          search={search} 
+        <Toolbar
+          search={search}
           setSearch={setSearch}
-          filterDept={filterDept} 
+          filterDept={filterDept}
           setFilterDept={setFilterDept}
-          filterRole={filterRole} 
+          filterRole={filterRole}
           setFilterRole={setFilterRole}
           disableDeptFilter={false}
           onOpenAddEmp={() => setShowAddEmp(true)}
@@ -470,7 +471,7 @@ export default function Schedule() {
         </div>
 
         {/* Card 3: Part-Time Vượt Giờ */}
-        <div 
+        <div
           onClick={() => setShowPTOvertime(true)}
           className={`bg-white p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
             summaryMetrics.ptOver91Count > 0
@@ -507,13 +508,13 @@ export default function Schedule() {
         </div>
 
         {/* Card 4: Radar Ca Trực & An Ninh */}
-        <div 
+        <div
           onClick={() => setShowRadarModal(true)}
           className={`bg-white p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
-            radarResults.hasCritical 
-              ? 'border-rose-200 hover:border-rose-300 hover:bg-rose-50/40' 
-              : radarResults.warningCount > 0 
-                ? 'border-amber-200 hover:border-amber-300 hover:bg-amber-50/40' 
+            radarResults.hasCritical
+              ? 'border-rose-200 hover:border-rose-300 hover:bg-rose-50/40'
+              : radarResults.warningCount > 0
+                ? 'border-amber-200 hover:border-amber-300 hover:bg-amber-50/40'
                 : 'border-slate-200/80 hover:border-emerald-200'
           }`}
           title="Bấm để xem Radar kiểm tra an ninh & định biên ca trực"
@@ -554,7 +555,7 @@ export default function Schedule() {
       {/* 3.1 Symmetrical Action Center */}
       <div className="bg-white/95 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs print:hidden space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
-          
+
           {/* Group 1: Nhân sự & Điều động */}
           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-2">
             <div className="flex items-center justify-between">
@@ -595,58 +596,58 @@ export default function Schedule() {
             </div>
           </div>
 
-          {/* Group 2: AI & Phân ca thông minh */}
+          {/* Group 2: Xếp lịch & xử lý ca */}
           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={13} className="text-indigo-600" />
-                AI & Phân ca thông minh
+                Xếp lịch & xử lý ca
               </span>
               <span className="text-[10px] font-semibold text-slate-400">4 tính năng</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
+              <Button
                 type="button"
-                onClick={() => setShowAIScheduler(true)}
-                className="flex items-center justify-center gap-1 px-2.5 py-2 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                title="Tự động xếp lịch thông minh từ định biên hoặc ảnh chụp doanh số"
+                variant="primary" onClick={() => setShowAIScheduler(true)}
+                className="text-xs"
+                title="Chọn ca nhân viên đã đăng ký và kiểm tra khung giờ thiếu người"
               >
-                <Sparkles size={13} className="text-amber-300 flex-shrink-0" />
-                <span>AI xếp ca</span>
-              </button>
-              <button
+                <Sparkles size={13} className="shrink-0" />
+                <span>Gợi ý xếp lịch</span>
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setShowAICopilot(true)}
-                className="flex items-center justify-center gap-1 px-2.5 py-2 bg-white text-purple-700 hover:bg-purple-50 border border-purple-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="text-xs"
                 title="Mở trợ lý AI giải đáp thắc mắc và phân tích tình hình nhân sự"
               >
-                <Bot size={13} className="text-purple-600 flex-shrink-0" />
+                <Bot size={13} className="shrink-0" />
                 <span>Trợ lý AI</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setShowSwapList(true)}
-                className="relative flex items-center justify-center gap-1 px-2.5 py-2 bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="text-xs"
                 title="Xem và duyệt các yêu cầu đổi ca"
               >
-                <RefreshCw size={13} className="text-indigo-600 flex-shrink-0" />
+                <RefreshCw size={13} className="shrink-0" />
                 <span>Đổi ca</span>
                 {pendingManagerSwapsCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black animate-pulse">
+                  <span className="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black">
                     {pendingManagerSwapsCount}
                   </span>
                 )}
-              </button>
-              <button 
+              </Button>
+              <Button
                 type="button"
                 onClick={handleCopyPreviousWeek}
                 disabled={isCopying || weekLocked}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50 active:scale-95"
+                className="text-xs"
                 title="Sao chép toàn bộ ca làm việc từ tuần trước sang tuần này"
               >
-                <Copy size={13} className="text-slate-500 flex-shrink-0" />
+                <Copy size={13} className="shrink-0" />
                 <span className="truncate">{isCopying ? 'Đang chép...' : 'Chép tuần'}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -660,7 +661,7 @@ export default function Schedule() {
               <span className="text-[10px] font-semibold text-slate-400">Nhập / Xuất / In</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowImportSchedule(true)}
                 className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-amber-800 hover:bg-amber-50 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
@@ -669,7 +670,7 @@ export default function Schedule() {
                 <Upload size={14} className="text-amber-600 flex-shrink-0" />
                 <span className="hidden sm:inline">Nhập</span>
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={handleExportExcel}
                 className="flex items-center justify-center gap-1 px-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
@@ -705,26 +706,26 @@ export default function Schedule() {
       {/* 3.5 Staffing Gap Analysis Widget */}
       <ScheduleQualityPanel employees={employees} week={currentWeek} storeId={filterDept} />
       {isManager && <ShiftAnalyticsBoard employees={employees} stores={stores} user={user} storeId={filterDept} currentWeek={currentWeek} />}
-      <StaffingGapTable 
-        employees={employees} 
-        weekSchedule={weekSchedule} 
-        filterDept={filterDept} 
+      <StaffingGapTable
+        employees={employees}
+        weekSchedule={weekSchedule}
+        filterDept={filterDept}
       />
 
       <div className="bg-blue-50/60 p-3 sm:px-5 sm:py-3 border-y border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900 print:hidden">
         <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY TẮC & TRẠNG THÁI XẾP LỊCH:</div>
         <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
           <li><strong>Nhận diện màu ca trực trực quan:</strong> Ca sáng (Xanh lá), Ca chiều (Xanh biển), Ca đêm (Đỏ), Ca HC (Tím), Ca 4h (Xanh nhạt), OFF (Xám).</li>
-          <li><strong>Ưu tiên AI tự động xếp:</strong> Giữ nguyên lịch đăng ký (Lịch rảnh) ➔ Ưu tiên Full-time đạt chuẩn 48h ➔ Part-time lấp ca thiếu. Không ép Part-time dư giờ nếu cửa hàng không cần.</li>
+          <li><strong>Gợi ý xếp lịch:</strong> Chỉ chọn đúng ca nhân viên đã đăng ký, giữ ca đã chốt và ngày OFF. Báo thiếu/dư người theo ngày; nghỉ giữa ca ít nhất 12 giờ, tối đa 3 đêm liên tiếp.</li>
         </ul>
       </div>
 
       {/* 4. Main Schedule Grid Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none">
-        
+
         {/* Shift Color Legend & Table Controls Bar */}
         <div className="bg-slate-50/95 px-3 sm:px-4 py-2.5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 text-xs print:hidden">
-          
+
           {/* Shift Color Legend Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-0.5 flex-nowrap sm:flex-wrap">
             <span className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider mr-1 flex-shrink-0">
@@ -755,7 +756,7 @@ export default function Schedule() {
 
           {/* Table Zoom Controls & View Mode Toggle */}
           <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
-            
+
             {/* Sync Status Indicator */}
             <div className="flex items-center gap-1 text-[11px] font-bold mr-2">
               {syncStatus === 'saving' && (
@@ -843,7 +844,7 @@ export default function Schedule() {
 
           </div>
         </div>
-        
+
         {/* Print Header */}
         <div className="hidden print:block p-4 border-b border-slate-300 text-center">
           <h1 className="text-xl font-bold uppercase tracking-wider text-black">
@@ -853,7 +854,7 @@ export default function Schedule() {
         </div>
 
         <div className="overflow-x-auto excel-table-container touch-auto">
-          <table 
+          <table
             className="w-full text-left border-collapse origin-top-left transition-[zoom] duration-150"
             style={{ zoom: tableZoom }}
           >
@@ -863,7 +864,7 @@ export default function Schedule() {
                 <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-600 text-xs sticky left-[48px] z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Mã NV</th>
                 <th className="min-w-[125px] sm:min-w-[150px] md:min-w-[192px] w-[125px] sm:w-[150px] md:w-[192px] max-w-[125px] sm:max-w-[150px] md:max-w-[192px] text-left font-bold text-slate-800 text-xs sticky left-0 sm:left-[48px] md:left-[144px] z-20 bg-slate-100 border-r border-slate-300 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] pl-2">Họ và Tên</th>
                 <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-600 text-xs sticky z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]" style={{ left: '336px' }}>Vị trí</th>
-                
+
                 {/* Dynamic Day Headers */}
                 {activeDays.map((day, idx) => {
                   let isToday = false;
@@ -881,7 +882,7 @@ export default function Schedule() {
                     const d = parseInt(parts[2], 10);
                     const curr = new Date(y, m - 1, d);
                     curr.setDate(curr.getDate() + idx);
-                    
+
                     const now = new Date();
                     isToday = curr.getDate() === now.getDate() && curr.getMonth() === now.getMonth() && curr.getFullYear() === now.getFullYear();
                     dateStr = `${curr.getDate().toString().padStart(2, '0')}/${(curr.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -893,11 +894,11 @@ export default function Schedule() {
                   const hasDeficit = dayDeficits && dayDeficits.length > 0;
 
                   return (
-                    <th 
-                      key={day} 
+                    <th
+                      key={day}
                       className={`min-w-[72px] max-w-[85px] text-center font-bold border-r border-slate-300 py-1 px-0.5 transition-colors ${
-                        isToday 
-                          ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500' 
+                        isToday
+                          ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500'
                           : (isSunday ? 'bg-orange-50/80 text-orange-950' : 'bg-slate-200 text-slate-700')
                       }`}
                       title={`${dayLabel} ngày ${dateStr}${hasDeficit ? ` · Đang thiếu ${dayDeficits.length} ca: ${dayDeficits.map(d => `Ca ${d.code} (cần ${d.required}, có ${d.actual})`).join(', ')}` : ''}`}
@@ -913,7 +914,7 @@ export default function Schedule() {
                           </span>
                         )}
                         {hasDeficit && (
-                          <span 
+                          <span
                             className="mt-1 px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs flex items-center gap-0.5"
                             title={`Thiếu ${dayDeficits.length} ca: ${dayDeficits.map(d => `${d.code} (-${Math.abs(d.gap)})`).join(', ')}`}
                           >
@@ -953,13 +954,13 @@ export default function Schedule() {
                           </div>
                         </td>
                       </tr>
-                      
+
                       {/* Employees Rows */}
                       {emps.map((emp, idx) => {
                         const empSched = viewMode === 'month'
                           ? Object.fromEntries(cycleDates.map(d => [d.key, schedule[d.weekKey]?.[emp.id]?.[d.dayKey] || '']))
                           : (weekSchedule[emp.id] || {});
-                        
+
                         // Nếu là view tháng thì ta kiểm tra status của tuần đầu tiên chứa ngày đang render hoặc cứ mặc định nếu không rõ.
                         // Để đơn giản, nếu view tuần thì lấy currentWeekStatus, view tháng thì check mỗi tuần
                         let isDraftRow = false;
@@ -968,10 +969,10 @@ export default function Schedule() {
                           const currentWeekStatus = (scheduleWeeks || {})[wKey]?.status || 'draft';
                           isDraftRow = currentWeekStatus !== 'approved';
                         }
-                        
+
                         const currentRow = absoluteRowIdx++;
                         return (
-                          <EmployeeRow 
+                          <EmployeeRow
                             key={emp.id + (emp.isBorrowedTo ? `_borrowed_${emp.isBorrowedTo}` : '')}
                             emp={emp}
                             empSched={empSched}
@@ -990,7 +991,7 @@ export default function Schedule() {
                 })()
               )}
             </tbody>
-            
+
             {/* Real-time Tracker Bar */}
             <tfoot className="sticky bottom-0 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] print:hidden">
               <tr className="bg-slate-800 text-white border-t-2 border-slate-900">
@@ -1014,7 +1015,7 @@ export default function Schedule() {
                       dailyTotal += getShiftHours(normalizeShift(shiftVal).shift);
                     });
                   });
-                  
+
                   let badgeClass = "bg-slate-700 text-slate-400 border border-slate-600";
                   let statusIcon = "";
                   if (dailyTotal > 0) {

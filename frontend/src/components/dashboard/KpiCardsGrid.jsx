@@ -10,11 +10,11 @@ export default function KpiCardsGrid({
 }) {
   return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        
+
         {/* Card 1: Cảnh báo PT vượt định mức */}
         <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden ${
-          ptOvertimeList.length > 0 
-            ? 'bg-gradient-to-br from-rose-50/90 via-red-50/50 to-white border-rose-200 shadow-sm' 
+          ptOvertimeList.length > 0
+            ? 'bg-white border-rose-200 shadow-sm'
             : 'bg-white border-slate-200/80 shadow-2xs'
         }`}>
           <div>
@@ -40,7 +40,7 @@ export default function KpiCardsGrid({
             <span className="text-[10px] font-bold text-slate-400">
               {ptOvertimeList.length > 0 ? '⚠️ Vượt định mức' : '✅ Đạt chuẩn'}
             </span>
-            <button 
+            <button
               onClick={() => scrollToChart('shifts')}
               className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 hover:underline cursor-pointer"
             >
@@ -67,7 +67,7 @@ export default function KpiCardsGrid({
             <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
               {currentDeptEmployees.length - allPTEmployees.length} FT • {allPTEmployees.length} PT
             </span>
-            <button 
+            <button
               onClick={() => scrollToChart('shifts')}
               className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 hover:underline cursor-pointer"
             >
@@ -96,7 +96,7 @@ export default function KpiCardsGrid({
             <span className="text-[10px] font-bold text-slate-400 truncate max-w-[80px]">
               {viewMode === 'month' ? `Tháng ${selectedMonthCycle.split('-')[1]}` : (() => { const p = currentWeek.split('-'); return p.length === 3 ? `Tuần ${p[2]}/${p[1]}` : `Tuần ${currentWeek}`; })()}
             </span>
-            <button 
+            <button
               onClick={() => scrollToChart('workload')}
               className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5 hover:underline cursor-pointer"
             >
@@ -127,7 +127,7 @@ export default function KpiCardsGrid({
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[70px]">
               {filterDept === 'ALL' ? 'Toàn chuỗi' : filterDept}
             </span>
-            <button 
+            <button
               onClick={() => scrollToChart('stores')}
               className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 hover:underline cursor-pointer"
             >
@@ -138,8 +138,8 @@ export default function KpiCardsGrid({
 
         {/* Card 5: Kệ & Date */}
         <Link to="/admin/shelves" className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden group block ${
-          quickStats.warningShelves > 0 
-            ? 'bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-white border-amber-200 shadow-sm hover:border-amber-400' 
+          quickStats.warningShelves > 0
+            ? 'bg-white border-amber-200 shadow-sm hover:border-amber-400'
             : 'bg-white border-slate-200/80 shadow-2xs hover:border-blue-300'
         }`}>
           <div>
@@ -167,7 +167,7 @@ export default function KpiCardsGrid({
         </Link>
 
         {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
@@ -190,7 +190,7 @@ export default function KpiCardsGrid({
             <span className="text-[10px] font-bold text-emerald-700">
               {viewMode === 'month' ? 'Chuẩn 50-91h' : 'Chuẩn 16-23h'}
             </span>
-            <button 
+            <button
               onClick={() => scrollToChart('shifts')}
               className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5 hover:underline cursor-pointer"
             >

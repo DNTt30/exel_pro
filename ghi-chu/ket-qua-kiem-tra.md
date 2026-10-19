@@ -1,0 +1,113 @@
+# Kết quả kiểm tra và việc đã hoàn thành
+
+Cập nhật: 19/10/2026.
+Trạng thái: Ghi nhận theo thời điểm; không dùng kết quả cũ để khẳng định code hiện tại hoặc production đã đạt.
+Nguồn: Kết quả công cụ trong phiên làm việc và [docs/HANDBOOK_PUBLICATION.md](../docs/HANDBOOK_PUBLICATION.md).
+
+## Bộ nhớ — hoàn tất ngày 18/10/2026
+
+- Người dùng đã xem và đồng ý bản thiết kế trước khi tạo.
+- Tạo `ghi-chu/`, mỗi chủ đề một file, mục lục một dòng cho mỗi ghi chú; tạo `dang-lam.md` và quy tắc cập nhật trong `CLAUDE.md`.
+- Lần kiểm tra trước khi tạo chưa có bộ nhớ ở các đường dẫn trên, nên không có file cũ cần gộp hoặc việc đã xong cần chuyển ra.
+- Các quyết định cũ được nhận diện và đánh dấu tại ghi chú tương ứng: nghỉ 11 giờ và quản lý công bố ngay tài liệu cửa hàng. ML/Jev được ghi là thử nghiệm, không mặc định đã vận hành thật.
+- Chỉ đưa việc chưa hoàn tất vào `dang-lam.md`. Không sao chép secret hay thông tin cá nhân vào bộ nhớ.
+
+## Kiểm tra local ban đầu của đợt dọn app — đã được xử lý tiếp
+
+- Frontend: `npm.cmd run test -- --maxWorkers=1` trong `frontend/` cho kết quả **83 file đạt, 1 file lỗi, 2 file bỏ qua; 882 kiểm thử đạt, 1 lỗi, 7 bỏ qua**.
+- Lỗi tại `wordCloud.test.jsx`: kiểm thử Dashboard cũ mock `getAdminLogs`, trong khi component mới gọi `getCopilotActivity`. Cần cập nhật kiểm thử theo hành vi mới; chưa chạy lại đạt.
+- PostgreSQL local: `scripts/test_practical_workflows.py` đã chạy qua bộ kiểm thử operational hardening, hạn đăng ký dùng chung, xung đột revision, chặn lưu quá hạn và quyền riêng tư của trạng thái đọc thông báo.
+- Bộ PostgreSQL trên **chưa đạt toàn bộ**: dừng ở bước ghi hội thoại Admin do RLS từ chối. Cần rà fixture và policy trước khi kết luận nguyên nhân.
+- Lint ở thời điểm chạy không có lỗi, có 4 cảnh báo import không dùng; đã chỉnh một số import Dashboard sau đó nhưng chưa xác nhận lại kết quả toàn bộ.
+- Chưa chạy build và kiểm tra trình duyệt cho toàn bộ phiên bản sau đợt dọn mới nhất.
+
+## Kiểm tra Sổ tay trước đợt dọn mới nhất
+
+Tài liệu rollout ghi nhận ngày 17/10/2026: 65 kiểm thử frontend đạt, kiểm thử PostgreSQL đạt, kiểm tra desktop/mobile đạt, lint không lỗi và build thành công. Đây là kết quả của phiên bản trước các thay đổi dọn app tiếp theo.
+
+Kiểm thử trình duyệt dùng dữ liệu/mạng giả lập; kiểm thử Storage dùng schema mô phỏng. Các kết quả này không xác nhận đã thử Gemini hoặc Supabase Storage trên production.
+
+## Rà luồng luật/công thức — 18/10/2026
+
+- Chạy lại 5 file `handbookManager`, `handbookKnowledge`, `handbookPublicationUi`, `copilotRag`, `copilotPermissions`: **57/57 kiểm thử đạt**. Kiểm tra API đề nghị/duyệt, xác nhận nội dung, lỗi giữ dữ liệu nhập, quyền đọc và truy xuất RAG.
+- Chạy lại `python scripts/test_handbook_publication.py` trên PostgreSQL local: **đạt**. Bao gồm phân quyền, giữ bản đang công bố khi chờ duyệt, từ chối có lý do, kiểm tra revision, gỡ mềm, duyệt đồng thời, phạm vi ảnh và nhật ký. Storage là bảng mô phỏng; không thử upload thật.
+- Qua đọc code phát hiện giới hạn chưa được kiểm thử trên UI hiện tại: các tab Sổ tay cũ vẫn render `GS25_HANDBOOK_DATA` trực tiếp, song song với `KnowledgeLibrary`. Sửa/gỡ bản database chưa đồng bộ toàn bộ các tab tĩnh đó.
+- Cơ chế thay nguồn tĩnh dựa tên chuẩn hóa; đổi tên hoặc tạo tài liệu cùng nội dung nhưng khác tên không tự xác lập quan hệ thay thế. Không coi test đạt là đã xử lý đầy đủ trùng lặp/mâu thuẫn nguồn.
+- Ngày hiệu lực chỉ là văn bản; chưa có lịch tự kích hoạt. Quy định viết trong Sổ tay không tự thay hằng số/validator của bộ xếp lịch.
+- Không thay đổi code ứng dụng hoặc deploy trong lần rà này. Chưa kiểm chứng Gemini, upload ảnh và luồng đầu-cuối bằng tài khoản production.
+
+## Giới hạn phát hành ghi nhận trước 19/10 — đã được thay thế
+
+Ở thời điểm ghi nhận trước 19/10, hai migration ngày 17/10/2026 cho Sổ tay và luồng vận hành cùng frontend tương ứng chưa được xác nhận phát hành. Trạng thái này được thay bằng kết quả phát hành ngày 19/10 ở cuối ghi chú.
+
+Việc tiếp theo được giữ duy nhất tại [dang-lam.md](../dang-lam.md).
+
+## Chuyển toàn bộ danh mục — kết quả mới nhất ngày 18/10/2026
+
+- Hoàn thành code Sổ tay/tra nhanh/TÚ mini chỉ đọc database, chuyển nguồn cũ sang snapshot ngoài frontend, tạo danh mục 98 tài liệu (62 công thức) và hai migration ngày 18/10 cho tên gọi khác/nhập chờ duyệt.
+- Sửa kiểm thử Dashboard cũ để kiểm tra nhóm câu hỏi thật thay vì word cloud đã bỏ.
+- Lần chạy toàn bộ frontend đạt **85 file, 886 kiểm thử; 2 file/7 kiểm thử bỏ qua**. Sau bổ sung chặn tên gọi khác của tài liệu đã gỡ và hai test tra nhanh/nguồn trống, chạy lại nhóm liên quan: **44/44 đạt**.
+- `scripts/test_handbook_catalog.py` đạt trên PostgreSQL local: nhập lặp an toàn, giữ bản đã có, chờ Admin duyệt, không giả xác nhận, giữ định lượng/tên gọi khác, kiểm tra quyền, sửa/đổi tên, gỡ và không xuất hiện lại khi nhập lại.
+- Kiểm tra trình duyệt desktop/mobile đạt: quản lý gửi sửa, Admin xác nhận và duyệt, nhân viên thấy 220ml thay 250ml; sau gỡ nhân viên không còn thấy cả hai. Không tràn chiều ngang trên màn hình 390px. Mạng và dữ liệu giả lập, không ghi production.
+- Build cuối thành công, còn cảnh báo chunk lớn; lint không lỗi, còn 2 cảnh báo import cũ tại Login. Các file sửa được kiểm tra whitespace.
+- Nội dung công thức không còn trong bundle theo đường import dữ liệu cũ; test kiến trúc kiểm tra runtime không import các snapshot/catalog seed.
+- Chưa áp dụng migration hay phát hành frontend lên production. 98 là số nguồn trong gói nhập, không phải số tài liệu đã công bố thực tế. Upload ảnh thật và Gemini thật chưa được kiểm chứng.
+
+## Phát hành và kiểm tra ngày 19/10/2026 — trạng thái mới nhất
+
+- Đã áp dụng 4 migration ngày 17–18/10 vào Supabase thật và phát hành frontend: **Published**, sau đó đối chiếu 12 file công khai đạt `FRONTEND_RELEASE_OK`. Chi tiết tại [RELEASE_20261019](../docs/RELEASE_20261019.md).
+- Đã nhập thật **98 nguồn, gồm 62 công thức**; tại thời điểm kiểm tra có **98 bản nhập chờ duyệt, 0 tài liệu công bố**. Admin cần kiểm tra nội dung/định lượng và duyệt trong app. Không tự công bố thay người phụ trách.
+- `test_practical_workflows.py` đạt toàn bộ trên PostgreSQL local. Lỗi Admin do fixture dùng mã không khớp `current_emp_id()`; frontend đã dùng đúng `admin`. Sửa fixture, thêm kiểm tra từ chối mã giả; không nới quyền.
+- Bổ sung 8 kiểm thử frontend: mất mạng chặn đăng ký, đồng hồ máy chủ, đổi tài khoản bỏ phản hồi cũ, revision conflict, Excel không lấy state cũ và nêu giới hạn, phân trang thông báo và lỗi ghi trạng thái đọc. Nhóm 4 file liên quan đạt **47/47**. Lint/build đạt với các cảnh báo cũ đã ghi nhận.
+- Kiểm tra SQL chỉ đọc trên production đạt `HANDBOOK_RELEASE_READONLY_OK`: dùng identity Auth thực, kiểm tra Admin đọc đề nghị, nhân viên không thấy nháp, hạn đăng ký, quyền anonymous và bucket riêng tư. Không thao tác thay đổi lịch/công hoặc duyệt tài liệu thử trên production.
+- Đã sao lưu public schema, nội dung Sổ tay và cấu hình/policy Storage vào `artifacts/release/` trước triển khai. Thử backup đầu bị giới hạn quyền Storage của Prisma, chưa gây thay đổi; đã dùng CLI quản trị để backup phần này rồi mới áp dụng migration.
+- Vẫn chưa xác minh upload ảnh/Gemini và đăng nhập giao diện bằng tài khoản thật sau phát hành. Frontend đã lên `gh-pages`; chưa commit toàn bộ workspace lên `main`.
+
+## Bổ sung duyệt toàn bộ và mở rộng trang — 19/10/2026
+
+- Theo yêu cầu mới, thêm nút Duyệt toàn bộ cho Admin trong tab Chờ duyệt. Chốt danh sách thêm/sửa đang lọc, xác nhận nội dung/định lượng, tái sử dụng RPC duyệt và nhật ký từng tài liệu; báo tiến độ/kết quả một phần, tải lại sau xử lý. Không duyệt gỡ hàng loạt. Đổi tài khoản dừng gửi các bản tiếp theo.
+- Mở rộng trang Sổ tay Admin/nhân viên theo chiều ngang vùng nội dung, bỏ max-width cố định. Không thay đổi giao diện các trang không thuộc Sổ tay.
+- 21 kiểm thử trong 3 file Sổ tay đạt, gồm quyền hiển thị, bộ lọc, xác nhận, kết quả lỗi một phần và chuyển tài khoản. Lint không lỗi, vẫn còn hai cảnh báo cũ tại Login; build đạt.
+- Trình duyệt 1440px/390px đạt: trang dùng chiều rộng khả dụng, duyệt hàng loạt có xác nhận, nhân viên thấy bản mới, gỡ qua duyệt và không tràn ngang. Dữ liệu/mạng giả lập; không duyệt tài liệu production khi kiểm thử.
+- Deploy **Published**; kiểm tra 12 file công khai đạt `FRONTEND_RELEASE_OK`, báo cáo `artifacts/release/frontend-verified-20261019T041023Z.json`. Bản chính mới `index-DRcEP5u6.js`. Không cần migration mới.
+
+## Cải tiến Cài đặt đơn vị — 19/10/2026
+
+- Người dùng yêu cầu mở rộng và tiếp tục tự rà giao diện. Đã bỏ giới hạn chiều rộng của layout dùng chung Nhận diện/Vai trò, giảm trang trí, thêm mô tả mục điều hướng, gom tên và email hỗ trợ vào một khối, giữ logo/màu ở khối riêng. Bản xem trước ở bên phải màn hình rộng và thu gọn phía trên ở màn hình nhỏ.
+- Sau xem ảnh vòng đầu, bỏ khối liên hệ đứng riêng vì để trống nhiều. Đã kiểm tra lại ảnh desktop/mobile của bố cục cuối. Thanh lưu khi có bản nháp được kiểm tra nằm trong viewport và không đè menu dưới mobile; input mobile dùng cỡ chữ 16px.
+- 51 kiểm thử nhận diện/vai trò/API đạt. Hai kịch bản trình duyệt đạt: tải logo, xem trước/lưu, xung đột, mất mạng, tạo/đổi tên/gán/thu hồi/ngưng vai trò, chặn truy cập nhân viên. Kiểm tra chiều rộng 390/640/768/1024/1280/1440/1920px cho trang nhận diện, desktop/mobile cho vai trò. Toàn bộ dữ liệu/mạng thử được giả lập.
+- Lint không lỗi (2 cảnh báo import cũ tại Login), build đạt (cảnh báo chunk lớn còn). `npm run deploy` báo **Published**; đối chiếu 15 file công khai đạt `FRONTEND_RELEASE_OK`, báo cáo `artifacts/release/frontend-verified-20261019T064351Z.json`, bundle chính `index-ta--HSdL.js`.
+- Không đổi schema, quyền, cấu hình nhận diện hoặc vai trò production trong lần thử. Hướng dẫn cập nhật tại `docs/WORKSPACE_SETTINGS_USER_GUIDE.md`.
+
+## TÚ mini nhận biết ngày/giờ — 19/10/2026
+
+- Nguyên nhân: prompt chỉ có ngày hiện tại bên trong nhánh dữ liệu lịch; câu hỏi ngày thuần túy bị gửi sang luồng Sổ tay thiếu mốc thời gian.
+- Thêm `copilotClock.js`: lấy ngày/thứ/giờ theo `Asia/Ho_Chi_Minh` mỗi yêu cầu, hỗ trợ hôm qua/mai/ngày kia. Drawer trả lời câu hỏi thời gian cơ bản trước khi tra Sổ tay, chạy agent hoặc gọi Gemini; ghi log model `local-clock`. Engine cũng dùng cùng helper; mọi prompt Gemini luôn có mốc thời gian riêng, tách khỏi tuần lịch đang xem.
+- Không bắt câu hỏi giờ hủy hàng, lịch cá nhân, câu hỏi hỗn hợp hoặc lịch âm vào câu trả lời ngày giờ đơn giản. Không thay đổi quyền dữ liệu.
+- 79 kiểm thử trong 4 file đạt, gồm ba role, chuyển ngày 00:00 Việt Nam, năm mới/năm nhuận, không gọi provider/Sổ tay và không nuốt câu nghiệp vụ. Lint/build đạt với các cảnh báo cũ. Không gọi Gemini thật để thử.
+- Deploy **Published**; đối chiếu 15 file công khai đạt, báo cáo `artifacts/release/frontend-verified-20261019T070102Z.json`, bundle chính `index-DlMCdW4v.js`.
+- Mốc thời gian dựa đồng hồ thiết bị, định dạng theo múi giờ Việt Nam; chưa có cơ chế hiệu chỉnh thiết bị đặt sai giờ bằng máy chủ. Không gọi đây là thời gian máy chủ.
+
+## TÚ mini thống kê có căn cứ — 19/10/2026
+
+- Phản hồi người dùng: trợ lý đoán các chủ đề phổ biến, rồi dùng số nhân viên/phản hồi/đổi ca thay số lượt hỏi. Đây là trả lời thiếu căn cứ và sai đối tượng thống kê; chưa xác minh các con số vận hành đó đúng hay sai tại thời điểm hỏi.
+- Thêm API đọc `ai_conversations` bằng JWT hiện tại, đếm chính xác qua Supabase và đọc tối đa 200 câu hỏi gần nhất. Dùng RLS đã phát hành; không lấy câu trả lời AI hay hồ sơ nhân sự để suy ra lượt hỏi. Nhân viên chỉ hỏi thống kê của mình; quản lý đọc trong phạm vi server cho phép và bộ lọc cửa hàng.
+- Drawer và engine dùng chung luồng trả lời trực tiếp, không gọi Gemini/Sổ tay cho thống kê. Nêu tổng lượt ghi nhận, thời gian Việt Nam, phạm vi, số mẫu và nguồn; nhóm chủ đề là phân loại tham khảo trong mẫu, không suy ra thứ hạng toàn bộ lịch sử hoặc số người dùng duy nhất. Bộ lọc cửa hàng chỉ đếm bản ghi gắn mã/phạm vi cửa hàng đã chọn; bản ghi `ALL` không tự chia cho từng cửa hàng.
+- Phân biệt chưa có bản ghi với lỗi tải; giữ chủ đề khi hỏi tiếp “cho tôi số lượng và dữ liệu thực tế”. Không coi “số lượng” là lương, “tra cứu lịch” là trà, “hủy ca” là hủy hàng; gọi tên TÚ mini trong câu hỏi lương/công thức không tự chuyển sang thống kê. Hủy kết quả nếu tài khoản đổi trong lúc tải.
+- 117 kiểm thử trong 7 file đạt; lint không lỗi, còn 2 cảnh báo import cũ tại Login. Build đạt với cảnh báo chunk lớn cũ. Các kiểm thử dùng dữ liệu giả lập; không tuyên bố đã đối chiếu tổng lượt production hoặc gọi Gemini thật trong lượt này.
+- Deploy **Published**, kiểm tra 15 file công khai đạt `FRONTEND_RELEASE_OK`; bundle `index-5VnEuXfS.js`, báo cáo `artifacts/release/frontend-verified-20261019T072355Z.json`.
+
+## Chống gửi dồn TÚ mini — 19/10/2026
+
+- Phát hiện guard chỉ dùng React state, có khoảng trễ trước rerender; Edge chưa chặn theo tài khoản. Thêm khóa ref, khoảng nghỉ 3 giây, giữ thời gian chờ server và không tạo log cho lượt bị chặn tại UI.
+- Thêm bộ đếm PostgreSQL riêng, cửa sổ trượt 10 yêu cầu Gemini/60 giây và tối thiểu 3 giây/lượt. Khóa hàng theo danh tính server để nhiều worker/tab không cùng lấy một lượt. RPC chỉ service role; kiểm tra thất bại thì không gọi provider. 429 không tự retry; upstream vẫn có tối đa 2 retry cho mỗi lượt đã nhận.
+- 122 test/6 file đạt, thêm test cooldown server rồi 18 test Drawer đạt (123 test liên quan tổng cộng). Local PostgreSQL thực: 12 yêu cầu đồng thời cùng tài khoản → 1 accepted; cửa sổ hết hạn, cooldown, giới hạn 10, tài khoản khác và quyền anon/authenticated đã kiểm tra. Database local giữ tại `copilot_rate_427be34b4ea7` để đối chiếu. Không thử spam vào Gemini thật.
+- Production migration đã áp dụng, backup `artifacts/release/public-schema-before-20261019T114643Z.sql`; RLS, hạn chế bảng/RPC và quyền service role đạt. `chat-proxy` deploy thành công. Không mở rộng các thay đổi này thành tuyên bố chống mọi bot hoặc chống spam cho toàn bộ app.
+- Thêm 2 test tích hợp assistant workers đạt, tổng 125 test liên quan. Frontend **Published**, 15 file công khai đã đối chiếu: `artifacts/release/frontend-verified-20261019T114950Z.json`, bundle `index-DPHtiVse.js`. PostgreSQL kiểm thử đã dừng. Chưa thử nhiều thiết bị với tài khoản production thật.
+
+## Rà soát toàn app sau phản hồi — 19/10/2026
+
+- Full frontend suite đạt 975 test, 7 test tích hợp bảo mật skipped do thiếu môi trường. 89 file passed/2 skipped. Đối chiếu public lần nữa đạt 15 file: `artifacts/release/frontend-verified-20261019T115856Z.json`.
+- Database read-only: các kiểm tra foundation/catalog true, 98 nguồn nhập, **0 pending imports, 114 published**. Trạng thái cũ “98 chờ duyệt, 0 công bố” chỉ đúng tại lần nhập đầu, không còn mô tả production hiện tại. Không suy ra ai duyệt hoặc chất lượng nội dung từ số đếm.
+- Review ghi nhận: stream Gemini thiếu timeout/hủy xuyên suốt; cache HTML offline không được làm mới và fallback dùng Promise sai; truy vấn thống kê nhiều cửa hàng không thống nhất; nhiều thay đổi chưa commit và CI chưa nối các test DB mới. Chi tiết, mức độ chắc chắn và thứ tự xử lý: [APP_REVIEW_20261019.md](../docs/APP_REVIEW_20261019.md).
+- Lượt này chỉ rà soát và cập nhật ghi chú, không sửa/deploy runtime. Không khẳng định đã kiểm chứng đăng nhập hoặc ghi lịch/công qua tài khoản production thật.

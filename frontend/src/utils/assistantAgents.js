@@ -1,7 +1,8 @@
 import { runAgentWorkflow } from './agentArbiter.js';
 import { scheduleQuality } from './aiDecisionEngine.js';
 import { triageShelfItem, routePersonalQuery, answerPersonalQuery } from './decisionRouting.js';
-import { isOpsManager, isAreaManagerFromEmp, isBuiltinStoreManager, getUserDepts } from '../lib/authSession.js';
+import { isOpsManager } from '../lib/authSession.js';
+import { scopeCopilotContext } from './copilotScope.js';
 
 export const ASSISTANT_AGENT_LABELS = { personal_schedule: 'Tra lịch cá nhân', schedule_review: 'Kiểm tra lịch tuần', shelf_review: 'Kiểm tra hạn sử dụng', synthesis: 'Tổng hợp kết quả' };
 const normalize = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
@@ -29,17 +30,8 @@ export function assistantAgentPlan(query, context, revision) {
 }
 
 function scopedContext(context) {
-  const { user, storeId } = context;
-  if (!user) throw new Error('AUTH_REQUIRED');
-  const allStores = isAreaManagerFromEmp(user) || isBuiltinStoreManager(user);
-  const selected = assistantStoreIds(storeId);
-  const canSeeStore = id => (allStores || getUserDepts(user).includes(id)) && (!selected || selected.has(id));
-  const employees = context.employees.filter(e => e.id === user.id || String(e.dept).split(',').some(d => canSeeStore(d.trim())));
-  const ids = new Set(employees.map(e => e.id));
-  const schedule = Object.fromEntries(Object.entries(context.schedule).map(([w, rows]) => [w, Object.fromEntries(Object.entries(rows).filter(([id]) => ids.has(id)))]));
-  const shelves = (context.shelves || []).filter(s => canSeeStore(s.storeId) && (isOpsManager(user) || String(s.assigneeId).split(',').map(s => s.trim()).includes(user.id)));
-  const shelfIds = new Set(shelves.map(s => s.id));
-  return { ...context, employees, schedule, shelves, shelfItems: (context.shelfItems || []).filter(i => shelfIds.has(i.shelfId)) };
+  if (!context.user) throw new Error('AUTH_REQUIRED');
+  return scopeCopilotContext(context);
 }
 
 export async function runAssistantAgents(query, context, { revision, decide, signal, isCurrent = () => true, onEvent } = {}) {

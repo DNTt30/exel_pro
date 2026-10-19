@@ -273,7 +273,7 @@ export default function Stores() {
               <tr className="bg-blue-50/40">
                 <td colSpan={4} className="p-3 space-y-3">
                   <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">GS25 Direct — lượt khách / doanh số TB ngày</div>
+                    <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">Báo cáo bán hàng — lượt khách / doanh số TB ngày</div>
                     <StoreDemandFields
                       demand={formData.demand}
                       onChange={demand => setFormData({ ...formData, demand })}
@@ -389,7 +389,7 @@ export default function Stores() {
                 <tr className="bg-blue-50/40">
                   <td colSpan={5} className="p-3 space-y-3">
                     <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">GS25 Direct — lượt khách / doanh số TB ngày</div>
+                      <div className="text-[10px] font-bold uppercase text-slate-500 mb-1">Báo cáo bán hàng — lượt khách / doanh số TB ngày</div>
                       <StoreDemandFields
                         demand={formData.demand}
                         onChange={demand => setFormData({ ...formData, demand })}

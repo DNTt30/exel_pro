@@ -4,6 +4,9 @@ import { requiredPasswordPath } from './utils/authNavigation';
 import { useStore } from './store/useStore';
 import { isOpsManager, isBuiltinStoreManager, canManageStoreList } from './lib/authSession';
 import { lazy, Suspense } from 'react';
+import WorkspaceBrandingSync from './components/WorkspaceBrandingSync';
+import WorkspaceRolesSync from './components/WorkspaceRolesSync';
+import ScheduleOverrideModal from './components/modals/ScheduleOverrideModal';
 
 const Login = lazy(() => import('./pages/Login'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
@@ -24,6 +27,8 @@ const Handbook = lazy(() => import('./pages/shared/Handbook'));
 const HandbookManager = lazy(() => import('./pages/admin/HandbookManager'));
 const EmployeeChangePassword = lazy(() => import('./pages/employee/EmployeeChangePassword'));
 const EmployeeProfile = lazy(() => import('./pages/employee/EmployeeProfile'));
+const WorkspaceSettings = lazy(() => import('./pages/admin/WorkspaceSettings'));
+const WorkspaceRoles = lazy(() => import('./pages/admin/WorkspaceRoles'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -138,6 +143,9 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <WorkspaceBrandingSync />
+      <WorkspaceRolesSync />
+      <ScheduleOverrideModal />
       <Router basename={routerBasename}>
         <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải trang...</div></div>}>
           <Routes>
@@ -159,6 +167,8 @@ function App() {
               <Route path="admin/employees" element={<PrivateRoute allowedRoles={['admin']}><Employees /></PrivateRoute>} />
               <Route path="admin/stores" element={<PrivateRoute allowedRoles={['admin']} storeAdminOnly><Stores /></PrivateRoute>} />
               <Route path="admin/logs" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><AdminLogs /></PrivateRoute>} />
+              <Route path="admin/settings" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><WorkspaceSettings /></PrivateRoute>} />
+              <Route path="admin/roles" element={<PrivateRoute allowedRoles={['admin']} fullAdminOnly><WorkspaceRoles /></PrivateRoute>} />
               <Route path="admin/security/change-password" element={<PrivateRoute allowedRoles={['admin']}><SecurityChangePassword /></PrivateRoute>} />
               <Route path="admin/shelves" element={<PrivateRoute allowedRoles={['admin']}><ShelfDateBoard /></PrivateRoute>} />
               <Route path="admin/handbook" element={<PrivateRoute allowedRoles={['admin']}><HandbookManager /></PrivateRoute>} />

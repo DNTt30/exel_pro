@@ -1,16 +1,18 @@
-﻿import { WEEK_DAYS, SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } from '../data/constants';
+﻿import { WEEK_DAYS, SCHEDULE_RULES, DECISION_RULES } from '../data/constants';
 import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelper';
-import { isNightReady, managedStoreIds, isEmployeeWeekLocked } from './employeeSkills';
-import { isWeekLocked, weekRecordKey } from './scheduleWeek';
-import { stripVi, lookupFfOnsiteRecipe } from '../data/ffOnsiteRecipes';
-import { GS25_HANDBOOK_DATA } from '../data/gs25HandbookData';
+import { scheduleRegisteredShifts } from './registeredScheduler';
+import { stripVi } from './textSearch';
 import { tryAnswerWithData, isSelfUserQuery } from './copilotIntents';
 import { streamGeminiMultiTurn, generateGeminiMultiTurn } from '../services/geminiService';
-import { sanitizeAiInput, sanitizeEmployeesForAi, sanitizeAiOutput } from './aiGuard';
+import { buildCopilotRequest } from './copilotContext';
+import { handbookApi } from '../services/api/handbook';
+import { sanitizeAiInput, sanitizeAiOutput } from './aiGuard';
+import { answerClockQuery } from './copilotClock';
+import { createCopilotRequest } from './copilotRequest';
+import { answerUsageQuery, routeUsageQuery } from './copilotUsage';
 
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-const OLLAMA_TIMEOUT_MS = 800;
 
 function todayDayKey(date = new Date()) {
   return DAY_CODE_BY_JS[date.getDay()];
@@ -214,145 +216,10 @@ function swapPeople(s, employees) {
 /**
  * BỘ TRI THỨC LUẬT LAO ĐỘNG & QUY CHẾ NỘI BỘ GS25 (KNOWLEDGE BASE)
  */
-export const GS25_LABOR_RULES_KNOWLEDGE = {
-  // 1. Khung ca làm việc chuẩn tại hệ thống GS25 (Shift standard)
-  shiftStandards: {
-    title: 'Khung Ca Làm Việc Tiêu Chuẩn Chuỗi Cửa Hàng Tiện Lợi GS25',
-    lawRef: 'Quy định Vận hành Tiện ích 24/7 GS25 Việt Nam',
-    details: [
-      '🕒 **Ca 8 tiếng (Ca chuẩn)**: Gồm ca Sáng (6:00 - 14:00), Chiều (14:00 - 22:00), Đêm (22:00 - 6:00) và ca Hành chính/Giao nhận (10:00 - 18:00). Phù hợp cho nhân viên Full-time (STFT) và Part-time đăng ký đủ ca.',
-      '⏱️ **Ca 4 tiếng (Ca linh hoạt / Part-time)**: Gồm ca 6:00 - 10:00, 10:00 - 14:00, 14:00 - 18:00, 18:00 - 22:00. Tối ưu cho sinh viên xoay ca theo lịch học và bổ sung giờ cao điểm đông khách.',
-      '🌙 **Ca đêm 8 tiếng (22:00 - 6:00)**: Phục vụ mô hình mở cửa xuyên suốt 24/7, luôn duy trì tối thiểu 1 nhân sự cứng trực quầy POS, trông coi an ninh và nhận hàng Fresh Food / Dry Food ca đêm.'
-    ]
-  },
 
-  // 2. Nghỉ giữa ca (Break time)
-  breakTime: {
-    title: 'Quy định Thời gian Nghỉ giữa ca (Nghỉ ngơi, ăn uống)',
-    lawRef: 'Điều 109 Bộ luật Lao động 2019 & Nội quy GS25',
-    details: [
-      '☕ **Ca ban ngày 8 tiếng (6-14, 14-22, 10-18)**: Được nghỉ giữa giờ ít nhất **30 phút** (thường chia thành 1 lần ăn chính 20-30 phút hoặc 2 lần nghỉ ngắn 15 phút).',
-      '🌙 **Ca ban đêm (22-6)**: Được nghỉ giữa giờ ít nhất **45 phút liên tục**.',
-      '⏳ **Ca ngắn 4 tiếng**: Được nghỉ giải lao linh động **10 - 15 phút** vào thời điểm lưu lượng khách thấp.',
-      '⚡ **Làm thêm giờ (Tăng ca > 2 tiếng)**: Được nghỉ thêm ít nhất **30 phút** trước khi vào ca làm thêm.',
-      '🏪 **Tại cửa hàng GS25**: Nhân viên luân phiên nghỉ ăn để luôn duy trì nhân sự trực quầy thu ngân (POS) và khu vực chế biến đồ ăn nhanh (Fresh Food).'
-    ]
-  },
-
-  // 3. Nghỉ chuyển ca (Daily Rest)
-  dailyRest: {
-    title: 'Quy định Thời gian Nghỉ chuyển giữa 2 ca liên tiếp',
-    lawRef: 'Điều 110 Bộ luật Lao động 2019',
-    details: [
-      '🛡️ Người lao động làm việc theo ca được nghỉ **ít nhất 12 giờ** (tối thiểu 11 giờ theo quy chuẩn) trước khi chuyển sang ca làm việc khác.',
-      '❌ **Cấm tuyệt đối**: Hết ca chiều lúc 22:00 hôm nay mà 06:00 sáng hôm sau lại xếp ca sáng (chỉ nghỉ được 8 tiếng -> Vi phạm).',
-      '🌙 **Sau ca đêm (22-6)**: Kết thúc lúc 06:00 sáng hôm sau, người lao động phải được nghỉ nguyên ngày hôm sau hoặc chỉ được làm ca tối muộn sau 18:00.'
-    ]
-  },
-
-  // 4. Nghỉ hàng tuần (Weekly Rest)
-  weeklyRest: {
-    title: 'Quy định Ngày Nghỉ Hàng Tuần (OFF)',
-    lawRef: 'Điều 111 Bộ luật Lao động 2019',
-    details: [
-      '📅 Mỗi tuần, người lao động được nghỉ **ít nhất 24 giờ liên tục** (tương đương 1 ngày OFF trọn vẹn).',
-      '⚖️ Full-Time (STFT) làm tối đa **6 ca 8h = 48h/tuần**, AI luôn khóa và đảm bảo có đúng 1 ngày nghỉ OFF so le, không làm 7 ngày liên tục.'
-    ]
-  },
-
-  // 5. Lương ca đêm & Làm thêm giờ (Overtime & Night Shift Pay)
-  salaryRules: {
-    title: 'Chế độ Tiền Lương Ca Đêm & Tăng Ca (OT)',
-    lawRef: 'Điều 98 Bộ luật Lao động 2019',
-    details: [
-      '🌙 **Làm việc ban đêm (22:00 - 06:00)**: Được trả thêm ít nhất **30% tiền lương** tính theo đơn giá ca ngày.',
-      '⏱️ **Làm thêm giờ (OT) ngày thường**: Trả ít nhất **150%** tiền lương.',
-      '📅 **Làm thêm ngày nghỉ tuần (OFF)**: Trả ít nhất **200%** tiền lương.',
-      '🎆 **Làm thêm ngày Lễ, Tết**: Trả ít nhất **300%** tiền lương (chưa kể lương ngày lễ).',
-      '🔥 **Làm thêm ca đêm**: Trả ít nhất **200% - 210%** tiền lương theo công thức luật định.'
-    ]
-  },
-
-  // 6. Định mức Part-Time & Full-Time GS25
-  headcountRules: {
-    title: 'Định Mức Giờ Công Chuỗi Cửa Hàng GS25',
-    lawRef: 'Quy chế C&B Nội Bộ GS25',
-    details: [
-      '💼 **Full-Time (STFT)**: Chuẩn 48h/tuần (6 ca 8h + 1 OFF). Tự động bù vào các ca thiếu người của cửa hàng.',
-      '⏳ **Part-Time (STPT)**: Định mức an toàn từ **16h đến 23h/tuần**, giới hạn tối đa không vượt quá **91h/tháng** để tuân thủ hợp đồng thời vụ GS25.',
-      '👥 **Nhân viên mới (CSR_NEW)**: Dưới 1 tháng kinh nghiệm bắt buộc phải có 1 Bạn Cứng (STFT/SM/Kinh nghiệm >=1 tháng) kèm cặp trong ca, tuyệt đối không trực solo.'
-    ]
-  },
-
-  // 7. Quy định Đồng phục & Văn hóa Chào khách GS25
-  uniformAndServiceRules: {
-    title: 'Tiêu Chuẩn Đồng Phục & Văn Hóa Chào Khách GS25',
-    lawRef: 'Sổ tay Văn hóa Dịch vụ Khách hàng GS25',
-    details: [
-      '👕 **Đồng phục chuẩn**: Luôn mặc áo đồng phục GS25 phẳng phiu, sơ vin gọn gàng, đeo bảng tên bên ngực trái, mang giày đen/tối màu kín mũi.',
-      '🧢 **Tạp dề & Mũ**: Bắt buộc đeo tạp dề sạch và đội mũ GS25 đúng quy cách khi đứng quầy Fresh Food và chuẩn bị thức ăn nhanh.',
-      '🗣️ **Tiêu chuẩn câu chào khách**: Khi khách bước vào cửa hàng, tất cả nhân viên trong ca tươi cười và chào to rõ ràng: **"GS25 xin chào!"**. Khi khách thanh toán xong và ra về: **"GS25 cảm ơn và hẹn gặp lại quý khách!"**.',
-      '📵 **Tác phong làm việc**: Tuyệt đối không bấm điện thoại cá nhân trong giờ làm, giữ gìn quầy thu ngân và khu vực ăn uống luôn sạch sẽ, ngăn nắp.'
-    ]
-  },
-
-  // 8. Sổ tay Chất lượng & Quy định Giờ hủy hàng GS25
-  handbookQualityExpiry: {
-    title: 'Đảm Bảo Chất Lượng & Quy Định Giờ Hủy Hàng GS25',
-    lawRef: 'Sổ tay Vận hành & ATVSTP GS25',
-    details: [
-      '🕒 **11:00 & 22:00**: Hủy thức ăn nhanh tươi & có rau (Sandwich có rau, burger, gimbap, soup).',
-      '🕒 **19:00**: Hủy nhóm cơm, mì, sushi (Cơm nắm onigiri, bento, sandwich không rau, mì, sushi).',
-      '🏷️ **Theo HSD / Tem**: FF Onsite, BTP, dessert trên tủ OSC, bánh tươi Patachou.',
-      '📦 **Hàng bách hóa (GM)**: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.',
-      '⚠️ **Quy tắc bắt buộc**: Phải xé rách bao bì hoặc làm biến dạng sản phẩm trước khi cho vào túi rác, tránh thất thoát.',
-      '🌡️ **Nhiệt độ chuẩn**: Tủ mát 0°C - 5°C; Tủ đông < -18°C; Nồi súp lẩu 70°C; Tủ hấp bánh bao 90°C (hấp ≥ 30 phút, CẤM lò vi sóng!).'
-    ]
-  },
-
-  // 9. Danh mục Hóa chất SARAYA & ECOLAB GS25
-  handbookChemicals: {
-    title: 'Danh Mục Hóa Chất Vệ Sinh Cửa Hàng GS25',
-    lawRef: 'Quy trình Vệ sinh & An toàn Hóa chất GS25 - Saraya Greentek',
-    details: [
-      '⚪ **Trắng (H-1 Smart San)**: Nước rửa tay nhân viên, dùng NGUYÊN CHẤT không pha loãng.',
-      '🔴 **Đỏ đô (S-4 Alcohol Sanitizer)**: Cồn sát khuẩn tay & dao thớt, dùng NGUYÊN CHẤT (giữ xa lửa!).',
-      '🟢 **Xanh lá (N-12 Sara Wash)**: Rửa CCDC (pha 6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (pha 1 lần nhấn 30ml + nước đầy bình).',
-      '🟤 **Nâu (G-2 Smart San Degreaser)**: Tẩy dầu mỡ bếp chiên, tủ hút, dùng NGUYÊN CHẤT (bắt buộc mang găng tay cao su!).',
-      '🔴 **Đỏ tươi (211 Pro WC)**: Tẩy bồn cầu & sàn toilet (pha 4 lần nhấn 120ml + nước đầy bình).',
-      '🔵🟡 **Xanh + Vàng (311 Multi Floor & Glass)**: Lau kính mặt tiền và sàn gạch (pha 1 lần nhấn 30ml + nước đầy bình).'
-    ]
-  },
-
-  // 10. SOP Chế biến & Bán hàng Lẩu - Miền Bắc
-  handbookHotpotSOP: {
-    title: 'SOP Chế Biến & Bán Hàng Lẩu Chả Cá Cay (BM: SOP-FFONSITE-CB-LAU-HN V.06)',
-    lawRef: 'SOP Fresh Food Onsite GS25',
-    details: [
-      '🍲 **Nước súp chả cá cay**: 2000ml nước lọc + 1 gói bột súp (120g). Nấu bếp từ công suất **2000W** trong **15 phút**.',
-      '🍢 **Chả cá xoắn xiên**: 10 xiên, nấu công suất **1200W** trong **10 phút** (sau 5 phút lật mặt). Nhiệt độ tâm sau nấu ≥ 75°C.',
-      '🍜 **Mì chả cá cay**: Nước sôi ≥ 95°C, trụng mì đúng **2 phút 30 giây**.',
-      '🥣 **Múc nước súp**: Ly lẩu = *Số xiên + 1 vá súp*. Tô mì = *4 vá nước súp* (~30g/vá). Luôn THÁO XIÊN trước khi cho vào ly hoặc tô.',
-      '🔥 **Nút bấm lò vi sóng công nghiệp**: Ly chả cá **BẤM SỐ 3** (gia dụng 30s). Tô mì **BẤM SỐ 5** (gia dụng 2 phút).',
-      '⏱️ **Thời gian trưng bày**: Tối đa 2 tiếng ở công suất 200W. Trữ đông BTP tối đa 15 ngày (-23°C đến -18°C).'
-    ]
-  },
-
-  // 11. Phân công Vệ sinh 3 Ca & Quy trình Rửa tay 12 bước
-  handbookCleaningAndHygiene: {
-    title: 'Phân Công Vệ Sinh Ca & Quy Trình Rửa Tay Saraya 60s',
-    lawRef: 'Lịch Vệ sinh Định kỳ & Chuẩn Vệ sinh Saraya GS25',
-    details: [
-      '☀️ **Ca 1 (6h - 14h)**: Vệ sinh quạt hút, thanh nẹp, dọn WH kho bãi, tủ mát kho, quét mạng nhện, lau kệ hàng.',
-      '🌤️ **Ca 2 (14h - 22h)**: Vệ sinh chân bàn ghế, rổ mua sắm, tủ đông/mát counter, kệ snack, sọt rác, xô lau.',
-      '🌙 **Ca 3 (22h - 6h)**: Chà sàn gạch xám, cọ rửa toilet, hộc counter, và **BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3**.',
-      '🧼 **Rửa tay 12 bước Saraya (60 giây)**: Rửa nước -> 2 nhấn H-1 -> chà lòng tay, mu tay, kẽ ngón, đầu ngón, ngón cái, cổ tay đến khuỷu, chà móng tay -> xả nước (≥60s) -> lau khô -> xịt cồn S-4. 4 vùng hay bị sót: móng tay, ngón cái, kẽ ngón, mu bàn tay.'
-    ]
-  }
-};
 
 /**
- * Kiểm tra vi phạm thời gian nghỉ giữa 2 ca của 2 ngày liên tiếp theo chuẩn Luật Lao Động (>= 11 tiếng nghỉ)
+ * Kiểm tra thời gian nghỉ giữa ca theo DECISION_RULES.MIN_REST_HOURS.
  */
 export function checkRestPeriodViolation(prevDayShift, currentDayShift) {
   if (!prevDayShift || !currentDayShift) return false;
@@ -397,573 +264,23 @@ export function isNewStaff(emp) {
   return false;
 }
 
-/**
- * AI SMART AUTO-SCHEDULER (V3.5)
- */
+/** Select only employee registrations; never invent availability. */
 export function generateAISchedule(employees, storeId, options = {}) {
-  const storeEmployees = employees.filter(e => e.dept === storeId && e.isActive !== false);
-  if (storeEmployees.length === 0) {
-    throw new Error(`Không tìm thấy nhân viên nào thuộc cửa hàng ${storeId}`);
-  }
-
-  const {
-    requiredMatrix = DEFAULT_STAFFING_MATRIX.weekday,
-    requiredMatrixByDay = {},
-    existingSchedule = {},
-    nightShiftVolunteers = [],
-    smOverrides = {},      // { "T5": { "22-6": { min:2, max:2, reason:"hàng về nhiều" } } }
-    employeeOverrides = {}, // { [empId]: { [dayKey]: shiftCode } }
-    demandFactor = 1.0,   // 0.8 = giảm 20% nhân sự toàn tuần, 1.2 = tăng 20%
-    smNotes = '',          // ghi log lý do vào insights
-    respectAvailability = true,
-    respectOffRequests = true
-  } = options;
-  if (isWeekLocked(options.scheduleWeeks?.[weekRecordKey(storeId, options.currentWeek)]?.status)) {
-    throw new Error('Tuần đang chờ duyệt hoặc đã duyệt, không thể xếp lại lịch.');
-  }
-  const managed = new Set(managedStoreIds(options.user, options.stores));
-  const lockedIds = new Set(employees.filter(emp => isEmployeeWeekLocked(emp, existingSchedule[emp.id], options.scheduleWeeks, options.currentWeek)).map(emp => emp.id));
-
-  // Áp dụng demandFactor lên requiredMatrixByDay (scale staffing requirement)
-  const effectiveMatrixByDay = {};
-  const allDayKeys = [...new Set([...Object.keys(requiredMatrixByDay), ...WEEK_DAYS])];
-  allDayKeys.forEach(dayKey => {
-    const base = requiredMatrixByDay[dayKey] || requiredMatrix;
-    if (demandFactor === 1.0) {
-      effectiveMatrixByDay[dayKey] = { ...base };
-    } else {
-      const scaled = {};
-      Object.entries(base).forEach(([shift, count]) => {
-        // Scale nhưng giữ tối thiểu 1 người cho ca bắt buộc (đặc biệt ca đêm)
-        const minCount = shift === '22-6' ? 1 : 0;
-        scaled[shift] = Math.max(minCount, Math.round((count || 0) * demandFactor));
-      });
-      effectiveMatrixByDay[dayKey] = scaled;
-    }
-    // SM override có priority cao nhất — ghi đè lên cả demand scaling
-    if (smOverrides[dayKey]) {
-      Object.entries(smOverrides[dayKey]).forEach(([shift, constraint]) => {
-        effectiveMatrixByDay[dayKey] = effectiveMatrixByDay[dayKey] || {};
-        effectiveMatrixByDay[dayKey][shift] = constraint.min ?? effectiveMatrixByDay[dayKey][shift] ?? 1;
-      });
-    }
-  });
-
-  const resultSchedule = {};
-  storeEmployees.forEach(e => {
-    resultSchedule[e.id] = { T2: 'off', T3: 'off', T4: 'off', T5: 'off', T6: 'off', T7: 'off', CN: 'off' };
-  });
-
-  const employeeHours = {};
-  const employeeShiftsCount = {};
-  storeEmployees.forEach(e => {
-    employeeHours[e.id] = 0;
-    employeeShiftsCount[e.id] = 0;
-  });
-
-  // Phân tích lịch đăng ký rảnh và ngày xin nghỉ (OFF) do nhân sự tự đăng ký
-  const employeeOffDays = {}; // empId -> Set(dayKey)
-  const employeeRegisteredShifts = {}; // empId -> { dayKey: shiftCode }
-  let totalRegisteredShiftsCount = 0;
-  let totalOffRequestsCount = 0;
-  let fulfilledRegisteredCount = 0;
-
-  storeEmployees.forEach(emp => {
-    employeeOffDays[emp.id] = new Set();
-    employeeRegisteredShifts[emp.id] = {};
-    const empSched = existingSchedule[emp.id] || {};
-
-    WEEK_DAYS.forEach(dayKey => {
-      const raw = empSched[dayKey];
-      if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
-        const { shift } = normalizeShift(raw);
-        if (shift === 'off') {
-          employeeOffDays[emp.id].add(dayKey);
-          totalOffRequestsCount++;
-        } else if (shift) {
-          employeeRegisteredShifts[emp.id][dayKey] = shift;
-          totalRegisteredShiftsCount++;
-        }
-      }
-    });
-  });
-
-  const isSMStaff = (emp) => {
-    const r = (emp.role || '').toLowerCase();
-    const jt = (emp.jobTitle || '').toLowerCase();
-    const tp = (emp.type || '').toUpperCase();
-    return r.includes('cửa hàng trưởng') || r.includes('sm') || jt.includes('cửa hàng trưởng') || jt.includes('sm') || tp === 'SM';
-  };
-
-  const smEmployees = storeEmployees.filter(isSMStaff);
-  // CSR_NEW tính như full-time theo quy chuẩn (≥48h & ≥6 ca/tuần), SM tách riêng để xếp giờ hành chính
-  const ftEmployees = storeEmployees.filter(e => !smEmployees.some(sm => sm.id === e.id) && (e.type === 'STFT' || e.type === 'CSR_NEW' || e.role?.includes('Full') || e.role?.includes('STFT')));
-  const ptEmployees = storeEmployees.filter(e => !smEmployees.some(sm => sm.id === e.id) && !ftEmployees.some(ft => ft.id === e.id));
-
-  const seniorEmployees = storeEmployees.filter(isSeniorStaff);
-  const newEmployees = storeEmployees.filter(isNewStaff);
-
-  const ftMandatoryOffDays = {};
-  ftEmployees.forEach((emp, index) => {
-    // Tôn trọng ngày OFF nếu FT đã chủ động đăng ký
-    const requestedOff = [...(employeeOffDays[emp.id] || [])];
-    if (requestedOff.length > 0) {
-      ftMandatoryOffDays[emp.id] = requestedOff[0];
-    } else {
-      ftMandatoryOffDays[emp.id] = WEEK_DAYS[index % WEEK_DAYS.length];
-    }
-  });
-
-  // Thu tu XU LY trong ngay: dem -> ca ngan gio vang (PT) -> khung xuong ca dai
-  const CANON_ORDER = ['22-6', '10-14', '14-18', '18-22', '6-10', '6-14', '14-22', '10-18', '6-12'];
-  const matrixCodes = new Set();
-  if (requiredMatrix) Object.keys(requiredMatrix).forEach(c => { if ((requiredMatrix[c] || 0) > 0) matrixCodes.add(c); });
-  Object.values(effectiveMatrixByDay).forEach(m => Object.keys(m || {}).forEach(c => { if ((m[c] || 0) > 0) matrixCodes.add(c); }));
-  // Thêm tất cả ca nhân viên thực tế đã đăng ký vào danh sách xem xét
-  Object.values(employeeRegisteredShifts).forEach(shifts => {
-    Object.values(shifts).forEach(c => { if (c && c !== 'off') matrixCodes.add(c); });
-  });
-  const shiftPriorities = CANON_ORDER.filter(c => c === '22-6' || matrixCodes.has(c));
-  matrixCodes.forEach(c => {
-    if (!shiftPriorities.includes(c) && c !== 'off') shiftPriorities.push(c);
-  });
-
-  const confirmedAssignments = new Set();
-  // Keep outbound coverage in the working schedule, so hours/rest match what will be saved.
-  storeEmployees.forEach(emp => WEEK_DAYS.forEach(day => {
-    const raw = existingSchedule[emp.id]?.[day];
-    const cell = normalizeShift(raw);
-    if (!lockedIds.has(emp.id) && !cell.covering_store) return;
-    if (raw !== undefined) resultSchedule[emp.id][day] = raw;
-    confirmedAssignments.add(`${emp.id}|${day}`);
-    employeeHours[emp.id] += getShiftHours(cell.shift);
-    if (getShiftHours(cell.shift) > 0) employeeShiftsCount[emp.id]++;
-  }));
-  const assignedAt = (day, code) => employees.filter(emp => {
-    if (emp.isActive === false) return false;
-    const cell = normalizeShift((resultSchedule[emp.id] || existingSchedule[emp.id])?.[day]);
-    return cell.confirmed && cell.shift === code && (cell.covering_store || emp.dept) === storeId;
-  });
-  const assignShiftTo = (emp, dayKey, shiftCode) => {
-    resultSchedule[emp.id][dayKey] = shiftCode;
-    confirmedAssignments.add(`${emp.id}|${dayKey}`);
-    employeeHours[emp.id] += getShiftHours(shiftCode);
-    employeeShiftsCount[emp.id]++;
-  };
-
-  const canTakeShift = (emp, dayKey, dayIdx, shiftCode, isFTBackfill = false) => {
-    if (lockedIds.has(emp.id)) return false;
-    if (resultSchedule[emp.id][dayKey] !== 'off') return false;
-
-    // BẢO VỆ NGÀY XIN NGHỈ (OFF): Tuyệt đối không gán ca vào ngày nhân viên đã báo bận/xin nghỉ
-    // Trừ trường hợp Quản lý có lệnh ép đích danh nhân viên đó làm ca này
-    const hasSmForce = employeeOverrides[emp.id]?.[dayKey] && employeeOverrides[emp.id]?.[dayKey] !== 'off';
-    if (respectOffRequests && employeeOffDays[emp.id]?.has(dayKey) && !hasSmForce) {
-      return false;
-    }
-
-    // TÔN TRỌNG CA ĐĂNG KÝ: Nếu nhân viên đã đăng ký ca cụ thể trong ngày (ví dụ 6-10),
-    // họ CHỈ ĐƯỢC PHÉP làm đúng ca đã đăng ký! Tuyệt đối không tự ý đổi sang 6-14 hay 14-22.
-    if (respectAvailability && !hasSmForce) {
-      const regShift = employeeRegisteredShifts[emp.id]?.[dayKey];
-      if (regShift && regShift !== shiftCode) {
-        return false;
-      }
-    }
-
-    const isFT = ftEmployees.some(ft => ft.id === emp.id);
-
-    if (isFT) {
-      const offDaysLeft = WEEK_DAYS.filter(d => resultSchedule[emp.id][d] === 'off').length;
-      // Luật nghỉ tuần TUYỆT ĐỐI: >=1 ngày off trọn vẹn và tối đa 6 ca (48h).
-      // Backfill chỉ được mượn ngày off định mức nếu NV còn ngày off khác & chưa đủ 6 ca.
-      if (ftMandatoryOffDays[emp.id] === dayKey && (!isFTBackfill || offDaysLeft <= 1)) return false;
-      if (employeeShiftsCount[emp.id] >= 6) return false;
-    }
-
-    if (dayIdx > 0) {
-      const prevDayKey = WEEK_DAYS[dayIdx - 1];
-      if (checkRestPeriodViolation(resultSchedule[emp.id][prevDayKey], shiftCode)) return false;
-    } else if (checkRestPeriodViolation(options.previousWeekSchedule?.[emp.id]?.CN, shiftCode)) {
-      return false;
-    }
-
-    const addedHours = getShiftHours(shiftCode);
-    if (!isFT) {
-      // Tôn trọng định mức riêng của từng NV nếu có (maxH), mặc định 23h
-      const ptCap = Number(emp.maxH) > 0 ? Number(emp.maxH) : SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK;
-      if (employeeHours[emp.id] + addedHours > ptCap) return false;
-    } else {
-      if (employeeHours[emp.id] + addedHours > SCHEDULE_RULES.STFT_MAX_HOURS_PER_WEEK) return false;
-    }
-
-    // Nghỉ giữa ca: kiểm cả ngày KẾ TIẾP đã bị xếp trước (phase 3/4 gán lệch thứ tự)
-    if (dayIdx < WEEK_DAYS.length - 1) {
-      const nextDayKey = WEEK_DAYS[dayIdx + 1];
-      if (checkRestPeriodViolation(shiftCode, resultSchedule[emp.id][nextDayKey])) return false;
-    } else if (checkRestPeriodViolation(shiftCode, options.nextWeekSchedule?.[emp.id]?.T2)) {
-      return false;
-    }
-
-    return true;
-  };
-
-  // GIAI ĐOẠN 0: ÁP DỤNG CHỈ ĐẠO ĐÍCH DANH NHÂN VIÊN TỪ CỬA HÀNG TRƯỞNG (SM OVERRIDES)
-  let smDirectAssignedCount = 0;
-  storeEmployees.forEach(emp => {
-    const overrides = employeeOverrides[emp.id] || {};
-    WEEK_DAYS.forEach((dayKey, dayIdx) => {
-      const overrideShift = overrides[dayKey];
-      if (overrideShift) {
-        if (lockedIds.has(emp.id) || normalizeShift(existingSchedule[emp.id]?.[dayKey]).covering_store) return;
-        if (overrideShift === 'off') {
-          resultSchedule[emp.id][dayKey] = 'off';
-          employeeOffDays[emp.id].add(dayKey);
-        } else if (canTakeShift(emp, dayKey, dayIdx, overrideShift, true)) {
-          assignShiftTo(emp, dayKey, overrideShift);
-          smDirectAssignedCount++;
-        }
-      }
-    });
-  });
-
-  // GIAI ĐOẠN 0.5: CỬA HÀNG TRƯỞNG (SM) MẶC ĐỊNH LÀM GIỜ HÀNH CHÍNH (8-17), T2 -> T7, CN NGHỈ (OFF)
-  smEmployees.forEach(sm => {
-    if (lockedIds.has(sm.id)) return;
-    WEEK_DAYS.forEach((dayKey) => {
-      if (resultSchedule[sm.id][dayKey] === 'off') {
-        if (dayKey !== 'CN' && employeeShiftsCount[sm.id] < 6) {
-          assignShiftTo(sm, dayKey, '8-17');
-        }
-      }
-    });
-  });
-
-  const borrowedAssignments = [];
-  const nightAllowed = emp => !nightShiftVolunteers.length || nightShiftVolunteers.includes(emp.id);
-  const pool = employees.filter(emp => emp.isActive !== false && emp.dept !== storeId && isNightReady(emp)
-    && managed.has(storeId) && managed.has(emp.dept) && !lockedIds.has(emp.id));
-  const borrowNightReady = (day, index) => {
-    // Adjacent weeks must have been loaded, including an explicitly empty result.
-    if (!options.previousWeekSchedule || !options.nextWeekSchedule) return false;
-    for (const emp of pool) {
-      if (!nightAllowed(emp)) continue;
-      const row = resultSchedule[emp.id] || existingSchedule[emp.id] || {};
-      const cell = normalizeShift(row[day]);
-      if (cell.shift !== 'off' || cell.covering_store) continue;
-      const hours = WEEK_DAYS.reduce((sum, d) => sum + getShiftHours(normalizeShift(row[d]).shift), 0);
-      const shifts = WEEK_DAYS.filter(d => getShiftHours(normalizeShift(row[d]).shift) > 0).length;
-      const isPT = emp.type === 'STPT';
-      const cap = isPT ? Math.min(Number(emp.maxH) > 0 ? Number(emp.maxH) : SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK, SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK) : SCHEDULE_RULES.STFT_MAX_HOURS_PER_WEEK;
-      if (hours + getShiftHours('22-6') > cap || shifts >= SCHEDULE_RULES.STFT_MIN_SHIFTS_PER_WEEK) continue;
-      const previous = index ? row[WEEK_DAYS[index - 1]] : options.previousWeekSchedule[emp.id]?.CN;
-      const next = index < WEEK_DAYS.length - 1 ? row[WEEK_DAYS[index + 1]] : options.nextWeekSchedule[emp.id]?.T2;
-      if (checkRestPeriodViolation(previous, '22-6') || checkRestPeriodViolation('22-6', next)) continue;
-      resultSchedule[emp.id] = { ...row, [day]: { shift: '22-6', covering_store: storeId } };
-      employeeHours[emp.id] = hours + getShiftHours('22-6');
-      employeeShiftsCount[emp.id] = shifts + 1;
-      borrowedAssignments.push({ empId: emp.id, name: emp.name, fromStore: emp.dept, day, shift: '22-6', covering_store: storeId });
-      return true;
-    }
-    return false;
-  };
-  const ensureNightMentor = (day, index) => {
-    if (assignedAt(day, '22-6').some(isNightReady)) return;
-    const mentor = storeEmployees.filter(emp => !isSMStaff(emp) && isNightReady(emp) && nightAllowed(emp)
-      && canTakeShift(emp, day, index, '22-6', true)).sort((a, b) => employeeHours[a.id] - employeeHours[b.id])[0];
-    if (mentor) assignShiftTo(mentor, day, '22-6');
-    else borrowNightReady(day, index);
-  };
-  // Reserve a qualified mentor before daytime assignments use all available hours.
-  WEEK_DAYS.forEach((day, index) => {
-    if ((effectiveMatrixByDay[day]?.['22-6'] || 0) > 0 || assignedAt(day, '22-6').length) ensureNightMentor(day, index);
-  });
-
-  // GIAI ĐOẠN 1: KHỚP LỊCH ĐĂNG KÝ RẢNH THEO NHU CẦU ĐỊNH BIÊN / DOANH THU
-  if (respectAvailability) {
-    WEEK_DAYS.forEach((dayKey, dayIdx) => {
-      shiftPriorities.forEach(shiftCode => {
-        const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-        let neededCount = dayMatrix[shiftCode] || 0;
-
-        // Nếu ca 4h (6-10, 10-14, 14-18, 18-22) chưa có định biên riêng trong matrix,
-        // nhưng ca lớn tương ứng (6-14 hoặc 14-22) đang cần người:
-        if (neededCount === 0) {
-          if (shiftCode === '6-10' || shiftCode === '10-14') {
-            const morningNeeded = dayMatrix['6-14'] || 0;
-            const morningAssigned = storeEmployees.filter(e => {
-              const s = resultSchedule[e.id][dayKey];
-              return s === '6-14' || s === '6-10' || s === '10-14';
-            }).length;
-            if (morningAssigned < morningNeeded) {
-              neededCount = Math.min(1, morningNeeded - morningAssigned);
-            }
-          } else if (shiftCode === '14-18' || shiftCode === '18-22') {
-            const afternoonNeeded = dayMatrix['14-22'] || 0;
-            const afternoonAssigned = storeEmployees.filter(e => {
-              const s = resultSchedule[e.id][dayKey];
-              return s === '14-22' || s === '14-18' || s === '18-22';
-            }).length;
-            if (afternoonAssigned < afternoonNeeded) {
-              neededCount = Math.min(1, afternoonNeeded - afternoonAssigned);
-            }
-          }
-        }
-
-        let assignedCount = assignedAt(dayKey, shiftCode).length;
-
-        if (assignedCount < neededCount) {
-          // Lấy tất cả nhân sự ĐÃ ĐĂNG KÝ ca này vào ngày này
-          const registeredCandidates = storeEmployees.filter(emp => {
-            return employeeRegisteredShifts[emp.id]?.[dayKey] === shiftCode &&
-                   canTakeShift(emp, dayKey, dayIdx, shiftCode, true);
-          });
-
-          // Ưu tiên: Full-time trước (cần đủ 48h), sau đó đến Part-time có số giờ tích lũy ít hơn để công bằng
-          registeredCandidates.sort((a, b) => {
-            const aIsFT = ftEmployees.some(ft => ft.id === a.id);
-            const bIsFT = ftEmployees.some(ft => ft.id === b.id);
-            if (aIsFT && !bIsFT) return -1;
-            if (!aIsFT && bIsFT) return 1;
-            return employeeHours[a.id] - employeeHours[b.id];
-          });
-
-          for (const cand of registeredCandidates) {
-            if (assignedCount >= neededCount) break;
-            assignShiftTo(cand, dayKey, shiftCode);
-            assignedCount++;
-            fulfilledRegisteredCount++;
-          }
-        }
-      });
-    });
-  }
-
-  // GIAI ĐOẠN 2: ƯU TIÊN FULL-TIME ĐẠT ĐỦ 48H VÀ ĐÚNG 1 NGÀY OFF
-  WEEK_DAYS.forEach((dayKey, dayIdx) => {
-    shiftPriorities.forEach(shiftCode => {
-      const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-      const neededCount = dayMatrix[shiftCode] || 0;
-      let assignedCount = assignedAt(dayKey, shiftCode).length;
-
-      if (assignedCount < neededCount) {
-        const candidateFT = [...ftEmployees].sort((a, b) => employeeHours[a.id] - employeeHours[b.id]);
-        for (const ft of candidateFT) {
-          if (assignedCount >= neededCount) break;
-          // Ưu tiên nguyện vọng ca đêm
-          if (shiftCode === '22-6' && nightShiftVolunteers.length > 0 && !nightShiftVolunteers.includes(ft.id)) continue;
-          
-          if (canTakeShift(ft, dayKey, dayIdx, shiftCode, true)) {
-            assignShiftTo(ft, dayKey, shiftCode);
-            assignedCount++;
-          }
-        }
-      }
-    });
-  });
-
-  // GIAI ĐOẠN 2.5: ÉP FULL-TIME ĐẠT ĐỦ ĐỊNH MỨC NẾU CÒN THIẾU (TÔN TRỌNG NGÀY NGHỈ OFF)
-  ftEmployees.forEach(ft => {
-    if (employeeShiftsCount[ft.id] < 6) {
-      for (let dayIdx = 0; dayIdx < WEEK_DAYS.length; dayIdx++) {
-        if (employeeShiftsCount[ft.id] >= 6) break;
-        const dayKey = WEEK_DAYS[dayIdx];
-
-        if (resultSchedule[ft.id][dayKey] === 'off' && ftMandatoryOffDays[ft.id] !== dayKey && !employeeOffDays[ft.id]?.has(dayKey)) {
-          let pickedShift = null;
-          for(const sCode of shiftPriorities) {
-             const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-             const needed = dayMatrix[sCode] || 0;
-             const actual = assignedAt(dayKey, sCode).length;
-             if (actual < needed && canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
-                 pickedShift = sCode;
-                 break;
-             }
-          }
-          if (!pickedShift) {
-             const fallback = ['14-22', '6-14', '10-18'];
-             for (const sCode of fallback) {
-               if (canTakeShift(ft, dayKey, dayIdx, sCode, true)) {
-                 pickedShift = sCode;
-                 break;
-               }
-             }
-          }
-
-          if (pickedShift) {
-             assignShiftTo(ft, dayKey, pickedShift);
-          }
-        }
-      }
-    }
-  });
-
-  // GIAI ĐOẠN 3: LẤP ĐẦY MATRIX BẰNG PART-TIME CÒN GIỜ (TUYỆT ĐỐI KHÔNG ÉP VÀO NGÀY XIN NGHỈ OFF)
-  WEEK_DAYS.forEach((dayKey, dayIdx) => {
-    shiftPriorities.forEach(shiftCode => {
-      const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-      const neededCount = dayMatrix[shiftCode] || 0;
-      let assignedCount = assignedAt(dayKey, shiftCode).length;
-
-      if (assignedCount < neededCount) {
-        // Lấy ứng viên Part-time: ưu tiên ai có đăng ký rảnh trước, rồi đến ai chưa có lịch và không xin OFF
-        const candidatePT = [...ptEmployees].sort((a, b) => {
-          const aHasReg = !!employeeRegisteredShifts[a.id]?.[dayKey];
-          const bHasReg = !!employeeRegisteredShifts[b.id]?.[dayKey];
-          if (aHasReg && !bHasReg) return -1;
-          if (!aHasReg && bHasReg) return 1;
-          return employeeHours[a.id] - employeeHours[b.id];
-        });
-
-        for (const pt of candidatePT) {
-          if (assignedCount >= neededCount) break;
-          // ưu tiên nguyện vọng ca đêm
-          if (shiftCode === '22-6' && nightShiftVolunteers.length > 0 && !nightShiftVolunteers.includes(pt.id)) continue;
-
-          if (canTakeShift(pt, dayKey, dayIdx, shiftCode)) {
-            assignShiftTo(pt, dayKey, shiftCode);
-            assignedCount++;
-          }
-        }
-      }
-    });
-  });
-
-  const criticalInsights = [];
-  WEEK_DAYS.forEach((day, index) => {
-    const required = effectiveMatrixByDay[day]?.['22-6'] || 0;
-    if (!required && !assignedAt(day, '22-6').length) return;
-    ensureNightMentor(day, index);
-    while (assignedAt(day, '22-6').length < required && borrowNightReady(day, index)) { /* Fill remaining gaps. */ }
-    if (!assignedAt(day, '22-6').some(isNightReady)) {
-      criticalInsights.push(`⚠️ Cảnh báo: Ca đêm ${day === 'CN' ? 'Chủ nhật' : `Thứ ${day.slice(1)}`} đang thiếu người cứng (Night Ready), rủi ro vận hành cao!`);
-    }
-  });
-
-  // Thống kê
-  let totalAssignedHours = 0;
-  let totalAssignedShifts = 0;
-  let compliantPTCount = 0;
-  let compliantFTCount = 0;
-  let mentorPairsCount = 0;
-
-  storeEmployees.forEach(e => {
-    const h = employeeHours[e.id];
-
-    if (ptEmployees.some(pt => pt.id === e.id)) {
-      if (h >= SCHEDULE_RULES.STPT_MIN_HOURS_PER_WEEK && h <= SCHEDULE_RULES.STPT_MAX_HOURS_PER_WEEK) {
-        compliantPTCount++;
-      }
-    } else {
-      if (h === 48 && employeeShiftsCount[e.id] === 6) {
-        compliantFTCount++;
-      }
-    }
-  });
-
-  const scheduledPeople = new Set();
-  employees.forEach(emp => WEEK_DAYS.forEach(day => {
-    const cell = normalizeShift((resultSchedule[emp.id] || existingSchedule[emp.id])?.[day]);
-    const hours = getShiftHours(cell.shift);
-    if (emp.isActive === false || !cell.confirmed || hours <= 0 || (cell.covering_store || emp.dept) !== storeId) return;
-    totalAssignedHours += hours;
-    totalAssignedShifts++;
-    scheduledPeople.add(emp.id);
-  }));
-
-  WEEK_DAYS.forEach(d => {
-    shiftPriorities.forEach(sCode => {
-      const assigned = storeEmployees.filter(e => resultSchedule[e.id][d] === sCode);
-      if (assigned.some(isNewStaff) && assigned.some(isSeniorStaff)) mentorPairsCount++;
-    });
-  });
-
-  // CẢNH BÁO: các ca vẫn thiếu người so với định biên sau khi đã tối ưu
-  const warnings = [];
-  WEEK_DAYS.forEach(dayKey => {
-    const dayMatrix = effectiveMatrixByDay[dayKey] || requiredMatrix;
-    shiftPriorities.forEach(shiftCode => {
-      const neededCount = dayMatrix[shiftCode] || 0;
-      const actualCount = assignedAt(dayKey, shiftCode).length;
-      if (actualCount < neededCount) {
-        warnings.push(`Thiếu ${neededCount - actualCount} người ca ${shiftCode} ngày ${dayKey} (cần ${neededCount}, có ${actualCount}).`);
-      }
-    });
-  });
-
-  // CHUẨN HÓA TRẠNG THÁI HIỂN THỊ:
-  // - Ca chốt chính thức (được Quản lý / AI xếp): giữ mã ca chốt ('6-14', '6-10', '14-22'...) để có màu sắc GS25.
-  // - Ca nhân viên đã đăng ký nhưng không được chốt (thừa định biên): VẪN GIỮ TRÊN BẢNG LỊCH nhưng ở trạng thái CHƯA CHỐT / KHÔNG MÀU ({ shift: reg, confirmed: false, registered: true }).
-  // - Ca không làm / xin nghỉ: 'off'.
-  storeEmployees.forEach(emp => {
-    WEEK_DAYS.forEach(dayKey => {
-      const isConfirmed = confirmedAssignments.has(`${emp.id}|${dayKey}`);
-      if (!isConfirmed) {
-        const reg = employeeRegisteredShifts[emp.id]?.[dayKey];
-        if (reg && reg !== 'off') {
-          resultSchedule[emp.id][dayKey] = { shift: reg, confirmed: false, registered: true };
-        }
-      }
-    });
-  });
-
-  return {
-    schedule: Object.fromEntries(Object.entries(resultSchedule).filter(([id]) => !lockedIds.has(id))),
-    borrowedAssignments,
-    criticalInsights,
-    employeeHours,
-    employeeShiftsCount,
-    stats: {
-      totalEmployees: storeEmployees.length,
-      totalFT: ftEmployees.length + smEmployees.length,
-      totalPT: ptEmployees.length,
-      totalSenior: seniorEmployees.length,
-      totalNew: newEmployees.length,
-      totalHours: totalAssignedHours,
-      totalShifts: totalAssignedShifts,
-      mentorPairsCount,
-      compliantFTPercent: (ftEmployees.length + smEmployees.length) > 0 ? Math.round((compliantFTCount / (ftEmployees.length + smEmployees.length)) * 100) : 100,
-      compliantPTPercent: ptEmployees.length > 0 ? Math.round((compliantPTCount / ptEmployees.length) * 100) : 100
-    },
-    warnings,
-    insights: [
-      ...criticalInsights,
-      ...(borrowedAssignments.length ? [`☾ Đề xuất ${borrowedAssignments.length} ca chi viện Night Ready; quản lý kiểm tra trước khi áp dụng.`] : []),
-      ...(smNotes ? [`💬 Lệnh SM: "${smNotes}"`] : []),
-      ...(totalRegisteredShiftsCount > 0 ? [
-        `📋 Lịch rảnh nhân viên: Đã tiếp nhận ${totalRegisteredShiftsCount} ca đăng ký rảnh từ ${storeEmployees.filter(e => Object.keys(employeeRegisteredShifts[e.id]).length > 0).length} nhân sự. Đã đáp ứng khớp ${fulfilledRegisteredCount} ca theo định biên.`
-      ] : []),
-      ...(totalOffRequestsCount > 0 ? [
-        `🛡️ Ngày xin nghỉ (OFF): Đã bảo lưu trọn vẹn ${totalOffRequestsCount} lượt xin nghỉ của nhân viên (tuyệt đối không bị xếp đè ca).`
-      ] : []),
-      ...(demandFactor !== 1.0 ? [`📊 Định biên đã scale ${demandFactor < 1 ? `↓${Math.round((1 - demandFactor) * 100)}%` : `↑${Math.round((demandFactor - 1) * 100)}%`} theo nhu cầu SM.`] : []),
-      ...(Object.keys(smOverrides).length > 0 ? [
-        `📌 Override theo lệnh SM: ${Object.entries(smOverrides).map(([day, shifts]) =>
-          Object.entries(shifts).map(([sh, c]) => `${day} ca ${sh}→${c.min}NV${c.reason ? ` (${c.reason})` : ''}`).join(', ')
-        ).join(' | ')}`
-      ] : []),
-      ...(smDirectAssignedCount > 0 ? [`👤 Đã áp dụng ${smDirectAssignedCount} chỉ đạo xếp/nghỉ đích danh nhân viên từ Cửa hàng trưởng.`] : []),
-      `🤖 Đề xuất ${totalAssignedShifts} ca làm việc (${totalAssignedHours} giờ) tại ${storeId} cho ${scheduledPeople.size} nhân sự, gồm chi viện.`,
-      `🛡️ Full-Time bù ca thiếu, tuân thủ Luật Nghỉ Tuần (mỗi bạn >=1 ngày OFF trọn vẹn, tối đa 6 ca = 48h).`,
-      `⏱️ Luật nghỉ giữa ca (>= 11 tiếng): không xếp ca gối đầu quá sức (hết ca 22h không dính ca sáng 6h hôm sau).`,
-      `👥 Kèm cặp nhân viên mới: ${mentorPairsCount} lượt kèm cặp Bạn Cứng trên các ca.`,
-      `✓ Full-Time đạt chuẩn: ${ftEmployees.length > 0 ? Math.round((compliantFTCount / ftEmployees.length) * 100) : 100}% (48h/tuần - 6 ca) | Part-Time đạt định mức: ${ptEmployees.length > 0 ? Math.round((compliantPTCount / ptEmployees.length) * 100) : 100}% (16-23h).`
-    ]
-  };
+  return scheduleRegisteredShifts(employees, storeId, options, { checkRestPeriodViolation, isSeniorStaff, isNewStaff });
 }
 
 /**
  * AI SCHEDULE AUDITOR (V3.5)
  */
 export function auditSchedule(employees, weekSchedule, storeId) {
-  const storeEmployees = employees.filter(e => e.dept === storeId);
+  const storeEmployees = employees.filter(e => e.dept === storeId && e.isActive !== false);
   const issues = [];
 
   WEEK_DAYS.forEach(dayKey => {
     ['6-14', '14-22', '22-6', '10-18', '6-10', '18-22'].forEach(shiftCode => {
       const assigned = storeEmployees.filter(emp => {
-        const { shift } = normalizeShift(weekSchedule[emp.id]?.[dayKey]);
-        return shift === shiftCode;
+        const { shift, confirmed, covering_store } = normalizeShift(weekSchedule[emp.id]?.[dayKey]);
+        return confirmed && shift === shiftCode && (!covering_store || covering_store === storeId);
       });
 
       if (assigned.length > 0) {
@@ -993,7 +310,7 @@ export function auditSchedule(employees, weekSchedule, storeId) {
     const isFT = !isPT;
 
     WEEK_DAYS.forEach((dayKey, idx) => {
-      const raw = empSched[dayKey];
+      const raw = normalizeShift(empSched[dayKey]).confirmed ? empSched[dayKey] : '';
       const { shift } = normalizeShift(raw);
 
       if (shift && shift !== 'off') {
@@ -1005,7 +322,7 @@ export function auditSchedule(employees, weekSchedule, storeId) {
 
       if (idx > 0) {
         const prevDayKey = WEEK_DAYS[idx - 1];
-        const prevRaw = empSched[prevDayKey];
+        const prevRaw = normalizeShift(empSched[prevDayKey]).confirmed ? empSched[prevDayKey] : '';
         if (checkRestPeriodViolation(prevRaw, raw)) {
           const prevCode = normalizeShift(prevRaw).shift;
           issues.push({
@@ -1015,7 +332,7 @@ export function auditSchedule(employees, weekSchedule, storeId) {
             empName: emp.name,
             day: dayKey,
             title: `Vi phạm luật nghỉ giữa 2 ca (${emp.name})`,
-            desc: `${emp.name} làm ca ${prevDayKey} (${prevCode}) và hôm sau ${dayKey} làm ca (${shift}). Khoảng cách nghỉ không đủ ≥ 11 tiếng!`,
+            desc: `${emp.name} làm ca ${prevDayKey} (${prevCode}) và hôm sau ${dayKey} làm ca (${shift}). Khoảng cách nghỉ không đủ ≥ ${DECISION_RULES.MIN_REST_HOURS} tiếng!`,
             autoFixable: true
           });
         }
@@ -1113,9 +430,6 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   const routedAnswer = tryAnswerWithData({ q, qn, employees, weekSchedule, stores, shiftSwaps, feedbacks, storeId, currentWeek, user });
   if (routedAnswer) return compactText(routedAnswer);
 
-  // 1b. Tra cuu cong thuc FF Onsite -- tra loi truc tiep, khong qua Gemini.
-  const recipeAnswer = lookupFfOnsiteRecipe(qn);
-  if (recipeAnswer) return compactText(recipeAnswer);
 
   // Lịch của tôi / gọi đúng tên mình (vd. "hôm nay Tú làm ca mấy" khi đang login là Tú)
   const selfUser = user && (employees.find(e => e.id === user.id) || user);
@@ -1157,30 +471,8 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   }
 
   // 1. FAQ — matcher hẹp, tránh "tối đa" / "gs25" / "ot" bắt nhầm
-  const isBreakTimeQuery =
-    q.includes('ăn trưa') || q.includes('ăn tối') || q.includes('ăn cơm') || q.includes('giải lao') || q.includes('break') ||
-    (q.includes('nghỉ') && (q.includes('phút') || q.includes('trong ca') || q.includes('giữa ca')));
-
-  if (isBreakTimeQuery && !q.includes('giữa 2 ca') && !q.includes('chuyển ca') && !q.includes('ngày nghỉ')) {
-    return `Ca ngày 8h: nghỉ 30 phút. Ca đêm: 45 phút. Tăng ca >2h: thêm 30 phút.`;
-  }
-
   if (q.includes('giữa 2 ca') || q.includes('chuyển ca') || q.includes('gối đầu') || q.includes('hồi phục') || (q.includes('cách') && q.includes('tiếng') && q.includes('nghỉ'))) {
-    return `Nghỉ giữa 2 ca tối thiểu 12 tiếng (luật 11h). Hết 22h không xếp ca 6h hôm sau. Hết ca đêm nghỉ tới sau 18h.`;
-  }
-
-  // FAQ Lễ / Tết
-  if (q.includes('lễ') || q.includes('tết')) {
-    if (q.includes('lương') || q.includes('tiền') || q.includes('phần trăm') || q.includes('%') || q.includes('ot') || q.includes('bao nhieu')) {
-      return `🎉 Lương làm ngày Lễ/Tết: hưởng ít nhất 300% lương (chưa kể tiền lương ngày nghỉ lễ theo quy định).`;
-    }
-  }
-
-  if (q.includes('lương') || q.includes('phụ cấp') || q.includes('tăng ca') || q.includes('overtime') || /(^| )ot( |$)/.test(` ${qn} `) || (q.includes('tiền') && (q.includes('ca') || q.includes('đêm') || q.includes('làm')))) {
-    if (q.includes('đêm')) {
-      return `Lương ca đêm (22h-6h): phụ cấp thêm ít nhất +30% so với ca ngày. OT đêm tính 200–210%.`;
-    }
-    return `Lương: ca đêm +30%. OT thường 150%, ngày OFF 200%, lễ/tết 300%, OT đêm 200–210%.`;
+    return `Ứng dụng yêu cầu nghỉ giữa ca ngày khác tối thiểu ${DECISION_RULES.MIN_REST_HOURS} tiếng. Hết 22h không xếp ca 6h hôm sau. Hết ca đêm lúc 6h thì sớm nhất bắt đầu ca tiếp lúc 18h.`;
   }
 
   const isNightShiftAsk = /ca đêm|ban đêm|22\s*-\s*6/.test(q)
@@ -1194,16 +486,13 @@ function answerCopilot(question, context = {}, chatHistory = []) {
   }
 
   if (q.includes('full') || q.includes('stft') || q.includes('bù ca') || q.includes('luật nghỉ') || q.includes('ngày off') || (q.includes('nghỉ') && (q.includes('ngày') || q.includes('tuần')) && !q.includes('phút'))) {
-    return `Full-Time (STFT): 48h/tuần (6 ca) + 1 ngày OFF. Nghỉ giữa 2 ca ≥ 11 tiếng.`;
+    return `Full-Time (STFT): 48h/tuần (6 ca) + 1 ngày OFF. Nghỉ giữa ca ≥ ${DECISION_RULES.MIN_REST_HOURS} tiếng; tối đa ${DECISION_RULES.MAX_CONSECUTIVE_NIGHTS} đêm liên tiếp.`;
   }
 
   if (q.includes('mới') || q.includes('kèm') || q.includes('csr_new') || q.includes('bạn cứng') || q.includes('học việc') || q.includes('thử việc')) {
     return `Bạn mới không trực solo — mỗi ca phải có 1 bạn cứng kèm.`;
   }
 
-  if (q.includes('đồng phục') || q.includes('xin chào') || q.includes('tác phong') || q.includes('bảng tên') || q.includes('thẻ tên') || q.includes('tạp dề') || (q.includes('chào') && q.includes('khách'))) {
-    return `Chào: "GS25 xin chào!" / "GS25 cảm ơn và hẹn gặp lại quý khách!". Áo sơ vin, bảng tên trái, tạp dề + mũ khi đứng FF.`;
-  }
 
   if (q.includes('khung ca') || q.includes('ca 4') || q.includes('ca 8') || (q.includes('ca làm') && (q.includes('mấy') || q.includes('loại')))) {
     return `Ca 8h: 6-14, 14-22, 22-6, 10-18. Ca 4h: 6-10, 10-14, 14-18, 18-22.`;
@@ -1534,344 +823,46 @@ export function isGenericCopilotFallback(text) {
   return /Hỏi ca, giờ, lương, công thức món|TÚ mini — hỏi ngắn là ra ngay|Hỏi trực tiếp câu hỏi ngắn/i.test(String(text || ''));
 }
 
-export async function askOllamaCopilot(question, context = {}, chatHistory = []) {
-  const localReply = askAICopilot(question, context, chatHistory);
-  if (!isGenericCopilotFallback(localReply)) return localReply;
-
-  const { 
-    employees = [], 
-    weekSchedule = {}, 
-    storeId = ''
-  } = context;
-
-  // Lược bớt dữ liệu để gửi cho LLM (tránh bị tràn token)
-  const storeEmps = employees.filter(e => e.dept === storeId);
-  const compactEmployees = storeEmps.map(e => ({
-    id: e.id, name: e.name, type: e.type, role: e.role
-  }));
-  
-  let textSchedule = '';
-  const dailySummary = {};
-  const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  
-  WEEK_DAYS.forEach(day => { dailySummary[day] = {}; });
-
-  storeEmps.forEach(e => {
-    if (weekSchedule[e.id]) {
-      // Ép kiểu Lịch cá nhân thành chuỗi Text rõ ràng để AI không đọc sai JSON
-      const daysStr = WEEK_DAYS.map(day => {
-        const rawShift = weekSchedule[e.id][day];
-        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
-        return `${day}(${shiftStr})`;
-      }).join(', ');
-      
-      textSchedule += `- [${e.id}] ${e.name}: ${daysStr}\n`;
-      
-      // Xây dựng danh sách ai làm ca nào trong ngày để LLM dễ đọc
-      WEEK_DAYS.forEach(day => {
-        const rawShift = weekSchedule[e.id][day];
-        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
-        const cleanShift = shiftStr.toUpperCase();
-        if (cleanShift && cleanShift !== 'OFF' && cleanShift !== 'AL' && cleanShift !== 'U') {
-          if (!dailySummary[day][cleanShift]) dailySummary[day][cleanShift] = [];
-          dailySummary[day][cleanShift].push(e.name);
-        }
-      });
-    }
-  });
-
-  const now = new Date();
-  const timeStr = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  }).format(now);
-
-  const systemPrompt = `Bạn là TÚ mini, trợ lý AI thông minh tại chuỗi cửa hàng tiện lợi GS25 (Chi nhánh ${storeId}).
-
-THỜI GIAN HIỆN TẠI TẠI CỬA HÀNG: ${timeStr}
-(Luôn dùng thời gian này làm gốc để trả lời các câu hỏi về "hôm nay", "ngày mai", "bây giờ").
-
-DỮ LIỆU NHÂN SỰ & LỊCH LÀM VIỆC:
-1. Thông tin nhân sự: ${JSON.stringify(compactEmployees)}
-2. Lịch cá nhân từng người (Từ T2 đến CN):
-${textSchedule}
-3. Danh sách ca trực theo ngày (RẤT QUAN TRỌNG): ${JSON.stringify(dailySummary)}
-
-HƯỚNG DẪN ĐỌC LỊCH:
-- Khi được hỏi "Lịch làm việc của X" hoặc "X làm ca nào": BẮT BUỘC phải liệt kê đầy đủ từng ngày trong tuần của người đó (Từ T2 đến CN) dựa vào [Lịch cá nhân từng người]. Tuyệt đối KHÔNG ĐƯỢC gộp chung chung "cả tuần" hay bỏ sót ngày. Tuyệt đối ghi ĐÚNG HỌ TÊN, không tự chế tên.
-- Để trả lời "ai làm cùng ai vào ngày X", hãy nhìn vào [Danh sách ca trực theo ngày], chọn ngày X, tìm xem nhân viên đó đang làm ca nào, và những ai đang có cùng ca đó. Phải đọc dữ liệu tuyệt đối CHÍNH XÁC, không đoán mò!
-- Nếu hỏi "ai nghỉ/rảnh", tìm những nhân viên không có tên trong bất kỳ ca nào của ngày hôm đó.
-
-SỔ TAY QUY CHUẨN VẬN HÀNH GS25 (BẮT BUỘC NẮM RÕ):
-1. Khung giờ hủy Thức ăn nhanh (Fast Food - FF):
-- 11:00 & 22:00: FF rau & tươi (Sandwich có rau, burger, gimbap, soup).
-- 19:00: Cơm, mì, sushi (Cơm nắm onigiri, bento, sandwich không rau, mì, sushi).
-- Theo HSD tem BTP: FF Onsite, BTP, bánh Patachou, dessert tủ OSC.
-- Hàng GM: HSD ≤ 7 ngày hủy trước 2h; 7 ngày-1 tháng hủy trước 1 ngày; 1-6 tháng hủy trước 3 ngày; 6 tháng-1 năm hủy trước 5 ngày.
-- Bắt buộc xé rách bao bì trước khi cho vào túi rác.
-2. Nhiệt độ chuẩn thiết bị:
-- Tủ mát 0°C - 5°C; Tủ đông < -18°C.
-- Tủ hấp bánh bao 90°C (hấp ít nhất 30 phút, CẤM hâm lò vi sóng!).
-- Nồi súp lẩu 70°C (công suất 200W khi trưng bày, tối đa 2 tiếng).
-3. Hóa chất Saraya (Hệ 6 mã màu chuẩn GS25):
-- Trắng (H-1 Smart San): Rửa tay nhân viên (dùng NGUYÊN CHẤT).
-- Đỏ đô (S-4 Sanitizer): Cồn sát khuẩn tay & dao thớt (NGUYÊN CHẤT, tránh xa lửa).
-- Xanh lá (N-12 Sara Wash): Rửa CCDC (6 lần nhấn 180ml + nước đầy bình); Lau bàn ghế (1 lần nhấn 30ml + nước đầy bình).
-- Nâu (G-2 Smart San Degreaser): Tẩy dầu mỡ bếp chiên/tủ hút (NGUYÊN CHẤT, mang găng cao su).
-- Đỏ tươi (211 Pro WC): Tẩy bồn cầu toilet (4 lần nhấn 120ml + nước đầy bình).
-- Xanh+Vàng (311 Multi Floor & Glass): Lau kính & sàn gạch (1 lần nhấn 30ml + nước đầy bình).
-4. SOP Chế biến & Bán hàng Lẩu Miền Bắc (BM: SOP-FFONSITE-CB-LAU-HN V.06):
-- Nước súp chả cá cay: 2000ml nước + 1 gói bột súp 120g, nấu 2000W trong 15 phút.
-- Chả cá xiên: 10 xiên, nấu 1200W trong 10 phút (sau 5 phút lật mặt). Nhiệt độ tâm ≥ 75°C.
-- Mì chả cá: Nước sôi ≥ 95°C, trụng 2 phút 30 giây.
-- Múc súp: Ly lẩu = Số xiên + 1 vá. Tô mì = 4 vá súp (~30g/vá). Tháo xiên trước khi cho vào ly/tô.
-- Nút bấm lò vi sóng công nghiệp: Ly chả cá BẤM SỐ 3 (gia dụng 30s); Tô mì BẤM SỐ 5 (gia dụng 2 phút).
-5. Phân công Vệ sinh 3 Ca & Rửa tay 12 bước:
-- Ca 1 (6-14h): Quạt hút, thanh nẹp, kho WH, tủ mát kho, quét mạng nhện, lau kệ hàng.
-- Ca 2 (14-22h): Chân bàn ghế, rổ mua sắm, tủ mát/đông counter, kệ snack, sọt rác, xô lau.
-- Ca 3 (22-6h): Chà sàn gạch xám, toilet, hộc counter, và BẮT BUỘC THAY DẦU BẾP CHIÊN vào đêm Thứ 3.
-- Rửa tay: 12 bước 60 giây Saraya. 4 vị trí hay sót: móng tay, ngón cái, kẽ ngón, mu bàn tay.
-6. Quy định Báo cáo Ca (Group Zalo Cửa Hàng & App TIMES):
-- Nơi gửi: Group Zalo Cửa Hàng. Hình ảnh bắt buộc chụp bằng App TIMES (có watermark ngày giờ & địa điểm).
-- 6 góc chụp FF: Tủ OSC (1-2 tấm), Kệ bakery, Tủ bánh bao, Tủ warmer, Kệ khuyến mãi, Máy Nestea (mở nắp ra chụp).
-- Ca 1: Check-in tác phong -> 6-7h chụp FF & check date -> 7-8h vệ sinh mặt tiền/tủ đông -> 11h gửi hình hủy hàng -> 13h30 dọn quầy counter -> 14h báo cáo kết ca (WC, bàn ăn, thùng rác).
-- Ca 2: Check-in tác phong -> 14-14h30 chụp FF bổ sung -> 14-15h check date -> 15-17h check tem giá quầy kệ -> 17h báo cáo FF & đèn bảng hiệu -> 19h gửi hình hủy hàng -> 22h báo cáo kết ca.
-- Ca 3: Check-in -> 22-23h check date & hình hủy -> 24h báo cáo kết ngày -> 24-1h chụp vệ sinh thiết bị -> 4-5h chụp quầy kệ -> 5-6h chụp FF chế biến -> 6h chụp in tem HSD & báo cáo kết ca.
-- Luôn kiểm tra khu vực ăn uống và thay bao rác 2 tiếng/lần.
-
-NGUYÊN TẮC XỬ LÝ NGỮ CẢNH:
-1. Theo dõi toàn bộ lịch sử hội thoại, không chỉ tin nhắn gần nhất.
-2. Giải quyết tham chiếu ngầm định ("cái đó", "hôm đó", "như lúc nãy"...).
-3. Giữ nhất quán vai trò "TÚ mini" (hài hước, xưng hô sếp - em hoặc Tú - bạn).
-
-Yêu cầu định dạng:
-- Trả lời bằng tiếng Việt. Dùng Markdown in đậm những thông tin quan trọng.
-- Xuống dòng rõ ràng, có thể dùng emoji (🥸) cho sinh động.`;
-
-  // Format lịch sử chat
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...chatHistory.map(m => ({
-      role: m.sender === 'ai' ? 'assistant' : 'user',
-      content: m.text
-    })),
-    { role: 'user', content: question }
-  ];
-
+export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '', onChunk = null, requestOptions = {}) {
+  const request = createCopilotRequest(requestOptions.signal, 120000);
   try {
-    const response = await fetch('http://localhost:11434/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'qwen2.5-coder:7b',
-        messages: messages,
-        stream: false
-      }),
-      signal: AbortSignal.timeout(OLLAMA_TIMEOUT_MS)
-    });
-
-    if (!response.ok) return localReply;
-    const data = await response.json();
-    return data.message?.content || localReply;
-  } catch {
-    // Ollama không chạy → thử Hugging Face GS25 Model
-    return askGS25HFModel(question, systemPrompt, chatHistory, localReply);
-  }
-}
-
-/**
- * Gọi model GS25 đã train trên Hugging Face Inference API.
- * Được kích hoạt khi model MiniMind GS25 đã được deploy.
- * Cấu hình trong .env: VITE_GS25_AI_MODEL_URL và VITE_HF_TOKEN
- */
-export async function askGS25HFModel(question, systemPrompt, chatHistory = [], fallbackReply = '') {
-  let modelUrl = import.meta.env.VITE_GS25_AI_MODEL_URL;
-  const hfToken = (typeof localStorage !== 'undefined' ? (localStorage.getItem('gs25_hf_token') || '') : '') || import.meta.env.VITE_HF_TOKEN || '';
-
-  // Nếu chưa cấu hình model URL → bỏ qua
-  if (!modelUrl) return fallbackReply;
-
-  // Tự động chuyển đổi endpoint cũ sang router mới nếu cần
-  if (modelUrl.includes('api-inference.huggingface.co/models/')) {
-    modelUrl = modelUrl.replace('api-inference.huggingface.co/models/', 'router.huggingface.co/hf-inference/models/');
-  }
-
-  const messages = [
-    { role: 'system', content: systemPrompt || 'Bạn là trợ lý AI nghiệp vụ GS25.' },
-    ...chatHistory.map(m => ({
-      role: m.sender === 'ai' ? 'assistant' : 'user',
-      content: m.text
-    })),
-    { role: 'user', content: question }
-  ];
-
-  const formattedPrompt = messages.map(m => `${m.role === 'system' ? 'HỆ THỐNG' : m.role === 'assistant' ? 'AI' : 'NGƯỜI DÙNG'}: ${m.content}`).join('\n') + '\nAI:';
-
-  try {
-    const response = await fetch(modelUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
-      },
-      body: JSON.stringify({
-        inputs: formattedPrompt,
-        parameters: {
-          max_new_tokens: 400,
-          temperature: 0.7,
-          return_full_text: false
-        }
-      }),
-      signal: AbortSignal.timeout(15000) // 15s timeout cho HF
-    });
-
-    if (!response.ok) return fallbackReply;
-    const data = await response.json();
-
-    // HF Inference API trả về array
-    if (Array.isArray(data) && data[0]?.generated_text) {
-      return data[0].generated_text;
+    request.signal.throwIfAborted();
+    // 1. Màng lọc đầu vào: Kiểm tra an toàn, chống prompt injection & che giấu secret
+    const guard = sanitizeAiInput(question);
+    if (!guard.safe) {
+      if (onChunk) onChunk(guard.reason);
+      return guard.reason;
     }
-    // Hoặc dạng object trực tiếp
-    if (data?.generated_text) return data.generated_text;
+    const cleanQuestion = guard.text;
 
-    return fallbackReply;
-  } catch {
-    return fallbackReply;
-  }
-}
-
-
-const GS25_HANDBOOK_TEXT = JSON.stringify(GS25_HANDBOOK_DATA, null, 2);
-
-export async function askGeminiCopilot(question, context = {}, chatHistory = [], geminiApiKey = '', onChunk = null) {
-  // 1. Màng lọc đầu vào: Kiểm tra an toàn, chống prompt injection & che giấu secret
-  const guard = sanitizeAiInput(question);
-  if (!guard.safe) {
-    if (onChunk) onChunk(guard.reason);
-    return guard.reason;
-  }
-  const cleanQuestion = guard.text;
-
-  const { 
-    employees = [], 
-    weekSchedule = {}, 
-    storeId = '',
-    currentWeek = '',
-    user = null,
-    feedbacks = [],
-    shiftSwaps = []
-  } = context;
-
-  // 2. Tường lửa dữ liệu: Chỉ trích xuất thông tin nghiệp vụ an toàn (Data Minimization)
-  const safeEmployees = sanitizeEmployeesForAi(employees);
-  const storeEmps = safeEmployees.filter(e => e.dept === storeId);
-  const compactEmployees = storeEmps.map(e => ({
-    id: e.id, name: e.name, type: e.type, role: e.role
-  }));
-  
-  let textSchedule = '';
-  const dailySummary = {};
-  const GEMINI_WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  
-  GEMINI_WEEK_DAYS.forEach(day => { dailySummary[day] = {}; });
-
-  storeEmps.forEach(e => {
-    if (weekSchedule[e.id]) {
-      const daysStr = GEMINI_WEEK_DAYS.map(day => {
-        const rawShift = weekSchedule[e.id][day];
-        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
-        return `${day}(${shiftStr})`;
-      }).join(', ');
-      
-      textSchedule += `- [${e.id}] ${e.name}: ${daysStr}\n`;
-      
-      GEMINI_WEEK_DAYS.forEach(day => {
-        const rawShift = weekSchedule[e.id][day];
-        const shiftStr = typeof rawShift === 'string' ? rawShift : (rawShift?.shift || 'OFF');
-        const cleanShift = shiftStr.toUpperCase();
-        if (cleanShift && cleanShift !== 'OFF' && cleanShift !== 'AL' && cleanShift !== 'U') {
-          if (!dailySummary[day][cleanShift]) dailySummary[day][cleanShift] = [];
-          dailySummary[day][cleanShift].push(e.name);
-        }
-      });
+    const clockAnswer = answerClockQuery(cleanQuestion);
+    if (clockAnswer) {
+      if (onChunk) onChunk(clockAnswer);
+      return clockAnswer;
     }
-  });
+    const usageRoute = routeUsageQuery(cleanQuestion, chatHistory);
+    if (usageRoute) {
+      const answer = await request.wait(answerUsageQuery(usageRoute, context));
+      if (onChunk) onChunk(answer);
+      return answer;
+    }
 
-  // Context bổ sung: đơn bù công + đơn đổi ca
-  const pendingFeedbacks = feedbacks.filter(f => f.status === 'pending');
-  const pendingSwaps = (shiftSwaps || []).filter(s => ['pending', 'pending_partner', 'pending_manager', 'approved_by_partner'].includes(s.status));
+    // Always fetch with the current JWT. No persisted cache can carry drafts or another
+    // store's knowledge across sessions; a failed fetch must not silently use stale rules.
+    const handbookEntries = await request.wait(handbookApi.getKnowledge({ signal: request.signal }));
+    const { contents, systemPrompt, options } = buildCopilotRequest(cleanQuestion, { ...context, handbookEntries }, chatHistory);
 
-  const now = new Date();
-  const timeStr = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  }).format(now);
+    // 3. Màng lọc đầu ra: Quét sạch thông tin nhạy cảm trước khi trả về
+    let rawResponse = '';
+    if (onChunk) {
+      rawResponse = await streamGeminiMultiTurn(contents, systemPrompt, geminiApiKey, (delta) => {
+        onChunk(sanitizeAiOutput(delta));
+      }, { ...options, signal: request.signal });
+    } else {
+      rawResponse = await generateGeminiMultiTurn(contents, systemPrompt, geminiApiKey, { ...options, signal: request.signal });
+    }
 
-  const systemPrompt = `Bạn là TÚ mini, trợ lý AI thông minh tại chuỗi cửa hàng GS25 (Chi nhánh ${storeId}).
-THỜI GIAN HIỆN TẠI: ${timeStr}
-TUẦN ĐANG XEM: ${currentWeek}
-NGƯỜI ĐANG TRÒ CHUYỆN: ${user ? `${user.name} (ID: ${user.id}, Bộ phận: ${user.dept || storeId})` : 'Chưa đăng nhập'}
-
-DỮ LIỆU NHÂN SỰ & LỊCH LÀM VIỆC TUẦN:
-1. Danh sách nhân sự: ${JSON.stringify(compactEmployees)}
-2. Lịch cá nhân từng người (T2 đến CN):
-${textSchedule}
-3. Phân bổ ca trực theo ngày: ${JSON.stringify(dailySummary)}
-${pendingFeedbacks.length > 0 ? `4. Đơn bù công đang chờ duyệt (${pendingFeedbacks.length} đơn): ${pendingFeedbacks.slice(0, 5).map(f => `${f.empId || f.emp_id} - ${f.date} - ${f.reason || 'Quên chấm công'}`).join('; ')}` : ''}
-${pendingSwaps.length > 0 ? `5. Đơn đổi ca đang chờ (${pendingSwaps.length} đơn): ${pendingSwaps.slice(0, 5).map(s => `${s.fromEmpName || s.fromEmpId} ⇄ ${s.toEmpName || s.toEmpId} (${s.fromDay || s.date})`).join('; ')}` : ''}
-
-HƯỚNG DẪN QUAN TRỌNG:
-- Khi người dùng dùng đại từ ngôi thứ nhất "em", "chị", "anh", "tôi", "tao", "mình", "tớ": BẮT BUỘC hiểu là đang hỏi về chính người đang trò chuyện (${user ? user.name : 'người dùng hiện tại'}).
-- Khi hỏi "ai làm cùng ca với em": tìm ca của người đó trong ngày, liệt kê đồng nghiệp cùng ca chính xác.
-- Khi hỏi số giờ: cộng tổng (ca 8h = 8 tiếng; ca 4h = 4 tiếng). Trả lời cụ thể và liệt kê ngắn gọn.
-- Luật Lương: ca đêm (22-6) +30%; Lễ/Tết 300%; STPT 16-23h/tuần, tối đa 91h/tháng; STFT 48h/tuần (6 ca) + 1 OFF, nghỉ giữa 2 ca ≥ 11 tiếng.
-- CHIẾN THUẬT XẾP LỊCH (Học từ dữ liệu thực tế): Với doanh thu ~18tr, ưu tiên dùng "ca gãy" (10-14, 18-22) ghép với ca chính để tối ưu quỹ lương. Part-time (STPT) lý tưởng nhất là xếp 2 ca 8h + 1 ca 4h (=20h/tuần), giúp đạt chuẩn 16-23h mà không cần tuyển quá nhiều người. Cửa hàng chỉ cần ~32h công/ngày (Sáng: 6-14 & 10-14, Chiều: 14-22 & 18-22, Đêm: 22-6).
-
-Phong cách: Tiếng Việt tự nhiên, thân thiện, chuyên nghiệp. Dùng Markdown (in đậm **text**, danh sách). Xưng hô sếp/anh/chị–em hoặc Tú–bạn.
-
-Bạn là TÚ mini, trợ lý ảo xuất sắc của GS25. Dưới đây là Sổ tay nghiệp vụ nội bộ của GS25. Khi nhân viên hỏi về quy trình, công thức, hoặc giờ giấc hủy hàng, bạn PHẢI dựa 100% vào Sổ tay này để trả lời. Trả lời thật DÀI, CHI TIẾT TỪNG BƯỚC (Bước 1, Bước 2...). Tuyệt đối không bịa đặt thông tin ngoài sổ tay. Xưng hô thân thiện, chuyên nghiệp.
-Nếu Sổ tay không có thông tin hoặc có mâu thuẫn, nói rõ và đề nghị xác nhận với quản lý; không tự thêm định lượng, thời gian hay bước thao tác. Nêu đúng tên mục được sử dụng. Phân biệt dữ liệu lịch làm việc ở trên với quy trình trong Sổ tay.
-
-SỔ TAY NGHIỆP VỤ GS25 — TOÀN BỘ NỘI DUNG:
-${GS25_HANDBOOK_TEXT}`;
-
-  // Xây dựng contents[] multi-turn chuẩn Gemini API
-  // Token-aware: tối đa 10 tin nhắn, cắt nếu tổng > 8000 ký tự
-  const MAX_HISTORY_MSGS = 10;
-  const MAX_HISTORY_CHARS = 8000;
-  
-  const historyFiltered = chatHistory.filter(m => m.id !== 'welcome');
-  const recentHistory = historyFiltered.slice(-MAX_HISTORY_MSGS);
-  
-  let charCount = 0;
-  const trimmedHistory = [];
-  for (let i = recentHistory.length - 1; i >= 0; i--) {
-    const msgLen = (recentHistory[i].text || '').length;
-    if (charCount + msgLen > MAX_HISTORY_CHARS) break;
-    charCount += msgLen;
-    trimmedHistory.unshift(recentHistory[i]);
-  }
-
-  // Chuyển sang format contents[] của Gemini API
-  const contents = trimmedHistory.map(m => ({
-    role: m.sender === 'ai' ? 'model' : 'user',
-    parts: [{ text: m.text }]
-  }));
-
-  // Thêm câu hỏi an toàn hiện tại
-  contents.push({ role: 'user', parts: [{ text: cleanQuestion }] });
-
-  // 3. Màng lọc đầu ra: Quét sạch thông tin nhạy cảm trước khi trả về
-  let rawResponse = '';
-  if (onChunk) {
-    rawResponse = await streamGeminiMultiTurn(contents, systemPrompt, geminiApiKey, (delta) => {
-      onChunk(sanitizeAiOutput(delta));
-    });
-  } else {
-    rawResponse = await generateGeminiMultiTurn(contents, systemPrompt, geminiApiKey);
-  }
-
-  return sanitizeAiOutput(rawResponse);
+    return sanitizeAiOutput(rawResponse);
+  } finally { request.dispose(); }
 }
 

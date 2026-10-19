@@ -22,8 +22,8 @@ describe('schedule persistence API contract', () => {
     const shifts=schedules['123456789'];
     expect(scheduleVersion(shifts)).toBe(7);
     await saveEmployeeSchedule('2026-09-21','123456789',shifts);
-    expect(client.rpc).toHaveBeenCalledWith('save_employee_schedule',{
-      p_week_date:'2026-09-21',p_emp_id:'123456789',p_shifts:{T2:'6-14'},p_expect_version:7
+    expect(client.rpc).toHaveBeenCalledWith('save_employee_schedule_checked',{
+      p_week_date:'2026-09-21',p_emp_id:'123456789',p_shifts:{T2:'6-14'},p_expect_version:7,p_override_reason:null
     });
     expect(scheduleVersion(shifts)).toBe(8);
     expect(JSON.stringify(shifts)).toBe('{"T2":"6-14"}');

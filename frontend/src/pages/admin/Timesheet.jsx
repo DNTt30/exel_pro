@@ -4,6 +4,7 @@ import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import TimesheetTable from '../../components/timesheet/TimesheetTable';
 import { Download, Printer, Pencil, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
+import Button from '../../components/ui/Button';
 import { toast } from '../../components/ui/toastStore';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { downloadPayrollXlsx } from '../../utils/exportPayroll';
@@ -80,118 +81,53 @@ export default function Timesheet() {
   ), 0);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:block">
-      <div className="print:hidden">
-        <Toolbar 
-          search={search} setSearch={setSearch}
-          filterDept={filterDept} setFilterDept={setFilterDept}
-          filterRole={filterRole} setFilterRole={setFilterRole}
-          showWeekPicker={false}
-          disableDeptFilter={false}
-          rightActions={
-            <>
-              {/* Điều hướng Tháng */}
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs mr-2">
-                <button 
-                  onClick={handlePrevMonth}
-                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
-                  title="Tháng trước"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <div className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg min-w-[110px] text-center shadow-xs mx-1">
-                  <span className="text-xs font-black text-slate-800">
-                    Tháng {payrollCycle.month}/{payrollCycle.year}
-                  </span>
-                </div>
-                <button 
-                  onClick={handleNextMonth}
-                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
-                  title="Tháng sau"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-
-              <button 
-                className="btn btn-outline text-xs py-1.5 px-3 hover:text-emerald-700 hover:border-emerald-300 font-semibold flex items-center gap-1.5 cursor-pointer" 
-                onClick={() => exportTimesheetToExcel({
-                  currentWeek,
-                  deptName: effDept === 'ALL' ? 'Toan_Bo_Cua_Hang' : effDept,
-                  groupedEmps,
-                  getDayValue: getEffectiveValue,
-                  activeDays,
-                  filterOnlyMe: false,
-                  currentUserId: user?.id,
-                  cycleDates
-                })}
-                title="Xuất file Excel có đầy đủ bảng biểu và màu sắc"
-              >
-                <Download size={14} className="text-emerald-600" /> Xuất Excel
-              </button>
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="text-xs py-1.5 px-3 rounded-lg font-bold border bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100 flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Kéo thả file Excel từ ezHR9 để nạp công thực tế cả tháng trong 2 giây"
-              >
-                <Upload size={14} className="text-indigo-600" /> Nhập từ Excel ezHR9
-              </button>
-              <button
-                onClick={() => setEditMode(v => !v)}
-                aria-label="Sửa công thực tế"
-                aria-pressed={editMode}
-                className={`text-xs py-1.5 px-3 rounded-lg font-bold border flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  editMode
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
-                    : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
-                }`}
-                title="Nhập số giờ thực tế từ ezHR — ô nền vàng = ghi đè lịch xếp"
-              >
-                {editMode ? <Check size={14} /> : <Pencil size={14} />}
-                {editMode ? `Đang sửa công (${overrideCount} ô)` : 'Sửa công thực tế'}
-              </button>
-              <button
-                onClick={() => downloadPayrollXlsx({
-                  cycleDates,
-                  groupedEmps,
-                  getDayValue: getEffectiveValue,
-                  getActualValue
-                }, `OFC_CongLuong_Thang_${payrollCycle.month}_${payrollCycle.year}.xlsx`)}
-                className="text-xs py-1.5 px-3 rounded-lg font-bold border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Xuất bảng công lương đúng mẫu C&B (31 ngày 26→25 + cột tổng hợp)"
-              >
-                <FileSpreadsheet size={14} /> Xuất Công Lương C&B
-              </button>
-              <button className="btn btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 cursor-pointer" onClick={() => window.print()}>
-                <Printer size={14} /> In Bảng Công
-              </button>
-            </>
-          }
-        />
-      </div>
-
-      <div className="hidden print:block text-center mb-4 pb-2 border-b border-slate-300">
-        <h1 className="text-xl font-black uppercase text-slate-900 tracking-wide">BẢNG TỔNG HỢP CÔNG & LƯƠNG THÁNG (26 - 25)</h1>
-        <div className="flex justify-between items-center text-xs text-slate-600 mt-1 px-2">
-          <span>{effDept !== 'ALL' ? `Cửa hàng: ${effDept}` : 'Toàn bộ chuỗi cửa hàng'}</span>
-          <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
-          <span>Hệ thống GS25 OFC</span>
-        </div>
-      </div>
-
-      {editMode && (
-        <div className="print:hidden mx-3 mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-2 text-amber-900 font-medium">
-            <span className="font-bold text-amber-800">💡 Chế độ sửa công thực tế:</span>
-            <span>Nhập số giờ thực tế từ ezHR9 (hỗ trợ cả số lẻ như <strong>7,84</strong> hoặc <strong>7.84</strong>, <strong>8</strong>, <strong>0</strong>) hoặc chữ <strong>OFF</strong> (nghỉ ca), <strong>AL</strong> (phép năm), <strong>PL</strong> (nghỉ lương). Nhấn <strong>Enter</strong> hoặc bấm ra ngoài để lưu. Xóa trắng ô để quay lại theo lịch xếp.</span>
+    <div className="relative flex h-full min-h-0 flex-col bg-white print:block">
+      <div className="shrink-0 border-b border-slate-200 px-3 py-3 sm:px-4 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">Bảng chấm công</h1>
+            <p className="text-xs text-slate-500">Kỳ công {cycleDates[0]?.display} – {cycleDates.at(-1)?.display}</p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> Ô vàng: Công thực tế</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-400"></span> Ô xám: Chấm 0h / OFF</span>
-            <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-white border border-slate-300"></span> Chữ mờ: Giờ theo lịch, chưa ghi đè</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-lg border border-slate-200">
+              <button type="button" onClick={handlePrevMonth} title="Tháng trước" aria-label="Tháng trước" className="p-3 text-slate-600 hover:bg-slate-50"><ChevronLeft size={16} /></button>
+              <span className="px-2 text-sm font-semibold text-slate-800">Tháng {payrollCycle.month}/{payrollCycle.year}</span>
+              <button type="button" onClick={handleNextMonth} title="Tháng sau" aria-label="Tháng sau" className="p-3 text-slate-600 hover:bg-slate-50"><ChevronRight size={16} /></button>
+            </div>
+            <Button variant={editMode ? 'primary' : 'secondary'} onClick={() => setEditMode(value => !value)} aria-label="Sửa công thực tế" aria-pressed={editMode}>
+              {editMode ? <Check size={16} /> : <Pencil size={16} />}{editMode ? 'Xong' : 'Sửa công thực tế'}
+            </Button>
           </div>
         </div>
-      )}
+      </div>
+      <div className="shrink-0 print:hidden">
+        <Toolbar search={search} setSearch={setSearch} filterDept={filterDept} setFilterDept={setFilterDept}
+          filterRole={filterRole} setFilterRole={setFilterRole} showWeekPicker={false} />
+        <details className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600 sm:px-4">
+          <summary className="w-fit cursor-pointer rounded py-1 font-medium">Nhập / xuất Excel và in</summary>
+          <div className="flex flex-wrap gap-2 pb-1 pt-2">
+            <Button onClick={() => setShowImportModal(true)}><Upload size={16} />Nhập công ezHR9</Button>
+            <Button onClick={() => exportTimesheetToExcel({currentWeek, deptName: effDept === 'ALL' ? 'Toan_Bo_Cua_Hang' : effDept,
+              groupedEmps, getDayValue: getEffectiveValue, activeDays, filterOnlyMe: false, currentUserId: user?.id, cycleDates})}>
+              <Download size={16} />Xuất bảng công
+            </Button>
+            <Button onClick={() => downloadPayrollXlsx({cycleDates, groupedEmps, getDayValue: getEffectiveValue, getActualValue},
+              `OFC_CongLuong_Thang_${payrollCycle.month}_${payrollCycle.year}.xlsx`)}><FileSpreadsheet size={16} />Xuất mẫu C&B</Button>
+            <Button onClick={() => window.print()}><Printer size={16} />In bảng công</Button>
+          </div>
+        </details>
+      </div>
+      <div className="mb-4 hidden border-b border-slate-300 pb-2 text-center print:block">
+        <h1 className="text-xl font-semibold">BẢNG CHẤM CÔNG THÁNG {payrollCycle.month}/{payrollCycle.year}</h1>
+        <p className="text-xs">Kỳ công {cycleDates[0]?.display} – {cycleDates.at(-1)?.display} · {effDept === 'ALL' ? 'Tất cả cửa hàng' : effDept}</p>
+      </div>
+      {editMode && <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 print:hidden">
+        <p><strong>Đang sửa công ({overrideCount} ô)</strong> · Nhập giờ hoặc mã nghỉ. Enter / rời ô để lưu; Esc để hủy thay đổi đang nhập.</p>
+        <details className="mt-1">
+          <summary className="w-fit cursor-pointer py-1">Hướng dẫn nhập công</summary>
+          <p className="max-w-3xl py-1 leading-relaxed">Ví dụ: 7,84 hoặc 8 giờ; 0 là không có giờ công; OFF là nghỉ ca; AL, PL, UL, SL, CL là mã nghỉ. Ô chưa nhập hiển thị mờ công theo lịch. Xóa trắng để dùng lại giờ theo lịch; xem ngày ở đầu cột.</p>
+        </details>
+      </div>}
 
       <TimesheetTable
         groupedEmps={groupedEmps}

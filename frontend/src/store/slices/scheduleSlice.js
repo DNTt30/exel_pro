@@ -15,6 +15,8 @@ import { mergeAiSchedule } from '../../utils/shiftHelper';
 import { toast } from '../../utils/toast'; // utils layer — tránh store → components/ui dependency
 import { getCurrentMondayWeek } from '../../data/constants';
 import { copyScheduleVersion, scheduleVersion, withScheduleVersion } from '../../utils/scheduleVersion';
+import { scheduleRuleViolations, SEVERITY } from '../../utils/scheduleConflicts';
+import { offsetWeek } from '../../utils/employeeSkills';
 
 // --- Constants ---
 
@@ -68,6 +70,28 @@ export const createScheduleSlice = (set, get) => {
     writeQueue = result;
     return result;
   };
+  const saveWithOverride = async (write, isCurrent) => {
+    try { return await write(); }
+    catch (error) {
+      if (error.code === 'SCHEDULE_RULES' && isCurrent() && get().requestScheduleOverride) {
+        const reason = await get().requestScheduleOverride(error);
+        if (reason && isCurrent()) return write(reason);
+      }
+      throw error;
+    }
+  };
+  // Early feedback uses the same rules as suggestions. The database checks the
+  // authoritative adjacent weeks again, including concurrent writes and overrides.
+  const checkSchedule = (week, payload, reason) => {
+    const state = get();
+    const violations = Object.entries(payload).flatMap(([id, shifts]) => {
+      const emp = state.employees.find(e => e.id === id);
+      return emp ? scheduleRuleViolations(emp, shifts, state.schedule[offsetWeek(week, -1)]?.[id], state.schedule[offsetWeek(week, 1)]?.[id]) : [];
+    });
+    const blockers = violations.filter(v => v.severity === SEVERITY.BLOCKER);
+    if (blockers.length) throw Object.assign(new Error(blockers.map(v => v.message).join(' ')), { code: 'VALIDATION_ERROR' });
+    if (violations.length && !reason) throw Object.assign(new Error(violations.map(v => `${v.employeeId}: ${v.message}`).join(' ')), { code: 'SCHEDULE_RULES', violations });
+  };
   const saveShifts = (weekDate, empId, patch) => enqueueWrite(async (isCurrent) => {
     assertCanEditShift(get(), empId, weekDate);
     const previous = get().schedule[weekDate]?.[empId] || EMPTY_WEEK_SHIFTS;
@@ -75,7 +99,10 @@ export const createScheduleSlice = (set, get) => {
     set(state => ({ syncStatus: 'saving', schedule: { ...state.schedule,
       [weekDate]: { ...state.schedule[weekDate], [empId]: next } } }));
     try {
-      await api.saveEmployeeSchedule(weekDate, empId, next);
+      await saveWithOverride(overrideReason => {
+        checkSchedule(weekDate, { [empId]: next }, overrideReason);
+        return api.saveEmployeeSchedule(weekDate, empId, next, { overrideReason });
+      }, isCurrent);
       if (!isCurrent()) return;
       set({ syncStatus: 'saved' });
       void get().appendAdminLog('UPDATE_SHIFT', empId, describeDiff(previous, next), {
@@ -111,7 +138,7 @@ export const createScheduleSlice = (set, get) => {
       } }, lastSyncedAt: Date.now() }));
       // Thông báo khi lịch người khác thay đổi — debounce 1.5s tránh spam toast
       const me = get().user;
-      if (me && row.emp_id !== me.id) {
+      if (me && row.updated_by !== me.id) {
         const epoch = get()._sessionEpoch;
         clearTimeout(scheduleToastTimer);
         scheduleToastTimer = setTimeout(() => {
@@ -250,7 +277,10 @@ export const createScheduleSlice = (set, get) => {
     if (storeId && storeId !== 'ALL') assertWeekEditable(get(), storeId, weekDate);
     set(state => ({ syncStatus: 'saving', schedule: { ...state.schedule, [weekDate]: { ...state.schedule[weekDate], ...payload } } }));
     try {
-      await api.saveBulkEmployeeSchedules(weekDate, payload);
+      await saveWithOverride(overrideReason => {
+        checkSchedule(weekDate, payload, overrideReason);
+        return api.saveBulkEmployeeSchedules(weekDate, payload, { overrideReason });
+      }, isCurrent);
     } catch (error) {
       if (isCurrent()) set(state => {
         const restored = { ...state.schedule[weekDate] };

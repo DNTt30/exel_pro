@@ -1,3 +1,5 @@
+import { weekDateSchema, employeeIdSchema, weekShiftsSchema, overrideReasonSchema } from '../../schemas/operationalSchemas';
+import { scheduleWriteError } from '../../utils/scheduleWriteError';
 import { db } from './client';
 import { scheduleVersion, withScheduleVersion } from '../../utils/scheduleVersion';
 
@@ -54,11 +56,14 @@ export async function getSchedulesByWeeks(weekDates = [], opts = {}) {
 
 // Lưu/Cập nhật toàn bộ lịch của 1 nhân viên trong 1 tuần (có optimistic versioning)
 export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
+  weekDateSchema.parse(weekDate); employeeIdSchema.parse(empId); weekShiftsSchema.parse(shifts);
+  if (opts.overrideReason != null) overrideReasonSchema.parse(opts.overrideReason);
   // 1. Gọi RPC save_employee_schedule (Row Lock + Optimistic Versioning)
-  const { data: rpcVer, error: rpcErr } = await db().rpc('save_employee_schedule', {
+  const { data: rpcVer, error: rpcErr } = await db().rpc('save_employee_schedule_checked', {
     p_week_date: weekDate,
     p_emp_id: empId,
     p_shifts: shifts,
+    p_override_reason: opts.overrideReason || null,
     p_expect_version: opts.expectVersion ?? scheduleVersion(shifts)
   });
 
@@ -67,23 +72,16 @@ export async function saveEmployeeSchedule(weekDate, empId, shifts, opts = {}) {
     return rpcVer;
   }
 
-  const msg = String(rpcErr.message || '');
-  if (rpcErr.code === '40001' || /40001|CONFLICT/i.test(msg)) {
-    const err = new Error(msg);
-    err.code = 'CONFLICT';
-    throw err;
-  }
-
-  console.error('Lỗi lưu lịch làm việc (RPC):', rpcErr);
-  const err = new Error(msg);
-  err.code = 'DATABASE_ERROR';
-  throw err;
+  throw scheduleWriteError(rpcErr);
 }
 
 // Lưu HÀNG LOẠT lịch của nhiều nhân viên.
 // Phase 3: ưu tiên RPC upsert_schedules_bulk — ATOMIC + optimistic locking (expect_version).
 // Sai version → lỗi code CONFLICT để UI báo người dùng thay vì ghi đè im lặng.
 export async function saveBulkEmployeeSchedules(weekDate, scheduleMap, opts = {}) {
+  weekDateSchema.parse(weekDate);
+  if (opts.overrideReason != null) overrideReasonSchema.parse(opts.overrideReason);
+  Object.entries(scheduleMap).forEach(([id, shifts]) => { employeeIdSchema.parse(id); weekShiftsSchema.parse(shifts); });
   const payload = Object.entries(scheduleMap).map(([empId, shifts]) => ({
     week_date: weekDate,
     emp_id: empId,
@@ -93,20 +91,11 @@ export async function saveBulkEmployeeSchedules(weekDate, scheduleMap, opts = {}
 
   if (payload.length === 0) return;
 
-  const { data, error } = await db().rpc('upsert_schedules_bulk', { p_rows: payload });
+  const { data, error } = await db().rpc('upsert_schedules_bulk_checked', { p_rows: payload, p_override_reason: opts.overrideReason || null });
   if (!error) {
     (data || []).forEach(row => withScheduleVersion(scheduleMap[row.o_emp_id], row.o_version));
     return data;
   }
 
-  const msg = String(error.message || '');
-  if (error.code === '40001' || /40001|CONFLICT/i.test(msg)) {
-    const err = new Error(msg);
-    err.code = 'CONFLICT';
-    throw err;
-  }
-  console.error('Lỗi lưu lịch hàng loạt (RPC):', error);
-  const err = new Error(msg);
-  err.code = 'DATABASE_ERROR';
-  throw err;
+  throw scheduleWriteError(error);
 }

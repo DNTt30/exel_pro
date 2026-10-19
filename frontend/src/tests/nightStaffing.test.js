@@ -11,11 +11,13 @@ const mentor = worker('mentor', 'B', ['NIGHT_READY']);
 const options = (extra = {}) => ({ requiredMatrix: {}, requiredMatrixByDay: { T2: { '22-6': 1 } },
   employeeOverrides: { trainee: { T2: '22-6' } }, currentWeek: '2026-09-28',
   user: { id: 'sm', role: 'SM', dept: 'A,B' }, stores: [{ id: 'A' }, { id: 'B' }],
-  existingSchedule: { mentor: offWeek() }, previousWeekSchedule: {}, nextWeekSchedule: {}, ...extra });
+  existingSchedule: { trainee: { T2: { shift: '22-6', confirmed: false, registered: true } }, mentor: offWeek() }, previousWeekSchedule: {}, nextWeekSchedule: {}, ...extra });
 
 describe('Night Ready buddy system and pooling', () => {
-  it('adds a local certified mentor even when the staffing minimum is already met', () => {
-    const result = generateAISchedule([trainee, { ...mentor, dept: 'A' }], 'A', options({ existingSchedule: {} }));
+  it('pairs registered trainee and local mentor when demand has two places', () => {
+    const result = generateAISchedule([trainee, { ...mentor, dept: 'A' }], 'A', options({ requiredMatrixByDay: { T2: { '22-6': 2 } }, existingSchedule: {
+      trainee: { T2: { shift: '22-6', confirmed: false, registered: true } }, mentor: { T2: { shift: '22-6', confirmed: false, registered: true } },
+    } }));
     expect(result.schedule.trainee.T2).toBe('22-6');
     expect(result.schedule.mentor.T2).toBe('22-6');
     expect(result.criticalInsights).toEqual([]);
@@ -26,18 +28,18 @@ describe('Night Ready buddy system and pooling', () => {
     expect(result.criticalInsights).toContain('⚠️ Cảnh báo: Ca đêm Thứ 2 đang thiếu người cứng (Night Ready), rủi ro vận hành cao!');
     expect(result.insights).toEqual(expect.arrayContaining(result.criticalInsights));
   });
-  it('borrows an OFF mentor, preserves the home store and every other cell', () => {
+  it('leaves an OFF mentor at the home store and warns instead of inventing consent', () => {
     const opts = options();
     opts.existingSchedule.mentor.T5 = { shift: '6-14', covering_store: 'C' };
     const before = structuredClone(opts);
     const result = generateAISchedule([trainee, mentor], 'A', opts);
-    expect(result.schedule.mentor).toEqual({ ...before.existingSchedule.mentor, T2: { shift: '22-6', covering_store: 'A' } });
+    expect(result.schedule.mentor).toBeUndefined();
     expect(mentor.dept).toBe('B');
     expect(opts).toEqual(before);
-    expect(result.employeeHours.mentor).toBe(16);
-    expect(result.stats.totalHours).toBe(16); // trainee + mentor at A; excludes donor's 8h at C
-    expect(result.stats.totalShifts).toBe(2);
-    expect(result.criticalInsights).toEqual([]);
+    expect(result.employeeHours.mentor).toBe(8);
+    expect(result.stats.totalHours).toBe(8); // registered trainee only; donor stays at C
+    expect(result.stats.totalShifts).toBe(1);
+    expect(result.criticalInsights).toHaveLength(1);
   });
   it.each(['', '6-14', { shift: 'off', covering_store: 'C' }])('does not treat a blank/busy/covered cell as OFF: %j', cell => {
     const existingSchedule = { mentor: { ...offWeek(), T2: cell } };

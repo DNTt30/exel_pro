@@ -73,7 +73,7 @@ describe('Performance & Concurrency Optimizations', () => {
 
       // Khẳng định: chỉ gọi API đúng 1 lần duy nhất thay vì 7 lần loop
       expect(spySave).toHaveBeenCalledTimes(1);
-      expect(spySave).toHaveBeenCalledWith('2026-08-24', 'emp1', expect.objectContaining(weeklyShifts));
+      expect(spySave).toHaveBeenCalledWith('2026-08-24', 'emp1', expect.objectContaining(weeklyShifts), { overrideReason: undefined });
       expect(state.schedule['2026-08-24']['emp1']).toEqual(expect.objectContaining(weeklyShifts));
 
       spySave.mockRestore();

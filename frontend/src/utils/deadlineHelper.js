@@ -58,12 +58,13 @@ export function parseMondayDate(weekMondayStr) {
  */
 export function formatFriendlyDeadline(date) {
   if (!date || isNaN(date.getTime())) return '';
-  const dayName = DAY_NAMES_VI[date.getDay()] || '';
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const y = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const mins = String(date.getMinutes()).padStart(2, '0');
+  const vn = new Date(date.getTime() + 7 * 3600000);
+  const dayName = DAY_NAMES_VI[vn.getUTCDay()] || '';
+  const d = String(vn.getUTCDate()).padStart(2, '0');
+  const m = String(vn.getUTCMonth() + 1).padStart(2, '0');
+  const y = vn.getUTCFullYear();
+  const hours = String(vn.getUTCHours()).padStart(2, '0');
+  const mins = String(vn.getUTCMinutes()).padStart(2, '0');
   return `${hours}:${mins} ${dayName}, ${d}/${m}/${y}`;
 }
 
@@ -105,7 +106,6 @@ export function formatRemainingTime(diffMs) {
  */
 export function calculateWeekDeadline(weekMondayStr, config = DEFAULT_DEADLINE_CONFIG, currentTime = new Date()) {
   const activeConfig = { ...DEFAULT_DEADLINE_CONFIG, ...(config || {}) };
-  const monday = parseMondayDate(weekMondayStr);
   const now = currentTime instanceof Date ? currentTime : new Date(currentTime);
 
   if (!activeConfig.enabled) {
@@ -152,19 +152,9 @@ export function calculateWeekDeadline(weekMondayStr, config = DEFAULT_DEADLINE_C
     deadlineDate = new Date(activeConfig.customDeadline);
   } else {
     const offset = DAY_OFFSET_MAP[activeConfig.dayKey] ?? 4;
-    const [hStr, mStr] = (activeConfig.time || '18:00').split(':');
-    const hours = parseInt(hStr, 10) || 0;
-    const mins = parseInt(mStr, 10) || 0;
-
-    deadlineDate = new Date(
-      monday.getFullYear(),
-      monday.getMonth(),
-      monday.getDate() - offset,
-      hours,
-      mins,
-      0,
-      0
-    );
+    const day = new Date(`${weekMondayStr}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() - offset);
+    deadlineDate = new Date(`${day.toISOString().slice(0, 10)}T${activeConfig.time || '18:00'}:00+07:00`);
   }
 
   const diffMs = deadlineDate.getTime() - now.getTime();
@@ -186,108 +176,6 @@ export function calculateWeekDeadline(weekMondayStr, config = DEFAULT_DEADLINE_C
     status,
     config: activeConfig
   };
-}
-
-/**
- * Lấy cấu hình hạn chót của cửa hàng/tuần với cơ chế fallback 4 cấp
- */
-export function getStoreDeadlineConfig(storeId, weekDate, stores = []) {
-  if (typeof window === 'undefined') return { ...DEFAULT_DEADLINE_CONFIG };
-
-  // 1. Cấu hình riêng cho tuần cụ thể
-  try {
-    if (storeId && weekDate) {
-      const weekSaved = localStorage.getItem(`gs25_reg_deadline_${storeId}_${weekDate}`);
-      if (weekSaved) {
-        const parsed = JSON.parse(weekSaved);
-        if (parsed && typeof parsed === 'object') {
-          return { ...DEFAULT_DEADLINE_CONFIG, ...parsed };
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // 2. Cấu hình trong thông tin store (database / Zustand)
-  if (storeId && Array.isArray(stores)) {
-    const storeObj = stores.find(s => s.id === storeId);
-    if (storeObj?.registration_deadline && typeof storeObj.registration_deadline === 'object') {
-      return { ...DEFAULT_DEADLINE_CONFIG, ...storeObj.registration_deadline };
-    }
-  }
-
-  // 3. Fallback localStorage của cửa hàng
-  try {
-    if (storeId) {
-      const storeSaved = localStorage.getItem(`gs25_reg_deadline_${storeId}`);
-      if (storeSaved) {
-        const parsed = JSON.parse(storeSaved);
-        if (parsed && typeof parsed === 'object') {
-          return { ...DEFAULT_DEADLINE_CONFIG, ...parsed };
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // 4. Mặc định
-  return { ...DEFAULT_DEADLINE_CONFIG };
-}
-
-/**
- * Lưu cấu hình hạn chót cho cửa hàng hoặc riêng cho tuần
- */
-export async function saveStoreDeadlineConfig({
-  storeId,
-  weekDate,
-  config,
-  applyToAllWeeks = false,
-  updateStore = null
-}) {
-  if (!storeId) return false;
-
-  const payload = { ...DEFAULT_DEADLINE_CONFIG, ...config };
-
-  if (applyToAllWeeks) {
-    // Lưu vào store settings
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`gs25_reg_deadline_${storeId}`, JSON.stringify(payload));
-        // Xóa override tuần này nếu chọn áp dụng chung
-        if (weekDate) {
-          localStorage.removeItem(`gs25_reg_deadline_${storeId}_${weekDate}`);
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    if (typeof updateStore === 'function') {
-      try {
-        await updateStore(storeId, { registration_deadline: payload });
-      } catch (err) {
-        console.warn('[saveStoreDeadlineConfig] Lỗi cập nhật store DB, đã lưu local:', err);
-      }
-    }
-  } else if (weekDate) {
-    // Lưu riêng cho tuần này
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`gs25_reg_deadline_${storeId}_${weekDate}`, JSON.stringify(payload));
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // Phát event đồng bộ giữa các tabs hoặc components
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('gs25_deadline_changed', { detail: { storeId, weekDate, config: payload } }));
-  }
-
-  return true;
 }
 
 /**

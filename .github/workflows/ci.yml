@@ -2,14 +2,52 @@ name: Continuous Integration (CI)
 
 on:
   push:
-    branches: [main, master, develop]
   pull_request:
-    branches: [main, master, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  database-rules:
+    name: PostgreSQL permissions and schedule transactions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: local-ci-only
+        ports:
+          - 55442:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Check database rules on disposable fixture
+        env:
+          STABILITY_PSQL: psql
+          STABILITY_PG_PORT: '55442'
+          PGPASSWORD: local-ci-only
+        run: |
+          python scripts/test_practical_workflows.py
+          python scripts/test_handbook_catalog.py
+          python scripts/test_copilot_rate_limit.py
   test-and-lint:
     name: Lint, Test & Build Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository

@@ -10,14 +10,14 @@ const ADMIN_GUIDE = [
       'Chọn tuần trên thanh công cụ: 8 tuần lịch sử + tuần này + 4 tuần tới. Copy tuần trước vẫn dùng được.',
       'Chi viện: dùng Điều chuyển — không đổi cửa hàng gốc của NV.',
       'Thiếu người: mở Định biên ca. Cuối tuần chỉnh T7–CN riêng.',
-      'AI xếp lịch: gửi ảnh Direct/doanh số → đọc lượt khách & DS → xếp ca. Có thể nhập tay nếu ảnh không đọc được.'
+      'AI xếp lịch: chỉ chọn ca nhân viên đã đăng ký, giữ ca đã chốt và ngày OFF. Bấm Xếp lịch để xem ngày/khung giờ thiếu người; bấm Áp dụng để lưu. Doanh số và ghi chú nằm trong mục Nhu cầu nhân sự & ghi chú.'
     ]
   },
   {
     title: 'Định biên theo Direct',
     steps: [
       'Quản lý Cửa hàng → Sửa CH.',
-      'Nhập lượt khách TB và doanh số TB (T2–T6 / T7–CN) từ GS25 Direct.',
+      'Nhập lượt khách TB và doanh số TB (T2–T6 / T7–CN) từ báo cáo bán hàng.',
       'Bấm Gợi ý định biên, kiểm tra rồi Lưu.',
       'AI xếp lịch sẽ theo định biên này.'
     ]

@@ -9,17 +9,15 @@ import {
 import { 
   DEADLINE_DAY_OPTIONS, 
   calculateWeekDeadline, 
-  getStoreDeadlineConfig, 
-  saveStoreDeadlineConfig,
   extendDeadlineHours,
   DEFAULT_DEADLINE_CONFIG
 } from '../../utils/deadlineHelper';
 import { toast } from '../ui/toastStore';
+import { getRegistrationDeadline, saveRegistrationDeadline } from '../../services/api';
 
 export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, weekDate }) {
-  const { stores, updateStore } = useStore(useShallow((s) => ({
+  const { stores } = useStore(useShallow((s) => ({
     stores: s.stores,
-    updateStore: s.updateStore
   })));
 
   const storeInfo = useMemo(() => {
@@ -29,16 +27,22 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
   const [config, setConfig] = useState(DEFAULT_DEADLINE_CONFIG);
   const [applyScope, setApplyScope] = useState('week'); // 'week' | 'all'
   const [saving, setSaving] = useState(false);
+  const [snapshot, setSnapshot] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   // Load config when modal opens or storeId/weekDate changes
   useEffect(() => {
+    let live = true;
+    setSnapshot(null); setLoadError('');
     if (isOpen && storeId) {
-      const existing = getStoreDeadlineConfig(storeId, weekDate, stores);
-      setConfig(existing);
+      getRegistrationDeadline(storeId, weekDate).then(result => {
+        if (live) { setConfig(result.config); setSnapshot(result); }
+      }).catch(error => { if (live) setLoadError(error.message); });
       // Mặc định: nếu có weekDate thì cho phép chỉnh tuần này trước
       setApplyScope('week');
     }
-  }, [isOpen, storeId, weekDate, stores]);
+    return () => { live = false; };
+  }, [isOpen, storeId, weekDate]);
 
   // Live preview calculation
   const preview = useMemo(() => {
@@ -48,17 +52,18 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
   const handleQuickExtend = (hours) => {
     const updated = extendDeadlineHours(preview, hours);
     setConfig(updated);
-    toast.success(`Đã cộng thêm ${hours} giờ vào hạn chót tuần này!`);
+    setApplyScope('week');
+    toast.info(`Đã chỉnh bản nháp thêm ${hours} giờ. Bấm Lưu để áp dụng.`);
   };
 
   const handleForceLock = () => {
     setConfig(prev => ({ ...prev, isForceClosed: true, isForceOpen: false }));
-    toast.info('Đã chuyển sang trạng thái: Khóa đăng ký ngay lập tức');
+    toast.info('Đã chọn khóa đăng ký. Bấm Lưu để áp dụng.');
   };
 
   const handleForceOpen = () => {
     setConfig(prev => ({ ...prev, isForceOpen: true, isForceClosed: false }));
-    toast.success('Đã chuyển sang trạng thái: Mở lại đăng ký (cho nộp bù)');
+    toast.info('Đã chọn mở lại đăng ký. Bấm Lưu để áp dụng.');
   };
 
   const handleResetDefault = () => {
@@ -74,13 +79,15 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveStoreDeadlineConfig({
+      const saved = await saveRegistrationDeadline({
         storeId,
         weekDate,
         config,
         applyToAllWeeks: applyScope === 'all',
-        updateStore
+        snapshot
       });
+      setSnapshot(saved);
+      window.dispatchEvent(new Event('registration-deadline-saved'));
       toast.success(
         applyScope === 'all'
           ? 'Đã lưu hạn đăng ký mặc định cho toàn cửa hàng!'
@@ -99,9 +106,12 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
       title="Thiết Lập Hạn Đăng Ký Lịch Tuần" 
       isOpen={isOpen} 
       onClose={onClose}
+      closeDisabled={saving}
       maxWidth="max-w-xl"
     >
-      <div className="space-y-4 text-xs">
+      {loadError && <p role="alert" className="mb-3 text-sm text-red-700">{loadError} Đóng rồi mở lại để tải lại.</p>}
+      {!snapshot && !loadError && <p role="status">Đang tải hạn đăng ký từ máy chủ…</p>}
+      <fieldset disabled={saving || !snapshot} className="space-y-4 text-xs disabled:opacity-60">
         {/* Info header */}
         <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center justify-between">
           <div>
@@ -319,7 +329,7 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
                 name="applyScope"
                 value="all"
                 checked={applyScope === 'all'}
-                onChange={() => setApplyScope('all')}
+                onChange={() => { setApplyScope('all'); setConfig(prev => ({ ...prev, customDeadline: null })); }}
                 className="text-blue-600 focus:ring-blue-500"
               />
               <span className="font-semibold text-slate-700">
@@ -349,7 +359,7 @@ export default function RegistrationDeadlineModal({ isOpen, onClose, storeId, we
             <span>{saving ? 'Đang lưu...' : 'Lưu Cài Đặt'}</span>
           </button>
         </div>
-      </div>
+      </fieldset>
     </Modal>
   );
 }

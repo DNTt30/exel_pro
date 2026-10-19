@@ -78,7 +78,7 @@ export function createResetPasswordHandler({ admin, hashSecret, botToken, chatId
             ? await fetchImpl(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000),
               body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }) })
             : await fetchImpl('https://api.resend.com/emails', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}`, 'Idempotency-Key': `password-reset/${issued.id}` }, signal: AbortSignal.timeout(8000),
-              body: JSON.stringify({ from: emailFrom, to: [issued.email], subject: 'GS25 — Mã OTP khôi phục mật khẩu', text }) });
+              body: JSON.stringify({ from: emailFrom, to: [issued.email], subject: 'Lịch Ca — Mã OTP khôi phục mật khẩu', text }) });
           const result = await sent.json();
           delivered = sent.ok && (isAdmin ? result.ok === true : !!result.id);
         } catch { /* Do not log OTPs, passwords, recipient emails, or provider URLs. */ }

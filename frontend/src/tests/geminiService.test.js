@@ -3,6 +3,11 @@ import { generateGeminiMultiTurn, streamGeminiMultiTurn, DEFAULT_GEMINI_MODEL } 
 import { supabase } from '../lib/supabase';
 vi.mock('../lib/supabase', () => ({ supabase: { auth: { getSession: vi.fn() } }, supabaseAnonKey: 'public-project-key' }));
 const contents = [{ role: 'user', parts: [{ text: 'Quy trình?' }] }];
+it('retains server cooldown and never retries a rejected spam request', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Chờ 12 giây', code: 'COPILOT_RATE_LIMITED', retryAfter: 12 }), { status: 429, headers: { 'Retry-After': '12' } })));
+  await expect(generateGeminiMultiTurn(contents)).rejects.toMatchObject({ status: 429, retryAfter: 12, code: 'COPILOT_RATE_LIMITED' });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
 beforeEach(() => {
   vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co');
   supabase.auth.getSession.mockResolvedValue({ data: { session: { access_token: 'session-token' } } });
@@ -19,6 +24,11 @@ it('preserves the overload explanation and does not multiply the server retry bu
   await expect(streamGeminiMultiTurn(contents)).rejects.toThrow(message);
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
+it.each([generateGeminiMultiTurn, streamGeminiMultiTurn])('retains status for HTML gateway failures without exposing the response body', async call => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>internal gateway detail</html>', { status: 503 })));
+  await expect(call(contents)).rejects.toMatchObject({ status: 503, message: 'Trợ lý AI tạm thời không phản hồi (503).' });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
 it('ignores saved models and legacy personal keys, sending only session authentication', async () => {
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'internal' }, { text: 'Bước 1' }, { text: ': đọc Sổ tay' }] } }] })));
   vi.stubGlobal('fetch', fetchMock);
@@ -29,7 +39,7 @@ it('ignores saved models and legacy personal keys, sending only session authenti
   expect(request.headers).toMatchObject({ Authorization: 'Bearer session-token' });
   expect(request.headers).not.toHaveProperty('x-gemini-api-key');
   expect(request.body).not.toContain('personal-key');
-  expect(JSON.parse(request.body).generationConfig.maxOutputTokens).toBe(8192);
+  expect(JSON.parse(request.body).generationConfig.maxOutputTokens).toBe(1024);
 });
 it('handles split UTF-8 streaming chunks and a final event without newline', async () => {
   const event = text => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] })}`;
@@ -45,4 +55,13 @@ it('does not call the proxy without an authenticated session', async () => {
   vi.stubGlobal('fetch', vi.fn());
   await expect(generateGeminiMultiTurn(contents, 'Sổ tay', '')).rejects.toThrow('đăng nhập lại');
   expect(fetch).not.toHaveBeenCalled();
+});
+it('passes the bounded detail budget for both streaming and non-streaming', async () => {
+  const fetchMock = vi.fn(async () => new Response('{}'));
+  vi.stubGlobal('fetch', fetchMock);
+  await generateGeminiMultiTurn(contents, 'Sổ tay', '', { maxOutputTokens: 2048 });
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).generationConfig.maxOutputTokens).toBe(2048);
+  fetchMock.mockResolvedValueOnce(new Response('data: {"candidates":[{"content":{"parts":[{"text":"Ngắn gọn."}]}}]}\n\n'));
+  await streamGeminiMultiTurn(contents, 'Sổ tay', '', () => {}, { maxOutputTokens: 99999 });
+  expect(JSON.parse(fetchMock.mock.calls[1][1].body).generationConfig.maxOutputTokens).toBe(2048);
 });

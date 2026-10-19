@@ -58,7 +58,7 @@ export default function AddStoreModal({ isOpen, onClose }) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1">GS25 Direct — lượt khách / doanh số TB</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">Báo cáo bán hàng — lượt khách / doanh số TB</label>
           <StoreDemandFields
             demand={formData.demand}
             onChange={demand => setFormData({ ...formData, demand })}

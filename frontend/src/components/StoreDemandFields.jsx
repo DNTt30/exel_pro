@@ -1,69 +1,26 @@
 import { normalizeStoreDemand, suggestStaffingFromDemand } from '../data/constants';
+import Button from './ui/Button';
 
-function formatSalesInput(n) {
-  if (!n) return '';
-  return String(n);
-}
+const buckets = [['weekday', 'Thứ 2 – Thứ 6'], ['weekend', 'Thứ 7 – Chủ nhật']];
+const fields = [['sales', 'Doanh số (đ)'], ['customers', 'Lượt khách']];
 
 export default function StoreDemandFields({ demand, onChange, onSuggest }) {
   const cfg = normalizeStoreDemand(demand);
-
   const setField = (bucket, field, value) => {
-    const n = Math.max(0, Number(String(value).replace(/[^\d]/g, '')) || 0);
-    onChange({
-      ...cfg,
-      [bucket]: { ...cfg[bucket], [field]: n }
-    });
+    const parsed = Number(value);
+    const n = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+    onChange({ ...cfg, [bucket]: { ...cfg[bucket], [field]: n } });
   };
-
-  const handleSuggest = () => {
-    onSuggest?.(suggestStaffingFromDemand(cfg));
-  };
-
-  const row = (bucket, label) => (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] font-bold uppercase text-slate-500 w-20">{label}</span>
-      <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-        Lượt khách TB
-        <input
-          type="number"
-          min="0"
-          className="w-20 p-1 border border-slate-300 rounded text-center font-mono text-xs"
-          value={cfg[bucket].customers || ''}
-          placeholder="0"
-          onChange={e => setField(bucket, 'customers', e.target.value)}
-        />
-      </label>
-      <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-        Doanh số TB (đ)
-        <input
-          type="number"
-          min="0"
-          className="w-28 p-1 border border-slate-300 rounded text-center font-mono text-xs"
-          value={formatSalesInput(cfg[bucket].sales)}
-          placeholder="0"
-          onChange={e => setField(bucket, 'sales', e.target.value)}
-        />
-      </label>
-    </div>
-  );
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-[10px] text-slate-500">
-        Số liệu trung bình ngày từ GS25 Direct (hoặc nhập tay). Bấm gợi ý để ra định biên ca.
-      </p>
-      {row('weekday', 'T2–T6')}
-      {row('weekend', 'T7–CN')}
-      {onSuggest && (
-        <button
-          type="button"
-          onClick={handleSuggest}
-          className="mt-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700"
-        >
-          Gợi ý định biên từ lưu lượng / doanh số
-        </button>
-      )}
-    </div>
-  );
+  return <div className="space-y-4">
+    <p className="text-sm leading-relaxed text-slate-600">Số liệu trung bình mỗi ngày. Để trống nếu chưa có số liệu.</p>
+    {buckets.map(([bucket, label]) => <fieldset key={bucket} className="min-w-0">
+      <legend className="mb-2 text-sm font-semibold text-slate-700">{label}</legend>
+      <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">{fields.map(([field, fieldLabel]) => <label key={field} className="min-w-0 text-sm text-slate-600">{fieldLabel}
+        <input type="number" min="0" step="1" inputMode="numeric" aria-label={`${fieldLabel} ${bucket}`} value={cfg[bucket][field] || ''}
+          onChange={event => setField(bucket, field, event.target.value)} placeholder="Chưa có"
+          className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500" />
+      </label>)}</div>
+    </fieldset>)}
+    {onSuggest && <Button onClick={() => onSuggest(suggestStaffingFromDemand(cfg))}>Gợi ý định biên từ số liệu</Button>}
+  </div>;
 }

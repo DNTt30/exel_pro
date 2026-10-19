@@ -1,3 +1,4 @@
+import { useEmployeeRoleName } from '../../hooks/useEmployeeRoleName';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, UserRound, Save, KeyRound } from 'lucide-react';
@@ -14,6 +15,7 @@ export default function EmployeeProfile() {
   return id ? <ProfileForm key={id} employeeId={id} /> : null;
 }
 function ProfileForm({ employeeId }) {
+  const roleName = useEmployeeRoleName({ id: employeeId });
   const [profile, setProfile] = useState(null), [form, setForm] = useState(null);
   const [email, setEmail] = useState(''), [pendingEmail, setPendingEmail] = useState(null), [password, setPassword] = useState('');
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reload, setReload] = useState(0);
@@ -82,7 +84,7 @@ function ProfileForm({ employeeId }) {
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800"><UserRound size={21} className="text-blue-600" /> Thông tin cá nhân</h2>
       <dl className="mt-4 grid grid-cols-1 gap-4 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
-        {[['Họ và tên', profile.name], ['Mã nhân viên', profile.id], ['Vai trò', profile.jobTitle || profile.role || profile.type], ['Cửa hàng', profile.dept]].map(([label, value]) => <div key={label}><dt className="text-slate-500">{label}</dt><dd className="mt-1 break-words font-semibold text-slate-800">{value || '—'}</dd></div>)}
+        {[['Họ và tên', profile.name], ['Mã nhân viên', profile.id], ['Vai trò', roleName || profile.jobTitle || profile.role || profile.type], ['Cửa hàng', profile.dept]].map(([label, value]) => <div key={label}><dt className="text-slate-500">{label}</dt><dd className="mt-1 break-words font-semibold text-slate-800">{value || '—'}</dd></div>)}
       </dl>
       <p className="my-4 text-xs text-slate-500">Các mục bên dưới không bắt buộc. Chỉ bạn và quản lý có quyền xem.</p>
       <form onSubmit={save} className="grid grid-cols-1 gap-4 sm:grid-cols-2">

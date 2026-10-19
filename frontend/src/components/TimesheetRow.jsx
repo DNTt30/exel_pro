@@ -1,14 +1,12 @@
 import React, { memo, useState, useEffect, useRef } from 'react';
-import { SHIFTS } from '../data/initialData';
-import { getRoleBadgeInfo, SCHEDULE_RULES, DEFAULT_PT_HOURLY_RATE } from '../data/constants';
+import { SCHEDULE_RULES } from '../data/constants';
 import { timesheetHours } from '../utils/timesheetValues';
-import { getShiftCode, getCoveringStore } from '../utils/shiftHelper';
+import { useEmployeeRoleName } from '../hooks/useEmployeeRoleName';
 
 /**
  * Ô nhập công thực tế:
  * - Hỗ trợ cả số (0, 4, 8, 8.5...) và mã chữ (OFF, AL, PL, UL, SL)
  * - Khi nhập '0' hoặc 'OFF': không bị rơi về placeholder số 8 của lịch
- * - Kèm chip chọn nhanh tiện lợi
  */
 function AttendanceCell({ empId, day, dayLabel, initial, isScheduledOff, scheduledVal, onCommit }) {
   const [val, setVal] = useState(initial ?? '');
@@ -20,43 +18,20 @@ function AttendanceCell({ empId, day, dayLabel, initial, isScheduledOff, schedul
   }, [initial, focused]);
 
   const has = String(val).trim() !== '';
-  const upper = String(val).trim().toUpperCase();
-  const isZero = val === '0' || upper === '0H' || String(val).replace(',', '.') === '0';
-  const isOff = upper === 'OFF';
-  const isLeave = ['AL', 'PL', 'UL', 'SL', 'CL'].includes(upper);
 
-  const applyQuickValue = (newVal) => {
-    setVal(newVal);
-    onCommit(empId, day, newVal);
-  };
-
-  let cellBgClass = 'bg-white border-slate-300 text-slate-800';
-  if (focused) {
-    cellBgClass = 'ring-2 ring-blue-500 bg-white border-blue-500 z-10 font-bold';
-  } else if (has) {
-    if (isZero) {
-      cellBgClass = 'bg-slate-200 border-slate-400 text-slate-800 font-black shadow-2xs';
-    } else if (isOff) {
-      cellBgClass = 'bg-rose-100 border-rose-300 text-rose-700 font-black shadow-2xs';
-    } else if (isLeave) {
-      cellBgClass = 'bg-emerald-100 border-emerald-400 text-emerald-800 font-black shadow-2xs';
-    } else {
-      // Số giờ thực tế đã nhập (ví dụ: 8, 4, 7.84...)
-      cellBgClass = 'bg-amber-100 border-amber-400 text-amber-950 font-black shadow-2xs';
-    }
-  } else if (isScheduledOff) {
-    cellBgClass = 'bg-slate-100/70 border-slate-200 text-slate-400';
-  }
+  const cellBgClass = focused
+    ? 'ring-2 ring-slate-500 border-slate-500 bg-white'
+    : has ? 'border-blue-200 bg-blue-50 text-blue-900'
+      : 'border-slate-200 bg-white text-slate-700';
 
   const tooltipText = has
-    ? `Công thực tế: ${val} (đã ghi đè). Xóa ô để quay lại theo lịch.`
+    ? `Công thực tế: ${val}. Theo lịch: ${scheduledVal || '—'}. Xóa ô để quay lại theo lịch.`
     : isScheduledOff
       ? 'Lịch xếp: Nghỉ (OFF). Bấm để nhập số giờ nếu đi làm.'
-      : `Theo lịch: ${scheduledVal || 'Chưa xếp công'}. Nhập số giờ thực tế hoặc chọn nhanh.`;
+      : `Theo lịch: ${scheduledVal || 'Chưa xếp công'}. Nhập số giờ thực tế hoặc mã nghỉ.`;
 
   return (
     <div className="relative group/cell w-full">
-      <span className="block text-[9px] font-semibold text-slate-500 mb-0.5">{dayLabel}</span>
       <input
         type="text"
         inputMode="decimal"
@@ -84,220 +59,49 @@ function AttendanceCell({ empId, day, dayLabel, initial, isScheduledOff, schedul
             onCommit(empId, day, trimmed);
           }
         }}
-        className={`w-full px-0.5 py-1 text-[10px] font-bold text-center rounded border outline-none uppercase placeholder:text-slate-500 transition-all ${cellBgClass}`}
-        title={tooltipText}
+        className={`w-full px-0.5 py-2 text-base sm:text-xs font-semibold text-center rounded border outline-none uppercase placeholder:text-slate-500 transition-colors ${cellBgClass}`}
+        title={`${dayLabel || day} · ${tooltipText}`}
       />
-      <span className="block text-[9px] text-slate-500 mt-0.5" title={tooltipText}>
-        Lịch: {scheduledVal || '—'}
-      </span>
-
-      {/* Quick selection chips popup when focused */}
-      {focused && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-30 bg-slate-900 text-white rounded-lg p-1 shadow-xl flex items-center gap-1 text-[9px] font-bold whitespace-nowrap">
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('8'); }}
-            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-cyan-300"
-          >
-            8h
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('4'); }}
-            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-amber-300"
-          >
-            4h
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('0'); }}
-            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-rose-300"
-          >
-            0h
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('OFF'); }}
-            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-rose-400"
-          >
-            OFF
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue('AL'); }}
-            className="px-1.5 py-0.5 rounded hover:bg-slate-700 text-emerald-300"
-          >
-            AL
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); applyQuickValue(''); }}
-            className="px-1.5 py-0.5 rounded hover:bg-rose-800 text-slate-400"
-            title="Khôi phục theo lịch"
-          >
-            Xóa
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
-const TimesheetRow = memo(({ emp, idx, activeDays, dayLabels = {}, getDayValue, editMode = false, getActualValue, onActualChange }) => {
-  // Tính toán Auto-sum — ưu tiên CÔNG THỰC TẾ (ezHR) khi có override
-  let totalPT = 0;
-  let totalFT = 0;
-  
-  const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || (emp.role && emp.role.includes('PT'));
-  
-  activeDays.forEach(day => {
-    let val = getDayValue(emp.id, day);
-    if (getActualValue) {
-      const act = getActualValue(emp.id, day);
-      if (act !== null && act !== undefined && act !== '') val = String(act);
-    }
-    const hours = timesheetHours(val);
-    if (isPT) totalPT += hours;
-    else totalFT += hours;
-  });
+const TimesheetRow = memo(({ emp, activeDays, dayLabels = {}, getDayValue, editMode = false, getActualValue, onActualChange }) => {
+  const customName = useEmployeeRoleName(emp);
+  const isPT = emp.type === 'STPT' || emp.type === 'PARTTIME' || emp.role?.includes('PT');
+  const total = Math.round(activeDays.reduce((sum, day) => {
+    const actual = getActualValue?.(emp.id, day);
+    return sum + timesheetHours(actual !== null && actual !== undefined && actual !== '' ? String(actual) : getDayValue(emp.id, day));
+  }, 0) * 100) / 100;
+  const exceedsLimit = isPT && total > SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH;
 
-  totalPT = Math.round(totalPT * 100) / 100;
-  totalFT = Math.round(totalFT * 100) / 100;
-  const isPTOvertimed = isPT && totalPT > SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH;
-  const tongCong = Math.round((totalPT + totalFT) * 100) / 100;
-  
-  // Ước tính lương (Ví dụ cơ bản: 25k/h cho PT)
-  const estSalary = isPT ? Math.round(totalPT * DEFAULT_PT_HOURLY_RATE).toLocaleString('vi-VN') + 'đ' : '—';
-
-  const badgeInfo = getRoleBadgeInfo(emp.role || emp.type);
-
-  return (
-    <tr className="hover:bg-slate-50 border-b border-slate-200 group/row">
-      <td className="text-center text-slate-400 font-mono min-w-[40px] w-[40px] max-w-[40px] md:sticky left-0 z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300">
-        {idx + 1}
-      </td>
-      <td className="hidden md:table-cell text-center font-mono text-slate-600 min-w-[96px] w-[96px] max-w-[96px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '40px' }}>
-        {emp.id}
-      </td>
-      <td className="font-bold text-slate-800 min-w-[150px] md:min-w-[192px] w-[150px] md:w-[192px] max-w-[150px] md:max-w-[192px] sticky md:z-10 z-20 bg-white group-hover/row:bg-slate-50 border-r border-slate-300 truncate px-2 left-0 md:left-[136px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-        {emp.name}
-      </td>
-      <td className="hidden md:table-cell text-center font-semibold text-slate-600 min-w-[80px] w-[80px] max-w-[80px] md:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-300" style={{ left: '328px' }}>
-        {emp.dept}
-      </td>
-      <td className="hidden lg:table-cell text-center min-w-[120px] w-[120px] max-w-[120px] lg:sticky z-10 bg-white group-hover/row:bg-slate-50 border-r border-slate-400 px-1" style={{ left: '408px' }}>
-        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeInfo.badgeCls}`}>
-          {badgeInfo.id}
-        </span>
-      </td>
-      
-      {/* 31 Ngày */}
-      {activeDays.map(day => {
-        const val = getDayValue(emp.id, day);
-        const isEmpty = !val || val === '-';
-        const isOff = val === 'OFF' || val === 'off';
-        
-        let badgeStyle = { backgroundColor: '#ffffff', color: '#94a3b8' };
-        if (!isOff) {
-          const actual = getShiftCode(val);
-          if (getCoveringStore(val)) {
-            badgeStyle = { backgroundColor: '#eab308', color: '#ffffff' };
-          } else if (SHIFTS[actual]) {
-            badgeStyle = { backgroundColor: SHIFTS[actual].bg, color: SHIFTS[actual].text };
-          } else {
-            badgeStyle = { backgroundColor: '#3b82f6', color: '#ffffff' };
-          }
-        }
-
-        if (editMode && onActualChange) {
-          const raw = getActualValue ? getActualValue(emp.id, day) : '';
-          const initial = (raw === null || raw === undefined) ? '' : String(raw);
-          return (
-            <td key={day} className="min-w-[64px] w-[64px] p-0.5 border-r border-slate-200 text-center">
-              <AttendanceCell
-                empId={emp.id}
-                day={day}
-                dayLabel={dayLabels[day]}
-                initial={initial}
-                isScheduledOff={isOff}
-                scheduledVal={isOff ? 'OFF' : String(val || '')}
-                onCommit={onActualChange}
-              />
-            </td>
-          );
-        }
-
-        // UU TIEN HIEN THI: cong thuc te override > lich xep
-        const actDisp = getActualValue ? getActualValue(emp.id, day) : '';
-        const actStr = String(actDisp ?? '').trim().toUpperCase();
-        const normActStr = actStr.replace(',', '.');
-        const actNum = parseFloat(normActStr);
-        const hasActNum = actStr !== '' && !isNaN(actNum);
-        return (
-          <td key={day} className="min-w-[48px] w-[48px] max-w-[48px] p-0.5 border-r border-slate-200 text-center font-semibold">
-            {hasActNum ? (
-              actNum === 0 ? (
-                <span 
-                  className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300 leading-tight" 
-                  title={`Công thực tế: 0h (Lịch xếp: ${val || 'Chưa xếp ca'})`}
-                >
-                  0
-                </span>
-              ) : (
-                <span 
-                  className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 leading-tight" 
-                  title={`Công thực tế: ${actNum}h (Lịch xếp: ${val || 'Chưa xếp ca'})`}
-                >
-                  {actNum}
-                </span>
-              )
-            ) : actStr === 'OFF' ? (
-              <span 
-                className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 leading-tight" 
-                title={`Chấm nghỉ (OFF). Lịch xếp: ${val || 'Chưa xếp ca'}`}
-              >
-                OFF
-              </span>
-            ) : actStr !== '' ? (
-              <span 
-                className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 leading-tight" 
-                title={`Mã công: ${actStr} (Lịch xếp: ${val || 'Chưa xếp ca'})`}
-              >
-                {actStr}
-              </span>
-            ) : isEmpty ? (
-              <span className="text-slate-300" title="Chưa xếp ca">—</span>
-            ) : isOff ? (
-              <span className="text-slate-300 text-[11px] block py-1" title="Lịch xếp: OFF">OFF</span>
-            ) : (
-              <span 
-                className="inline-block w-full py-0.5 px-0.5 rounded text-[10px] font-bold truncate leading-tight shadow-2xs"
-                style={badgeStyle}
-                title={`Theo lịch xếp: ${val} (Chưa ghi đè thực tế)`}
-              >
-                {val}
-              </span>
-            )}
-            <div className="hidden print:block text-center font-bold text-[10px] text-black py-0.5">
-              {actStr || val || '-'}
-            </div>
-          </td>
-        );
-      })}
-      
-      {/* Tổng Hợp — khớp đúng 3 cột header: Giờ FT | Giờ PT | Tổng */}
-      <td className="min-w-[64px] w-[64px] text-center font-bold text-blue-700 border-l border-slate-300 bg-slate-50">{totalFT > 0 ? totalFT.toFixed(2) : '0.00'}</td>
-      <td className={`min-w-[64px] w-[64px] text-center font-bold ${
-        isPTOvertimed 
-          ? 'bg-red-100 text-red-700 font-extrabold cursor-help' 
-          : 'bg-slate-100 text-blue-700'
-      }`} title={isPTOvertimed ? `⚠️ Cảnh báo: Part-time vượt định mức tháng (${totalPT.toFixed(2)}h / 91h)` : ''}>
-        {isPTOvertimed ? `⚠️ ${totalPT.toFixed(2)}` : (totalPT > 0 ? totalPT.toFixed(2) : '0.00')}
-      </td>
-      <td className="min-w-[64px] w-[64px] text-center font-black text-emerald-700 bg-emerald-50">{tongCong > 0 ? tongCong.toFixed(2) : '0.00'}</td>
-      <td className="min-w-[80px] w-[80px] text-center font-bold text-amber-700 bg-amber-50">{estSalary}</td>
-    </tr>
-  );
+  return <tr className="group/row border-b border-slate-200 hover:bg-slate-50">
+    <th scope="row" className="sticky left-0 z-10 w-[144px] min-w-[144px] max-w-[144px] border-b border-r border-slate-200 bg-white px-3 py-3 text-left group-hover/row:bg-slate-50 sm:w-[208px] sm:min-w-[208px] sm:max-w-[208px]">
+      <span className="block truncate text-sm font-semibold text-slate-900" title={emp.name}>{emp.name}</span>
+      <span className="block truncate text-[11px] font-normal text-slate-500" title={`${emp.id} · ${customName || emp.role || emp.type || ''}`}>{emp.id} · {customName || emp.role || emp.type}</span>
+    </th>
+    <td className={`min-w-[72px] border-b border-r border-slate-200 px-2 text-center text-sm font-semibold tabular-nums ${exceedsLimit ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-900'}`}
+      title={exceedsLimit ? `Vượt định mức ${SCHEDULE_RULES.STPT_MAX_HOURS_PER_MONTH} giờ/tháng` : 'Tổng giờ trong kỳ, ưu tiên công thực tế khi đã nhập'}>
+      {total.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+      {exceedsLimit && <span className="block text-[10px] font-normal">Vượt định mức</span>}
+    </td>
+    {activeDays.map(day => {
+      const scheduled = getDayValue(emp.id, day);
+      const isOff = String(scheduled).toUpperCase() === 'OFF';
+      const actual = getActualValue?.(emp.id, day);
+      const hasActual = actual !== null && actual !== undefined && String(actual).trim() !== '';
+      const value = hasActual ? String(actual).trim().toUpperCase() : isOff ? 'OFF' : String(scheduled ?? '');
+      return <td key={day} className={`min-w-[72px] w-[72px] border-b border-r border-slate-200 px-1 py-2 text-center ${hasActual ? 'bg-blue-50/60' : ''}`}>
+        {editMode && onActualChange ? <AttendanceCell
+          empId={emp.id} day={day} dayLabel={dayLabels[day]} initial={hasActual ? String(actual) : ''}
+          isScheduledOff={isOff} scheduledVal={isOff ? 'OFF' : String(scheduled ?? '')} onCommit={onActualChange}
+        /> : <span className={`block text-xs tabular-nums ${hasActual ? 'font-semibold text-blue-900' : value === 'OFF' || !value || value === '-' ? 'text-slate-400' : 'text-slate-700'}`}
+          title={`${dayLabels[day]} · ${hasActual ? `Công thực tế: ${value}. Lịch: ${scheduled || '—'}` : `Theo lịch: ${value || 'Chưa xếp'}`}`}>
+          {value || '—'}
+        </span>}
+      </td>;
+    })}
+  </tr>;
 });
 
 export default TimesheetRow;

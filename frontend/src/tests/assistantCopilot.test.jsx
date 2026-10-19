@@ -7,6 +7,8 @@ import { useStore } from '../store/useStore';
 import { requiredDecisionWeeks } from '../utils/aiDecisionEngine';
 
 vi.mock('../services/api', async importOriginal => ({ ...await importOriginal(), decideAssistantAgent: vi.fn().mockResolvedValue(null) }));
+vi.mock('../services/api/logs', () => ({ addAdminLog: vi.fn().mockResolvedValue(null) }));
+
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const initial = useStore.getState();
 afterEach(() => { useStore.setState(initial, true); localStorage.clear(); });

@@ -101,6 +101,7 @@ describe('generateAISchedule voi SM Overrides', () => {
     const parsed = parseSmInstructions(text, currentWeek);
 
     const res = generateAISchedule(emps, 'VN0485', {
+      existingSchedule: { ft1: { T3: { shift: '22-6', registered: true, confirmed: false } }, ft2: { T3: { shift: '22-6', registered: true, confirmed: false } } },
       smOverrides: parsed.dayOverrides,
       demandFactor: parsed.demandFactor,
       smNotes: text
@@ -117,6 +118,7 @@ describe('generateAISchedule voi SM Overrides', () => {
     const parsed = parseSmInstructions(text, currentWeek, emps);
 
     const res = generateAISchedule(emps, 'VN0485', {
+      existingSchedule: { ft2: { T4: 'off' }, pt2: { T2: { shift: '14-22', registered: true, confirmed: false } } },
       employeeOverrides: parsed.employeeOverrides,
       smNotes: text
     });

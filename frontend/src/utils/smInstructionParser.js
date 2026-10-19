@@ -298,7 +298,7 @@ export async function parseSmInstructionsWithGemini(text, currentWeek, geminiApi
     .map(([date, dayKey]) => `${dayKey}=ngay ${date}`)
     .join(', ');
 
-  const systemPrompt = `Ban la AI phan tich lenh xep lich cua Cua hang truong GS25 (Viet Nam).
+  const systemPrompt = `Ban la AI phan tich lenh xep lich cua Cua hang truong (Viet Nam).
 Tuan dang xep: ${currentWeek || 'chua ro'}. Mapping ngay→thu: ${weekSummary || 'chua co'}.
 Ca lam viec hop le: "6-14" (sang), "14-22" (chieu), "22-6" (dem), "10-18" (hanh chinh), "6-10", "10-14", "14-18", "18-22" (ca ngan PT).
 

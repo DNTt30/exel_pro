@@ -1,41 +1,22 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { canApproveSchedule, isOpsManager } from '../lib/authSession';
 import { weekRecordKey, weekStatusMeta, isWeekLocked } from '../utils/scheduleWeek';
 import { telegramConfigured } from '../utils/telegram';
 import { toast } from '../components/ui/toastStore';
 import { Clock, Settings } from 'lucide-react';
-import { getStoreDeadlineConfig, calculateWeekDeadline } from '../utils/deadlineHelper';
+import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
 import RegistrationDeadlineModal from './modals/RegistrationDeadlineModal';
+import StatusBadge from './ui/StatusBadge';
 
 export default function WeekFlowBar({ storeId, weekDate }) {
   const user = useStore(s => s.user);
-  const stores = useStore(s => s.stores) || [];
   const scheduleWeeks = useStore(s => s.scheduleWeeks) || {};
   const saveWeekStatus = useStore(s => s.saveWeekStatus);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
-  const [deadlineVersion, setDeadlineVersion] = useState(0);
-
-  // Lắng nghe thay đổi hạn nộp để re-render tức thì
-  const handleDeadlineChanged = useCallback((e) => {
-    if (!e.detail || e.detail.storeId === storeId) {
-      setDeadlineVersion(v => v + 1);
-    }
-  }, [storeId]);
-
-  useEffect(() => {
-    window.addEventListener('gs25_deadline_changed', handleDeadlineChanged);
-    return () => window.removeEventListener('gs25_deadline_changed', handleDeadlineChanged);
-  }, [handleDeadlineChanged]);
-
-  const deadlineInfo = useMemo(() => {
-    if (!storeId || storeId === 'ALL' || !weekDate) return null;
-    const cfg = getStoreDeadlineConfig(storeId, weekDate, stores);
-    return calculateWeekDeadline(weekDate, cfg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, weekDate, stores, deadlineVersion]);
+  const { info: deadlineInfo } = useRegistrationDeadline(storeId, weekDate);
 
   if (!storeId || storeId === 'ALL' || !weekDate) {
     return (
@@ -64,8 +45,8 @@ export default function WeekFlowBar({ storeId, weekDate }) {
 
   return (
     <>
-      <div className={`flex flex-wrap items-center gap-2 text-xs border rounded-xl px-3 py-2 ${meta.cls}`}>
-        <span className="font-black">{meta.label}</span>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+        <StatusBadge status={status} customText={meta.label} />
         <span className="text-[11px] opacity-80">{storeId} · {weekDate}{locked ? ' · khóa sửa ô' : ''}</span>
         {rec?.reviewNote && status === 'rejected' && (
           <span className="text-[11px]">Lý do: {rec.reviewNote}</span>
@@ -78,14 +59,14 @@ export default function WeekFlowBar({ storeId, weekDate }) {
               deadlineInfo.isExpired
                 ? 'bg-rose-100 text-rose-800 border-rose-200'
                 : deadlineInfo.isNearDeadline
-                ? 'bg-amber-100 text-amber-800 border-amber-200 animate-pulse'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
                 : 'bg-white text-blue-700 border-blue-200'
             }`}>
               <Clock size={11} className={deadlineInfo.isExpired ? 'text-rose-600' : 'text-blue-600'} />
               <span>
-                {deadlineInfo.isExpired ? 'Đã hết hạn nộp' : `Hạn: ${deadlineInfo.formattedDeadline}`}
+                {deadlineInfo.status === 'unavailable' ? deadlineInfo.formattedDeadline : deadlineInfo.isExpired ? 'Đã hết hạn nộp' : `Hạn: ${deadlineInfo.formattedDeadline}`}
               </span>
-              <span className="opacity-70 font-normal">({deadlineInfo.remainingText})</span>
+              {deadlineInfo.remainingText && <span className="opacity-70 font-normal">({deadlineInfo.remainingText})</span>}
             </span>
           </div>
         )}

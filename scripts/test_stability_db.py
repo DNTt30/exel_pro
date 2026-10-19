@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = Path(__file__).resolve().parents[1]
 PSQL = os.environ.get('STABILITY_PSQL', 'C:/Program Files/PostgreSQL/17/bin/psql.exe')
 DB = 'ofc_stability_test_' + uuid.uuid4().hex[:12]
-BASE = [PSQL, '-X', '-h', '127.0.0.1', '-p', '55439', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-At']
+BASE = [PSQL, '-X', '-h', '127.0.0.1', '-p', os.environ.get('STABILITY_PG_PORT', '55439'), '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-At']
 
 
 def sql(source, *, db=DB, error=None):
@@ -65,6 +65,10 @@ if '--bundle' in sys.argv:
     print('MIGRATED single SQL Editor bundle', flush=True)
 else:
     for migration in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
+        # New operational guards need authenticated fixtures; exercised separately
+        # by test_operational_hardening.py after this baseline transaction suite.
+        if migration.name >= '20261012000002':
+            continue
         sql('BEGIN;\n' + migration.read_text(encoding='utf-8') + '\nCOMMIT;')
         print('MIGRATED', migration.name, flush=True)
 

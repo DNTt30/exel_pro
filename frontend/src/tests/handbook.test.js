@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GS25_HANDBOOK_DATA } from '../data/gs25HandbookData';
+import { GS25_HANDBOOK_DATA } from '../../../scripts/data/legacy-handbook/gs25HandbookData.mjs';
 
 describe('GS25 Handbook Data Structure', () => {
   it('contains all 9 store operational scan documents', () => {

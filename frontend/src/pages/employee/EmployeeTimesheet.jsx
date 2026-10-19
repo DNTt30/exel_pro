@@ -274,7 +274,7 @@ export default function EmployeeTimesheet() {
         <div className="flex justify-between items-center text-xs text-slate-600 mt-1 px-2">
           <span>Cửa hàng: {myDept} | Nhân viên: {user?.name} ({user?.id})</span>
           <span>Ngày in: {new Date().toLocaleDateString('vi-VN')}</span>
-          <span>Đơn vị: Chuỗi Cửa Hàng GS25</span>
+          <span>Bảng công nhân viên</span>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Modal from './Modal';
 import { useStore } from '../../store/useStore';
 import { RefreshCw, ArrowRightLeft, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
-import { WEEK_DAYS, DAY_FULL_NAMES } from '../../data/constants';
+import { WEEK_DAYS, DAY_FULL_NAMES, DECISION_RULES } from '../../data/constants';
 import { getUserDepts } from '../../lib/authSession';
 import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap, buildSwappedSchedules } from '../../utils/shiftHelper';
 import { rankSwapPartners } from '../../utils/shiftSuggestionHelper';
@@ -344,7 +344,7 @@ export default function ShiftSwapModal({ isOpen, onClose, currentWeek }) {
             <div className="flex items-start gap-2 text-amber-900 text-xs">
               <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <strong className="block mb-1">⚠️ Cảnh báo: Bạn cần nghỉ ngơi đủ 11 tiếng!</strong>
+                <strong className="block mb-1">⚠️ Cảnh báo: Bạn cần nghỉ ngơi đủ {DECISION_RULES.MIN_REST_HOURS} tiếng!</strong>
                 <ul className="list-disc pl-4 space-y-0.5 text-amber-800">
                   {restWarningInfo.issues.map((iss, i) => (
                     <li key={i}>{iss.message}</li>

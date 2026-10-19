@@ -65,10 +65,11 @@ export const SCHEDULE_RULES = {
 
 // Conservative automation gates, not new contractual hour limits.
 export const DECISION_RULES = {
-  MIN_REST_HOURS: 11,
+  MIN_REST_HOURS: 12,
   AUTO_SWAP_MAX_RISK: 60,
   SHORT_NOTICE_HOURS: 24,
   CONSECUTIVE_NIGHTS_WARNING: 3,
+  MAX_CONSECUTIVE_NIGHTS: 3,
   CANDIDATE_LIMIT: 2,
 };
 

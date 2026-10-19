@@ -12,6 +12,7 @@ function mapEmployee(e) {
     dept: e.dept,
     type: e.type,
     role: e.role,
+    workspaceRoleId: e.workspace_role_id || null,
     jobTitle: e.job_title || '',
     maxH: e.max_h,
     isActive: e.is_active !== false,
@@ -39,9 +40,17 @@ export async function getEmployeeById(id) {
 }
 
 export async function getEmployees(opts = {}) {
-  let q = db().from('employees').select('id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline,recovery_email,skills').order('dept', { ascending: true });
-  if (opts.dept) q = q.eq('dept', opts.dept);
-  const { data, error } = await q;
+  const columns = 'id,name,dept,type,role,job_title,max_h,is_active,created_at,password_changed_at,password_deadline,recovery_email,skills';
+  const query = (fields) => {
+    let q = db().from('employees').select(fields).order('dept', { ascending: true });
+    if (opts.dept) q = q.eq('dept', opts.dept);
+    return q;
+  };
+  let { data, error } = await query(`${columns},workspace_role_id`);
+  // Deploy compatibility: only fall back for this exact missing column.
+  if (['42703', 'PGRST204'].includes(error?.code) && error.message?.includes('workspace_role_id')) {
+    ({ data, error } = await query(columns));
+  }
   if (error) {
     console.error('Lỗi lấy danh sách nhân viên:', error);
     throw error;

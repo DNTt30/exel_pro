@@ -24,7 +24,8 @@ const FLAGS = {
 };
 
 export function jevEnabled(task) {
-  return Boolean(FN_URL && FLAGS[task]);
+  // Experimental only: production keeps deterministic rules until real calibration.
+  return Boolean(import.meta.env.DEV && import.meta.env.VITE_JEV_EXPERIMENTAL === 'on' && FN_URL && FLAGS[task]);
 }
 
 /**

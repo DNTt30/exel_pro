@@ -11,6 +11,9 @@ import { createAdminSlice } from './slices/adminSlice';
 import { createEmployeeSlice } from './slices/employeeSlice';
 import { createScheduleSlice } from './slices/scheduleSlice';
 import { createShelfSlice } from './slices/shelfSlice';
+import { createWorkspaceSlice } from './slices/workspaceSlice';
+import { createWorkspaceRolesSlice } from './slices/workspaceRolesSlice';
+import { createScheduleOverrideSlice } from './slices/scheduleOverrideSlice';
 import { toast } from '../utils/toast';
 import { sessionPersistence } from '../lib/sessionStorage';
 
@@ -22,6 +25,9 @@ export const useStore = create(
       ...createEmployeeSlice(set, get),
       ...createScheduleSlice(set, get),
       ...createShelfSlice(set, get),
+      ...createWorkspaceSlice(set, get),
+      ...createWorkspaceRolesSlice(set, get),
+      ...createScheduleOverrideSlice(set, get),
       
       isInitializing: false,
       syncStatus: 'idle',
@@ -154,6 +160,8 @@ export const useStore = create(
           const authWarning = await bindAuthSession(user);
           if (!active()) return;
           if (authWarning) { set({ authWarning }); throw new Error(authWarning); }
+          set({ authWarning: null });
+          void get().loadWorkspaceRoles();
           const plan = bootstrapQueryPlan(user);
           let failed = false;
           const load = async (promise, fallback) => {

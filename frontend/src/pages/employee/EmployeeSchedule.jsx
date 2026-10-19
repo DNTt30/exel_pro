@@ -10,7 +10,7 @@ import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
 import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
-import { getStoreDeadlineConfig, calculateWeekDeadline } from '../../utils/deadlineHelper';
+import { useRegistrationDeadline } from '../../hooks/useRegistrationDeadline';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
 import ShiftSwapListModal from '../../components/modals/ShiftSwapListModal';
 import ShiftSuggestionModal from '../../components/modals/ShiftSuggestionModal';
@@ -49,26 +49,8 @@ export default function EmployeeSchedule() {
   const isDraft = currentWeekStatus !== 'approved';
 
   // Láº¯ng nghe sá»± kiá»‡n Ä‘á»•i háº¡n ná»™p Ä‘á»ƒ Ä‘á»“ng bá»™ giao diá»‡n
-  const [deadlineVersion, setDeadlineVersion] = useState(0);
-  useEffect(() => {
-    const handler = (e) => {
-      if (!e.detail || e.detail.storeId === myDept) {
-        setDeadlineVersion(v => v + 1);
-      }
-    };
-    window.addEventListener('gs25_deadline_changed', handler);
-    return () => window.removeEventListener('gs25_deadline_changed', handler);
-  }, [myDept]);
-
-  // ThÃ´ng tin háº¡n ná»™p lá»‹ch tuáº§n
-  const deadlineInfo = useMemo(() => {
-    const targetStore = activeDept === 'ALL' ? myDept : activeDept;
-    const cfg = getStoreDeadlineConfig(targetStore, currentWeek, stores);
-    return calculateWeekDeadline(currentWeek, cfg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDept, myDept, currentWeek, stores, deadlineVersion]);
-
-  const isDeadlineExpired = deadlineInfo?.enabled && deadlineInfo?.isExpired;
+  const { info: deadlineInfo, ready: deadlineReady } = useRegistrationDeadline(myDept, currentWeek);
+  const isDeadlineExpired = !deadlineReady || (deadlineInfo.enabled && deadlineInfo.isExpired);
 
   // 1. NgÃ y hiá»ƒn thá»‹ cá»‘ Ä‘á»‹nh theo Tuáº§n (T2 -> CN)
   const activeDays = WEEK_DAYS;
@@ -598,7 +580,8 @@ export default function EmployeeSchedule() {
         )}
 
         {/* Banner khi ÄÃƒ Háº¾T Háº N ÄÄ‚NG KÃ (Expired Bar) */}
-        {isFutureWeek && isDeadlineExpired && (
+        {isFutureWeek && !deadlineReady && <p role="status" className="border-b border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{deadlineInfo.formattedDeadline}</p>}
+        {isFutureWeek && deadlineReady && isDeadlineExpired && (
           <div className="bg-gradient-to-r from-rose-50 via-red-50 to-amber-50 px-3 sm:px-4 py-2.5 border-b border-rose-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">

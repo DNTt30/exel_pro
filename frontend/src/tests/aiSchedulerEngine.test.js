@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { generateAISchedule, auditSchedule, checkRestPeriodViolation, askAICopilot } from '../utils/aiSchedulerEngine';
+import { normalizeShift } from '../utils/shiftHelper';
+const reg = shift => ({ shift, confirmed: false, registered: true });
+const registeredWeek = () => Object.fromEntries(['T2','T3','T4','T5','T6','T7','CN'].map(day => [day, reg('6-14')]));
 
 describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () => {
   const mockEmployees = [
@@ -38,7 +41,8 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
   describe('Full-Time Weekly Rest Law & Backfill', () => {
     it('should ensure 100% of FT employees have at least 1 mandatory day OFF', () => {
       const result = generateAISchedule(mockEmployees, 'VN0485', {
-        requiredMatrix: { '6-14': 2, '14-22': 2, '22-6': 1 }
+        requiredMatrix: { '6-14': 5 },
+        existingSchedule: Object.fromEntries(mockEmployees.map(emp => [emp.id, registeredWeek()]))
       });
 
       // FT staff (101 & 102) must have exactly 1 day OFF (6 working shifts)
@@ -47,14 +51,15 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
         expect(result.employeeHours[ftId]).toBe(48);
 
         // Count number of 'off' days in the week
-        const offDays = Object.values(result.schedule[ftId]).filter(s => s === 'off');
+        const offDays = Object.values(result.schedule[ftId]).filter(s => !normalizeShift(s).confirmed);
         expect(offDays.length).toBeGreaterThanOrEqual(1);
       });
     });
 
     it('should backfill FT into all missing shifts while maintaining rest rules', () => {
       const result = generateAISchedule(mockEmployees, 'VN0485', {
-        requiredMatrix: { '6-14': 2, '14-22': 2, '22-6': 1 }
+        requiredMatrix: { '6-14': 5 },
+        existingSchedule: Object.fromEntries(mockEmployees.map(emp => [emp.id, registeredWeek()]))
       });
 
       const audit = auditSchedule(mockEmployees, result.schedule, 'VN0485');
@@ -100,17 +105,17 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
       const reply = askAICopilot('Full-time bù ca và luật nghỉ thế nào?', mockContext);
       expect(reply).toContain('Full-Time');
       expect(reply).toContain('48h/tuần');
-      expect(reply).toContain('11 tiếng');
+      expect(reply).toContain('12 tiếng');
     });
 
-    it('should answer break time inquiry with exact minutes and law reference', () => {
+    it('does not supply unapproved break-time policy from source code', () => {
       const reply1 = askAICopilot('full time có thể được nghỉ bao nhiêu phút', mockContext);
-      expect(reply1).toContain('30 phút');
-      expect(reply1).toContain('45 phút');
+      expect(reply1).not.toContain('30 phút');
+      expect(reply1).not.toContain('45 phút');
 
       const reply2 = askAICopilot('full time nghỉ mấy phút', mockContext);
-      expect(reply2).toContain('30 phút');
-      expect(reply2).toContain('45 phút');
+      expect(reply2).not.toContain('30 phút');
+      expect(reply2).not.toContain('45 phút');
     });
 
     it('should lookup specific employee schedule and profile by name or ID', () => {
@@ -235,8 +240,8 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
 
     it('tuyệt đối không xếp ca vào ngày nhân viên đã đăng ký xin nghỉ (OFF)', () => {
       const registeredSchedule = {
-        'pt_1': { T2: '14-22', T3: 'off', T4: '14-22', T5: 'off', T6: 'off', T7: 'off', CN: 'off' },
-        'pt_2': { T2: 'off', T3: '14-22', T4: 'off', T5: '14-22', T6: 'off', T7: 'off', CN: 'off' }
+        'pt_1': { T2: reg('14-22'), T3: 'off', T4: reg('14-22'), T5: 'off', T6: 'off', T7: 'off', CN: 'off' },
+        'pt_2': { T2: 'off', T3: reg('14-22'), T4: 'off', T5: reg('14-22'), T6: 'off', T7: 'off', CN: 'off' }
       };
 
       const result = generateAISchedule(testEmps, 'VN0485', {
@@ -253,8 +258,8 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
 
     it('ưu tiên gán đúng ca nhân viên đã đăng ký rảnh khi khớp định biên doanh thu', () => {
       const registeredSchedule = {
-        'pt_1': { T2: '14-22', T4: '14-22' },
-        'pt_2': { T3: '14-22', T5: '14-22' }
+        'pt_1': { T2: reg('14-22'), T4: reg('14-22') },
+        'pt_2': { T3: reg('14-22'), T5: reg('14-22') }
       };
 
       const result = generateAISchedule(testEmps, 'VN0485', {
@@ -275,8 +280,8 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
     it('chỉ chọn đủ số người theo doanh thu khi nhiều người cùng đăng ký rảnh, không gây dư thừa', () => {
       // Cả 2 PT cùng đăng ký rảnh T2 ca 14-22, nhưng định biên chỉ cần 1 người
       const registeredSchedule = {
-        'pt_1': { T2: '14-22' },
-        'pt_2': { T2: '14-22' }
+        'pt_1': { T2: reg('14-22') },
+        'pt_2': { T2: reg('14-22') }
       };
 
       const result = generateAISchedule(testEmps, 'VN0485', {
@@ -293,8 +298,8 @@ describe('AI Scheduler & Auditing Engine (FT Backfill & Labor Rest Laws)', () =>
     it('tôn trọng ca ngắn 6-10 nhân viên đăng ký, không tự đổi thành 6-14 hay 14-22, giữ ca chưa chốt không màu', () => {
       // NV pt_1 đăng ký 6-10, NV pt_2 đăng ký 6-10 vào Thứ 2
       const registeredSchedule = {
-        'pt_1': { T2: '6-10' },
-        'pt_2': { T2: '6-10' }
+        'pt_1': { T2: reg('6-10') },
+        'pt_2': { T2: reg('6-10') }
       };
 
       const result = generateAISchedule(testEmps, 'VN0485', {

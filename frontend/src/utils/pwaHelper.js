@@ -17,9 +17,9 @@ export function registerServiceWorker() {
         }
         if ('caches' in window) {
           const keys = await window.caches.keys();
-          await Promise.all(keys.filter(key => key.startsWith('dntgs25-')).map(key => window.caches.delete(key)));
+          await Promise.all(keys.filter(key => (key.startsWith('dntgs25-') || key.startsWith('lichca-'))).map(key => window.caches.delete(key)));
         }
-      }).catch(err => console.warn('[DNTgs25] Dev worker cleanup:', err?.message));
+      }).catch(err => console.warn('[LichCa] Dev worker cleanup:', err?.message));
     }
     return;
   }
@@ -29,10 +29,10 @@ export function registerServiceWorker() {
       const swUrl = `${import.meta.env.BASE_URL || './'}sw.js`;
       navigator.serviceWorker.register(swUrl)
         .then((reg) => {
-          console.log('[DNTgs25] Service Worker registered successfully:', reg.scope);
+          console.log('[LichCa] Service Worker registered successfully:', reg.scope);
         })
         .catch((err) => {
-          console.warn('[DNTgs25] Service Worker registration failed:', err);
+          console.warn('[LichCa] Service Worker registration failed:', err);
         });
     });
   }
@@ -48,7 +48,7 @@ export function registerServiceWorker() {
     window.addEventListener('appinstalled', () => {
       deferredPrompt = null;
       listeners.forEach((cb) => cb(false));
-      console.log('[DNTgs25] App was successfully installed!');
+      console.log('[LichCa] App was successfully installed!');
     });
   }
 }
@@ -87,9 +87,9 @@ export function usePWAInstall() {
       deferredPrompt.prompt();
       const choiceResult = await deferredPrompt.userChoice;
       if (choiceResult.outcome === 'accepted') {
-        console.log('[DNTgs25] User accepted install prompt');
+        console.log('[LichCa] User accepted install prompt');
       } else {
-        console.log('[DNTgs25] User dismissed install prompt');
+        console.log('[LichCa] User dismissed install prompt');
       }
       deferredPrompt = null;
       setCanInstall(false);

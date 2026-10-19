@@ -1,5 +1,33 @@
 import { db } from './client';
 
+export async function getCopilotUsage({ storeId = 'ALL', userId, from, to } = {}) {
+  let query = db().from('ai_conversation_activity')
+    .select('id,store_id,user_message,error,created_at', { count: 'exact' })
+    .not('user_message', 'is', null).neq('user_message', '')
+    .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(200);
+  if (storeId && storeId !== 'ALL') {
+    const stores = [...new Set(storeId.split(',').map(id => id.trim()).filter(Boolean))];
+    query = query.overlaps('store_ids', stores);
+  }
+  if (userId) query = query.eq('user_id', userId);
+  if (from) query = query.gte('created_at', from);
+  if (to) query = query.lt('created_at', to);
+  const { data, count, error } = await query;
+  if (error || !Number.isInteger(count) || !Array.isArray(data)) throw new Error('Chưa tải được thống kê lịch sử trợ lý.');
+  return { total: count, limit: 200, rows: data.map(row => ({ id: row.id, storeId: row.store_id,
+    userMessage: row.user_message, error: row.error, createdAt: row.created_at })) };
+}
+
+export async function getCopilotActivity(storeId = 'ALL') {
+  return (await getCopilotUsage({ storeId })).rows;
+}
+
+export async function getServerAuditLogs() {
+  const { data, error } = await db().from('server_audit_events').select('*').order('created_at', { ascending: false }).limit(300);
+  if (error) throw new Error('Chưa tải được nhật ký hệ thống. Vui lòng thử lại sau.');
+  return (data || []).map(row => mapAuditLog({ ...row, id: `server:${row.id}`, metadata: { ...row.metadata, description: [row.action, row.metadata?.reason || row.metadata?.overrideReason].filter(Boolean).join(' · ') } }));
+}
+
 export async function getAdminLogs() {
   try {
     const { data, error } = await db().from('admin_logs').select('*').order('created_at', { ascending: false }).limit(300);

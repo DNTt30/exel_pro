@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { Search, ScrollText, Shield, Bot, Activity } from 'lucide-react';
 import { canPickStore } from '../../lib/authSession';
 import { describeDiff } from '../../utils/appLogs';
+import { getServerAuditLogs } from '../../services/api';
 
 function JsonBlock({ title, value, tone }) {
   return (
@@ -28,7 +29,15 @@ const EMPTY_ARR = [];
 export default function AdminLogs() {
   const user = useStore(s => s.user);
   const activityLogs = useStore(s => s.activityLogs) || EMPTY_ARR;
-  const auditLogs = useStore(s => s.auditLogs) || EMPTY_ARR;
+  const clientAuditLogs = useStore(s => s.auditLogs) || EMPTY_ARR;
+  const [serverAuditLogs, setServerAuditLogs] = useState([]);
+  const [auditError, setAuditError] = useState('');
+  const auditLogs = useMemo(() => [...serverAuditLogs, ...clientAuditLogs].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))), [serverAuditLogs, clientAuditLogs]);
+  useEffect(() => {
+    let active = true;
+    getServerAuditLogs().then(rows => { if (active) setServerAuditLogs(rows); }).catch(e => { if (active) setAuditError(e.message); });
+    return () => { active = false; };
+  }, []);
   const aiConversations = useStore(s => s.aiConversations) || EMPTY_ARR;
   const adminLogs = useStore(s => s.adminLogs) || EMPTY_ARR;
   const loadAdminLogs = useStore(s => s.loadAdminLogs);
@@ -109,8 +118,9 @@ export default function AdminLogs() {
             Nhật ký
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Audit lưu <span className="font-mono">old_data / new_data</span> JSONB — truy vết được từng trường (vd. SL 10 → 5). Chạy <span className="font-mono">sql_app_logs.sql</span> trên Supabase.
+            Nhật ký server ghi tự động khi sửa lịch, duyệt công, đọc dữ liệu công/lương và lưu ngoại lệ. Mở bản ghi để xem dữ liệu trước/sau.
           </p>
+          {auditError && <p role="alert" className="mt-2 text-sm text-rose-700">{auditError}</p>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {TABS.map(t => (

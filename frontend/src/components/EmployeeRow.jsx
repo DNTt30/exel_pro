@@ -3,6 +3,7 @@ import ShiftInput from './ShiftInput';
 import { useStore } from '../store/useStore';
 import { Edit2, Copy, Check } from 'lucide-react';
 import { STANDARD_ROLES, getRoleBadgeInfo } from '../data/constants';
+import { useEmployeeRoleName } from '../hooks/useEmployeeRoleName';
 import { parseShiftForCell, calculateEmployeeWeeklyHours, validateEmployeeSchedule } from '../utils/shiftHelper';
 
 // So sánh lịch theo GIÁ TRỊ: view tháng ở cha tạo object mới mỗi render,
@@ -27,6 +28,7 @@ const EmployeeRow = memo(({
   isDraft
 }) => {
   const canEditShifts = canEdit ?? isAdmin;
+  const customName = useEmployeeRoleName(emp);
   const updateEmployee = useStore(state => state.updateEmployee);
   
   const [isEditingName, setIsEditingName] = useState(false);
@@ -145,9 +147,9 @@ const EmployeeRow = memo(({
             ) : (
               <div 
                 className={`font-bold text-slate-800 truncate flex items-center gap-1 ${
-                  isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded group/name' : ''
+                  isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId ? 'cursor-pointer hover:bg-slate-200 px-1 -ml-1 rounded group/name' : ''
                 }`}
-                title={isAdmin && !emp.isBorrowedTo ? "Click để sửa họ tên" : emp.name}
+                title={isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId ? "Click để sửa họ tên" : emp.name}
                 onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingName(true); }}
               >
                 {emp.name} 
@@ -189,13 +191,13 @@ const EmployeeRow = memo(({
             return (
               <span 
                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${badge.badgeCls} group/role ${
-                  isAdmin && !emp.isBorrowedTo ? 'cursor-pointer hover:brightness-95' : ''
+                  isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId ? 'cursor-pointer hover:brightness-95' : ''
                 }`}
-                title={isAdmin && !emp.isBorrowedTo ? "Click để sửa vị trí" : ''}
-                onClick={() => { if (isAdmin && !emp.isBorrowedTo) setIsEditingRole(true); }}
+                title={isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId ? "Click để sửa vị trí" : ''}
+                onClick={() => { if (isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId) setIsEditingRole(true); }}
               >
-                <span className="truncate">{badge.id}</span>
-                {isAdmin && !emp.isBorrowedTo && (
+                <span className="truncate">{customName || badge.id}</span>
+                {isAdmin && !emp.isBorrowedTo && !emp.workspaceRoleId && (
                   <Edit2 size={10} className="opacity-0 group-hover/role:opacity-100 text-blue-500 flex-shrink-0" />
                 )}
               </span>

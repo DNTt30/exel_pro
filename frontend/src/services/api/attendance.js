@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { attendanceRowSchema, isoDateSchema, employeeIdSchema } from '../../schemas/operationalSchemas';
 import { db } from './client';
 
 // --- ATTENDANCE (cong thuc te tu ezHR, SM nhap tay) ---
@@ -8,16 +10,16 @@ function mapRow(r) {
 
 /** Lấy công thực tế trong khoảng ngày ISO [from, to] */
 export async function getAttendanceRange(fromDate, toDate) {
-  const { data, error } = await db().from('attendance')
-    .select('emp_id,work_date,actual_hours,note')
-    .gte('work_date', fromDate)
-    .lte('work_date', toDate);
+  isoDateSchema.parse(fromDate); isoDateSchema.parse(toDate);
+  if (fromDate > toDate) throw new Error('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
+  const { data, error } = await db().rpc('get_attendance_audited', { p_from: fromDate, p_to: toDate });
   if (error) throw error;
   return (data || []).map(mapRow).filter(Boolean);
 }
 
 /** Removing an override is different from recording zero worked hours. */
 export async function deleteAttendanceCell(empId, workDate) {
+  employeeIdSchema.parse(empId); isoDateSchema.parse(workDate);
   const { error } = await db().from('attendance').delete().eq('emp_id', empId).eq('work_date', workDate);
   if (error) throw error;
 }
@@ -25,6 +27,7 @@ export async function deleteAttendanceCell(empId, workDate) {
 /** Upsert hàng loạt (bulk) công thực tế */
 export async function upsertAttendanceRows(rows) {
   if (!rows || !rows.length) return;
+  z.array(attendanceRowSchema).max(10000).parse(rows);
   const payload = rows.map(r => ({
     emp_id: r.empId,
     work_date: r.workDate,

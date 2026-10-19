@@ -28,9 +28,9 @@ describe('scheduleConflicts engine', () => {
     expect(v.date).toBe('T3');
   });
 
-  it('Không báo thiếu nghỉ khi cách nhau đủ 8h (14-22 rồi 6-14)', () => {
+  it('Báo thiếu nghỉ khi chỉ có 8h, dưới rule 11h (14-22 rồi 6-14)', () => {
     const f = analyzeEmployeeWeek({ ...PT, shifts: { T2: '14-22', T3: '6-14' } });
-    expect(f.find(x => x.code === 'INSUFFICIENT_REST')).toBeUndefined();
+    expect(f.find(x => x.code === 'INSUFFICIENT_REST')).toBeTruthy();
   });
 
   it('WARNING: PT thiếu giờ tuần', () => {

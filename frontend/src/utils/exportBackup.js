@@ -2,9 +2,8 @@ import * as XLSX from 'xlsx';
 import * as api from '../services/api';
 
 // =====================================================================
-// Sao luu du lieu day du ra .xlsx nhieu sheet (SM/OFC/admin).
-// Luon FETCH MOI tu DB de file backup day du du moi trang da nap.
-// Neu 1 bang loi (RLS chan...) thi dung du lieu state lam phuong an.
+// Scoped Excel export for reconciliation, not a database backup.
+// Fetch fresh accessible data; abort on failure rather than export stale state.
 // =====================================================================
 
 /** Gom cot tu dong tu cac dong du lieu (chong do schema khong ro). */
@@ -39,19 +38,10 @@ function dayShiftText(val) {
 
 const DAY_KEYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-/** Fetch an toàn: lỗi thì dùng fallback từ state. */
-async function safe(promise, fallback) {
-  try { const v = await promise; return (Array.isArray(v) && v.length) ? v : fallback; } catch { return fallback; }
-}
-
 export async function buildBackupData(state) {
   const [emps, fbs, swaps, shelves, items, stores] = await Promise.all([
-    safe(api.getEmployees({}), state.employees || []),
-    safe(api.getFeedbacks({}), state.feedbacks || []),
-    safe(api.getShiftSwaps({}), state.shiftSwaps || []),
-    safe(api.getShelves({}), state.shelves || []),
-    safe(api.getShelfItems({}), state.shelfItems || []),
-    safe(api.getStores(), state.stores || [])
+    api.getEmployees({}), api.getFeedbacks({ limit: 150 }), api.getShiftSwaps({ limit: 150 }),
+    api.getShelves({}), api.getShelfItems({}), api.getStores()
   ]);
   // Danh sách tuần cần lấy: mọi tuần state đã biết
   const weekSet = new Set(Object.keys(state.schedule || {}));
@@ -61,17 +51,23 @@ export async function buildBackupData(state) {
   // Khử N+1 query: lấy toàn bộ các tuần trong 1 query duy nhất qua getSchedulesByWeeks
   let schedule = {};
   if (weeks.length > 0) {
-    try {
-      schedule = await api.getSchedulesByWeeks(weeks);
-    } catch {
-      schedule = state.schedule || {};
-    }
+    schedule = await api.getSchedulesByWeeks(weeks);
   }
-  return { employees: emps, feedbacks: fbs, shiftSwaps: swaps, shelves, shelfItems: items, stores, schedule };
+  return { employees: emps, feedbacks: fbs, shiftSwaps: swaps, shelves, shelfItems: items, stores, schedule, exportedWeeks: weeks };
 }
 
 export function buildBackupWorkbook(data) {
   const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Phạm vi file xuất', 'Thông tin'],
+    ['Thời điểm', new Date().toISOString()],
+    ['Quyền truy cập', 'Chỉ dữ liệu tài khoản hiện tại được phép đọc'],
+    ['Tuần lịch', (data.exportedWeeks || Object.keys(data.schedule || {})).join(', ')],
+    ['Bao gồm', 'Nhân viên, cửa hàng, lịch các tuần nêu trên, phản hồi, đổi ca, kệ và mặt hàng'],
+    ['Giới hạn', 'Phản hồi và đổi ca: tối đa 150 bản ghi gần nhất mỗi loại; các bảng khác chịu giới hạn truy vấn của máy chủ'],
+    ['Không bao gồm', 'Công thực tế, Auth, cấu hình, tài liệu/ảnh Sổ tay, lịch sử đầy đủ và các tuần chưa tải'],
+    ['Mục đích', 'Đối chiếu Excel; không dùng làm bản sao lưu hoặc khôi phục toàn bộ database'],
+  ]), 'Pham vi');
   const nameOf = {};
   (data.employees || []).forEach(e => { nameOf[e.id] = e.name || ''; });
 
@@ -109,7 +105,7 @@ export async function downloadBackupXlsx(state) {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
   const stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes());
-  const name = 'OFC_Backup_' + stamp + '.xlsx';
+  const name = 'LichCa_DuLieu_' + stamp + '.xlsx';
   XLSX.writeFile(wb, name);
   return name;
 }

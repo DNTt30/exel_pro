@@ -22,7 +22,7 @@ export default function PWAInstallModal({ isOpen, onClose }) {
         <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 p-1 shadow-xl shadow-blue-500/25 flex items-center justify-center border-2 border-white/40">
           <img 
             src={`${import.meta.env.BASE_URL || './'}icon-192.png`} 
-            alt="DNTgs25 Icon" 
+            alt="Biểu tượng Lịch Ca"
             className="w-full h-full rounded-xl object-cover"
             onError={(e) => {
               e.target.src = `${import.meta.env.BASE_URL || './'}favicon.svg`;
@@ -31,7 +31,7 @@ export default function PWAInstallModal({ isOpen, onClose }) {
         </div>
 
         <h3 className="text-lg font-black text-slate-800 tracking-tight">
-          Cài đặt App DNTgs25
+          Cài đặt App Lịch Ca
         </h3>
         <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
           Thêm ứng dụng vào màn hình chính để mở toàn màn hình, tải siêu tốc và thao tác ca kíp mượt mà như app thật.
@@ -68,7 +68,7 @@ export default function PWAInstallModal({ isOpen, onClose }) {
                 3
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Bấm <strong>"Thêm"</strong> ở góc phải trên cùng. App <strong>DNTgs25</strong> sẽ xuất hiện ngay trên màn hình điện thoại của bạn!
+                Bấm <strong>"Thêm"</strong> ở góc phải trên cùng. App <strong>Lịch Ca</strong> sẽ xuất hiện ngay trên màn hình điện thoại của bạn!
               </p>
             </div>
           </div>

@@ -1,11 +1,12 @@
 import { WEEK_DAYS } from '../data/constants';
 import { normalizeShift, getShiftHours } from './shiftHelper';
-import { stripVi } from '../data/ffOnsiteRecipes';
+import { stripVi } from './textSearch';
+import { answerClockQuery } from './copilotClock';
 
 // =====================================================================
 // INTENT MO RONG CHO AI COPILOT - module rieng de de mo rong & test.
 // tryAnswerWithData() only handles structured app-data questions.
-// Handbook/SOP conversation belongs to Gemini, with the complete source handbook.
+// Handbook/SOP conversation belongs to Gemini, with retrieved handbook excerpts.
 // Khop mau bang substring/token - ho tro cau hoi khong dau.
 // =====================================================================
 
@@ -217,6 +218,8 @@ export function isSelfUserQuery(q, qn) {
 }
 
 export function tryAnswerWithData(ctx) {
+  const clockAnswer = answerClockQuery(ctx?.q || ctx?.qn || '');
+  if (clockAnswer) return clockAnswer;
   const {
     qn = '',
     employees = [],
@@ -225,7 +228,7 @@ export function tryAnswerWithData(ctx) {
     user = null,
   } = ctx || {};
 
-  // Business/SOP questions fall through to Gemini with the complete handbook.
+  // Business/SOP questions fall through to Gemini with retrieved handbook excerpts.
 
   const q = ctx.q || qn;
   const storeEmps = employees.filter((e) => e.dept === storeId);

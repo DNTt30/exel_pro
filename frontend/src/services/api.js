@@ -15,3 +15,7 @@ export * from './api/password';
 export * from './api/employeeProfile';
 export * from './api/copilotConfig';
 export * from './api/handbook';
+export * from './api/workspace';
+export * from './api/workspaceRoles';
+export * from './api/notifications';
+export * from './api/registrationDeadlines';

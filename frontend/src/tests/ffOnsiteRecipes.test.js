@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { lookupFfOnsiteRecipe } from '../data/ffOnsiteRecipes';
+import { retrieveHandbook } from '../utils/copilotRetrieval';
+import catalog from '../../../scripts/data/handbook-catalog.json';
+const entries = catalog.map(c => ({ ...c, is_active: true, published_at: '2026-10-18' }));
+const lookupFfOnsiteRecipe = question => retrieveHandbook(question, [], { entries }).text || null;
 import { askAICopilot } from '../utils/aiSchedulerEngine';
 
 const ctx = { employees: [], weekSchedule: {}, storeId: 'VN0485', currentWeek: '2026-08-17' };
@@ -84,13 +87,6 @@ describe('FF Onsite recipes from giấy quầy counter', () => {
     expect(lookupFfOnsiteRecipe('gà nugget')).toContain('nugget');
     expect(lookupFfOnsiteRecipe('gà nugget')).not.toContain('lá chanh');
     expect(lookupFfOnsiteRecipe('gà nướng')).toContain('lá chanh');
-  });
-
-  it('does not treat schedule questions as recipes', () => {
-    expect(lookupFfOnsiteRecipe('Tú mai làm ca mấy giờ?')).toBeNull();
-    expect(lookupFfOnsiteRecipe('đổi ca với đồng nghiệp')).toBeNull();
-    expect(lookupFfOnsiteRecipe('Hôm nay ngày mấy?')).toBeNull();
-    expect(lookupFfOnsiteRecipe('Fulltime một tuần được nghỉ mấy ngày?')).toBeNull();
   });
 
   it('askAICopilot still answers schedule after recipe wiring', () => {

@@ -2,10 +2,12 @@ import React from 'react';
 import Modal from './Modal';
 import { Printer, ShieldCheck } from 'lucide-react';
 import { getRoleBadgeInfo } from '../../data/constants';
+import { useEmployeeRoleName } from '../../hooks/useEmployeeRoleName';
 import { normalizeShift } from '../../utils/shiftHelper';
 import { timesheetHours } from '../../utils/timesheetValues';
 
 export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDays = [], cycleDates = [], getDayValue, weekSchedule = {} }) {
+  const customName = useEmployeeRoleName(user);
   if (!user) return null;
 
   const roleInfo = getRoleBadgeInfo(user.role || user.type);
@@ -81,7 +83,7 @@ export default function PersonalTimesheetModal({ isOpen, onClose, user, activeDa
             </div>
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Vị Trí / Chức Vụ</span>
-              <strong className="text-indigo-700">{roleInfo.label}</strong>
+              <strong className="text-indigo-700">{customName || roleInfo.label}</strong>
             </div>
           </div>
 

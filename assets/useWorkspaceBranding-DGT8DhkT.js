@@ -1,0 +1,1 @@
+import{D as e,o as t}from"./index-ta--HSdL.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

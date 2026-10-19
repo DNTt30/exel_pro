@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-39qeawTm.js";import{t}from"./KnowledgeLibrary-BNRyXjXH.js";var n=e();function r(){return(0,n.jsx)(`div`,{className:`w-full min-w-0 p-3 pb-24 sm:p-5`,children:(0,n.jsx)(t,{})})}export{r as default};

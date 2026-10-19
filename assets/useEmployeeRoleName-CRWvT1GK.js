@@ -1,1 +1,0 @@
-import{o as e,w as t}from"./index-ta--HSdL.js";function n(n){return e(e=>t(e.employees.find(e=>e.id===n?.id)||n,e.workspaceRoles))}export{n as t};

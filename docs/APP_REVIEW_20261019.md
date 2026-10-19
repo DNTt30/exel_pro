@@ -1,5 +1,7 @@
 # Rà soát trạng thái ứng dụng — 19/10/2026
 
+**Cập nhật sau yêu cầu triển khai:** các điểm runtime bên dưới đã được sửa; full suite 986 passed/7 skipped, các kiểm thử PostgreSQL và desktop/mobile đạt. Chi tiết phát hành tại `RELEASE_20261019.md`. Phần dưới giữ nguyên bằng chứng của lần rà soát, không còn là danh sách lỗi runtime chưa xử lý. CI đã bổ sung nhưng chưa xác nhận chạy GitHub Actions từ commit mới.
+
 ## Bằng chứng tại thời điểm rà soát
 
 - Full frontend suite: **975 passed, 7 skipped**, 89 file passed / 2 skipped. Các test bỏ qua thuộc `rlsSecurity.test.js` và `securityRegression.test.js`, phụ thuộc môi trường tích hợp. Không suy ra production không có lỗi từ các test local.

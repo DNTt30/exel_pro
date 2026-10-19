@@ -10,4 +10,3 @@
 - Khi được yêu cầu dọn bộ nhớ: đọc lại các file, đề xuất danh sách gộp/sửa/chuyển trước và chỉ thực hiện sau khi người dùng đồng ý.
 - Không lưu mật khẩu, API key hoặc dữ liệu cá nhân không cần thiết.
 - Bộ nhớ bổ sung ngữ cảnh; tuân thủ [AGENTS.md](AGENTS.md) và chỉ dẫn mới của người dùng.
-

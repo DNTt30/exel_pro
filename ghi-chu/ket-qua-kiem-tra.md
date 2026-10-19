@@ -111,3 +111,11 @@ Việc tiếp theo được giữ duy nhất tại [dang-lam.md](../dang-lam.md)
 - Database read-only: các kiểm tra foundation/catalog true, 98 nguồn nhập, **0 pending imports, 114 published**. Trạng thái cũ “98 chờ duyệt, 0 công bố” chỉ đúng tại lần nhập đầu, không còn mô tả production hiện tại. Không suy ra ai duyệt hoặc chất lượng nội dung từ số đếm.
 - Review ghi nhận: stream Gemini thiếu timeout/hủy xuyên suốt; cache HTML offline không được làm mới và fallback dùng Promise sai; truy vấn thống kê nhiều cửa hàng không thống nhất; nhiều thay đổi chưa commit và CI chưa nối các test DB mới. Chi tiết, mức độ chắc chắn và thứ tự xử lý: [APP_REVIEW_20261019.md](../docs/APP_REVIEW_20261019.md).
 - Lượt này chỉ rà soát và cập nhật ghi chú, không sửa/deploy runtime. Không khẳng định đã kiểm chứng đăng nhập hoặc ghi lịch/công qua tài khoản production thật.
+
+## Triển khai các phát hiện review — 19/10/2026
+
+- Đã thêm cancellation/deadline client và proxy, giữ/đánh dấu câu trả lời dở; sửa HTML cache/fallback offline; thống nhất query thống kê qua view chuẩn hóa cửa hàng với RLS cũ; nối test PostgreSQL mới vào CI Linux.
+- Full suite **986 passed/7 skipped**. Ba bộ PostgreSQL (`test_practical_workflows.py`, `test_handbook_catalog.py`, `test_copilot_rate_limit.py`) đạt; fixture DB lần lượt `ofc_stability_test_2ba68d68f7b3`, `ofc_stability_test_8ce638ddc666`, `copilot_rate_6fda85010561`. Lint/build đạt với cảnh báo cũ.
+- Trình duyệt desktop/mobile đạt. Vòng đầu harness đọc nhầm câu trả lời thành công cũ khi request mới chưa gửi xong; đã sửa harness chờ đúng request rồi chạy lại đạt. Ảnh đã kiểm tra, không thấy tràn ngang phần chat.
+- Database view và Edge đã deploy. Scan 226 file staged không khớp secret đang cấu hình hoặc các mẫu credential được kiểm tra; đây không phải chứng nhận không có mọi loại secret. Tag bản nguồn: `release-20261019-stability`. Các thử nghiệm ML chưa đưa vào commit phát hành. Chi tiết: `docs/RELEASE_20261019.md`.
+- Bản public cuối khớp 15 file; `artifacts/release/frontend-verified-20261019T130208Z.json`, bundle `index-BtYtWRIz.js`. CI mới chưa được chạy trên GitHub; kiểm thử trong lượt này chạy local.

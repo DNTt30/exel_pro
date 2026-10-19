@@ -18,4 +18,3 @@ Nguồn: Yêu cầu chỉ xếp ca NV đăng ký và các trả lời xác nhậ
 - **Đã cũ:** tự động lấy người rảnh/OFF để lấp thiếu. Yêu cầu sau đó giới hạn gợi ý vào ca đã đăng ký; chi viện cần quản lý quyết định.
 
 Kết quả đã kiểm chứng: [ket-qua-kiem-tra.md](ket-qua-kiem-tra.md). Công việc còn dở: [dang-lam.md](../dang-lam.md).
-

@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-39qeawTm.js";import{N as t}from"./index-C2SnFPD7.js";import{t as n}from"./KnowledgeLibrary-CUbpwMQX.js";var r=e(),i=t,a=Object.fromEntries(i.map(e=>[e.value,e]));function o(){return(0,r.jsx)(`div`,{className:`mx-auto max-w-5xl p-3 sm:p-6`,children:(0,r.jsx)(n,{manage:!0})})}export{a as CATEGORY_MAP,i as CATEGORY_OPTIONS,o as default};

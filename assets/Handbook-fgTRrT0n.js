@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-39qeawTm.js";import{t}from"./KnowledgeLibrary-CUbpwMQX.js";var n=e();function r(){return(0,n.jsx)(`main`,{className:`mx-auto max-w-5xl p-3 pb-24 sm:p-6`,children:(0,n.jsx)(t,{})})}export{r as default};

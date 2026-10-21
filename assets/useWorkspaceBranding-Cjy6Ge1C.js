@@ -1,1 +1,0 @@
-import{D as e,o as t}from"./index-BtYtWRIz.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

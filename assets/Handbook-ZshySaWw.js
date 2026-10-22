@@ -1,1 +1,0 @@
-import{n as e}from"./index-CE5L3FpR.js";import{f as t}from"./App-BgT2n7GB.js";import{t as n}from"./KnowledgeLibrary-1pFngOzu.js";var r=e();function i(){let[e]=t();return(0,r.jsx)(`div`,{className:`w-full min-w-0 p-3 pb-24 sm:p-5`,children:(0,r.jsx)(n,{initialCategory:e.get(`category`)||`all`})})}export{i as default};

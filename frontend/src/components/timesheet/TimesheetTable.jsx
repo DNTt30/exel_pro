@@ -1,7 +1,8 @@
 import React, { memo, useMemo } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import TimesheetRow from '../TimesheetRow';
 
-const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue, editMode = false, getActualValue, onActualChange }) => {
+const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue, editMode = false, getActualValue, onActualChange, payrollCycle, onPrevMonth, onNextMonth }) => {
   const deptKeys = Object.keys(groupedEmps);
   const totalEmployees = deptKeys.reduce((sum, dept) => sum + (groupedEmps[dept]?.length || 0), 0);
   const dayLabels = useMemo(() => Object.fromEntries(cycleDates.map(d => [d.key, `${d.dayKey} ${d.shortDisplay || d.display}`])), [cycleDates]);
@@ -14,7 +15,20 @@ const TimesheetTable = memo(({ groupedEmps, cycleDates, activeDays, getDayValue,
 
   return <div className="flex min-h-0 flex-1 flex-col bg-white">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-xs text-slate-500 print:hidden">
-      <span>{totalEmployees} nhân viên · Đơn vị: giờ</span>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span>{totalEmployees} nhân viên · Đơn vị: giờ</span>
+        {payrollCycle && onPrevMonth && onNextMonth && (
+          <div className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50/70 px-1 py-0.5 text-blue-700 font-bold">
+            <button type="button" onClick={onPrevMonth} title="Xem kỳ tháng trước" className="p-0.5 hover:bg-blue-100 rounded cursor-pointer">
+              <ChevronLeft size={13} />
+            </button>
+            <span className="px-1.5 text-[11px]">Kỳ T{payrollCycle.month}/{payrollCycle.year}</span>
+            <button type="button" onClick={onNextMonth} title="Xem kỳ tháng sau" className="p-0.5 hover:bg-blue-100 rounded cursor-pointer">
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
+      </div>
       <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-blue-200" />Nền xanh: đã nhập thực tế · Ô còn lại: theo lịch</span>
       <span>Kéo ngang để xem các ngày →</span>
     </div>

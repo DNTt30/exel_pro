@@ -321,9 +321,9 @@ export default function EmployeeSchedule() {
         onClose={() => setShowRecipeModal(false)}
       />
 
-      {/* Top Toolbar */}
-      <div className="shrink-0 print:hidden">
-        <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+      {/* Top Toolbar (Ghim cố định khi cuộn) */}
+      <div className="shrink-0 sticky top-0 z-30 print:hidden">
+        <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
 
           {/* Left: View Switcher & Shift Swap Action */}
           <div className="flex items-center gap-2 max-w-full flex-wrap">
@@ -807,6 +807,46 @@ export default function EmployeeSchedule() {
             )}
           </div>
 
+          {/* Thanh chọn Tuần ngay trên danh sách 7 ngày */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-2xl border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+            <div className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+              <CalendarIcon size={15} className="text-blue-600" />
+              <span>Chi tiết 7 ngày trong tuần</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  const parts = currentWeek.split('-').map(Number);
+                  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                  d.setDate(d.getDate() - 7);
+                  const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  setCurrentWeek(wKey);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                title="Xem tuần trước"
+              >
+                <ChevronLeft size={13} />
+                <span>Tuần trước</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const parts = currentWeek.split('-').map(Number);
+                  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                  d.setDate(d.getDate() + 7);
+                  const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  setCurrentWeek(wKey);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                title="Xem tuần sau"
+              >
+                <span>Tuần sau</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+
           {/* 7 Daily Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {weekDaysCardData.map((card) => {
@@ -996,6 +1036,39 @@ export default function EmployeeSchedule() {
                   </div>
                 </div>);
             })}
+          </div>
+
+          {/* Thanh chuyển Tuần ở cuối danh sách 7 ngày (tiện bấm bằng 1 tay trên điện thoại không cần cuộn lên đầu) */}
+          <div className="flex items-center justify-between gap-2 bg-white rounded-2xl border border-slate-200 p-3 shadow-xs">
+            <button
+              type="button"
+              onClick={() => {
+                const parts = currentWeek.split('-').map(Number);
+                const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                d.setDate(d.getDate() - 7);
+                const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                setCurrentWeek(wKey);
+              }}
+              className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <ChevronLeft size={14} />
+              <span>Tuần trước</span>
+            </button>
+            <span className="text-xs font-mono font-bold text-slate-500 hidden sm:inline">Tuần {currentWeek}</span>
+            <button
+              type="button"
+              onClick={() => {
+                const parts = currentWeek.split('-').map(Number);
+                const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                d.setDate(d.getDate() + 7);
+                const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                setCurrentWeek(wKey);
+              }}
+              className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <span>Tuần sau</span>
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       )}

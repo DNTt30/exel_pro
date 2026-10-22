@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Search, Lock, Unlock, Crown, KeyRound, ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, Copy, Check } from 'lucide-react';
@@ -344,7 +344,8 @@ export default function Employees() {
           <button 
             onClick={() => { 
               setIsAdding(true); 
-              setFormData({ id: '', name: '', dept: homeDept, role: 'STFT', type: 'STFT', maxH: 48 }); 
+              setFormData({ id: '', name: '', dept: homeDept, role: 'STFT', type: 'STFT', maxH: 48 });
+              setTimeout(() => document.getElementById('employee-add-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 40);
             }}
             className="btn btn-primary text-xs py-2 px-3 rounded-lg shadow-2xs font-bold whitespace-nowrap cursor-pointer"
           >
@@ -369,7 +370,7 @@ export default function Employees() {
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {canEditEmps && isAdding && (
-              <tr className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
+              <tr id="employee-add-row" className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
                 <td className="p-2.5">
                   <input 
                     type="text" 

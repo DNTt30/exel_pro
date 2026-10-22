@@ -632,46 +632,94 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── 3-TAB SEGMENTED NAVIGATION BAR (Sạch sẽ, Tối giản, Trực quan) ── */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/75 backdrop-blur-sm rounded-2xl w-full sm:w-fit border border-slate-300/60 shadow-2xs">
-        <button
-          type="button"
-          onClick={() => handleTabChange('overview')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            dashboardTab === 'overview'
-              ? 'bg-white text-blue-700 shadow-sm shadow-slate-200 font-extrabold'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
-          }`}
-        >
-          <Zap size={14} className={dashboardTab === 'overview' ? 'text-blue-600' : 'text-slate-400'} />
-          <span>Tổng Quan Vận Hành</span>
-        </button>
+      {/* ── 3-TAB SEGMENTED NAVIGATION BAR + STICKY PERIOD CONTROLS ── */}
+      <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-2 p-1.5 bg-white/95 backdrop-blur-md rounded-2xl w-full border border-slate-200/90 shadow-sm">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
+          <button
+            type="button"
+            onClick={() => handleTabChange('overview')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              dashboardTab === 'overview'
+                ? 'bg-white text-blue-700 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+            }`}
+          >
+            <Zap size={14} className={dashboardTab === 'overview' ? 'text-blue-600' : 'text-slate-400'} />
+            <span>Tổng Quan Vận Hành</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => handleTabChange('ai')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative ${
-            dashboardTab === 'ai'
-              ? 'bg-white text-purple-700 shadow-sm shadow-slate-200 font-extrabold'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
-          }`}
-        >
-          <Bot size={14} className={dashboardTab === 'ai' ? 'text-purple-600' : 'text-slate-400'} />
-          <span>Quản Trị Trợ Lý AI</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('ai')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative whitespace-nowrap ${
+              dashboardTab === 'ai'
+                ? 'bg-white text-purple-700 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+            }`}
+          >
+            <Bot size={14} className={dashboardTab === 'ai' ? 'text-purple-600' : 'text-slate-400'} />
+            <span>Quản Trị Trợ Lý AI</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => handleTabChange('analytics')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            dashboardTab === 'analytics'
-              ? 'bg-white text-indigo-700 shadow-sm shadow-slate-200 font-extrabold'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
-          }`}
-        >
-          <BarChart3 size={14} className={dashboardTab === 'analytics' ? 'text-indigo-600' : 'text-slate-400'} />
-          <span>Báo Cáo & Dữ Liệu Chi Tiết</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('analytics')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              dashboardTab === 'analytics'
+                ? 'bg-white text-indigo-700 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+            }`}
+          >
+            <BarChart3 size={14} className={dashboardTab === 'analytics' ? 'text-indigo-600' : 'text-slate-400'} />
+            <span>Báo Cáo & Dữ Liệu Chi Tiết</span>
+          </button>
+        </div>
+
+        {/* Bộ chuyển nhanh Tháng / Tuần luôn đi theo khi cuộn trang */}
+        <div className="flex items-center gap-1.5 ml-auto pr-1">
+          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('month')}
+              className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                viewMode === 'month' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tháng
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('week')}
+              className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                viewMode === 'week' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tuần
+            </button>
+          </div>
+
+          <div className="flex items-center bg-blue-50/80 border border-blue-200 rounded-xl p-0.5">
+            <button
+              type="button"
+              onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
+              className="p-1 hover:bg-white rounded-lg text-blue-700 transition-colors cursor-pointer"
+              title={viewMode === 'month' ? 'Tháng trước' : 'Tuần trước'}
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="px-2 text-[11px] font-extrabold text-blue-800 whitespace-nowrap">
+              {viewMode === 'month' ? `T${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}` : `Tuần ${currentWeek.slice(8, 10)}/${currentWeek.slice(5, 7)}`}
+            </span>
+            <button
+              type="button"
+              onClick={viewMode === 'month' ? handleNextMonth : handleNextWeek}
+              className="p-1 hover:bg-white rounded-lg text-blue-700 transition-colors cursor-pointer"
+              title={viewMode === 'month' ? 'Tháng sau' : 'Tuần sau'}
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── TAB 1: TỔNG QUAN VẬN HÀNH ── */}
@@ -777,6 +825,31 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Inline Period Navigator right on the PT Table Header */}
+            <div className="flex items-center bg-white border border-blue-200 rounded-xl p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
+                className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
+                title={viewMode === 'month' ? 'Tháng trước' : 'Tuần trước'}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="px-2 text-xs font-bold text-blue-700 whitespace-nowrap">
+                {viewMode === 'month'
+                  ? `Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}`
+                  : `Tuần ${currentWeek.slice(8, 10)}/${currentWeek.slice(5, 7)}`}
+              </span>
+              <button
+                type="button"
+                onClick={viewMode === 'month' ? handleNextMonth : handleNextWeek}
+                className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
+                title={viewMode === 'month' ? 'Tháng sau' : 'Tuần sau'}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />

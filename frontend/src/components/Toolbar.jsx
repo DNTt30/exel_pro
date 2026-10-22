@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Filter, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Search, Filter, Calendar, ChevronLeft, ChevronRight, X, RotateCcw } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { listNearbyWeeks } from '../data/constants';
 import { visibleDeptIds } from '../utils/dataScope';
@@ -20,9 +20,11 @@ export default function Toolbar({
   // Chỉ liệt kê các phòng ban mà user có quyền truy cập
   const depts = [...allowedDepts].filter(Boolean).sort();
   const roles = [...new Set(employees.filter(e => !e.dept || allowedDepts.has(e.dept)).map(e => e.role || e.type))].sort();
+  const nearbyWeeks = React.useMemo(() => listNearbyWeeks(), []);
+  const thisWeekKey = nearbyWeeks.find(w => w.offset === 0)?.key;
 
   return (
-    <div className="bg-white px-3 md:px-4 py-2 border-b border-slate-200 flex flex-wrap gap-2 md:gap-3 items-center justify-between shadow-2xs">
+    <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-3 md:px-4 py-2 border-b border-slate-200 flex flex-wrap gap-2 md:gap-3 items-center justify-between shadow-xs">
       <div className="flex flex-wrap gap-2 md:gap-3 items-center">
         {/* Search Box with Clear Button */}
         {setSearch && (
@@ -177,6 +179,18 @@ export default function Toolbar({
                 Chọn tuần qua lịch
               </div>
             </div>
+
+            {thisWeekKey && currentWeek !== thisWeekKey && (
+              <button
+                type="button"
+                onClick={() => setCurrentWeek(thisWeekKey)}
+                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold transition-colors cursor-pointer"
+                title="Quay nhanh về tuần hiện tại"
+              >
+                <RotateCcw size={11} />
+                <span className="hidden sm:inline">Tuần này</span>
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -181,6 +181,9 @@ export default function ShelfDateBoard() {
     setSelectedId(shelf.id);
     const existing = (shelfItems || []).filter(i => i.shelfId === shelf.id);
     setRows(existing.length ? existing.map(toShelfItemRow) : [emptyShelfItemRow()]);
+    setTimeout(() => {
+      document.getElementById('shelf-editor-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
   };
 
   const openDetail = (shelf) => {
@@ -197,7 +200,9 @@ export default function ShelfDateBoard() {
       dueDate: shelf.dueDate || '',
       notifyDays: shelf.notifyDays || DEFAULT_NOTIFY_DAYS
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      document.getElementById('shelf-assign-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
   };
 
   const selected = filteredShelves.find(s => s.id === selectedId) || storeShelves.find(s => s.id === selectedId) || null;
@@ -265,7 +270,7 @@ export default function ShelfDateBoard() {
       </div>
 
       {isManager && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div id="shelf-assign-form" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
           <div className="text-sm font-black text-slate-800 mb-3">{form.id ? `Sửa nhiệm vụ kệ: ${form.name}` : `Giao nhiệm vụ tại ${storeLabel}`}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <Field label="1. Nhân viên (chọn nhiều)">
@@ -402,15 +407,32 @@ export default function ShelfDateBoard() {
       </div>
 
       {selected && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div>
-              <div className="font-black text-slate-800">Bảng date · {selected.name || selected.code}</div>
-              <div className="text-xs text-slate-500">NV {empName(selected.assigneeId)} · hạn nộp {selected.dueDate || '—'}</div>
+        <div id="shelf-editor-panel" className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md pb-3 mb-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <div className="font-black text-slate-800">Bảng date · {selected.name || selected.code}</div>
+                <div className="text-xs text-slate-500">NV {empName(selected.assigneeId)} · hạn nộp {selected.dueDate || '—'}</div>
+              </div>
+              {filteredShelves.length > 1 && (
+                <select
+                  aria-label="Đổi nhanh kệ đang nhập"
+                  value={selected.id}
+                  onChange={(e) => {
+                    const nextShelf = filteredShelves.find(s => s.id === e.target.value) || storeShelves.find(s => s.id === e.target.value);
+                    if (nextShelf) openShelf(nextShelf);
+                  }}
+                  className="border border-blue-200 bg-blue-50/80 text-blue-700 rounded-xl px-2.5 py-1.5 text-xs font-bold outline-none cursor-pointer"
+                >
+                  {filteredShelves.map(s => (
+                    <option key={s.id} value={s.id}>Đổi kệ: {s.name || s.code}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setRows([...rows, emptyShelfItemRow()])} className="px-3 py-2 border rounded-xl text-sm font-bold">+ Dòng</button>
-              <button type="button" disabled={saving} onClick={handleSaveRows} className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold disabled:opacity-50">
+              <button type="button" onClick={() => setRows([...rows, emptyShelfItemRow()])} className="px-3 py-2 border rounded-xl text-sm font-bold hover:bg-slate-50 cursor-pointer">+ Dòng</button>
+              <button type="button" disabled={saving} onClick={handleSaveRows} className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 cursor-pointer">
                 <Save size={15} /> {saving ? 'Đang lưu' : 'Lưu bảng'}
               </button>
             </div>

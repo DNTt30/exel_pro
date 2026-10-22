@@ -4,12 +4,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 
-import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek, getStaffingMatrix } from '../../data/constants';
+import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek, getStaffingMatrix, listNearbyWeeks } from '../../data/constants';
 import {
   Download, Printer, Copy, Upload, Sparkles, Bot, Users, Clock,
   UserPlus, ArrowRightLeft, RefreshCw, ShieldAlert, ShieldCheck,
   AlertTriangle, ZoomIn, ZoomOut, Maximize2, AlertCircle,
-  CheckCircle2, FileText
+  CheckCircle2, FileText, ChevronLeft, ChevronRight, ChevronUp, ChevronDown
 } from 'lucide-react';
 import Toolbar from '../../components/Toolbar';
 import ConfirmModal from '../../components/modals/ConfirmModal';
@@ -47,7 +47,7 @@ import { toast } from '../../components/ui/toastStore';
 const EMPTY_SCHED = {};
 
 export default function Schedule() {
-  const { employees, stores, schedule, updateShift, currentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks, syncStatus } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks, syncStatus: s.syncStatus })));
+  const { employees, stores, schedule, updateShift, currentWeek, setCurrentWeek, user, shiftSwaps, ensureWeeksLoaded, scheduleWeeks, syncStatus } = useStore(useShallow((s) => ({ employees: s.employees, stores: s.stores, schedule: s.schedule, updateShift: s.updateShift, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, user: s.user, shiftSwaps: s.shiftSwaps, ensureWeeksLoaded: s.ensureWeeksLoaded, scheduleWeeks: s.scheduleWeeks, syncStatus: s.syncStatus })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,6 +63,7 @@ export default function Schedule() {
   const weekLocked = isWeekLocked((scheduleWeeks || {})[weekRecordKey(flowStore === 'ALL' ? '' : flowStore, currentWeek)]?.status);
   const canEditGrid = isManager && !weekLocked;
   const [filterRole, setFilterRole] = useState('ALL');
+  const [compactTopPanels, setCompactTopPanels] = useState(false);
 
   const [showAddEmp, setShowAddEmp] = useState(false);
   const [showAddStore, setShowAddStore] = useState(false);
@@ -76,6 +77,36 @@ export default function Schedule() {
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [copyPlan, setCopyPlan] = useState(null);
+
+  const handlePrevWeek = useCallback(() => {
+    const parts = currentWeek.split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() - 7);
+    const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setCurrentWeek(wKey);
+  }, [currentWeek, setCurrentWeek]);
+
+  const handleNextWeek = useCallback(() => {
+    const parts = currentWeek.split('-').map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() + 7);
+    const wKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setCurrentWeek(wKey);
+  }, [currentWeek, setCurrentWeek]);
+
+  const weekOptions = useMemo(() => {
+    const list = listNearbyWeeks();
+    if (!list.some(item => item.key === currentWeek)) {
+      const parts = currentWeek.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        d.setHours(0, 0, 0, 0);
+        list.push({ key: currentWeek, offset: null, startDate: d, endDate: new Date(d.getTime() + 6 * 86400000), tag: 'Tuần đã chọn' });
+        list.sort((a, b) => a.startDate - b.startDate);
+      }
+    }
+    return list;
+  }, [currentWeek]);
 
   // Quản lý phóng to / thu nhỏ bảng lịch (Table Zoom & Fit to Screen)
   const [tableZoom, setTableZoom] = useState(() => {
@@ -282,8 +313,6 @@ export default function Schedule() {
         });
       }
 
-
-
       toast.success(`✅ Đã sao chép lịch làm việc của ${copiedCount} nhân sự sang tuần này (${curRange})!`);
     } catch (err) {
       console.error('Lỗi sao chép lịch:', err);
@@ -368,8 +397,12 @@ export default function Schedule() {
     return { totalEmps, totalHours, totalFT, totalPT, ptOver91Count };
   }, [groupedEmps, weekSchedule, activeDays, viewMode, cycleDates, schedule]);
 
+  const scrollToGrid = useCallback(() => {
+    document.getElementById('schedule-grid-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
   return (
-    <div className="space-y-4 w-full max-w-full overflow-x-clip">
+    <div className="space-y-3 w-full max-w-full">
       {/* 1. Modal Components */}
       <Suspense fallback={null}>
         <AddEmployeeModal isOpen={showAddEmp} onClose={() => setShowAddEmp(false)} />
@@ -413,8 +446,8 @@ export default function Schedule() {
         storeId={filterDept}
       />
 
-      {/* 2. Top Toolbar */}
-      <div className="print:hidden">
+      {/* 2. Sticky Top Toolbar — luôn ghim trên cùng khi cuộn xuống bảng lịch */}
+      <div className="sticky top-0 z-30 print:hidden">
         <Toolbar
           search={search}
           setSearch={setSearch}
@@ -429,22 +462,43 @@ export default function Schedule() {
           onOpenPTOvertime={() => setShowPTOvertime(true)}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          rightActions={
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCompactTopPanels(v => !v)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                title={compactTopPanels ? 'Hiện lại các bảng phân tích phía trên' : 'Thu gọn các bảng phân tích để đưa Bảng lịch lên cao'}
+              >
+                {compactTopPanels ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                <span className="hidden sm:inline">{compactTopPanels ? 'Hiện phân tích' : 'Thu gọn trên'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={scrollToGrid}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                title="Cuộn thẳng tới Bảng xếp lịch"
+              >
+                <span>Bảng lịch ↓</span>
+              </button>
+            </div>
+          }
         />
       </div>
 
-      <div className="print:hidden px-2 pt-2">
+      <div className="print:hidden px-2 pt-1 space-y-2">
         <WeekFlowBar storeId={flowStore} weekDate={currentWeek} />
         <StoreHoursBudget stores={stores.filter(s => allowedFlow.has(s.id) && (flowStore === 'ALL' || s.id === flowStore))} employees={employees} schedule={weekSchedule} week={currentWeek} />
         <ConflictPanel findings={conflictFindings} />
       </div>
 
       {/* 3. Balanced KPI Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 print:hidden">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 print:hidden px-2">
         {/* Card 1: Tổng nhân sự */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 hover:border-blue-200 transition-all">
+        <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 hover:border-blue-200 transition-all">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-              <Users size={18} className="text-blue-600" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+              <Users size={17} className="text-blue-600" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold text-slate-500 truncate">Nhân sự ca trực</div>
@@ -457,10 +511,10 @@ export default function Schedule() {
         </div>
 
         {/* Card 2: Tổng giờ */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 hover:border-emerald-200 transition-all">
+        <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 hover:border-emerald-200 transition-all">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-              <Clock size={18} className="text-emerald-600" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
+              <Clock size={17} className="text-emerald-600" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold text-slate-500 truncate">Tổng giờ phân ca</div>
@@ -475,7 +529,7 @@ export default function Schedule() {
         {/* Card 3: Part-Time Vượt Giờ */}
         <div
           onClick={() => setShowPTOvertime(true)}
-          className={`bg-white p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
+          className={`bg-white p-2.5 sm:p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
             summaryMetrics.ptOver91Count > 0
               ? 'border-rose-200 hover:border-rose-300 hover:bg-rose-50/40'
               : 'border-slate-200/80 hover:border-slate-300'
@@ -483,13 +537,13 @@ export default function Schedule() {
           title="Click để xem chi tiết danh sách Part-time"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
               summaryMetrics.ptOver91Count > 0 ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'
             }`}>
               {summaryMetrics.ptOver91Count > 0 ? (
-                <AlertCircle size={18} className="text-rose-600 animate-pulse" />
+                <AlertCircle size={17} className="text-rose-600 animate-pulse" />
               ) : (
-                <CheckCircle2 size={18} className="text-emerald-600" />
+                <CheckCircle2 size={17} className="text-emerald-600" />
               )}
             </div>
             <div className="min-w-0">
@@ -512,7 +566,7 @@ export default function Schedule() {
         {/* Card 4: Radar Ca Trực & An Ninh */}
         <div
           onClick={() => setShowRadarModal(true)}
-          className={`bg-white p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
+          className={`bg-white p-2.5 sm:p-3 rounded-2xl border shadow-2xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
             radarResults.hasCritical
               ? 'border-rose-200 hover:border-rose-300 hover:bg-rose-50/40'
               : radarResults.warningCount > 0
@@ -522,7 +576,7 @@ export default function Schedule() {
           title="Bấm để xem Radar kiểm tra an ninh & định biên ca trực"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
               radarResults.hasCritical
                 ? 'bg-rose-50 border border-rose-100'
                 : radarResults.warningCount > 0
@@ -530,11 +584,11 @@ export default function Schedule() {
                   : 'bg-emerald-50 border border-emerald-100'
             }`}>
               {radarResults.hasCritical ? (
-                <ShieldAlert size={18} className="text-rose-600 animate-pulse" />
+                <ShieldAlert size={17} className="text-rose-600 animate-pulse" />
               ) : radarResults.warningCount > 0 ? (
-                <AlertTriangle size={18} className="text-amber-600" />
+                <AlertTriangle size={17} className="text-amber-600" />
               ) : (
-                <ShieldCheck size={18} className="text-emerald-600" />
+                <ShieldCheck size={17} className="text-emerald-600" />
               )}
             </div>
             <div className="min-w-0">
@@ -555,11 +609,11 @@ export default function Schedule() {
       </div>
 
       {/* 3.1 Symmetrical Action Center */}
-      <div className="bg-white/95 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs print:hidden space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+      <div className="bg-white/95 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-xs print:hidden mx-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-stretch">
 
           {/* Group 1: Nhân sự & Điều động */}
-          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-2">
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Users size={13} className="text-blue-600" />
@@ -567,11 +621,11 @@ export default function Schedule() {
               </span>
               <span className="text-[10px] font-semibold text-slate-400">3 thao tác</span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => setShowAddEmp(true)}
-                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Thêm nhân viên mới"
               >
                 <UserPlus size={14} className="text-blue-600 flex-shrink-0" />
@@ -580,7 +634,7 @@ export default function Schedule() {
               <button
                 type="button"
                 onClick={() => setShowTransfer(true)}
-                className="flex items-center justify-center gap-1.5 px-2 py-2 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-700 border border-slate-200/80 hover:border-orange-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-orange-700 border border-slate-200/80 hover:border-orange-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Điều chuyển / Mượn nhân sự giữa các cửa hàng"
               >
                 <ArrowRightLeft size={14} className="text-orange-600 flex-shrink-0" />
@@ -589,7 +643,7 @@ export default function Schedule() {
               <button
                 type="button"
                 onClick={() => setShowDeadlineModal(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 hover:border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 hover:border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Thiết lập hạn nộp lịch tuần cho nhân viên"
               >
                 <Clock size={14} className="text-indigo-600 flex-shrink-0" />
@@ -599,7 +653,7 @@ export default function Schedule() {
           </div>
 
           {/* Group 2: Xếp lịch & xử lý ca */}
-          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-2">
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={13} className="text-indigo-600" />
@@ -607,7 +661,7 @@ export default function Schedule() {
               </span>
               <span className="text-[10px] font-semibold text-slate-400">4 tính năng</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               <Button
                 type="button"
                 variant="primary" onClick={() => setShowAIScheduler(true)}
@@ -655,7 +709,7 @@ export default function Schedule() {
           </div>
 
           {/* Group 3: Dữ liệu & Xuất bản */}
-          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-2">
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Download size={13} className="text-emerald-600" />
@@ -663,11 +717,11 @@ export default function Schedule() {
               </span>
               <span className="text-[10px] font-semibold text-slate-400">Nhập / Xuất / In</span>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-1.5">
               <button
                 type="button"
                 onClick={() => setShowImportSchedule(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-amber-800 hover:bg-amber-50 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white text-amber-800 hover:bg-amber-50 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Nhập lịch từ file Excel"
               >
                 <Upload size={14} className="text-amber-600 flex-shrink-0" />
@@ -676,7 +730,7 @@ export default function Schedule() {
               <button
                 type="button"
                 onClick={handleExportExcel}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
                 title="Xuất file Excel chuẩn"
               >
                 <Download size={13} className="flex-shrink-0" />
@@ -685,7 +739,7 @@ export default function Schedule() {
               <button
                 type="button"
                 onClick={() => exportScheduleToPDF(currentWeek, allVisibleEmployees, schedule[currentWeek] || {}, filterDept)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="Xuất file PDF để in"
               >
                 <FileText size={13} className="flex-shrink-0" />
@@ -694,7 +748,7 @@ export default function Schedule() {
               <button
                 type="button"
                 onClick={handlePrint}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 title="In bảng lịch (Print)"
               >
                 <Printer size={14} className="text-slate-600 flex-shrink-0" />
@@ -706,62 +760,68 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* 3.5 Staffing Gap Analysis Widget */}
-      <ScheduleQualityPanel employees={employees} week={currentWeek} storeId={filterDept} />
-      {isManager && <ShiftAnalyticsBoard employees={employees} stores={stores} user={user} storeId={filterDept} currentWeek={currentWeek} />}
-      <StaffingGapTable
-        employees={employees}
-        weekSchedule={weekSchedule}
-        filterDept={filterDept}
-      />
-
-      <div className="bg-blue-50/60 p-3 sm:px-5 sm:py-3 border-y border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900 print:hidden">
-        <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY TẮC & TRẠNG THÁI XẾP LỊCH:</div>
-        <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
-          <li><strong>Nhận diện màu ca trực trực quan:</strong> Ca sáng (Xanh lá), Ca chiều (Xanh biển), Ca đêm (Đỏ), Ca HC (Tím), Ca 4h (Xanh nhạt), OFF (Xám).</li>
-          <li><strong>Gợi ý xếp lịch:</strong> Chỉ chọn đúng ca nhân viên đã đăng ký, giữ ca đã chốt và ngày OFF. Báo thiếu/dư người theo ngày; nghỉ giữa ca ít nhất 12 giờ, tối đa 3 đêm liên tiếp.</li>
-        </ul>
-      </div>
+      {/* 3.5 Staffing Gap Analysis Widget (Có thể thu gọn 1 chạm để đẩy Bảng lịch lên cao) */}
+      {!compactTopPanels && (
+        <div className="space-y-2.5 px-2 print:hidden">
+          <ScheduleQualityPanel employees={employees} week={currentWeek} storeId={filterDept} />
+          {isManager && <ShiftAnalyticsBoard employees={employees} stores={stores} user={user} storeId={filterDept} currentWeek={currentWeek} />}
+          <StaffingGapTable
+            employees={employees}
+            weekSchedule={weekSchedule}
+            filterDept={filterDept}
+          />
+          <details className="bg-blue-50/60 px-3.5 py-2 rounded-xl border border-blue-100 text-[11px] text-blue-900">
+            <summary className="font-bold flex items-center gap-1.5 cursor-pointer select-none">
+              <Sparkles size={13} className="text-blue-600" />
+              <span>QUY TẮC & TRẠNG THÁI XẾP LỊCH (Bấm để xem)</span>
+            </summary>
+            <ul className="list-disc list-inside space-y-1 ml-1 mt-1.5 opacity-90 text-[10.5px]">
+              <li><strong>Nhận diện màu ca trực trực quan:</strong> Ca sáng (Xanh lá), Ca chiều (Xanh biển), Ca đêm (Đỏ), Ca HC (Tím), Ca 4h (Xanh nhạt), OFF (Xám).</li>
+              <li><strong>Gợi ý xếp lịch:</strong> Chỉ chọn đúng ca nhân viên đã đăng ký, giữ ca đã chốt và ngày OFF. Báo thiếu/dư người theo ngày; nghỉ giữa ca ít nhất 12 giờ, tối đa 3 đêm liên tiếp.</li>
+            </ul>
+          </details>
+        </div>
+      )}
 
       {/* 4. Main Schedule Grid Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none">
+      <div id="schedule-grid-section" className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-none print:shadow-none mx-2">
 
-        {/* Shift Color Legend & Table Controls Bar */}
-        <div className="bg-slate-50/95 px-3 sm:px-4 py-2.5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 text-xs print:hidden">
+        {/* Shift Color Legend & Inline Week Navigator + Table Controls Bar */}
+        <div className="bg-slate-50/95 px-3 sm:px-4 py-2.5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 text-xs print:hidden">
 
           {/* Shift Color Legend Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-0.5 flex-nowrap sm:flex-wrap">
             <span className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider mr-1 flex-shrink-0">
               🎨 Bảng màu:
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#22c55e] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#14532d] bg-[#bbf7d0] shadow-2xs flex-shrink-0">
               6-14 (Sáng)
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#3b82f6] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#1e3a8a] bg-[#bfdbfe] shadow-2xs flex-shrink-0">
               14-22 (Chiều)
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#ef4444] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#312e81] bg-[#c7d2fe] shadow-2xs flex-shrink-0">
               22-6 (Đêm)
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#8b5cf6] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#4c1d95] bg-[#ddd6fe] shadow-2xs flex-shrink-0">
               8-17 (HC)
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#1e3a8a] bg-[#93c5fd] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#134e4a] bg-[#99f6e4] shadow-2xs flex-shrink-0">
               Ca 4h
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-slate-600 bg-slate-200 border border-slate-300 flex-shrink-0">
               OFF
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white bg-[#eab308] shadow-2xs flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-[#78350f] bg-[#fde68a] shadow-2xs flex-shrink-0">
               Chi viện
             </span>
           </div>
 
-          {/* Table Zoom Controls & View Mode Toggle */}
+          {/* Inline Week Switcher + View Mode Toggle + Table Zoom Controls */}
           <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
 
             {/* Sync Status Indicator */}
-            <div className="flex items-center gap-1 text-[11px] font-bold mr-2">
+            <div className="flex items-center gap-1 text-[11px] font-bold">
               {syncStatus === 'saving' && (
                 <span className="text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                   <RefreshCw size={12} className="animate-spin" /> Đang lưu...
@@ -777,6 +837,44 @@ export default function Schedule() {
                   <AlertCircle size={12} /> Lưu thất bại
                 </span>
               )}
+            </div>
+
+            {/* Điều hướng Tuần ngay trên đầu Bảng lịch — không cần cuộn lên trên */}
+            <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-blue-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
+                title="Xem tuần trước"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <select
+                aria-label="Chọn nhanh tuần ngay tại bảng lịch"
+                value={currentWeek}
+                onChange={e => setCurrentWeek(e.target.value)}
+                className="bg-transparent text-blue-700 font-bold text-xs px-1.5 py-1 outline-none cursor-pointer"
+              >
+                {weekOptions.map(item => {
+                  const wStart = item.startDate;
+                  const wEnd = item.endDate || new Date(wStart.getTime() + 6 * 86400000);
+                  const startStr = `${wStart.getDate().toString().padStart(2, '0')}/${(wStart.getMonth() + 1).toString().padStart(2, '0')}`;
+                  const endStr = `${wEnd.getDate().toString().padStart(2, '0')}/${(wEnd.getMonth() + 1).toString().padStart(2, '0')}`;
+                  return (
+                    <option key={item.key} value={item.key}>
+                      {item.tag} ({startStr} → {endStr})
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-700 transition-colors cursor-pointer"
+                title="Xem tuần sau"
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
 
             {/* View Mode: Tuần vs Tháng */}
@@ -967,8 +1065,6 @@ export default function Schedule() {
                           ? Object.fromEntries(cycleDates.map(d => [d.key, schedule[d.weekKey]?.[emp.id]?.[d.dayKey] || '']))
                           : (weekSchedule[emp.id] || {});
 
-                        // Nếu là view tháng thì ta kiểm tra status của tuần đầu tiên chứa ngày đang render hoặc cứ mặc định nếu không rõ.
-                        // Để đơn giản, nếu view tuần thì lấy currentWeekStatus, view tháng thì check mỗi tuần
                         let isDraftRow = false;
                         if (viewMode === 'week') {
                           const wKey = weekRecordKey(flowStore === 'ALL' ? '' : flowStore, currentWeek);

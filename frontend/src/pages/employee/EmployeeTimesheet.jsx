@@ -80,7 +80,7 @@ export default function EmployeeTimesheet() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block overflow-x-hidden">
+    <div className="flex flex-col min-h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block">
       {/* Modal Phiếu Chấm Công Cá Nhân */}
       <PersonalTimesheetModal
         isOpen={showPersonalSlip}
@@ -92,9 +92,9 @@ export default function EmployeeTimesheet() {
         weekSchedule={weekSchedule}
       />
       
-      {/* Top Toolbar */}
-      <div className="print:hidden">
-        <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+      {/* Top Toolbar (Ghim cố định khi cuộn) */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md shadow-xs print:hidden">
+        <div className="border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
           
           {/* Left: Search & Filters */}
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -285,6 +285,9 @@ export default function EmployeeTimesheet() {
         cycleDates={cycleDates}
         activeDays={activeDays}
         getDayValue={getDayValue}
+        payrollCycle={payrollCycle}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
       />
     </div>
   );

@@ -232,8 +232,12 @@ export default function Stores() {
         </div>
         {pickStore && (
           <button 
-            onClick={() => { setIsAdding(true); setFormData(emptyStoreForm()); }}
-            className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap"
+            onClick={() => {
+              setIsAdding(true);
+              setFormData(emptyStoreForm());
+              setTimeout(() => document.getElementById('store-add-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 40);
+            }}
+            className="btn btn-primary text-xs py-2 px-3.5 rounded-lg shadow-2xs font-bold whitespace-nowrap cursor-pointer"
           >
             <Plus size={15} /> Thêm cửa hàng
           </button>
@@ -253,7 +257,7 @@ export default function Stores() {
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
             {isAdding && (
-              <tr className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
+              <tr id="store-add-row" className="bg-blue-50/70 border-b border-blue-100 animate-in fade-in duration-150">
                 <td className="p-2.5"><input type="text" className="w-full p-1.5 border border-blue-300 rounded bg-white font-mono text-xs outline-none" placeholder="VD: VN0485" value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} /></td>
                 <td className="p-2.5"><input type="text" className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs font-semibold outline-none" placeholder="Tên hiển thị" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></td>
                 <td className="p-2.5">

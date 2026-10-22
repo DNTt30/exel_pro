@@ -82,28 +82,28 @@ export default function Timesheet() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-white print:block">
-      <div className="shrink-0 border-b border-slate-200 px-3 py-3 sm:px-4 print:hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">Bảng chấm công</h1>
-            <p className="text-xs text-slate-500">Kỳ công {cycleDates[0]?.display} – {cycleDates.at(-1)?.display}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center rounded-lg border border-slate-200">
-              <button type="button" onClick={handlePrevMonth} title="Tháng trước" aria-label="Tháng trước" className="p-3 text-slate-600 hover:bg-slate-50"><ChevronLeft size={16} /></button>
-              <span className="px-2 text-sm font-semibold text-slate-800">Tháng {payrollCycle.month}/{payrollCycle.year}</span>
-              <button type="button" onClick={handleNextMonth} title="Tháng sau" aria-label="Tháng sau" className="p-3 text-slate-600 hover:bg-slate-50"><ChevronRight size={16} /></button>
+      <div className="sticky top-0 z-30 shrink-0 bg-white/95 backdrop-blur-md print:hidden">
+        <div className="border-b border-slate-200 px-3 py-2.5 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-base sm:text-lg font-semibold text-slate-900">Bảng chấm công</h1>
+              <p className="text-xs text-slate-500">Kỳ công {cycleDates[0]?.display} – {cycleDates.at(-1)?.display}</p>
             </div>
-            <Button variant={editMode ? 'primary' : 'secondary'} onClick={() => setEditMode(value => !value)} aria-label="Sửa công thực tế" aria-pressed={editMode}>
-              {editMode ? <Check size={16} /> : <Pencil size={16} />}{editMode ? 'Xong' : 'Sửa công thực tế'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-white">
+                <button type="button" onClick={handlePrevMonth} title="Tháng trước" aria-label="Tháng trước" className="p-2.5 text-slate-600 hover:bg-slate-50 cursor-pointer"><ChevronLeft size={16} /></button>
+                <span className="px-2 text-sm font-semibold text-slate-800">Tháng {payrollCycle.month}/{payrollCycle.year}</span>
+                <button type="button" onClick={handleNextMonth} title="Tháng sau" aria-label="Tháng sau" className="p-2.5 text-slate-600 hover:bg-slate-50 cursor-pointer"><ChevronRight size={16} /></button>
+              </div>
+              <Button variant={editMode ? 'primary' : 'secondary'} onClick={() => setEditMode(value => !value)} aria-label="Sửa công thực tế" aria-pressed={editMode}>
+                {editMode ? <Check size={16} /> : <Pencil size={16} />}{editMode ? 'Xong' : 'Sửa công thực tế'}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="shrink-0 print:hidden">
         <Toolbar search={search} setSearch={setSearch} filterDept={filterDept} setFilterDept={setFilterDept}
           filterRole={filterRole} setFilterRole={setFilterRole} showWeekPicker={false} />
-        <details className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600 sm:px-4">
+        <details className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600 sm:px-4 bg-white">
           <summary className="w-fit cursor-pointer rounded py-1 font-medium">Nhập / xuất Excel và in</summary>
           <div className="flex flex-wrap gap-2 pb-1 pt-2">
             <Button onClick={() => setShowImportModal(true)}><Upload size={16} />Nhập công ezHR9</Button>
@@ -137,6 +137,9 @@ export default function Timesheet() {
         editMode={editMode}
         getActualValue={getActualValue}
         onActualChange={handleActualChange}
+        payrollCycle={payrollCycle}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
       />
 
       {showImportModal && (

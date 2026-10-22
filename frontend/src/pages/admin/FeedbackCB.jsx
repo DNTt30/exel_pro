@@ -273,9 +273,9 @@ export default function FeedbackCB() {
       </div>
 
       <div className="flex-1 overflow-auto bg-slate-100 p-2">
-        <div className="bg-white shadow border border-slate-300 inline-block min-w-full rounded-lg overflow-hidden">
+        <div className="bg-white shadow border border-slate-300 inline-block min-w-full rounded-lg">
           <table className="excel-table">
-            <thead>
+            <thead className="sticky top-0 z-20 bg-slate-200 shadow-2xs">
               <tr className="bg-slate-200 border-b border-slate-300 font-bold text-slate-700 text-xs">
                 <th className="w-12 text-center">STT</th>
                 <th className="w-24 text-center">Cửa hàng</th>

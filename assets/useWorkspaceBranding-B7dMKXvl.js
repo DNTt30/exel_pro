@@ -1,0 +1,1 @@
+import{T as e,t}from"./useStore-BZHMH5OZ.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

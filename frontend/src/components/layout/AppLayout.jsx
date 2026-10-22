@@ -203,9 +203,20 @@ export default function AppLayout() {
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           {/* Lịch Ca logo badge */}
-          <div title={branding.organizationName || branding.appName} style={{ backgroundColor: branding.primaryColor }} className="flex items-center gap-2 min-w-0 max-w-[140px] sm:max-w-[240px] text-white px-3 py-1.5 rounded-xl shadow-sm font-black text-xs sm:text-sm tracking-tight select-none border border-white/20">
-            {branding.logoDataUrl && <img src={branding.logoDataUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white object-contain" />}
-            <span className="truncate">{branding.appName}</span>
+          {/* Lịch Ca logo & nhận diện đơn vị */}
+          <div title={branding.organizationName || branding.appName} style={{ backgroundColor: branding.primaryColor }} className="flex items-center gap-2.5 min-w-0 max-w-[190px] sm:max-w-[290px] text-white pl-1.5 pr-3.5 py-1 rounded-2xl shadow-sm select-none border border-white/20">
+            {branding.logoDataUrl && (
+              <img src={branding.logoDataUrl} alt="" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-white p-0.5 object-contain shadow-xs ring-1 ring-black/5" />
+            )}
+            <div className="min-w-0 py-0.5">
+              <div className="font-black text-xs sm:text-sm tracking-tight truncate leading-tight">{branding.appName}</div>
+              {branding.organizationName && (
+                <div className="text-[10px] font-medium text-white/80 truncate leading-tight hidden sm:block">{branding.organizationName}</div>
+              )}
+            </div>
+
+
+
           </div>
           
           {/* Active store context pill */}

@@ -200,11 +200,11 @@ export default function Login() {
           </svg>
 
           <div className="relative z-10 flex items-center justify-between">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#140e26]/70 backdrop-blur-md border border-purple-200/15 text-amber-200 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-2xl bg-[#140e26]/75 backdrop-blur-md border border-purple-200/20 text-amber-200 text-xs font-bold shadow-sm">
               {branding.logoDataUrl ? (
-                <img src={branding.logoDataUrl} alt="" className="h-4 w-4 shrink-0 object-contain rounded" />
+                <img src={branding.logoDataUrl} alt="" className="h-8 w-8 shrink-0 object-contain rounded-xl bg-white p-0.5" />
               ) : (
-                <Sparkles size={12} className="text-amber-300" />
+                <Sparkles size={14} className="text-amber-300 ml-1" />
               )}
               <span className="truncate max-w-[180px]">{branding.appName}</span>
             </div>
@@ -361,13 +361,16 @@ export default function Login() {
           <div>
             {/* Tiêu đề & nhận diện đơn vị */}
             <div className="mb-6">
-              <div className="hidden lg:inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-purple-950/60 border border-purple-300/20 text-amber-200 text-xs font-semibold mb-4 max-w-full">
+              <div className="hidden lg:inline-flex items-center gap-2.5 pl-1.5 pr-3.5 py-1.5 rounded-2xl bg-purple-950/60 border border-purple-300/20 text-amber-200 text-xs font-bold mb-4 max-w-full shadow-xs">
                 {branding.logoDataUrl ? (
-                  <img src={branding.logoDataUrl} alt="" className="h-4 w-4 shrink-0 object-contain rounded" />
+                  <img src={branding.logoDataUrl} alt="" className="h-9 w-9 shrink-0 object-contain rounded-xl bg-white p-0.5 shadow-xs" />
                 ) : (
-                  <Sparkles size={13} className="shrink-0 text-amber-300" />
+                  <Sparkles size={14} className="shrink-0 text-amber-300 ml-1.5" />
                 )}
-                <span className="truncate max-w-[240px]" title={branding.appName}>{branding.appName}</span>
+                <div className="min-w-0">
+                  <div className="truncate max-w-[240px] text-white" title={branding.appName}>{branding.appName}</div>
+                  {branding.organizationName && <div className="truncate max-w-[240px] text-[10px] font-medium text-purple-200/75">{branding.organizationName}</div>}
+                </div>
               </div>
 
               <h2 className="text-2xl font-bold text-white tracking-tight">

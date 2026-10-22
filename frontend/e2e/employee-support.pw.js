@@ -20,6 +20,8 @@ test('nhân viên tự xác nhận hướng dẫn và theo dõi trọn vòng yê
   await page.reload(); await expect(page.getByTestId('help-requests').locator('tbody tr')).toHaveCount(1);
   await page.goto('/?preview=support-admin');
   await expect(page.getByRole('heading', { name: 'Theo dõi hướng dẫn & hỗ trợ' })).toBeVisible();
+  await expect(page.getByTestId('registration-readiness')).toContainText('2 người chưa có đăng ký');
+  await expect(page.getByTestId('registration-readiness')).toContainText('1 người còn đăng ký chờ xếp');
   await page.getByLabel('Người hướng dẫn của Nhân viên mẫu An', { exact: true }).selectOption('990000005');
   await page.getByRole('button', { name: 'Xem yêu cầu: Tôi tìm công thức đã duyệt ở đâu?' }).click();
   await page.getByRole('button', { name: 'Nhận xử lý', exact: true }).click();

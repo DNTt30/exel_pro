@@ -745,7 +745,7 @@ export default function Dashboard() {
             scrollToChart={scrollToChart}
           />
 
-          <MonthConfirmWidget employees={currentDeptEmployees} cycleKey={selectedMonthCycle} />
+          <MonthConfirmWidget storeId={filterDept} cycleKey={selectedMonthCycle} />
 
 
         </div>

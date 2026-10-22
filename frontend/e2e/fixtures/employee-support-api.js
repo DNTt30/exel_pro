@@ -44,4 +44,5 @@ export async function getEmployeeHelpEvents(id) { return read().events.filter(e 
 export async function getEmployeeAnswerFeedback() { return read().feedback; }
 export async function saveEmployeeAnswerFeedback() {}
 export async function getMonthConfirmations() { return []; }
+export async function getEmployeeRegistrationWeek() { return { '990000001': { T2: { shift: '6-14', registered: true } }, '990000002': { T2: '6-14' }, '990000003': { T2: 'off' } }; }
 export async function readAllPages() { return []; }

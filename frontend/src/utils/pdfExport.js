@@ -1,6 +1,18 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { DAY_FULL_NAMES } from '../data/constants';
+import { DAY_FULL_NAMES, WEEK_DAYS } from '../data/constants';
+import { normalizeShift } from './shiftHelper';
+
+function formatPdfShiftCell(emp, rawVal) {
+  if (!rawVal) return 'OFF';
+  const { shift, covering_store, confirmed } = normalizeShift(rawVal);
+  if (!shift || shift === 'off' || confirmed === false) return 'OFF';
+
+  if (emp?.isBorrowedTo) {
+    return covering_store === emp.isBorrowedTo ? shift : 'OFF';
+  }
+  return covering_store ? `${shift} ${covering_store}` : shift;
+}
 
 export const exportScheduleToPDF = (currentWeek, employees, scheduleMap, storeId) => {
   const doc = new jsPDF('landscape');
@@ -17,13 +29,7 @@ export const exportScheduleToPDF = (currentWeek, employees, scheduleMap, storeId
     return [
       emp.id,
       emp.name,
-      empSched['T2'] || 'OFF',
-      empSched['T3'] || 'OFF',
-      empSched['T4'] || 'OFF',
-      empSched['T5'] || 'OFF',
-      empSched['T6'] || 'OFF',
-      empSched['T7'] || 'OFF',
-      empSched['CN'] || 'OFF'
+      ...WEEK_DAYS.map(dayKey => formatPdfShiftCell(emp, empSched[dayKey]))
     ];
   });
 

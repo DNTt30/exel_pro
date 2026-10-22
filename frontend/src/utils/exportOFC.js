@@ -1,5 +1,15 @@
 // Xuất báo cáo Part-time dạng CSV (BOM UTF-8 để Excel mở tiếng Việt đúng).
 // Tách thuần khỏi Dashboard để kiểm thử unit.
+import * as XLSX from 'xlsx';
+import { normalizeShift } from './shiftHelper';
+
+/** Chuyen mot o ca (string hoac object {shift, covering_store}) thanh chuoi hien thi (bỏ qua ca chưa chốt / OFF). */
+export function shiftCellText(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  const { shift, covering_store, confirmed } = normalizeShift(v);
+  if (!shift || confirmed === false) return '';
+  return String(shift) + (covering_store ? ' (' + covering_store + ')' : '');
+}
 
 /**
  * Dựng nội dung CSV.
@@ -12,7 +22,7 @@ export function buildOFCReportCSV({ list, dayKeys, dateHeaders }) {
   let csv = 'STT,Cửa Hàng,Mã nhân Viên,Mã Điểm Danh,Vị Trí,Họ và Tên,' + dateHeaders + ',Tổng giờ làm\n';
   list.forEach((emp, idx) => {
     const shiftsMap = emp.shiftsMap || {};
-    const shiftsStr = dayKeys.map((k) => shiftsMap[k] || '').join(',');
+    const shiftsStr = dayKeys.map((k) => shiftCellText(shiftsMap[k])).join(',');
     csv += [
       idx + 1,
       emp.dept || '',
@@ -39,16 +49,6 @@ export function downloadCSV(csv, filename) {
 // =====================================================================
 // Ban xuat .xlsx thay CSV — khong lo delimiter, mo truc tiep bang Excel.
 // =====================================================================
-import * as XLSX from 'xlsx';
-
-/** Chuyen mot o ca (string hoac object {shift, covering_store}) thanh chuoi hien thi. */
-export function shiftCellText(v) {
-  if (v === '' || v === null || v === undefined) return '';
-  if (typeof v === 'object') {
-    return String(v.shift || '') + (v.covering_store ? ' (' + v.covering_store + ')' : '');
-  }
-  return String(v);
-}
 
 export function buildOFCReportAOA({ list, dayKeys, dateLabels }) {
   const rows = [['STT', 'Cửa Hàng', 'Mã nhân Viên', 'Mã Điểm Danh', 'Vị Trí', 'Họ và Tên', ...dateLabels, 'Tổng giờ làm']];

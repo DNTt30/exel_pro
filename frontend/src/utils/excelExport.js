@@ -1,4 +1,4 @@
-import { normalizeShift } from './shiftHelper';
+import { normalizeShift, getShiftHours } from './shiftHelper';
 import { WEEK_DAYS, getPayrollCycleDates, getPayrollCycleFromWeek } from '../data/constants';
 
 /**
@@ -55,15 +55,21 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
     };
   });
 
-  // Khớp màu ca theo đúng Excel Template
-  const getShiftStyle = (rawVal, empType) => {
+  // Khớp màu ca theo đúng Excel Template (chỉ áp dụng cho ca đã chốt)
+  const getShiftStyle = (rawVal, emp) => {
     if (!rawVal) return 'background-color: #FFFFFF; color: #000000;';
-    const { shift, covering_store } = normalizeShift(rawVal);
-    if (!shift || shift.toLowerCase() === 'off') return 'background-color: #FFFFFF; color: #000000;';
+    const { shift, covering_store, confirmed } = normalizeShift(rawVal);
+    if (!shift || shift.toLowerCase() === 'off' || confirmed === false) {
+      return 'background-color: #FFFFFF; color: #000000;';
+    }
+    if (emp?.isBorrowedTo && covering_store !== emp.isBorrowedTo) {
+      return 'background-color: #FFFFFF; color: #000000;';
+    }
     
     if (covering_store) return 'background-color: #FFFF00; color: #000000; font-weight: bold;'; // Hỗ trợ (Vàng)
     
     const s = shift.toLowerCase();
+    const empType = emp?.type;
     
     // Ca 1 (Sáng): Xanh lá #00FF00
     if (['6-14', '5-14', '6-10', '10-14', '5-10', '6-12', '14-18h'].includes(s) || s.startsWith('6-') || s.startsWith('5-') || s === '10-14') {
@@ -105,11 +111,20 @@ export function exportScheduleToExcel({ currentWeek, deptName, groupedEmps, week
 
       const dayCells = dayColumns.map(col => {
         const rawVal = empSched[col.dayKey] || '';
-        const { shift, covering_store } = normalizeShift(rawVal);
-        let display = shift === 'off' ? 'off' : shift;
-        if (covering_store) display += ` ${covering_store}`;
+        const { shift, covering_store, confirmed } = normalizeShift(rawVal);
+        let display = '';
+        if (confirmed !== false && shift) {
+          if (emp?.isBorrowedTo) {
+            if (covering_store === emp.isBorrowedTo) {
+              display = shift === 'off' ? 'off' : shift;
+            }
+          } else {
+            display = shift === 'off' ? 'off' : shift;
+            if (covering_store) display += ` ${covering_store}`;
+          }
+        }
         
-        let style = getShiftStyle(rawVal, emp.type);
+        let style = getShiftStyle(rawVal, emp);
         
         return `<td style="border: 1px solid #000000; text-align: center; mso-number-format: '\\@'; ${style}">${sanitizeExcelCell(display)}</td>`;
       }).join('');
@@ -233,27 +248,48 @@ export function exportTimesheetToExcel({ currentWeek, deptName, groupedEmps, get
         let displayVal = val || '-';
 
         if (val && val !== 'OFF' && val !== 'off') {
-          const num = parseFloat(String(val).replace(',', '.'));
           let hrs = 0;
-          if (!isNaN(num)) {
-            hrs = num;
+          if (typeof val === 'object') {
+            const norm = normalizeShift(val);
+            if (norm.confirmed === false || !norm.shift || norm.shift === 'off') {
+              displayVal = '-';
+            } else {
+              displayVal = norm.shift;
+              hrs = getShiftHours(norm.shift);
+            }
           } else {
-            const u = String(val).trim().toUpperCase();
-            if (u === 'AL' || u === 'PL') hrs = 8;
-            else if (u === 'AL_H' || u === 'PL_H') hrs = 4;
-            else hrs = 0; // UL, KL, NS, v.v..
+            const trimmed = String(val).trim().replace(',', '.');
+            if (/^\d+(\.\d+)?h?$/i.test(trimmed)) {
+              hrs = parseFloat(trimmed);
+            } else {
+              const norm = normalizeShift(trimmed);
+              if (norm.confirmed === false) {
+                displayVal = '-';
+                hrs = 0;
+              } else {
+                const shiftH = getShiftHours(norm.shift);
+                if (shiftH > 0) {
+                  hrs = shiftH;
+                } else {
+                  const u = trimmed.toUpperCase();
+                  if (u === 'AL' || u === 'PL') hrs = 8;
+                  else if (u === 'AL_H' || u === 'PL_H') hrs = 4;
+                  else hrs = 0; // UL, KL, NS, v.v..
+                }
+              }
+            }
           }
           
           total += hrs;
           if (isPT) ptTotal += hrs;
           else ftTotal += hrs;
 
-          if (val === '6-14') cellStyle = 'background-color: #bbf7d0; color: #166534; font-weight: bold;';
-          else if (val === '14-22') cellStyle = 'background-color: #bfdbfe; color: #1e40af; font-weight: bold;';
-          else if (val === '10-18') cellStyle = 'background-color: #fed7aa; color: #9a3412; font-weight: bold;';
-          else if (val === '22-6') cellStyle = 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
-          else if (['KL', 'UL'].includes(String(val).toUpperCase())) cellStyle = 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;';
-          else cellStyle = 'background-color: #e2e8f0; color: #1e293b; font-weight: bold;';
+          if (displayVal === '6-14') cellStyle = 'background-color: #bbf7d0; color: #166534; font-weight: bold;';
+          else if (displayVal === '14-22') cellStyle = 'background-color: #bfdbfe; color: #1e40af; font-weight: bold;';
+          else if (displayVal === '10-18') cellStyle = 'background-color: #fed7aa; color: #9a3412; font-weight: bold;';
+          else if (displayVal === '22-6') cellStyle = 'background-color: #fecaca; color: #991b1b; font-weight: bold;';
+          else if (['KL', 'UL'].includes(String(displayVal).toUpperCase())) cellStyle = 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;';
+          else if (displayVal !== '-') cellStyle = 'background-color: #e2e8f0; color: #1e293b; font-weight: bold;';
         }
 
         return `<td style="border: 1px solid #94a3b8; text-align: center; mso-number-format: '\\@'; ${cellStyle}">${sanitizeExcelCell(displayVal)}</td>`;

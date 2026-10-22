@@ -10,6 +10,7 @@
 - Tú mini có **Đã hiểu**, **Chưa rõ**, **Cần người hỗ trợ**. Chưa rõ ghi nhận phản hồi tự nguyện và điền câu hỏi gợi ý, không tự gửi tiếp. Yêu cầu hỗ trợ chỉ gửi sau bước xem lại và bấm **Xác nhận gửi quản lý**; chỉ chia sẻ câu hỏi/trích đoạn người dùng chọn, không toàn bộ lịch sử chat.
 - Vòng đời: mới gửi → quản lý nhận/trả lời → chờ nhân viên xác nhận → đã giải đáp. Nhân viên có thể mở lại. Quản lý không được tự xác nhận thay nhân viên. Mọi chuyển trạng thái và phân công hướng dẫn đều ghi nhật ký.
 - Bảng quản lý: từng nhân viên và tiến độ tự xác nhận; từng yêu cầu/cửa hàng/người phụ trách/trạng thái; chủ đề/số yêu cầu/số người/số chưa giải đáp; người đã tự đánh dấu câu trả lời Tú mini chưa rõ. Bộ lọc ngày áp dụng ngày tạo yêu cầu, hoặc ngày cập nhật phản hồi Tú mini; bảng tiến độ là hiện trạng. Số câu hỏi không đồng nghĩa số người.
+- Bảng **Theo dõi đăng ký ca** chọn tuần độc lập, đếm người trống cả tuần và người còn đăng ký chờ xếp, có chi tiết giờ/ngày đăng ký, giờ/ngày đã xếp, OFF và ngày trống. Dùng danh sách nhân viên hoạt động có phân quyền từ server và API lịch nhiều tuần có phân trang hiện có; không suy diễn “chưa từng đăng ký” khi ca đã được quản lý chọn.
 - Bảng xác nhận công lọc đúng chu kỳ, đọc đủ các trang, dùng phản hồi mới nhất và tách báo chênh lệch khỏi xác nhận. Tải lỗi không hiển thị thành 0. Công thực tế bằng 0 không được thay bằng giờ ca; đăng ký chưa xếp không được tính vào công tham khảo. Mọi bù công/đổi ca vẫn dùng quy trình cũ.
 
 ## Cơ sở dữ liệu và phân quyền
@@ -55,4 +56,10 @@ Script không đọc `.env`, tạo database mới trong cụm thử ở `artifac
 4. Chọn người hướng dẫn thực tế; kiểm tra các tài liệu được duyệt; thử một chu kỳ đăng ký/xếp lịch và ít nhất một câu hỏi tới khi nhân viên xác nhận hoặc mở lại. Chưa thể tuyên bố ứng dụng đã được nghiệm thu vận hành chỉ từ test kỹ thuật.
 5. Ghi nhận vướng mắc, cải tiến rồi mở rộng. Chưa bổ sung thông báo đẩy/email riêng cho yêu cầu hỗ trợ; người dùng xem câu trả lời tại trang hỗ trợ. Không có AI tự đánh giá nhân viên, không có AI tự công bố lịch.
 
-Kết quả kiểm tra cuối cùng được bổ sung sau khi chạy đủ các bước.
+## Kết quả kiểm tra (23/10/2026)
+
+- Toàn bộ Vitest: 101 file đạt, 2 file bỏ qua; 1.054 test đạt, 7 bỏ qua. Sau các sửa cuối ở bảng đăng ký/xác nhận công, chạy thêm bộ kiểm tra tập trung (kết quả cập nhật bên dưới).
+- Playwright cuối: **12/12 đạt** ở desktop 1440×1000 và mobile 390×844, chạy Edge headless. Có kiểm tra lưu rồi tải lại, phân công người hướng dẫn, trả lời/đóng/mở lại, thống kê đăng ký và không tràn màn hình. Các lần chạy đầu có lỗi fixture/HMR khi mã đang thay đổi; đã sửa fixture và chạy lại trọn 12 bài thành công.
+- Build production thành công, có cảnh báo chunk Schedule lớn hơn 500 kB. Lint không có lỗi; còn 1 cảnh báo import `Building2` không dùng trong `WorkspaceRoles.jsx` thuộc phần đang sửa đồng thời.
+- PostgreSQL cục bộ đã đạt lần kiểm tra đầu cho RLS, phạm vi cửa hàng, quyền sở hữu, chống trùng, revision, chu kỳ yêu cầu và nhật ký bất biến. Kết quả chạy cuối sau khi bổ sung kiểm tra nội dung gửi lại được ghi bên dưới.
+- Không chạy pilot với người thật, không ghi yêu cầu thử vào dữ liệu cửa hàng thật, không đổi tài khoản/mật khẩu, không tự thêm dịch vụ.

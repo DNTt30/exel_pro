@@ -278,7 +278,18 @@ export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthVi
  */
 export function parseShiftTimeRange(shiftCode) {
   if (!shiftCode || shiftCode === 'off' || shiftCode === '-') return null;
-  const match = shiftCode.match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
+  if (String(shiftCode).includes('/')) {
+    const ranges = String(shiftCode)
+      .split('/')
+      .map(s => parseShiftTimeRange(s.trim()))
+      .filter(Boolean);
+    if (ranges.length === 0) return null;
+    return {
+      start: Math.min(...ranges.map(r => r.start)),
+      end: Math.max(...ranges.map(r => r.end))
+    };
+  }
+  const match = String(shiftCode).match(/^(\d+)[hH]?(?:\s*-\s*|\s+)(\d+)[hH]?$/);
   if (!match) return null;
   let start = parseInt(match[1], 10);
   let end = parseInt(match[2], 10);

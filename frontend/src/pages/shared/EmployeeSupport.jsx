@@ -6,12 +6,13 @@ import * as api from '../../services/api';
 import EmployeeStartGuide from '../../components/employee/EmployeeStartGuide';
 import HelpRequestForm from '../../components/employee/HelpRequestForm';
 import HelpRequestDetail from '../../components/employee/HelpRequestDetail';
+import RegistrationReadiness from '../../components/dashboard/RegistrationReadiness';
 import { HELP_TOPICS, HELP_STATUSES, EMPLOYEE_START_STEPS } from '../../data/employeeStart';
 import { belongsToStore, supportTopicSummary, understoodStepCount } from '../../utils/employeeSupport';
 
 export default function EmployeeSupport() {
   const user = useStore(s => s.user);
-  return <SupportWorkspace key={`${user?.id}:${user?.dept}:${user?.role}:${user?.workspaceRoleId}`} user={user} />;
+  return <SupportWorkspace key={`${user?.id}:${user?.dept}:${user?.role}:${user?.workspaceRoleId}:${isOpsManager(user)}`} user={user} />;
 }
 function SupportWorkspace({ user }) {
   const manager = isOpsManager(user);
@@ -32,7 +33,7 @@ function SupportWorkspace({ user }) {
     if (!from || !to || from > to) { setError('Chọn khoảng ngày hợp lệ.'); setLoading(false); return; }
     Promise.all([api.getEmployeeStartRoster(), api.getEmployeeHelpRequests({ from, to, store }), manager ? api.getEmployeeAnswerFeedback({ from, to, store }) : Promise.resolve([])])
       .then(([roster, requests, feedback]) => { if (active) setData({ roster, requests, feedback }); })
-      .catch(() => { if (active) setError('Chưa tải được dữ liệu hỗ trợ. Hãy thử lại; nếu chưa cài migration, quản trị viên cần cập nhật cơ sở dữ liệu.'); })
+      .catch(() => { if (active) setError('Chưa tải được dữ liệu hỗ trợ. Hãy thử lại hoặc liên hệ quản trị viên.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [from, to, store, retry, manager]);
@@ -61,6 +62,7 @@ function SupportWorkspace({ user }) {
     {loading && <p role="status">Đang tải dữ liệu hỗ trợ…</p>}{error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
     {!loading && !error && data && <>
       {!manager && data.roster.find(row => row.id === user.id) && <EmployeeStartGuide record={data.roster.find(row => row.id === user.id)} onChange={record => setData(value => ({ ...value, roster: value.roster.map(row => row.id === record.id ? record : row) }))} />}
+      {manager && <RegistrationReadiness employees={roster} identity={`${user.id}:${user.dept}`} />}
       {manager && <section className="rounded-xl border bg-white p-3 space-y-3">
         <h2 className="font-bold">Tiến độ hướng dẫn hiện tại · {roster.length} nhân viên</h2><p className="text-xs">Bảng này theo cửa hàng, không giới hạn theo ngày gửi yêu cầu. Người hướng dẫn do quản lý phân công.</p>
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Tiến độ từng nhân viên</caption><thead><tr>{['Nhân viên', 'Cửa hàng', 'Đã mở', 'Tự xác nhận đã hiểu', 'Người hướng dẫn'].map(label => <th className="p-2" scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{roster.map(row => <tr className="border-t" key={row.id}><th scope="row" className="p-2">{row.name}<span className="block text-xs font-normal">{row.id}</span></th><td className="p-2">{row.dept}</td><td className="p-2">{EMPLOYEE_START_STEPS.filter(step => row.steps?.[`${step.id}_viewed`]).length}/{EMPLOYEE_START_STEPS.length}</td><td className="p-2"><details><summary>{understoodStepCount(row.steps)}/{EMPLOYEE_START_STEPS.length} mục</summary><ul>{EMPLOYEE_START_STEPS.map(step => <li key={step.id}>{step.label}: {row.steps?.[`${step.id}_understood`] ? 'Tự xác nhận đã hiểu' : 'Chưa xác nhận'}</li>)}</ul></details></td><td className="p-2"><select aria-label={`Người hướng dẫn của ${row.name}`} disabled={!!busy} value={row.mentorId || ''} onChange={e => mentor(row.id, e.target.value)} className="max-w-48 rounded border p-2"><option value="">Chưa phân công</option>{(data.roster || []).filter(candidate => candidate.id !== row.id && candidate.dept.split(',').some(d => belongsToStore(row.dept, d.trim()))).map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></td></tr>)}</tbody></table></div>

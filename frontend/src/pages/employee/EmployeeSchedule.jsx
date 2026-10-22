@@ -9,7 +9,7 @@ import StoreDaySchedule from '../../components/schedule/StoreDaySchedule';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
-import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap } from '../../utils/shiftHelper';
+import { normalizeShift, getShiftHours, checkEmployeeShiftRestGap, calculateEmployeeWeeklyHours, parseShiftForCell } from '../../utils/shiftHelper';
 import { getStoreLabel, isSupportAssignment, getSwapsForWeek, getSwapBadgeForDay } from '../../utils/scheduleAnnotations';
 import { useRegistrationDeadline } from '../../hooks/useRegistrationDeadline';
 import ShiftSwapModal from '../../components/modals/ShiftSwapModal';
@@ -37,7 +37,7 @@ export default function EmployeeSchedule() {
     const viewParam = searchParams.get('view');
     if (viewParam === 'mine' || viewParam === 'card') return 'card';
     if (viewParam === 'store' || viewParam === 'table') return 'table';
-    return typeof window !== 'undefined' && window.innerWidth < 640 ? 'card' : 'table';
+    return 'table';
   }); // 'card' (Lịch thẻ cá nhân) hoặc 'table' (Bảng tính toàn CH)
   const visibleDepts = useMemo(() => visibleDeptIds(user, stores, employees), [user, stores, employees]);
   const [viewDept, setViewDept] = useState(''); // '' = mặc định ALL nếu có nhiều CH cùng SM, hoặc CH của mình
@@ -662,7 +662,16 @@ export default function EmployeeSchedule() {
                   <div className="text-sm font-bold text-slate-700">
                     {!todayCard || todayCard.isOff
                       ? <span className="text-slate-500">{todayCard?.shift === 'off' ? 'Nghỉ (OFF)' : 'Chưa xếp ca'}</span>
-                      : <span className="text-blue-700">{todayCard.shift}</span>}
+                      : (
+                        <span className="inline-flex items-center gap-1.5 flex-wrap">
+                          <span className="text-blue-700">{todayCard.shift}</span>
+                          {todayCard.isConfirmed === false && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                              Đăng ký chờ chốt
+                            </span>
+                          )}
+                        </span>
+                      )}
                   </div>
                   {todayCard?.isSupport && (
                     <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-0.5">
@@ -1193,25 +1202,19 @@ export default function EmployeeSchedule() {
                         const empSched = weekSchedule[emp.id] || {};
                         const isMe = emp.id === user?.id;
 
-                        let totalH = 0;
-                        let totalShifts = 0;
-                        activeDays.forEach(d => {
-                          const raw = empSched[d];
-                          if (raw) {
-                            const { shift } = normalizeShift(raw);
-                            if (shift && shift !== 'off') {
-                              totalShifts++;
-                              totalH += getShiftHours(shift);
-                            }
-                          }
-                        });
+                        const { totalHours: totalH, totalShifts } = calculateEmployeeWeeklyHours(
+                          emp,
+                          empSched,
+                          activeDays,
+                          { includeCovering: !emp.isBorrowedTo }
+                        );
 
                         const isEmpPT = emp.type === 'PARTTIME' || emp.type === 'STPT' || (emp.role && emp.role.includes('PT'));
                         const isPTOvertimed = isEmpPT && totalH > 23;
 
                         return (
                           <tr
-                            key={emp.id}
+                            key={emp.id + (emp.isBorrowedTo ? `_borrowed_${emp.isBorrowedTo}` : '')}
                             className={`hover:bg-slate-50 border-b border-slate-200 ${
                               isMe ? 'bg-blue-50/70 font-bold ring-2 ring-blue-500/40' : ''
                             }`}
@@ -1243,17 +1246,18 @@ export default function EmployeeSchedule() {
 
                             {/* Ô Ca Làm Việc */}
                             {activeDays.map((day, dIdx) => {
-                              const val = empSched[day] || '';
+                              const rawVal = empSched[day] || '';
+                              const { display, colorClass } = parseShiftForCell(emp, rawVal);
                               const canEdit = isMe && canRegister;
                               const swapInfo = isMe ? swapBadgeForDay(day) : null;
 
                               return (
-                                <td key={day} className={`p-0 relative border-r border-slate-300 min-w-[64px] w-[64px] max-w-[64px] h-8 text-center align-middle ${
+                                <td key={day} className={`p-0 relative border-r border-slate-300 min-w-[64px] w-[64px] max-w-[64px] h-8 text-center align-middle ${colorClass} ${
                                   canEdit ? 'bg-white hover:ring-2 hover:ring-emerald-400 cursor-pointer' : ''
                                 }`} title={swapInfo ? swapInfo.label : undefined}>
                                   <ShiftInput
-                                    value={val}
-                                    rawValue={val}
+                                    value={display}
+                                    rawValue={display === '' ? '' : rawVal}
                                     readOnly={!canEdit}
                                     rowIndex={idx}
                                     colIndex={dIdx}

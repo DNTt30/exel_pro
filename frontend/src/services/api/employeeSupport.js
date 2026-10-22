@@ -1,4 +1,5 @@
 import { db } from './client';
+import { getSchedulesByWeeks } from './schedules';
 
 async function rpc(name, args) {
   const { data, error } = await db().rpc(name, args);
@@ -16,7 +17,15 @@ export async function readAllPages(query) {
     if (data.length < 500) return rows;
   }
 }
-export const getEmployeeStartRoster = () => rpc('employee_start_roster');
+export async function getEmployeeStartRoster() {
+  const rows = await rpc('employee_start_roster');
+  if (!Array.isArray(rows)) throw new Error('Chưa đọc được danh sách nhân viên.');
+  return rows;
+}
+export async function getEmployeeRegistrationWeek(week) {
+  const rows = await getSchedulesByWeeks([week]);
+  return rows[week] || {};
+}
 export const saveMyOnboarding = (step, value) => rpc('save_my_onboarding', { p_step: step, p_value: value });
 export const assignEmployeeMentor = (employee, mentor) => rpc('assign_employee_mentor', { p_employee: employee, p_mentor: mentor || null });
 export const createEmployeeHelp = ({ key, store, topic, question, context = '' }) => rpc('create_employee_help', {

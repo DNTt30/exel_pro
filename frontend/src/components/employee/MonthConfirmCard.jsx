@@ -5,6 +5,7 @@ import * as api from '../../services/api';
 import { getPayrollCycle } from '../../utils/payrollCycle';
 import { normalizeShift, getShiftHours } from '../../utils/shiftHelper';
 import { homeWeek } from '../../utils/employeeHome';
+import { formatISODate } from '../../data/constants';
 
 const pad = n => String(n).padStart(2, '0');
 const DAY_KEYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -20,7 +21,8 @@ export default function MonthConfirmCard({ onlyPending = false }) {
   const loadAttendanceRange = useStore(st => st.loadAttendanceRange);
   const ensureWeeksLoaded = useStore(st => st.ensureWeeksLoaded);
   
-  const cycle = useMemo(() => getPayrollCycle(new Date()), []);
+  const todayKey = formatISODate(new Date());
+  const cycle = useMemo(() => getPayrollCycle(new Date(`${todayKey}T12:00:00`)), [todayKey]);
   const isWindow = new Date().getDate() >= 25;
   const [open, setOpen] = useState(false);
   const [mine, setMine] = useState(null);   // row xac nhan neu da co
@@ -66,6 +68,7 @@ export default function MonthConfirmCard({ onlyPending = false }) {
   }, [isWindow, user?.id, cycle, retry, loadAttendanceRange, ensureWeeksLoaded]);
 
   if (!isWindow || (onlyPending && mine?.status === 'confirmed')) return null;
+  const canConfirm = !mine || ['approved', 'rejected'].includes(mine.status);
 
   const confirm = async () => {
     setBusy(true); setError('');
@@ -111,13 +114,13 @@ export default function MonthConfirmCard({ onlyPending = false }) {
             {mine?.status === 'confirmed' ? `Bạn đã xác nhận công chu kỳ ${cycle.label} ✓` : mine ? `Bạn đã gửi phản hồi công chu kỳ ${cycle.label}` : `Kiểm tra và xác nhận công chu kỳ ${cycle.label}`}
           </div>
           <div className={`text-xs mt-0.5 ${mine?.status === 'confirmed' ? 'text-emerald-700' : 'text-amber-700'}`}>
-            {mine ? (mine.status === 'confirmed' ? 'Cảm ơn bạn. SM sẽ tổng hợp gửi C&B.' : 'Yêu cầu chênh lệch đã gửi — SM sẽ kiểm tra.') : 'Kiểm tra tổng giờ của bạn rồi bấm xác nhận đúng/đủ công'}
+            {mine ? (mine.status === 'confirmed' ? 'Cảm ơn bạn. SM sẽ tổng hợp gửi C&B.' : canConfirm ? 'Phản hồi đã được xử lý. Mở Bù công C&B để xem kết quả và kiểm tra lại trước khi xác nhận.' : 'Yêu cầu chênh lệch đã gửi — SM sẽ kiểm tra.') : 'Kiểm tra tổng giờ của bạn rồi bấm xác nhận đúng/đủ công'}
           </div>
         </div>
         {open ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
       </button>
 
-      {open && ready && !mine && (
+      {open && ready && canConfirm && (
         <div className="mt-3 pt-3 border-t border-amber-200 space-y-3">
           <p className="text-xs text-slate-600">
             Tổng giờ tham khảo: <b>{monthHours.total}h</b>. Ngày chưa có công thực tế dùng lịch đã tải; hãy đối chiếu trang Chấm công trước khi xác nhận.

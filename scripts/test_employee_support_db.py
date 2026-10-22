@@ -51,6 +51,7 @@ try:
     sql(actor(other, create), error='HELP_FORBIDDEN')
     row = obj(staff, create)
     assert obj(staff, create)['id'] == row['id']
+    sql(actor(staff, create.replace('How to find the approved recipe?', 'A different question using the same key')), error='HELP_RETRY_CONTENT_MISMATCH')
     assert value(staff, 'SELECT count(*) FROM employee_help_requests;') == '1'
     assert value(other, 'SELECT count(*) FROM employee_help_requests;') == '0'
     assert value(other, 'SELECT count(*) FROM employee_help_events;') == '0'

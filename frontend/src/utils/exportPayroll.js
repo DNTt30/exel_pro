@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { normalizeShift, getShiftHours } from './shiftHelper';
 
 // =====================================================================
 // Xuat BANG CONG TONG HOP chuan C&B — sao chep dung 1:1 file mau
@@ -10,21 +11,38 @@ import * as XLSX from 'xlsx';
 
 const EN_DOW = { CN: 'Sun', T2: 'Mon', T3: 'Tue', T4: 'Wed', T5: 'Thu', T6: 'Fri', T7: 'Sat' };
 
+function parsePayrollCellValue(raw) {
+  if (raw === null || raw === undefined || raw === '' || raw === '-') return '';
+  if (typeof raw === 'number' && !isNaN(raw)) return raw;
+  if (typeof raw === 'object') {
+    const norm = normalizeShift(raw);
+    if (norm.confirmed === false || !norm.shift) return '';
+    if (norm.shift === 'off') return 'OFF';
+    const shHours = getShiftHours(norm.shift);
+    return shHours > 0 ? shHours : String(norm.shift).toUpperCase();
+  }
+  const t = String(raw).trim().replace(',', '.');
+  if (!t || t === '-') return '';
+  if (t.toUpperCase() === 'OFF') return 'OFF';
+  // Chỉ ép số trực tiếp khi chuỗi là số thuần (VD: "8", "7.84", "8h") — tránh parseFloat("22-6") === 22
+  if (/^\d+(\.\d+)?h?$/i.test(t)) {
+    return parseFloat(t);
+  }
+  const norm = normalizeShift(t);
+  if (norm.confirmed === false) return '';
+  if (norm.shift === 'off') return 'OFF';
+  const shHours = getShiftHours(norm.shift);
+  if (shHours > 0) return shHours;
+  return t.toUpperCase();
+}
+
 /** Doi mot o ngay thanh gia tri dang bang cong: SO GIO hoac ma chu (AL/PL/OFF...) */
 function dayCell(getDayValue, getActualValue, empId, day) {
   const act = getActualValue ? getActualValue(empId, day) : '';
-  if (act !== null && act !== undefined && String(act).trim() !== '') {
-    const t = String(act).trim().replace(',', '.');
-    const num = parseFloat(t);
-    if (!isNaN(num)) return num;
-    return String(act).trim().toUpperCase(); // AL / PL / UL / NS...
-  }
-  const sched = getDayValue(empId, day);
-  if (!sched || sched === '-') return '';
-  if (sched === 'OFF') return 'OFF';
-  const num = parseFloat(String(sched).replace(',', '.'));
-  if (!isNaN(num)) return num;
-  return String(sched).toUpperCase();
+  const parsedAct = parsePayrollCellValue(act);
+  if (parsedAct !== '') return parsedAct;
+  const sched = getDayValue ? getDayValue(empId, day) : '';
+  return parsePayrollCellValue(sched);
 }
 
 const SUMMARY_HEADS = [

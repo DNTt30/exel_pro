@@ -20,6 +20,7 @@ import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import WeekFlowBar from '../../components/WeekFlowBar';
 import StoreHoursBudget from '../../components/schedule/StoreHoursBudget';
+import { storeHoursLimit } from '../../utils/storeHours';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 import { analyzeWeek } from '../../utils/scheduleConflicts';
 import ConflictPanel from '../../components/schedule/ConflictPanel';
@@ -356,10 +357,11 @@ export default function Schedule() {
     return map;
   }, [viewMode, filterDept, user?.dept, stores, employees, weekSchedule]);
 
-  // Tổng hợp chỉ số KPI
+  // Tổng hợp chỉ số KPI (chỉ tính ca đã chốt tương đồng với Quỹ giờ tuần & cột Tổng giờ)
   const summaryMetrics = useMemo(() => {
     let totalEmps = 0;
     let totalHours = 0;
+    let pendingRegHours = 0;
     let totalFT = 0;
     let totalPT = 0;
     let ptOver91Count = 0;
@@ -378,13 +380,19 @@ export default function Schedule() {
 
         cells.forEach(rawVal => {
           if (!rawVal) return;
-          const { shift, covering_store } = normalizeShift(rawVal);
+          const { shift, covering_store, confirmed } = normalizeShift(rawVal);
           if (!shift || shift === 'off') return;
 
           if (emp.isBorrowedTo && covering_store !== emp.isBorrowedTo) return;
           if (!emp.isBorrowedTo && covering_store) return;
 
-          empHours += getShiftHours(shift);
+          const h = getShiftHours(shift);
+          if (confirmed === false) {
+            pendingRegHours += h;
+            return;
+          }
+
+          empHours += h;
         });
 
         totalHours += empHours;
@@ -394,7 +402,7 @@ export default function Schedule() {
       });
     });
 
-    return { totalEmps, totalHours, totalFT, totalPT, ptOver91Count };
+    return { totalEmps, totalHours, pendingRegHours, totalFT, totalPT, ptOver91Count };
   }, [groupedEmps, weekSchedule, activeDays, viewMode, cycleDates, schedule]);
 
   const scrollToGrid = useCallback(() => {
@@ -518,9 +526,19 @@ export default function Schedule() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold text-slate-500 truncate">Tổng giờ phân ca</div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-base sm:text-lg font-black font-mono text-emerald-700">{summaryMetrics.totalHours}</span>
-                <span className="text-xs font-bold text-emerald-600">giờ</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-base sm:text-lg font-black font-mono text-emerald-700">{summaryMetrics.totalHours}</span>
+                  <span className="text-xs font-bold text-emerald-600">giờ</span>
+                </div>
+                {summaryMetrics.pendingRegHours > 0 && (
+                  <span
+                    className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md"
+                    title="Số giờ nhân viên đã đăng ký (ô viền nét đứt) nhưng chưa được quản lý chốt phân ca"
+                  >
+                    +{summaryMetrics.pendingRegHours}h ĐK chờ chốt
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1105,6 +1123,7 @@ export default function Schedule() {
                 </td>
                 {activeDays.map((day, idx) => {
                   let dailyTotal = 0;
+                  let dailyPendingReg = 0;
                   Object.values(groupedEmps).forEach(emps => {
                     emps.forEach(emp => {
                       let shiftVal = '';
@@ -1114,19 +1133,33 @@ export default function Schedule() {
                       } else {
                         shiftVal = (weekSchedule[emp.id] || {})[day];
                       }
-                      dailyTotal += getShiftHours(normalizeShift(shiftVal).shift);
+                      if (!shiftVal) return;
+                      const { shift, covering_store, confirmed } = normalizeShift(shiftVal);
+                      if (!shift || shift === 'off') return;
+                      if (emp.isBorrowedTo && covering_store !== emp.isBorrowedTo) return;
+                      if (!emp.isBorrowedTo && covering_store) return;
+
+                      const h = getShiftHours(shift);
+                      if (confirmed === false) {
+                        dailyPendingReg += h;
+                        return;
+                      }
+                      dailyTotal += h;
                     });
                   });
+
+                  const configuredWeeklyLimit = storeHoursLimit(currentStoreInfo);
+                  const dailyStandardLimit = Math.max(48, configuredWeeklyLimit ? Math.round(configuredWeeklyLimit / 7) : 48);
 
                   let badgeClass = "bg-slate-700 text-slate-400 border border-slate-600";
                   let statusIcon = "";
                   if (dailyTotal > 0) {
-                    if (dailyTotal <= 35) {
+                    if (dailyTotal <= 40) {
                       badgeClass = "bg-emerald-500 text-white ring-1 ring-emerald-400 shadow-xs";
                       statusIcon = "💚 Tối ưu";
-                    } else if (dailyTotal <= 45) {
-                      badgeClass = "bg-amber-500 text-white ring-1 ring-amber-400 shadow-xs";
-                      statusIcon = "⚠️ Tiêu chuẩn";
+                    } else if (dailyTotal <= dailyStandardLimit) {
+                      badgeClass = "bg-blue-500 text-white ring-1 ring-blue-400 shadow-xs";
+                      statusIcon = "✅ Đạt chuẩn";
                     } else {
                       badgeClass = "bg-rose-500 text-white ring-1 ring-rose-400 shadow-xs";
                       statusIcon = "🚨 Vượt quỹ";
@@ -1135,20 +1168,46 @@ export default function Schedule() {
 
                   return (
                     <td key={day} className="text-center p-1.5 border-r border-slate-700 bg-slate-800/95 backdrop-blur">
-                      <div className="flex flex-col items-center justify-center gap-1">
+                      <div className="flex flex-col items-center justify-center gap-0.5">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-black tracking-wide ${badgeClass}`}>
                           {dailyTotal}h
                         </span>
                         {dailyTotal > 0 && (
-                          <span className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold leading-none">
+                          <span className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold leading-none mt-0.5">
                             {statusIcon}
+                          </span>
+                        )}
+                        {dailyPendingReg > 0 && (
+                          <span
+                            className="text-[8.5px] font-semibold text-amber-300 leading-none mt-0.5"
+                            title={`${dailyPendingReg}h nhân viên đăng ký chờ chốt`}
+                          >
+                            +{dailyPendingReg}h ĐK
                           </span>
                         )}
                       </div>
                     </td>
                   );
                 })}
-                <td className="bg-slate-800 border-l border-slate-700"></td>
+                <td className="bg-slate-900 border-l border-slate-700 px-1.5 py-1.5 text-center">
+                  <div className="flex flex-col items-center justify-center leading-tight">
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black font-mono">
+                      {summaryMetrics.totalHours}h
+                    </span>
+                    {summaryMetrics.pendingRegHours > 0 ? (
+                      <span
+                        className="text-[8.5px] font-bold text-amber-300 mt-0.5"
+                        title="Tổng giờ nhân viên đăng ký chờ chốt"
+                      >
+                        +{summaryMetrics.pendingRegHours}h ĐK
+                      </span>
+                    ) : (
+                      <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold mt-0.5">
+                        Tổng chốt
+                      </span>
+                    )}
+                  </div>
+                </td>
               </tr>
             </tfoot>
           </table>

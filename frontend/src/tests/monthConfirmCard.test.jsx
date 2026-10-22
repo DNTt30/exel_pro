@@ -9,7 +9,8 @@ import { useStore } from '../store/useStore';
 vi.mock('../services/api', () => ({
   getSchedulesByWeeks: vi.fn().mockResolvedValue({}),
   getAttendanceRange: vi.fn().mockResolvedValue([]),
-  getFeedbacks: vi.fn().mockResolvedValue([])
+  getFeedbacks: vi.fn().mockResolvedValue([]),
+  getMonthConfirmations: vi.fn().mockResolvedValue([])
 }));
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => vi.useRealTimers());

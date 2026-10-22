@@ -96,12 +96,14 @@ const EmployeeRow = memo(({
   const isMonthView = days.length > 7;
 
   // Tính toán trực tiếp tổng giờ & tổng số ca từ lịch thực tế (bao gồm ca chi viện nếu là dòng CH gốc)
-  const { totalHours, totalShifts, homeHours, coveringHours } = calculateEmployeeWeeklyHours(
+  const { totalHours, totalShifts, homeHours, coveringHours, allHours, allShifts } = calculateEmployeeWeeklyHours(
     emp, 
     empSched, 
     days, 
     { includeCovering: !emp.isBorrowedTo }
   );
+  const pendingHours = Math.max(0, (allHours || 0) - totalHours);
+  const pendingShifts = Math.max(0, (allShifts || 0) - totalShifts);
 
   // Validate theo rules (PT min/max, FT min hours/shifts)
   const validation = validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthView);
@@ -253,15 +255,29 @@ const EmployeeRow = memo(({
               ({homeHours}h + {coveringHours}h CV)
             </span>
           )}
+          {pendingHours > 0 && (
+            <span
+              className="text-[9px] font-semibold text-slate-600 bg-white/80 border border-dashed border-slate-400 px-1 rounded leading-tight mt-0.5"
+              title={`Đã chốt ${totalHours}h • Còn +${pendingHours}h (${pendingShifts} ca) nhân viên đăng ký chờ chốt`}
+            >
+              +{pendingHours}h ĐK
+            </span>
+          )}
         </div>
 
         {/* Warning Tooltip */}
-        {validation.warnings.length > 0 && (
+        {(validation.warnings.length > 0 || pendingHours > 0) && (
           <div className="absolute right-full top-1/2 -translate-y-1/2 mr-1 hidden group-hover/totalcell:block bg-slate-900 text-white text-[11px] font-medium py-2 px-3 rounded-xl shadow-2xl z-30 whitespace-nowrap pointer-events-none border border-slate-700 min-w-[200px] text-left">
             <div className="font-bold text-amber-300 border-b border-slate-700 pb-1 mb-1 flex items-center gap-1">
-              <span>CẢNH BÁO QUY CHUẨN XẾP CA:</span>
+              <span>CHI TIẾT & QUY CHUẨN XẾP CA:</span>
             </div>
             <ul className="space-y-1 text-slate-200">
+              {pendingHours > 0 && (
+                <li className="flex items-start gap-1.5 text-sky-300">
+                  <span>•</span>
+                  <span>Đã chốt: {totalHours}h ({totalShifts} ca) • Chờ chốt: +{pendingHours}h ({pendingShifts} ca ĐK)</span>
+                </li>
+              )}
               {validation.warnings.map((w, wIdx) => (
                 <li key={wIdx} className={`flex items-start gap-1.5 ${w.type === 'error' ? 'text-red-300' : 'text-amber-200'}`}>
                   <span>•</span>

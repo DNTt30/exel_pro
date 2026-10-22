@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import Modal from './Modal';
 
-import { getShiftCode, getShiftHours } from '../../utils/shiftHelper';
+import { getShiftCode, getShiftHours, normalizeShift } from '../../utils/shiftHelper';
 import { getPayrollCycleDates, getPayrollCycleFromWeek } from '../../data/constants';
 import { Download, AlertTriangle, Users, FileSpreadsheet } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -48,7 +48,8 @@ export default function PTOvertimeModal({ isOpen, onClose }) {
 
       cycleDates.forEach(({ key, weekKey, dayKey }) => {
         const s = schedule[weekKey]?.[emp.id]?.[dayKey] || empSched[dayKey];
-        const actual = getShiftCode(s);
+        const parsed = normalizeShift(s);
+        const actual = parsed.confirmed === false ? '' : parsed.shift;
         
         if (actual && actual !== 'off') {
           dailyShifts[key] = formatShiftForOFC(actual);

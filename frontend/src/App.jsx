@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { requiredPasswordPath } from './utils/authNavigation';
 import { useStore } from './store/useStore';
 import { isOpsManager, isBuiltinStoreManager, canManageStoreList } from './lib/authSession';
+import { getPayrollCycleDates, getPayrollCycleFromWeek } from './data/constants';
+import { offsetWeek } from './utils/employeeSkills';
 import { lazy, Suspense } from 'react';
 import WorkspaceBrandingSync from './components/WorkspaceBrandingSync';
 import WorkspaceRolesSync from './components/WorkspaceRolesSync';
@@ -27,6 +29,7 @@ const Handbook = lazy(() => import('./pages/shared/Handbook'));
 const HandbookManager = lazy(() => import('./pages/admin/HandbookManager'));
 const EmployeeChangePassword = lazy(() => import('./pages/employee/EmployeeChangePassword'));
 const EmployeeProfile = lazy(() => import('./pages/employee/EmployeeProfile'));
+const EmployeeSupport = lazy(() => import('./pages/shared/EmployeeSupport'));
 const WorkspaceSettings = lazy(() => import('./pages/admin/WorkspaceSettings'));
 const WorkspaceRoles = lazy(() => import('./pages/admin/WorkspaceRoles'));
 
@@ -134,9 +137,57 @@ const CatchAllRedirect = () => {
 function App() {
   const user = useStore(state => state.user);
   const initializeData = useStore(state => state.initializeData);
+  const syncStatus = useStore(state => state.syncStatus);
+  const currentWeek = useStore(state => state.currentWeek);
+
+  // Nạp ngầm (background warmup) các trang cốt lõi & dữ liệu Lịch/Bảng công kỳ hiện tại để sẵn sàng xem Offline
+  useEffect(() => {
+    if (!user?.id || syncStatus !== 'ok') return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const timer = setTimeout(() => {
+      void import('./pages/employee/EmployeeHome').catch(() => {});
+      void import('./pages/employee/EmployeeSchedule').catch(() => {});
+      void import('./pages/employee/EmployeeTimesheet').catch(() => {});
+      void import('./pages/shared/Handbook').catch(() => {});
+      void import('./pages/shared/ShelfDateBoard').catch(() => {});
+      const st = useStore.getState();
+      const week = st.currentWeek || currentWeek;
+      if (week) {
+        const cycle = getPayrollCycleFromWeek(week);
+        const cycleDates = getPayrollCycleDates(cycle.year, cycle.month);
+        const weeksToCache = [...new Set([...cycleDates.map(c => c.weekKey), week, offsetWeek(week, 1)])];
+        void st.ensureWeeksLoaded?.(weeksToCache)?.catch?.(() => {});
+        if (cycleDates.length) {
+          void st.loadAttendanceRange?.(cycleDates[0].fullDateStr, cycleDates.at(-1).fullDateStr)?.catch?.(() => {});
+        }
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [user?.id, syncStatus, currentWeek]);
 
   useEffect(() => {
     if (user?.id) initializeData();
+  }, [user?.id, initializeData]);
+
+  useEffect(() => {
+    if (!user?.id || typeof window === 'undefined') return;
+    const handleOnline = () => {
+      if (useStore.getState().user?.id) initializeData();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const st = useStore.getState();
+        if (st.user?.id && (st.syncStatus === 'error' || st.realtimeStatus === 'error' || st.realtimeStatus === 'disconnected')) {
+          initializeData();
+        }
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [user?.id, initializeData]);
 
   const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
@@ -147,7 +198,7 @@ function App() {
       <WorkspaceRolesSync />
       <ScheduleOverrideModal />
       <Router basename={routerBasename}>
-        <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-slate-50"><div className="text-blue-600 font-bold">Đang tải trang...</div></div>}>
+        <Suspense fallback={<div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900/95 text-slate-200 gap-3"><div className="w-7 h-7 border-2 border-sky-400/30 border-t-sky-400 rounded-full animate-spin" /><div className="text-xs font-semibold tracking-wide text-slate-300">Đang tải không gian làm việc...</div></div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
             
@@ -176,6 +227,8 @@ function App() {
               {/* Employee Routes */}
               <Route path="employee/profile" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeProfile /></PrivateRoute>} />
               <Route path="employee/home" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeHome /></PrivateRoute>} />
+              <Route path="employee/support" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSupport /></PrivateRoute>} />
+              <Route path="admin/support" element={<PrivateRoute allowedRoles={['admin']}><EmployeeSupport /></PrivateRoute>} />
               <Route path="employee/schedule" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSchedule /></PrivateRoute>} />
               <Route path="employee/timesheet" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeTimesheet /></PrivateRoute>} />
               <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />

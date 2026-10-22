@@ -10,7 +10,11 @@ export function useTimesheetValues(cycleDates) {
   const loadAttendanceRange = useStore(s => s.loadAttendanceRange);
   const cells = useMemo(() => new Map(cycleDates.map(cell => [cell.key, cell])), [cycleDates]);
   useEffect(() => {
-    ensureWeeksLoaded(cycleDates.map(cell => cell.weekKey)).catch(() => toast.error('Không tải được lịch chấm công. Vui lòng thử lại.'));
+    ensureWeeksLoaded(cycleDates.map(cell => cell.weekKey)).catch(() => {
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        toast.error('Không tải được lịch chấm công. Vui lòng thử lại.');
+      }
+    });
     if (cycleDates.length) loadAttendanceRange(cycleDates[0].fullDateStr, cycleDates.at(-1).fullDateStr);
   }, [cycleDates, ensureWeeksLoaded, loadAttendanceRange]);
   const getDayValue = useCallback((empId, day) => {

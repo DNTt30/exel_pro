@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { SHIFTS } from '../../data/initialData';
 import { Download, Printer, Calendar as CalendarIcon, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock, Sparkles, Zap, RotateCcw, LayoutGrid, Table, MapPin, Sun, Moon, Coffee, ArrowRightLeft, Lock } from 'lucide-react';
 
 import ShiftInput from '../../components/ShiftInput';
+import StoreDaySchedule from '../../components/schedule/StoreDaySchedule';
 import { useGroupedEmployees } from '../../hooks/useGroupedEmployees';
 import { exportScheduleToExcel } from '../../utils/excelExport';
 import { WEEK_DAYS, DAY_FULL_NAMES, listNearbyWeeks } from '../../data/constants';
@@ -20,23 +21,29 @@ import { visibleDeptIds } from '../../utils/dataScope';
 import { toast } from '../../components/ui/toastStore';
 import { weekRecordKey } from '../../utils/scheduleWeek';
 
-// Ã” lá»‹ch / máº£ng trá»‘ng dÃ¹ng chung â€” giá»¯ tham chiáº¿u á»•n Ä‘á»‹nh cho useMemo & React.memo
+// Ô lịch / mảng trống dùng chung — giữ tham chiếu ổn định cho useMemo & React.memo
 const EMPTY_SCHED = {};
 
 export default function EmployeeSchedule() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, schedule, updateShift, updateEmployeeWeeklyShifts, currentWeek, setCurrentWeek, shiftSwaps, stores, scheduleWeeks, employees } = useStore(useShallow((s) => ({ user: s.user, schedule: s.schedule, updateShift: s.updateShift, updateEmployeeWeeklyShifts: s.updateEmployeeWeeklyShifts, currentWeek: s.currentWeek, setCurrentWeek: s.setCurrentWeek, shiftSwaps: s.shiftSwaps, stores: s.stores, scheduleWeeks: s.scheduleWeeks, employees: s.employees })));
   const weekSchedule = schedule[currentWeek] || EMPTY_SCHED;
 
   const [search] = useState('');
   const [filterOnlyMe] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving'
-  const [displayView, setDisplayView] = useState('card'); // 'card' (Lá»‹ch tháº» cÃ¡ nhÃ¢n) hoáº·c 'table' (Báº£ng tÃ­nh toÃ n CH)
+  const [displayView, setDisplayView] = useState(() => {
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'mine' || viewParam === 'card') return 'card';
+    if (viewParam === 'store' || viewParam === 'table') return 'table';
+    return typeof window !== 'undefined' && window.innerWidth < 640 ? 'card' : 'table';
+  }); // 'card' (Lịch thẻ cá nhân) hoặc 'table' (Bảng tính toàn CH)
   const visibleDepts = useMemo(() => visibleDeptIds(user, stores, employees), [user, stores, employees]);
-  const [viewDept, setViewDept] = useState(''); // '' = máº·c Ä‘á»‹nh ALL náº¿u cÃ³ nhiá»u CH cÃ¹ng SM, hoáº·c CH cá»§a mÃ¬nh
-  const activeDept = viewDept || (visibleDepts.length > 1 ? 'ALL' : (user?.dept || ''));
+  const [viewDept, setViewDept] = useState(''); // '' = mặc định ALL nếu có nhiều CH cùng SM, hoặc CH của mình
+  const activeDept = viewDept || user?.dept?.split(',')[0]?.trim() || visibleDepts[0] || '';
   const [showSwapModal, setShowSwapModal] = useState(false);
-  const [showSwapListModal, setShowSwapListModal] = useState(false);
+  const [showSwapListModal, setShowSwapListModal] = useState(() => searchParams.get('openSwaps') === 'true');
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
 
@@ -48,20 +55,20 @@ export default function EmployeeSchedule() {
   const currentWeekStatus = (scheduleWeeks || {})[weekRecordKey(activeDept === 'ALL' ? myDept : activeDept, currentWeek)]?.status || 'draft';
   const isDraft = currentWeekStatus !== 'approved';
 
-  // Láº¯ng nghe sá»± kiá»‡n Ä‘á»•i háº¡n ná»™p Ä‘á»ƒ Ä‘á»“ng bá»™ giao diá»‡n
+  // Lắng nghe sự kiện đổi hạn nộp để đồng bộ giao diện
   const { info: deadlineInfo, ready: deadlineReady } = useRegistrationDeadline(myDept, currentWeek);
   const isDeadlineExpired = !deadlineReady || (deadlineInfo.enabled && deadlineInfo.isExpired);
 
-  // 1. NgÃ y hiá»ƒn thá»‹ cá»‘ Ä‘á»‹nh theo Tuáº§n (T2 -> CN)
+  // 1. Ngày hiển thị cố định theo Tuần (T2 -> CN)
   const activeDays = WEEK_DAYS;
 
-  // 3. NhÃ³m nhÃ¢n viÃªn theo CH Ä‘ang xem (náº¿u 'ALL' hiá»ƒn thá»‹ toÃ n bá»™ cÃ¡c CH cÃ¹ng SM)
+  // 3. Nhóm nhân viên theo CH đang xem (nếu 'ALL' hiển thị toàn bộ các CH cùng SM)
   const groupedEmps = useGroupedEmployees(search, activeDept, 'ALL', weekSchedule);
 
-  // 4. Lá»‹ch cá»§a nhÃ¢n viÃªn Ä‘Äƒng nháº­p
+  // 4. Lịch của nhân viên đăng nhập
   const mySched = weekSchedule[user?.id] || EMPTY_SCHED;
 
-  // 5. Kiá»ƒm tra xem tuáº§n Ä‘ang chá»n cÃ³ pháº£i lÃ  TUáº¦N SAU / TÆ¯Æ NG LAI hay khÃ´ng
+  // 5. Kiểm tra xem tuần đang chọn có phải là TUẦN SAU / TƯƠNG LAI hay không
   const isFutureWeek = useMemo(() => {
     const parts = currentWeek.split('-');
     if (parts.length !== 3) return false;
@@ -75,11 +82,11 @@ export default function EmployeeSchedule() {
     currentMonday.setDate(diff);
     currentMonday.setHours(0, 0, 0, 0);
 
-    // Chá»‰ cho phÃ©p Ä‘Äƒng kÃ½ ca á»Ÿ tuáº§n sau (selectedMonday > currentMonday)
+    // Chỉ cho phép đăng ký ca ở tuần sau (selectedMonday > currentMonday)
     return selectedMonday.getTime() > currentMonday.getTime();
   }, [currentWeek]);
 
-  // Äiá»u kiá»‡n Ä‘Æ°á»£c phÃ©p Ä‘Äƒng kÃ½ / chá»‰nh sá»­a ca
+  // Điều kiện được phép đăng ký / chỉnh sửa ca
   const canRegister = isFutureWeek && !isDeadlineExpired && isDraft;
   // QW-4: Tính ngày hôm nay để auto-scroll đến cột hiện tại
   const todayKey = React.useMemo(() => {
@@ -93,7 +100,7 @@ export default function EmployeeSchedule() {
     if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [todayKey, currentWeek]);
 
-  // 6. TÃ­nh tuáº§n sau
+  // 6. Tính tuần sau
   const nextWeekDateStr = useMemo(() => {
     const today = new Date();
     const currentMonday = new Date(today);
@@ -103,19 +110,19 @@ export default function EmployeeSchedule() {
     return `${currentMonday.getFullYear()}-${String(currentMonday.getMonth() + 1).padStart(2, '0')}-${String(currentMonday.getDate()).padStart(2, '0')}`;
   }, []);
 
-  // 7. Xá»­ lÃ½ chá»‰nh sá»­a / Ä‘Äƒng kÃ½ ca lÃ m viá»‡c (Chá»‰ tuáº§n tÆ°Æ¡ng lai chÆ°a háº¿t háº¡n má»›i Ä‘Æ°á»£c sá»­a)
+  // 7. Xử lý chỉnh sửa / đăng ký ca làm việc (Chỉ tuần tương lai chưa hết hạn mới được sửa)
   const handleShiftChange = useCallback(async (emp, day, value) => {
     if (emp.id !== user?.id) return;
     if (!isFutureWeek) {
-      toast.error('Tuáº§n nÃ y Ä‘Ã£ qua thá»i háº¡n Ä‘Äƒng kÃ½ / chá»‰nh sá»­a. Báº¡n chá»‰ cÃ³ thá»ƒ Ä‘Äƒng kÃ½ ca cho cÃ¡c tuáº§n sau.');
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     if (isDeadlineExpired) {
-      toast.error(`ÄÃ£ háº¿t háº¡n Ä‘Äƒng kÃ½ ca tuáº§n nÃ y (${deadlineInfo?.formattedDeadline || ''}). Vui lÃ²ng liÃªn há»‡ Cá»­a hÃ ng trÆ°á»Ÿng náº¿u cáº§n bá»• sung.`);
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
       return;
     }
     if (!isDraft) {
-      toast.error('Lá»‹ch tuáº§n nÃ y Ä‘Ã£ Ä‘Æ°á»£c Quáº£n lÃ½ duyá»‡t, khÃ´ng thá»ƒ thay Ä‘á»•i.');
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
       return;
     }
     setSaveStatus('saving');
@@ -124,18 +131,18 @@ export default function EmployeeSchedule() {
     setTimeout(() => setSaveStatus('saved'), 400);
   }, [currentWeek, updateShift, user?.id, isFutureWeek, isDeadlineExpired, isDraft, deadlineInfo?.formattedDeadline]);
 
-  // 8. ÄÄƒng kÃ½ nhanh cáº£ tuáº§n máº«u (Gom thÃ nh 1 request duy nháº¥t)
+  // 8. Đăng ký nhanh cả tuần mẫu (Gom thành 1 request duy nhất)
   const handleQuickRegister = async (shiftCode) => {
     if (!isFutureWeek) {
-      toast.error('Tuáº§n nÃ y Ä‘Ã£ qua thá»i háº¡n Ä‘Äƒng kÃ½ / chá»‰nh sá»­a. Báº¡n chá»‰ cÃ³ thá»ƒ Ä‘Äƒng kÃ½ ca cho cÃ¡c tuáº§n sau.');
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     if (isDeadlineExpired) {
-      toast.error(`ÄÃ£ háº¿t háº¡n Ä‘Äƒng kÃ½ ca tuáº§n nÃ y (${deadlineInfo?.formattedDeadline || ''}). Vui lÃ²ng liÃªn há»‡ Cá»­a hÃ ng trÆ°á»Ÿng náº¿u cáº§n bá»• sung.`);
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
       return;
     }
     if (!isDraft) {
-      toast.error('Lá»‹ch tuáº§n nÃ y Ä‘Ã£ Ä‘Æ°á»£c Quáº£n lÃ½ duyá»‡t, khÃ´ng thá»ƒ thay Ä‘á»•i.');
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
       return;
     }
     setSaveStatus('saving');
@@ -154,18 +161,18 @@ export default function EmployeeSchedule() {
     setTimeout(() => setSaveStatus('saved'), 400);
   };
 
-  // 8b. Ãp dá»¥ng lá»‹ch gá»£i Ã½ thÃ´ng minh (1 request duy nháº¥t)
+  // 8b. Áp dụng lịch gợi ý thông minh (1 request duy nhất)
   const handleApplySuggestion = async (suggestedShifts) => {
     if (!isFutureWeek) {
-      toast.error('Tuáº§n nÃ y Ä‘Ã£ qua thá»i háº¡n Ä‘Äƒng kÃ½ / chá»‰nh sá»­a. Báº¡n chá»‰ cÃ³ thá»ƒ Ä‘Äƒng kÃ½ ca cho cÃ¡c tuáº§n sau.');
+      toast.error('Tuần này đã qua thời hạn đăng ký / chỉnh sửa. Bạn chỉ có thể đăng ký ca cho các tuần sau.');
       return;
     }
     if (isDeadlineExpired) {
-      toast.error(`ÄÃ£ háº¿t háº¡n Ä‘Äƒng kÃ½ ca tuáº§n nÃ y (${deadlineInfo?.formattedDeadline || ''}). Vui lÃ²ng liÃªn há»‡ Cá»­a hÃ ng trÆ°á»Ÿng náº¿u cáº§n bá»• sung.`);
+      toast.error(`Đã hết hạn đăng ký ca tuần này (${deadlineInfo?.formattedDeadline || ''}). Vui lòng liên hệ Cửa hàng trưởng nếu cần bổ sung.`);
       return;
     }
     if (!isDraft) {
-      toast.error('Lá»‹ch tuáº§n nÃ y Ä‘Ã£ Ä‘Æ°á»£c Quáº£n lÃ½ duyá»‡t, khÃ´ng thá»ƒ thay Ä‘á»•i.');
+      toast.error('Lịch tuần này đã được Quản lý duyệt, không thể thay đổi.');
       return;
     }
     setSaveStatus('saving');
@@ -175,10 +182,10 @@ export default function EmployeeSchedule() {
     });
     try { await updateEmployeeWeeklyShifts(currentWeek, user.id, formatted); } catch { setSaveStatus('error'); return; }
     setTimeout(() => setSaveStatus('saved'), 400);
-    toast.success('ÄÃ£ Ã¡p dá»¥ng lá»‹ch gá»£i Ã½ thÃ nh cÃ´ng!');
+    toast.success('Đã áp dụng lịch gợi ý thành công!');
   };
 
-  // 9. TÃ­nh tá»•ng giá» & sá»‘ ca cÃ¡ nhÃ¢n
+  // 9. Tính tổng giờ & số ca cá nhân
   const { myTotalHours, myTotalShifts } = useMemo(() => {
     let totalH = 0;
     let totalShifts = 0;
@@ -210,7 +217,7 @@ export default function EmployeeSchedule() {
 
   const swapBadgeForDay = (dayKey) => getSwapBadgeForDay(mySwapsThisWeek, user?.id, dayKey);
 
-  // 10. Danh sÃ¡ch 7 ngÃ y chi tiáº¿t cho Card View
+  // 10. Danh sách 7 ngày chi tiết cho Card View
   const weekDaysCardData = useMemo(() => {
     const parts = currentWeek.split('-').map(Number);
     const weekStartDate = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -219,7 +226,7 @@ export default function EmployeeSchedule() {
     return WEEK_DAYS.map((dayKey, idx) => {
       const dateObj = new Date(weekStartDate);
       dateObj.setDate(weekStartDate.getDate() + idx);
-      
+
       const isToday = today.toDateString() === dateObj.toDateString();
       const rawVal = mySched[dayKey] || '';
       const { shift, covering_store, confirmed, isConfirmed } = normalizeShift(rawVal);
@@ -228,7 +235,7 @@ export default function EmployeeSchedule() {
       const hours = isOff ? 0 : getShiftHours(shift);
       const isSupport = isSupportAssignment(rawVal, myDept);
       const swapInfo = getSwapBadgeForDay(mySwapsThisWeek, user?.id, dayKey);
-      
+
       const pseudoWeekSched = { [user?.id]: mySched };
       const restWarning = checkEmployeeShiftRestGap(pseudoWeekSched, user?.id, dayKey, shift);
 
@@ -290,7 +297,7 @@ export default function EmployeeSchedule() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block overflow-x-hidden">
+    <div className="flex flex-col min-h-0 h-full w-full max-w-full bg-slate-50 relative print:bg-white print:block overflow-x-hidden">
       {/* Modals */}
       <ShiftSwapModal
         isOpen={showSwapModal}
@@ -309,74 +316,74 @@ export default function EmployeeSchedule() {
         currentWeek={currentWeek}
         onApply={handleApplySuggestion}
       />
-      <RecipeQuickModal 
-        isOpen={showRecipeModal} 
-        onClose={() => setShowRecipeModal(false)} 
+      <RecipeQuickModal
+        isOpen={showRecipeModal}
+        onClose={() => setShowRecipeModal(false)}
       />
-      
+
       {/* Top Toolbar */}
-      <div className="print:hidden">
+      <div className="shrink-0 print:hidden">
         <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-          
+
           {/* Left: View Switcher & Shift Swap Action */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full pb-0.5 sm:pb-0 flex-nowrap sm:flex-wrap">
+          <div className="flex items-center gap-2 max-w-full flex-wrap">
             {/* Tab View Switcher */}
             <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 shadow-inner flex-shrink-0">
               <button
                 type="button"
-                onClick={() => setDisplayView('card')}
+                aria-pressed={displayView === 'card'} onClick={() => setDisplayView('card')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  displayView === 'card' 
-                    ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200' 
+                  displayView === 'card'
+                    ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <LayoutGrid size={14} />
-                <span>Lá»‹ch cá»§a tÃ´i</span>
+                <span>Lịch của tôi</span>
               </button>
               <button
                 type="button"
-                onClick={() => setDisplayView('table')}
+                aria-pressed={displayView === 'table'} data-testid="store-schedule-tab" onClick={() => setDisplayView('table')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  displayView === 'table' 
-                    ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200' 
+                  displayView === 'table'
+                    ? 'bg-white text-blue-700 shadow-xs ring-1 ring-slate-200'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Table size={14} />
-                <span>ToÃ n cá»­a hÃ ng</span>
+                <span>Toàn cửa hàng</span>
               </button>
             </div>
 
-            {/* Button: Sá»• tay 1 cháº¡m */}
+            {/* Button: Sổ tay 1 chạm */}
             <button
               type="button"
               onClick={() => setShowRecipeModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white border border-transparent rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap animate-pulse"
-              title="Má»Ÿ sá»• tay cÃ´ng thá»©c nhanh"
+              title="Mở sổ tay công thức nhanh"
             >
-              <span>ðŸ³ CÃ´ng Thá»©c Nhanh</span>
+              <span>🍳 Công Thức Nhanh</span>
             </button>
 
-            {/* Button: Äá»•i ca */}
+            {/* Button: Đổi ca */}
             <button
               type="button"
               onClick={() => setShowSwapModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-              title="Gá»­i yÃªu cáº§u Ä‘á»•i ca cho Ä‘á»“ng nghiá»‡p"
+              title="Gửi yêu cầu đổi ca cho đồng nghiệp"
             >
               <RotateCcw size={13} className="text-indigo-600" />
-              <span>Äá»•i ca</span>
+              <span>Đổi ca</span>
             </button>
 
-            {/* Button: ÄÆ¡n Ä‘á»•i ca */}
+            {/* Button: Đơn đổi ca */}
             <button
               type="button"
               onClick={() => setShowSwapListModal(true)}
               className="relative flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-              title="Xem danh sÃ¡ch Ä‘Æ¡n Ä‘á»•i ca"
+              title="Xem danh sách đơn đổi ca"
             >
-              <span>ðŸ“‹ ÄÆ¡n Ä‘á»•i ca</span>
+              <span>📋 Đơn đổi ca</span>
               {pendingMySwapsCount > 0 && (
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
@@ -387,7 +394,7 @@ export default function EmployeeSchedule() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Week Selector */}
             <div className="flex items-center bg-slate-100 rounded-lg border border-slate-200 p-0.5">
-              <button 
+              <button
                 onClick={() => {
                   const parts = currentWeek.split('-').map(Number);
                   const d = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -396,12 +403,12 @@ export default function EmployeeSchedule() {
                   setCurrentWeek(wKey);
                 }}
                 className="p-1 hover:bg-white rounded text-slate-600 cursor-pointer"
-                title="Tuáº§n trÆ°á»›c"
+                title="Tuần trước"
               >
                 <ChevronLeft size={14} />
               </button>
 
-              <select 
+              <select
                 value={currentWeek}
                 onChange={e => setCurrentWeek(e.target.value)}
                 className="border-none bg-transparent text-blue-700 font-bold text-xs outline-none px-2 cursor-pointer"
@@ -411,7 +418,7 @@ export default function EmployeeSchedule() {
                   if (!list.some(item => item.key === currentWeek)) {
                     const parts = currentWeek.split('-').map(Number);
                     const d = new Date(parts[0], parts[1] - 1, parts[2]);
-                    list.push({ key: currentWeek, offset: null, startDate: d, endDate: new Date(d.getTime() + 6 * 86400000), tag: 'Tuáº§n Ä‘Ã£ chá»n' });
+                    list.push({ key: currentWeek, offset: null, startDate: d, endDate: new Date(d.getTime() + 6 * 86400000), tag: 'Tuần đã chọn' });
                     list.sort((a, b) => a.startDate - b.startDate);
                   }
                   return list.map(item => {
@@ -419,12 +426,12 @@ export default function EmployeeSchedule() {
                     const wEnd = item.endDate || new Date(wStart.getTime() + 6 * 86400000);
                     const startStr = `${String(wStart.getDate()).padStart(2, '0')}/${String(wStart.getMonth() + 1).padStart(2, '0')}`;
                     const endStr = `${String(wEnd.getDate()).padStart(2, '0')}/${String(wEnd.getMonth() + 1).padStart(2, '0')}`;
-                    return <option key={item.key} value={item.key}>{item.tag} ({startStr} â†’ {endStr})</option>;
+                    return <option key={item.key} value={item.key}>{item.tag} ({startStr} → {endStr})</option>;
                   });
                 })()}
               </select>
 
-              <button 
+              <button
                 onClick={() => {
                   const parts = currentWeek.split('-').map(Number);
                   const d = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -433,7 +440,7 @@ export default function EmployeeSchedule() {
                   setCurrentWeek(wKey);
                 }}
                 className="p-1 hover:bg-white rounded text-slate-600 cursor-pointer"
-                title="Tuáº§n sau"
+                title="Tuần sau"
               >
                 <ChevronRight size={14} />
               </button>
@@ -441,20 +448,20 @@ export default function EmployeeSchedule() {
 
             {/* Quick Next Week Jump */}
             {!isFutureWeek && (
-              <button 
+              <button
                 onClick={() => setCurrentWeek(nextWeekDateStr)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg font-bold text-xs transition-all shadow-2xs cursor-pointer"
-                title="Chuyá»ƒn sang tuáº§n sau Ä‘á»ƒ Ä‘Äƒng kÃ½ ca lÃ m viá»‡c"
+                title="Chuyển sang tuần sau để đăng ký ca làm việc"
               >
                 <Zap size={13} className="text-amber-600" />
-                <span>ÄÄƒng kÃ½ Tuáº§n Sau â†—</span>
+                <span>Đăng ký Tuần Sau ↗</span>
               </button>
             )}
 
-            <button className="btn btn-outline text-xs py-1.5 px-2.5 rounded-lg font-semibold hover:text-emerald-700 hover:border-emerald-300" onClick={handleExportExcel} title="Xuáº¥t file Excel">
-              <Download size={13} className="text-emerald-600" /> <span className="hidden md:inline">Xuáº¥t Excel</span>
+            <button className="btn btn-outline text-xs py-1.5 px-2.5 rounded-lg font-semibold hover:text-emerald-700 hover:border-emerald-300" onClick={handleExportExcel} title="Xuất file Excel">
+              <Download size={13} className="text-emerald-600" /> <span className="hidden md:inline">Xuất Excel</span>
             </button>
-            <button className="btn btn-outline text-xs py-1.5 px-2.5 rounded-lg font-semibold hover:text-blue-700" onClick={handlePrint} title="In hoáº·c lÆ°u PDF">
+            <button className="btn btn-outline text-xs py-1.5 px-2.5 rounded-lg font-semibold hover:text-blue-700" onClick={handlePrint} title="In hoặc lưu PDF">
               <Printer size={13} /> <span className="hidden md:inline">In PDF</span>
             </button>
           </div>
@@ -466,7 +473,7 @@ export default function EmployeeSchedule() {
             <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">
-                  <Sparkles size={12} /> ÄANG Má»ž ÄÄ‚NG KÃ CA LÃ€M
+                  <Sparkles size={12} /> ĐANG MỞ ĐĂNG KÝ CA LÀM
                 </span>
                 {deadlineInfo?.enabled && (
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] border shadow-2xs flex-shrink-0 ${
@@ -475,12 +482,12 @@ export default function EmployeeSchedule() {
                       : 'bg-white text-blue-800 border-blue-200'
                   }`}>
                     <Clock size={11} className={deadlineInfo.isNearDeadline ? 'text-amber-700' : 'text-blue-600'} />
-                    <span>Háº¡n: {deadlineInfo.formattedDeadline}</span>
+                    <span>Hạn: {deadlineInfo.formattedDeadline}</span>
                     <span className="opacity-80 font-normal">({deadlineInfo.remainingText})</span>
                   </span>
                 )}
                 <span className="text-slate-700 font-semibold hidden md:inline">
-                  Chá»n ca lÃ m viá»‡c cho tuáº§n sau hoáº·c báº¥m chá»n nhanh máº«u:
+                  Chọn ca làm việc cho tuần sau hoặc bấm chọn nhanh mẫu:
                 </span>
               </div>
 
@@ -490,16 +497,16 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => setShowSuggestionModal(true)}
                   className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-[10px] transition-all shadow-xs flex items-center gap-1 cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="Má»Ÿ trá»£ lÃ½ gá»£i Ã½ ca lÃ m viá»‡c tá»± Ä‘á»™ng theo nguyá»‡n vá»ng"
+                  title="Mở trợ lý gợi ý ca làm việc tự động theo nguyện vọng"
                 >
                   <Sparkles size={11} className="text-amber-300" />
-                  <span>âœ¨ Gá»£i Ã½ ca cho tÃ´i</span>
+                  <span>✨ Gợi ý ca cho tôi</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickRegister('6-10')}
                   className="px-2.5 py-1 bg-white hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="ÄÄƒng kÃ½ ca 6-10 (4 tiáº¿ng) tá»« T2 Ä‘áº¿n T7, CN nghá»‰"
+                  title="Đăng ký ca 6-10 (4 tiếng) từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 6-10
                 </button>
@@ -507,7 +514,7 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => handleQuickRegister('6-14')}
                   className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="ÄÄƒng kÃ½ ca 6-14 tá»« T2 Ä‘áº¿n T7, CN nghá»‰"
+                  title="Đăng ký ca 6-14 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 6-14
                 </button>
@@ -515,7 +522,7 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => handleQuickRegister('14-22')}
                   className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="ÄÄƒng kÃ½ ca 14-22 tá»« T2 Ä‘áº¿n T7, CN nghá»‰"
+                  title="Đăng ký ca 14-22 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 14-22
                 </button>
@@ -523,7 +530,7 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => handleQuickRegister('22-6')}
                   className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="ÄÄƒng kÃ½ ca Ä‘Ãªm 22-6 tá»« T2 Ä‘áº¿n T7, CN nghá»‰"
+                  title="Đăng ký ca đêm 22-6 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 22-6
                 </button>
@@ -531,7 +538,7 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => handleQuickRegister('10-18')}
                   className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-[10px] transition-all shadow-2xs cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="ÄÄƒng kÃ½ ca 10-18 tá»« T2 Ä‘áº¿n T7, CN nghá»‰"
+                  title="Đăng ký ca 10-18 từ T2 đến T7, CN nghỉ"
                 >
                   + Ca 10-18
                 </button>
@@ -539,9 +546,9 @@ export default function EmployeeSchedule() {
                   type="button"
                   onClick={() => handleQuickRegister('off')}
                   className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold text-[10px] flex items-center gap-0.5 transition-colors cursor-pointer flex-shrink-0 whitespace-nowrap"
-                  title="XÃ³a táº¥t cáº£ ca tuáº§n nÃ y"
+                  title="Xóa tất cả ca tuần này"
                 >
-                  <RotateCcw size={10} /> Äáº·t láº¡i
+                  <RotateCcw size={10} /> Đặt lại
                 </button>
               </div>
             </div>
@@ -551,7 +558,7 @@ export default function EmployeeSchedule() {
               <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-md border border-emerald-200">
                 <span className={`w-2 h-2 rounded-full ${saveStatus === 'saving' ? 'bg-amber-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`}></span>
                 <span className="text-[10px] font-bold text-slate-700">
-                  {saveStatus === 'saving' ? 'Äang lÆ°u...' : 'Cloud Auto-Saved'}
+                  {saveStatus === 'saving' ? 'Đang lưu...' : 'Đã lưu'}
                 </span>
               </div>
 
@@ -565,72 +572,72 @@ export default function EmployeeSchedule() {
                       : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                 }`}>
                   {isWeekOver23
-                    ? `âš ï¸ VÆ°á»£t Ä‘á»‹nh má»©c PT (${myTotalHours}h / 23h)`
+                    ? `⚠️ Vượt định mức PT (${myTotalHours}h / 23h)`
                     : isWeekUnder16
-                      ? `âš ï¸ Thiáº¿u giá» tá»‘i thiá»ƒu (${myTotalHours}h / 16h)`
-                      : `âœ“ Äá»‹nh má»©c PT an toÃ n (${myTotalHours}h)`}
+                      ? `⚠️ Thiếu giờ tối thiểu (${myTotalHours}h / 16h)`
+                      : `✓ Định mức PT an toàn (${myTotalHours}h)`}
                 </span>
               ) : (
                 <span className="font-bold text-blue-700 text-[10px] bg-white px-2 py-1 rounded-md border border-blue-200">
-                  ÄÃ£ Ä‘Äƒng kÃ½: {myTotalHours}h / 6 ca
+                  Đã đăng ký: {myTotalHours}h / 6 ca
                 </span>
               )}
             </div>
           </div>
         )}
 
-        {/* Banner khi ÄÃƒ Háº¾T Háº N ÄÄ‚NG KÃ (Expired Bar) */}
+        {/* Banner khi ĐÃ HẾT HẠN ĐĂNG KÝ (Expired Bar) */}
         {isFutureWeek && !deadlineReady && <p role="status" className="border-b border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{deadlineInfo.formattedDeadline}</p>}
         {isFutureWeek && deadlineReady && isDeadlineExpired && (
           <div className="bg-gradient-to-r from-rose-50 via-red-50 to-amber-50 px-3 sm:px-4 py-2.5 border-b border-rose-200 text-[11px] text-slate-700 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-600 text-white rounded-md font-extrabold text-[11px] shadow-2xs flex-shrink-0">
-                <Lock size={13} /> ÄÃƒ Háº¾T Háº N ÄÄ‚NG KÃ Lá»ŠCH TUáº¦N
+                <Lock size={13} /> ĐÃ HẾT HẠN ĐĂNG KÝ LỊCH TUẦN
               </span>
               <span className="text-rose-900 font-bold">
-                Háº¡n chÃ³t: {deadlineInfo?.formattedDeadline} ({deadlineInfo?.remainingText}).
+                Hạn chót: {deadlineInfo?.formattedDeadline} ({deadlineInfo?.remainingText}).
               </span>
               <span className="text-slate-600 font-medium hidden sm:inline">
-                Há»‡ thá»‘ng Ä‘Ã£ khÃ³a cÃ¡c Ã´ Ä‘Äƒng kÃ½ ca. Náº¿u cáº§n bá»• sung hoáº·c Ä‘á»•i ca Ä‘á»™t xuáº¥t, vui lÃ²ng liÃªn há»‡ Cá»­a hÃ ng trÆ°á»Ÿng.
+                Hệ thống đã khóa các ô đăng ký ca. Nếu cần bổ sung hoặc đổi ca đột xuất, vui lòng liên hệ Cửa hàng trưởng.
               </span>
             </div>
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="px-2.5 py-1 bg-white border border-rose-300 rounded-md text-[10px] font-black text-rose-700 shadow-2xs">
-                ðŸ”’ ÄÃ£ khÃ³a Ä‘Äƒng kÃ½
+                🔒 Đã khóa đăng ký
               </span>
             </div>
           </div>
         )}
 
-        {/* Banner khi TUáº¦N ÄÃƒ ÄÆ¯á»¢C DUYá»†T (Approved Bar) */}
+        {/* Banner khi TUẦN ĐÃ ĐƯỢC DUYỆT (Approved Bar) */}
         {isFutureWeek && !isDraft && (
           <div className="bg-emerald-50 px-3 sm:px-4 py-2 border-b border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-600 text-white rounded-md font-extrabold text-[11px]">
-                âœ“ Lá»ŠCH ÄÃƒ ÄÆ¯á»¢C DUYá»†T CHÃNH THá»¨C
+                ✓ LỊCH ĐÃ ĐƯỢC DUYỆT CHÍNH THỨC
               </span>
-              <span className="font-semibold">Quáº£n lÃ½ Ä‘Ã£ chá»‘t phÃ¢n ca. Má»i thay Ä‘á»•i cáº§n thÃ´ng qua tÃ­nh nÄƒng Äá»•i ca.</span>
+              <span className="font-semibold">Quản lý đã chốt phân ca. Mọi thay đổi cần thông qua tính năng Đổi ca.</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="bg-blue-50/50 p-3 sm:px-5 sm:py-3 border-b border-blue-100 flex flex-col gap-1 text-[11px] text-blue-900">
-        <div className="font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-blue-600" /> QUY Táº®C & TRáº NG THÃI Xáº¾P Lá»ŠCH:</div>
-        <ul className="list-disc list-inside space-y-1 ml-1 opacity-90 text-[10.5px]">
-          <li><strong>Ná»n tráº¯ng (khÃ´ng mÃ u):</strong> Ca Ä‘Äƒng kÃ½ / Lá»‹ch nhÃ¡p. Äang chá» Quáº£n lÃ½ duyá»‡t.</li>
-          <li><strong>CÃ³ mÃ u ná»n theo ca:</strong> Lá»‹ch Ä‘Ã£ Ä‘Æ°á»£c Quáº£n lÃ½ CHá»T & BAN HÃ€NH chÃ­nh thá»©c.</li>
-          <li><strong>AI xáº¿p ca thÃ´ng minh:</strong> AI sáº½ dá»±a vÃ o lá»‹ch ráº£nh báº¡n Ä‘Ã£ Ä‘Äƒng kÃ½ káº¿t há»£p dá»± bÃ¡o doanh thu cá»­a hÃ ng vÃ  chá»‰ Ä‘áº¡o cá»§a Quáº£n lÃ½ Ä‘á»ƒ phÃ¢n ca cÃ´ng báº±ng, tuyá»‡t Ä‘á»‘i tÃ´n trá»ng ngÃ y báº¡n Ä‘Ã£ xin nghá»‰ (OFF).</li>
+      <details className="shrink-0 bg-blue-50/50 p-2 sm:px-5 border-b border-blue-100 text-xs text-blue-900">
+        <summary className="cursor-pointer py-1 font-semibold">Cách đọc lịch và đăng ký ca</summary>
+        <ul className="list-disc pl-4 space-y-1 py-2">
+          <li>Chọn ngày để xem đồng nghiệp và các ca tiếp theo trong cửa hàng.</li>
+          <li>“Đăng ký · chưa chốt” là ca chờ quản lý chọn. Lịch chính thức cần được duyệt theo tuần.</li>
+          <li>Muốn đăng ký ca của mình, mở “Lịch của tôi” và chọn tuần sau. Ngày OFF được giữ nguyên khi gợi ý xếp lịch.</li>
         </ul>
-      </div>
+      </details>
 
-      {/* VIEW 1: Lá»ŠCH BIá»‚U THáºº CÃ NHÃ‚N (CARD VIEW - Tá»I Æ¯U MOBILE & TRá»°C QUAN) */}
+      {/* VIEW 1: LỊCH BIỂU THẺ CÁ NHÂN (CARD VIEW - TỐI ƯU MOBILE & TRỰC QUAN) */}
       {displayView === 'card' && (
         <div className="flex-1 overflow-auto p-3 sm:p-5 space-y-4">
           {/* Enhanced Personal Mini-Dashboard */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            
-            {/* Cá»™t 1: ThÃ´ng tin cÃ¡ nhÃ¢n & HÃ´m nay */}
+
+            {/* Cột 1: Thông tin cá nhân & Hôm nay */}
             <div className="lg:col-span-1 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
@@ -642,25 +649,25 @@ export default function EmployeeSchedule() {
                     <span className="text-xs font-mono text-slate-400">({user?.id})</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    <span className="font-semibold text-blue-700">{myDept}</span> â€¢ {user?.role || user?.type || 'NhÃ¢n viÃªn'}
+                    <span className="font-semibold text-blue-700">{myDept}</span> • {user?.role || user?.type || 'Nhân viên'}
                   </div>
                 </div>
               </div>
-              
-              {/* Ca hÃ´m nay */}
+
+              {/* Ca hôm nay */}
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-3">
                 <div className="bg-blue-600 text-white p-1.5 rounded-lg"><Sun size={16} /></div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-blue-800 uppercase mb-0.5">Ca lÃ m hÃ´m nay</div>
+                  <div className="text-xs font-bold text-blue-800 uppercase mb-0.5">Ca làm hôm nay</div>
                   <div className="text-sm font-bold text-slate-700">
                     {!todayCard || todayCard.isOff
-                      ? <span className="text-slate-500">{todayCard?.shift === 'off' ? 'Nghá»‰ (OFF)' : 'ChÆ°a xáº¿p ca'}</span>
+                      ? <span className="text-slate-500">{todayCard?.shift === 'off' ? 'Nghỉ (OFF)' : 'Chưa xếp ca'}</span>
                       : <span className="text-blue-700">{todayCard.shift}</span>}
                   </div>
                   {todayCard?.isSupport && (
                     <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-0.5">
                       <MapPin size={11} />
-                      Há»— trá»£ {storeLabel(todayCard.covering_store)}
+                      Hỗ trợ {storeLabel(todayCard.covering_store)}
                     </div>
                   )}
                   {todayCard?.swapInfo && (
@@ -670,41 +677,41 @@ export default function EmployeeSchedule() {
                     </div>
                   )}
                   {!todayCard && (
-                    <div className="text-[11px] text-slate-400 mt-1">Äang xem tuáº§n khÃ¡c â€” khÃ´ng cÃ³ â€œhÃ´m nayâ€.</div>
+                    <div className="text-[11px] text-slate-400 mt-1">Đang xem tuần khác — không có “hôm nay”.</div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Cá»™t 2: Tiáº¿n Ä‘á»™ giá» lÃ m & Thá»‘ng kÃª */}
+            {/* Cột 2: Tiến độ giờ làm & Thống kê */}
             <div className="lg:col-span-2 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-center">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-800 flex items-center gap-1.5"><Clock size={16} className="text-slate-500"/> Tiáº¿n Ä‘á»™ tuáº§n nÃ y</h3>
+                <h3 className="font-bold text-slate-800 flex items-center gap-1.5"><Clock size={16} className="text-slate-500"/> Tiến độ tuần này</h3>
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${
-                  canRegister 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  canRegister
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : (isDeadlineExpired ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200')
                 }`}>
-                  {canRegister ? 'Äang má»Ÿ Ä‘Äƒng kÃ½ âœï¸' : (isDeadlineExpired ? 'ÄÃ£ háº¿t háº¡n ná»™p ðŸ”’' : 'ÄÃ£ chá»‘t lá»‹ch ðŸ”’')}
+                  {canRegister ? 'Đang mở đăng ký ✍️' : (isDeadlineExpired ? 'Đã hết hạn nộp 🔒' : 'Đã chốt lịch 🔒')}
                 </span>
               </div>
-              
-              {/* Thanh tiáº¿n Ä‘á»™ */}
+
+              {/* Thanh tiến độ */}
               <div className="mb-4">
                 <div className="flex justify-between text-xs font-bold mb-1.5">
-                  <span className="text-slate-600">ÄÃ£ Ä‘Äƒng kÃ½: <span className="text-blue-700 text-sm">{myTotalHours}h</span> <span className="text-slate-400 font-normal">({myTotalShifts} ca)</span></span>
-                  <span className="text-slate-400">Äá»‹nh má»©c: {isPT ? '16h-23h' : '48h'}</span>
+                  <span className="text-slate-600">Đã đăng ký: <span className="text-blue-700 text-sm">{myTotalHours}h</span> <span className="text-slate-400 font-normal">({myTotalShifts} ca)</span></span>
+                  <span className="text-slate-400">Định mức: {isPT ? '16h-23h' : '48h'}</span>
                 </div>
                 <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/50">
-                  <div 
+                  <div
                     className={`h-full rounded-full transition-all duration-500 ${isWeekOver23 ? 'bg-red-500' : (isWeekUnder16 || isFTUnder48) ? 'bg-amber-400' : 'bg-emerald-500'}`}
                     style={{ width: `${Math.min(100, (myTotalHours / (isPT ? 23 : 48)) * 100)}%` }}
                   ></div>
                 </div>
                 <div className="text-[11px] font-medium text-slate-500 mt-2 flex justify-between">
-                  <span>Tráº¡ng thÃ¡i: 
+                  <span>Trạng thái:
                     <span className={`ml-1 font-bold ${isWeekOver23 ? 'text-red-600' : (isWeekUnder16 || isFTUnder48) ? 'text-amber-600' : 'text-emerald-600'}`}>
-                      {isWeekOver23 ? 'VÆ°á»£t Ä‘á»‹nh má»©c tá»‘i Ä‘a!' : (isWeekUnder16 || isFTUnder48 ? 'ChÆ°a Ä‘á»§ giá» chuáº©n' : 'Tuyá»‡t vá»i, Ä‘áº¡t Ä‘á»‹nh má»©c')}
+                      {isWeekOver23 ? 'Vượt định mức tối đa!' : (isWeekUnder16 || isFTUnder48 ? 'Chưa đủ giờ chuẩn' : 'Tuyệt vời, đạt định mức')}
                     </span>
                   </span>
                 </div>
@@ -714,28 +721,28 @@ export default function EmployeeSchedule() {
               <div className="flex items-center gap-2 mt-auto">
                 {pendingMySwapsCount > 0 ? (
                   <button onClick={() => setShowSwapListModal(true)} className="flex-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer hover:bg-amber-100 transition-colors shadow-sm">
-                    <AlertTriangle size={14}/> Báº¡n cÃ³ {pendingMySwapsCount} Ä‘Æ¡n Ä‘á»•i ca chá» xÃ¡c nháº­n!
+                    <AlertTriangle size={14}/> Bạn có {pendingMySwapsCount} đơn đổi ca chờ xác nhận!
                   </button>
                 ) : (
                   <div className="flex-1 bg-slate-50 border border-slate-100 text-slate-500 text-xs font-medium py-2 px-3 rounded-xl flex items-center justify-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-500"/> KhÃ´ng cÃ³ Ä‘Æ¡n tá»« nÃ o tá»“n Ä‘á»ng
+                    <CheckCircle2 size={14} className="text-emerald-500"/> Không có đơn từ nào tồn đọng
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* TÃ³m táº¯t tuáº§n: Ä‘á»•i ca + há»— trá»£ */}
+          {/* Tóm tắt tuần: đổi ca + hỗ trợ */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
                 <CalendarIcon size={15} className="text-slate-500" />
-                TÃ³m táº¯t tuáº§n: Ä‘á»•i ca & há»— trá»£
+                Tóm tắt tuần: đổi ca & hỗ trợ
               </h3>
               <div className="flex items-center gap-2 text-[10px] font-bold">
-                <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">Há»— trá»£ CH</span>
-                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">ÄÃ£ Ä‘á»•i ca</span>
-                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">Chá» duyá»‡t</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">Hỗ trợ CH</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">Đã đổi ca</span>
+                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">Chờ duyệt</span>
               </div>
             </div>
 
@@ -757,21 +764,21 @@ export default function EmployeeSchedule() {
                   title={[
                     card.dayFullName,
                     card.isOff ? 'OFF' : card.shift,
-                    card.isSupport ? `Há»— trá»£ ${storeLabel(card.covering_store)}` : '',
+                    card.isSupport ? `Hỗ trợ ${storeLabel(card.covering_store)}` : '',
                     card.swapInfo?.label || ''
-                  ].filter(Boolean).join(' Â· ')}
+                  ].filter(Boolean).join(' · ')}
                 >
                   <div className="text-[10px] font-black text-slate-700">{card.dayKey}</div>
                   <div className="text-[8.5px] font-mono text-slate-400 font-semibold">{card.dateFormatted.slice(0, 5)}</div>
                   <div className="text-[10px] font-bold text-slate-800 truncate mt-0.5">
-                    {card.isOff ? 'OFF' : (card.shift || 'â€”')}
+                    {card.isOff ? 'OFF' : (card.shift || '—')}
                   </div>
                   {card.isSupport && (
-                    <div className="text-[9px] font-black text-amber-700 truncate">â†’ {card.covering_store}</div>
+                    <div className="text-[9px] font-black text-amber-700 truncate">→ {card.covering_store}</div>
                   )}
                   {card.swapInfo && (
                     <div className={`text-[9px] font-black truncate ${card.swapInfo.pending ? 'text-indigo-700' : 'text-emerald-700'}`}>
-                      â‡„ {card.swapInfo.kind === 'swap-out' ? 'Ä‘i' : card.swapInfo.kind === 'swap-in' ? 'nháº­n' : 'Ä‘á»•i'}
+                      ⇄ {card.swapInfo.kind === 'swap-out' ? 'đi' : card.swapInfo.kind === 'swap-in' ? 'nhận' : 'đổi'}
                     </div>
                   )}
                 </div>
@@ -779,13 +786,13 @@ export default function EmployeeSchedule() {
             </div>
 
             {supportDaysThisWeek.length === 0 && swapDaysThisWeek.length === 0 ? (
-              <p className="text-[11px] text-slate-500">Tuáº§n nÃ y chÆ°a cÃ³ ngÃ y Ä‘á»•i ca hoáº·c Ä‘i há»— trá»£ cá»­a hÃ ng khÃ¡c.</p>
+              <p className="text-[11px] text-slate-500">Tuần này chưa có ngày đổi ca hoặc đi hỗ trợ cửa hàng khác.</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {supportDaysThisWeek.map((card) => (
                   <div key={`sup-${card.dayKey}`} className="text-[11px] font-semibold text-amber-800">
-                    {card.dayFullName}: há»— trá»£ {storeLabel(card.covering_store)}
-                    {card.shift && !card.isOff ? ` Â· ca ${card.shift}` : ''}
+                    {card.dayFullName}: hỗ trợ {storeLabel(card.covering_store)}
+                    {card.shift && !card.isOff ? ` · ca ${card.shift}` : ''}
                   </div>
                 ))}
                 {swapDaysThisWeek.map((card) => (
@@ -806,11 +813,11 @@ export default function EmployeeSchedule() {
               const canEdit = canRegister;
 
               return (
-                <div 
+                <div
                   key={card.dayKey}
                   className={`rounded-2xl border transition-all flex flex-col justify-between overflow-hidden shadow-2xs ${
-                    card.isToday 
-                      ? 'bg-blue-50/70 border-blue-400 ring-2 ring-blue-500/20' 
+                    card.isToday
+                      ? 'bg-blue-50/70 border-blue-400 ring-2 ring-blue-500/20'
                       : card.swapInfo?.pending
                         ? 'bg-white border-indigo-300 ring-1 ring-indigo-200'
                         : card.swapInfo
@@ -833,14 +840,14 @@ export default function EmployeeSchedule() {
                     <div className="flex flex-col items-end gap-0.5">
                       {card.isToday && (
                         <span className="px-2 py-0.5 bg-white text-blue-700 rounded-full font-black text-[9px] uppercase tracking-wider shadow-xs">
-                          HÃ´m nay
+                          Hôm nay
                         </span>
                       )}
                       {card.isSupport && (
                         <span className={`px-1.5 py-0.5 rounded-full font-black text-[8px] uppercase tracking-wide ${
                           card.isToday ? 'bg-amber-200 text-amber-900' : 'bg-amber-100 text-amber-800'
                         }`}>
-                          Há»— trá»£
+                          Hỗ trợ
                         </span>
                       )}
                       {card.swapInfo && (
@@ -849,7 +856,7 @@ export default function EmployeeSchedule() {
                             ? (card.isToday ? 'bg-indigo-200 text-indigo-900' : 'bg-indigo-100 text-indigo-800')
                             : (card.isToday ? 'bg-emerald-200 text-emerald-900' : 'bg-emerald-100 text-emerald-800')
                         }`}>
-                          {card.swapInfo.pending ? 'Chá» Ä‘á»•i' : 'Äá»•i ca'}
+                          {card.swapInfo.pending ? 'Chờ đổi' : 'Đổi ca'}
                         </span>
                       )}
                     </div>
@@ -862,15 +869,15 @@ export default function EmployeeSchedule() {
                         <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-1.5">
                           <Coffee size={18} />
                         </div>
-                        <div className="font-extrabold text-slate-400 text-xs">NGHá»ˆ (OFF)</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">KhÃ´ng cÃ³ ca lÃ m</div>
+                        <div className="font-extrabold text-slate-400 text-xs">NGHỈ (OFF)</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Không có ca làm</div>
                       </div>
                     ) : (
                       <div>
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
                             {card.shift.startsWith('22') ? <Moon size={11} className="text-indigo-600" /> : <Sun size={11} className="text-amber-500" />}
-                            <span>Ca lÃ m viá»‡c</span>
+                            <span>Ca làm việc</span>
                           </span>
                           <span className="font-mono font-bold text-xs text-blue-700 bg-blue-50 border border-blue-200 px-1.5 rounded">
                             {card.hours}h
@@ -878,7 +885,7 @@ export default function EmployeeSchedule() {
                         </div>
 
                         {/* Shift Badge */}
-                        <div 
+                        <div
                           className={`p-2.5 rounded-xl font-black text-sm text-center shadow-2xs ${
                             !card.isConfirmed
                               ? 'border-2 border-dashed border-slate-300 bg-white text-slate-700'
@@ -897,7 +904,7 @@ export default function EmployeeSchedule() {
                           <div>{card.shift}</div>
                           {!card.isConfirmed && (
                             <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                              (Lá»‹ch ráº£nh Ä‘Äƒng kÃ½ - ChÆ°a chá»‘t)
+                              (Lịch rảnh đăng ký - Chưa chốt)
                             </div>
                           )}
                         </div>
@@ -907,8 +914,8 @@ export default function EmployeeSchedule() {
                           <MapPin size={12} className={`mt-0.5 shrink-0 ${card.isSupport ? 'text-amber-600' : 'text-slate-400'}`} />
                           <span>
                             {card.isSupport
-                              ? `Há»— trá»£: ${storeLabel(card.covering_store)}`
-                              : `Táº¡i: ${storeLabel(myDept) || myDept}`}
+                              ? `Hỗ trợ: ${storeLabel(card.covering_store)}`
+                              : `Tại: ${storeLabel(myDept) || myDept}`}
                           </span>
                         </div>
                       </div>
@@ -919,7 +926,7 @@ export default function EmployeeSchedule() {
                         {card.isSupport && card.isOff && (
                           <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-1.5 py-1">
                             <MapPin size={11} />
-                            Há»— trá»£ {storeLabel(card.covering_store)}
+                            Hỗ trợ {storeLabel(card.covering_store)}
                           </div>
                         )}
                         {card.swapInfo && (
@@ -931,22 +938,22 @@ export default function EmployeeSchedule() {
                         {card.restWarning?.hasRestWarning && (
                           <div className="flex flex-col gap-0.5 text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-1.5 py-1" title={card.restWarning.issues.map(i => i.message).join('\n')}>
                             <div className="flex items-center gap-1">
-                              <span className="text-[12px]">ðŸ’¤</span> 
-                              <span>Cáº§n nghá»‰ ngÆ¡i ({card.restWarning.restHours}h gap)</span>
+                              <span className="text-[12px]">💤</span>
+                              <span>Cần nghỉ ngơi ({card.restWarning.restHours}h gap)</span>
                             </div>
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Quick Actions (Khi lá»‹ch Ä‘Ã£ chá»‘t) */}
+                    {/* Quick Actions (Khi lịch đã chốt) */}
                     {!canEdit && !card.isOff && (
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 mt-auto">
                         <button
                           onClick={() => setShowSwapModal(true)}
                           className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
                         >
-                          <RotateCcw size={10} /> Äá»•i ca
+                          <RotateCcw size={10} /> Đổi ca
                         </button>
                         <button
                           onClick={() => {
@@ -963,17 +970,17 @@ export default function EmployeeSchedule() {
                             });
                           }}
                           className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold rounded-lg border border-red-100 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
-                          title="BÃ¡o lá»—i hoáº·c yÃªu cáº§u bÃ¹ cÃ´ng cho ca nÃ y"
+                          title="Báo lỗi hoặc yêu cầu bù công cho ca này"
                         >
-                          <AlertTriangle size={10} /> BÃ¡o lá»—i
+                          <AlertTriangle size={10} /> Báo lỗi
                         </button>
                       </div>
                     )}
 
-                    {/* Interactive Shift Changer (Khi lá»‹ch Ä‘ang má»Ÿ) */}
+                    {/* Interactive Shift Changer (Khi lịch đang mở) */}
                     {canEdit && (
                       <div className="pt-2 border-t border-slate-100 mt-auto">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1">ÄÄƒng kÃ½ ca ngÃ y nÃ y:</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Đăng ký ca ngày này:</label>
                         <select
                           className="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs"
                           value={card.shift || 'off'}
@@ -993,10 +1000,10 @@ export default function EmployeeSchedule() {
         </div>
       )}
 
-      {/* VIEW 2: Báº¢NG TÃNH EXCEL TOÃ€N Cá»¬A HÃ€NG (TABLE VIEW) */}
+      {/* VIEW 2: BẢNG TÍNH EXCEL TOÀN CỬA HÀNG (TABLE VIEW) */}
       {displayView === 'table' && visibleDepts.length > 1 && (
         <div className="print:hidden px-3 pt-2 pb-1.5 flex flex-wrap items-center gap-1.5 bg-slate-100 border-b border-slate-200">
-          <span className="text-[11px] font-bold text-slate-500 mr-1">ðŸ¬ Cá»­a hÃ ng:</span>
+          <span className="text-[11px] font-bold text-slate-500 mr-1">🏬 Cửa hàng:</span>
           <button
             onClick={() => setViewDept('ALL')}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
@@ -1004,9 +1011,9 @@ export default function EmployeeSchedule() {
                 ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                 : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
             }`}
-            title="Xem toÃ n bá»™ lá»‹ch cÃ¡c cá»­a hÃ ng trong cÃ¹ng cá»¥m quáº£n lÃ½ cá»§a SM"
+            title="Xem toàn bộ lịch các cửa hàng trong cùng cụm quản lý của SM"
           >
-            ðŸ¢ Táº¥t cáº£ cá»­a hÃ ng (Cá»¥m SM)
+            🏢 Tất cả cửa hàng (Cụm SM)
           </button>
           {visibleDepts.map(id => (
             <button key={id}
@@ -1016,7 +1023,7 @@ export default function EmployeeSchedule() {
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
               }`}
-              title={`Xem lá»‹ch ${getStoreLabel(stores, id)}`}
+              title={`Xem lịch ${getStoreLabel(stores, id)}`}
             >
               {getStoreLabel(stores, id)}
             </button>
@@ -1024,18 +1031,19 @@ export default function EmployeeSchedule() {
         </div>
       )}
 
+      {displayView === 'table' && <StoreDaySchedule groupedEmployees={groupedEmps} schedule={weekSchedule} week={currentWeek} userId={user?.id} />}
       {displayView === 'table' && (
-        <div className="flex-1 overflow-auto excel-table-container touch-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
+        <div className="hidden sm:block min-h-0 flex-1 overflow-auto excel-table-container touch-auto bg-slate-100 p-2 relative print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print:h-auto">
           {(supportDaysThisWeek.length > 0 || swapDaysThisWeek.length > 0) && (
             <div className="print:hidden mb-2 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[11px] flex flex-wrap gap-x-4 gap-y-1">
               {supportDaysThisWeek.map((card) => (
                 <span key={`t-sup-${card.dayKey}`} className="font-bold text-amber-800">
-                  {card.dayKey}: há»— trá»£ {card.covering_store}
+                  {card.dayKey}: hỗ trợ {card.covering_store}
                 </span>
               ))}
               {swapDaysThisWeek.map((card) => (
                 <span key={`t-sw-${card.dayKey}`} className={`font-bold ${card.swapInfo.pending ? 'text-indigo-800' : 'text-emerald-800'}`}>
-                  {card.dayKey}: â‡„ {card.swapInfo.label}
+                  {card.dayKey}: ⇄ {card.swapInfo.label}
                 </span>
               ))}
             </div>
@@ -1045,14 +1053,14 @@ export default function EmployeeSchedule() {
               <thead>
                 <tr className="bg-slate-200 border-b border-slate-300">
                   <th className="hidden sm:table-cell min-w-[48px] w-[48px] max-w-[48px] text-center font-bold text-slate-700 text-xs sticky left-0 z-20 bg-slate-200 border-r border-slate-300">STT</th>
-                  <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-700 text-xs sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '48px' }}>MÃ£ NV</th>
+                  <th className="hidden md:table-cell min-w-[96px] w-[96px] max-w-[96px] text-center font-bold text-slate-700 text-xs sticky z-20 bg-slate-200 border-r border-slate-300" style={{ left: '48px' }}>Mã NV</th>
                   <th className="min-w-[125px] sm:min-w-[150px] md:min-w-[200px] w-[125px] sm:w-[150px] md:w-[200px] max-w-[125px] sm:max-w-[150px] md:max-w-[200px] text-left font-bold text-slate-700 text-xs sticky z-30 bg-slate-200 border-r border-slate-300 px-2 sm:px-3 left-0 sm:left-[48px] md:left-[144px] shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)]">
-                    Há» vÃ  TÃªn
+                    Họ và Tên
                   </th>
-                  <th className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Vá»‹ trÃ­</th>
-                  <th className="hidden lg:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Cá»­a hÃ ng</th>
-                  
-                  {/* 7 Cá»™t NgÃ y Trong Tuáº§n */}
+                  <th className="hidden md:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Vị trí</th>
+                  <th className="hidden lg:table-cell min-w-[80px] w-[80px] max-w-[80px] text-center font-bold text-slate-700 text-xs border-r border-slate-300">Cửa hàng</th>
+
+                  {/* 7 Cột Ngày Trong Tuần */}
                   {activeDays.map((day, idx) => {
                     let dateStr = '';
                     let isToday = false;
@@ -1068,12 +1076,12 @@ export default function EmployeeSchedule() {
                     }
 
                     return (
-                      <th 
-                        key={day} 
+                      <th
+                        key={day}
                         data-day-col={day}
                         className={`min-w-[52px] w-[52px] sm:min-w-[60px] sm:w-[60px] sm:max-w-[60px] border-r border-slate-300 py-1 transition-colors ${
-                          isToday 
-                            ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500' 
+                          isToday
+                            ? 'bg-blue-200/90 text-blue-950 font-black ring-1 ring-blue-500'
                             : (day === 'CN' ? 'bg-orange-50/80 text-orange-900' : 'bg-slate-200 text-slate-700')
                         }`}
                       >
@@ -1082,7 +1090,7 @@ export default function EmployeeSchedule() {
                           {dateStr && <span className="text-[10px] font-mono font-bold opacity-80 mt-0.5">{dateStr}</span>}
                           {isToday && (
                             <span className="text-[8px] uppercase tracking-tighter bg-blue-600 text-white px-1 rounded font-black mt-0.5 shadow-2xs">
-                              HÃ´m nay
+                              Hôm nay
                             </span>
                           )}
                         </div>
@@ -1090,21 +1098,21 @@ export default function EmployeeSchedule() {
                     );
                   })}
 
-                  <th className="min-w-[64px] w-[64px] text-center font-bold text-slate-800 text-xs border-r border-slate-300 bg-slate-200">Tá»•ng giá»</th>
-                  <th className="min-w-[56px] w-[56px] text-center font-bold text-slate-800 text-xs bg-slate-200">Sá»‘ ca</th>
+                  <th className="min-w-[64px] w-[64px] text-center font-bold text-slate-800 text-xs border-r border-slate-300 bg-slate-200">Tổng giờ</th>
+                  <th className="min-w-[56px] w-[56px] text-center font-bold text-slate-800 text-xs bg-slate-200">Số ca</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(groupedEmps).map(([dept, emps]) => {
-                  const filteredList = filterOnlyMe 
-                    ? emps.filter(e => e.id === user?.id) 
+                  const filteredList = filterOnlyMe
+                    ? emps.filter(e => e.id === user?.id)
                     : emps;
 
                   return (
                     <React.Fragment key={dept}>
                       <tr className="bg-slate-100 font-bold border-b border-slate-300">
                         <td colSpan={activeDays.length + 7} className="px-4 py-1.5 text-blue-800 text-xs sticky left-0 z-10 bg-slate-100">
-                          ðŸ¬ Cá»¬A HÃ€NG: {dept} ({filteredList.length} nhÃ¢n sá»±)
+                          🏬 CỬA HÀNG: {dept} ({filteredList.length} nhân sự)
                         </td>
                       </tr>
 
@@ -1129,8 +1137,8 @@ export default function EmployeeSchedule() {
                         const isPTOvertimed = isEmpPT && totalH > 23;
 
                         return (
-                          <tr 
-                            key={emp.id} 
+                          <tr
+                            key={emp.id}
                             className={`hover:bg-slate-50 border-b border-slate-200 ${
                               isMe ? 'bg-blue-50/70 font-bold ring-2 ring-blue-500/40' : ''
                             }`}
@@ -1148,7 +1156,7 @@ export default function EmployeeSchedule() {
                                 <span>{emp.name}</span>
                                 {isMe && (
                                   <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[10px] font-bold">
-                                    TÃ´i
+                                    Tôi
                                   </span>
                                 )}
                               </div>
@@ -1160,7 +1168,7 @@ export default function EmployeeSchedule() {
                               {emp.dept}
                             </td>
 
-                            {/* Ã” Ca LÃ m Viá»‡c */}
+                            {/* Ô Ca Làm Việc */}
                             {activeDays.map((day, dIdx) => {
                               const val = empSched[day] || '';
                               const canEdit = isMe && canRegister;
@@ -1178,6 +1186,7 @@ export default function EmployeeSchedule() {
                                     colIndex={dIdx}
                                     onChange={(newVal) => handleShiftChange(emp, day, newVal)}
                                     empName={emp.name}
+                                    empId={emp.id}
                                     dayLabel={day}
                                   />
                                   {swapInfo && (
@@ -1186,24 +1195,24 @@ export default function EmployeeSchedule() {
                                         swapInfo.pending ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
                                       }`}
                                     >
-                                      â‡„
+                                      ⇄
                                     </span>
                                   )}
                                 </td>
                               );
                             })}
 
-                            {/* Tá»•ng Giá» */}
+                            {/* Tổng Giờ */}
                             <td className={`min-w-[64px] w-[64px] text-center font-black text-xs border-r border-slate-300 ${
-                              isPTOvertimed 
-                                ? 'bg-red-100 text-red-700' 
+                              isPTOvertimed
+                                ? 'bg-red-100 text-red-700'
                                 : (totalH > 0 ? 'text-blue-700 bg-slate-50' : 'text-slate-400 bg-slate-50')
                             }`}>
-                              {isPTOvertimed && <span>âš ï¸ </span>}
+                              {isPTOvertimed && <span>⚠️ </span>}
                               <span>{totalH}h</span>
                             </td>
 
-                            {/* Sá»‘ Ca */}
+                            {/* Số Ca */}
                             <td className="min-w-[56px] w-[56px] text-center font-bold text-xs text-slate-700 bg-slate-50">
                               {totalShifts} ca
                             </td>

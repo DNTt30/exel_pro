@@ -89,6 +89,8 @@ Entry point của app là `frontend/index.html`. Thư mục `schedule-app/` là 
 
 ## 🧪 5. Kiểm Thử & Kiểm Soát Chất Lượng (Quality Gates)
 
+Thử bot đọc nhân viên, xem lịch và tạo nháp bằng dữ liệu local riêng: [Hướng dẫn bot tạo lịch nháp](docs/AGENT_SCHEDULING.md) (`npm run dev:agent`, `npm run test:agent`).
+
 Dự án áp dụng cổng kiểm soát chất lượng tự động nghiêm ngặt:
 
 ```bash

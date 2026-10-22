@@ -1,48 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, AlarmClock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import * as api from '../../services/api';
 import { getPayrollCycle } from '../../utils/payrollCycle';
+import { monthConfirmationState } from '../../utils/employeeSupport';
 
-/** O thong ke xac nhan cong chu ky 26->25 cho Dashboard admin */
-export default function MonthConfirmWidget() {
+export default function MonthConfirmWidget({ employees: scopedEmployees, cycleKey }) {
   const employees = useStore(s => s.employees);
-  const [rows, setRows] = useState([]);
-  const cycle = useMemo(() => getPayrollCycle(new Date()), []);
-
+  const identity = useStore(s => s.user?.id);
+  const cycle = cycleKey || getPayrollCycle(new Date()).key;
+  const [state, setState] = useState({});
+  const [retry, setRetry] = useState(0);
+  const key = `${identity}:${cycle}`;
   useEffect(() => {
-    let alive = true;
-    api.getFeedbacks({ limit: 400 }).then(rs => { if (alive) setRows(rs || []); }).catch(() => {});
+    let alive = true; setState({});
+    api.getMonthConfirmations(cycle).then(rows => { if (alive) setState({ key, rows }); })
+      .catch(() => { if (alive) setState({ key, error: 'Chưa tải được trạng thái xác nhận công.' }); });
     return () => { alive = false; };
-  }, []);
-
-  const confirmedIds = useMemo(
-    () => new Set(rows.filter(r => r.shift === 'XAC_NHAN_CONG' && r.date === cycle.key).map(r => r.empId)),
-    [rows, cycle.key]
-  );
-  const total = employees.length;
-  const done = employees.filter(e => confirmedIds.has(e.id)).length;
-  const pct = total ? Math.round((done / total) * 100) : 100;
-  const missing = employees.filter(e => !confirmedIds.has(e.id)).slice(0, 5);
-  // Qua han chot (sau ngay 25): nhac SM ra tay xu ly
-  const overdue = new Date().getDate() > 25 && pct < 100;
-
-  return (
-    <div className={`rounded-2xl border p-4 bg-white shadow-sm ${overdue ? 'border-red-300' : 'border-slate-200'}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className={`text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${overdue ? 'text-red-500' : 'text-slate-400'}`}>
-          {overdue ? <AlarmClock size={13} /> : <BadgeCheck size={13} className="text-emerald-600" />}
-          {overdue ? `Quá hạn chốt công ${cycle.label}` : `Xác nhận công ${cycle.label}`}
-        </div>
-        <span className={`text-xs font-black ${pct === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{pct}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} />
-      </div>
-      <div className="text-xs text-slate-600 mt-1.5">{done}/{total} nhân viên đã xác nhận{overdue ? ' · hệ thống ghi nhận công mặc định đúng, SM rà lại danh sách dưới' : ''}</div>
-      {missing.length > 0 && (
-        <div className="text-[11px] text-slate-400 mt-1 truncate">Chưa xác nhận: {missing.map(m => m.name).join(', ')}{employees.length - done > 5 ? ` +${employees.length - done - 5} người khác` : ''}</div>
-      )}
-    </div>
-  );
+  }, [cycle, key, retry]);
+  const people = monthConfirmationState(state.rows || [], scopedEmployees || employees);
+  const done = people.filter(row => row.confirmation === 'confirmed').length;
+  const disputed = people.filter(row => row.confirmation === 'disputed').length;
+  return <section className="rounded-xl border bg-white p-4 space-y-3" data-testid="month-confirm-widget">
+    <h2 className="font-bold text-sm">Xác nhận công · chu kỳ {cycle}</h2>
+    {state.key !== key ? <p role="status">Đang tải xác nhận công…</p> : state.error ? <p role="alert" className="text-red-700">{state.error} <button className="min-h-11 underline" onClick={() => setRetry(v => v + 1)}>Thử lại</button></p> : <>
+      <p className="text-sm">{done}/{people.length} người đã xác nhận · {disputed} người có phản hồi cần đối chiếu · {people.length - done - disputed} người chưa gửi xác nhận.</p>
+      <details><summary className="cursor-pointer text-sm">Danh sách trạng thái từng nhân viên</summary><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th scope="col" className="p-2">Nhân viên</th><th scope="col" className="p-2">Cửa hàng</th><th scope="col" className="p-2">Trạng thái mới nhất</th></tr></thead><tbody>{people.map(person => <tr key={person.id} className="border-t"><th scope="row" className="p-2">{person.name} · {person.id}</th><td className="p-2">{person.dept}</td><td className="p-2">{{ confirmed: 'Đã xác nhận', disputed: 'Có phản hồi cần đối chiếu', missing: 'Chưa gửi xác nhận' }[person.confirmation]}</td></tr>)}</tbody></table></div></details>
+      <Link to="/admin/feedback" className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Xử lý chênh lệch tại Bù công C&B</Link>
+    </>}
+    <Link to="/admin/support" className="block text-sm text-blue-700 underline">Theo dõi nhân viên mới và câu hỏi cần giải đáp</Link>
+  </section>;
 }

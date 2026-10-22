@@ -1,5 +1,5 @@
 import { SHIFTS } from '../data/initialData.js';
-import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES } from '../data/constants.js';
+import { SCHEDULE_RULES, DEFAULT_STAFFING_MATRIX, DECISION_RULES, WEEK_DAYS } from '../data/constants.js';
 
 /**
  * Chuẩn hóa giá trị ca làm việc thành object thống nhất:
@@ -203,6 +203,10 @@ export function calculateEmployeeWeeklyHours(emp, empSched, days = ['T2', 'T3', 
  * - STPT: ≥16h/tuần, ≤23h/tuần (~91h/tháng)
  * - STFT: ≥48h/tuần VÀ ≥6 ca/tuần
  */
+export function countConfirmedShifts(shifts = {}) {
+  return WEEK_DAYS.filter(day => normalizeShift(shifts[day]).confirmed && getShiftHours(shifts[day]) > 0).length;
+}
+
 export function validateEmployeeSchedule(emp, totalHours, totalShifts, isMonthView = false) {
   const empType = (emp.type || '').toUpperCase();
   const empRole = (emp.role || '').toUpperCase();
@@ -471,6 +475,29 @@ export function calculateStaffingGap(employees, weekSched, dayKey, storeId, requ
     };
   });
 
+  return result;
+}
+
+
+// Giờ ca đã xếp tính tại cửa hàng thực tế, không trừ quỹ cho đăng ký đang chờ.
+export function storeWeeklyHours(employees, schedule, storeId) {
+  return employees.reduce((sum, emp) => sum + WEEK_DAYS.reduce((hours, day) => {
+    const cell = normalizeShift(schedule?.[emp.id]?.[day]);
+    return hours + (cell.confirmed && (cell.covering_store || emp.dept) === storeId ? getShiftHours(cell.shift) : 0);
+  }, 0), 0);
+}
+
+export function employeeWeekProgress(shifts = {}) {
+  const result = { registeredHours: 0, registeredDays: 0, assignedHours: 0, assignedDays: 0, blankDays: 0, offDays: 0 };
+  WEEK_DAYS.forEach(day => {
+    const cell = normalizeShift(shifts[day]);
+    if (!cell.shift) { result.blankDays++; return; }
+    if (cell.shift === 'off') { result.offDays++; return; }
+    const hours = getShiftHours(cell.shift);
+    if (hours <= 0) return;
+    if (cell.confirmed) { result.assignedHours += hours; result.assignedDays++; }
+    else if (cell.registered) { result.registeredHours += hours; result.registeredDays++; }
+  });
   return result;
 }
 

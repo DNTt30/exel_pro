@@ -6,9 +6,9 @@ import AICopilotDrawer from '../components/ai/AICopilotDrawer';
 import { useStore } from '../store/useStore';
 import { askGeminiCopilot } from '../utils/aiSchedulerEngine';
 import { DEFAULT_GEMINI_MODEL } from '../services/geminiService';
-import { getCopilotConfiguration, saveCopilotConfiguration } from '../services/api';
+import { getCopilotConfiguration, saveCopilotConfiguration, getEmployees } from '../services/api';
 import { getCopilotUsage } from '../services/api/logs';
-vi.mock('../services/api', async importOriginal => ({ ...await importOriginal(), getCopilotConfiguration: vi.fn(), saveCopilotConfiguration: vi.fn() }));
+vi.mock('../services/api', async importOriginal => ({ ...await importOriginal(), getCopilotConfiguration: vi.fn(), saveCopilotConfiguration: vi.fn(), getEmployees: vi.fn() }));
 vi.mock('../utils/aiSchedulerEngine', () => ({ askGeminiCopilot: vi.fn() }));
 vi.mock('../utils/assistantAgents', () => ({ assistantAgentPlan: () => null, assistantStoreIds: () => null, runAssistantAgents: async () => null }));
 vi.mock('../services/api/logs', () => ({ addAdminLog: vi.fn().mockResolvedValue(null), getCopilotUsage: vi.fn() }));
@@ -210,4 +210,15 @@ it('passes cancellation to the transport when the drawer is closed', async () =>
   await act(async () => root.render(<AICopilotDrawer isOpen={false} onClose={() => {}} currentWeek="2026-09-28" storeId="A" />));
   expect(signal.aborted).toBe(true);
   expect(log).not.toHaveBeenCalled();
+});
+
+it('counts named staff from the requested authorized store without invoking Gemini', async () => {
+  useStore.setState({ user: { id: 'admin', role: 'admin' }, stores: [{ id: 'A' }, { id: 'VN0485' }] });
+  getEmployees.mockResolvedValue([{ id: '1', name: 'Nguyễn Văn Đức', dept: 'VN0485' }, { id: '2', name: 'Trần Minh Đức', dept: 'VN0485' }]);
+  await mount(); await send('vn0485 có bao nhiêu đức');
+  expect(getEmployees).toHaveBeenCalledWith({ dept: 'VN0485' });
+  expect(container.textContent).toContain('VN0485 có 2 nhân viên');
+  expect(container.textContent).toContain('Nguyễn Văn Đức');
+  expect(askGeminiCopilot).not.toHaveBeenCalled();
+  expect(log).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'local-employee-directory', storeId: 'VN0485' }));
 });

@@ -1,0 +1,47 @@
+import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+const mockSource = new URL('./fixtures/employee-support-api.js', import.meta.url);
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-22T10:00:00+07:00'));
+  await page.route('**/src/services/api/employeeSupport.js*', async route => route.fulfill({ contentType: 'text/javascript', body: await readFile(mockSource, 'utf8') }));
+  await page.route('https://**', route => route.abort());
+});
+test('nhân viên tự xác nhận hướng dẫn và theo dõi trọn vòng yêu cầu hỗ trợ', async ({ page }, info) => {
+  await page.goto('/?preview=support');
+  const guide = page.getByTestId('employee-start-guide');
+  await expect(guide).toBeVisible({ timeout: 30000 });
+  await page.getByRole('checkbox', { name: 'Tôi đã hiểu: Kiểm tra hồ sơ và cửa hàng', exact: true }).check();
+  await expect(guide).toContainText('1/5 mục');
+  await page.reload(); await expect(guide).toContainText('1/5 mục');
+  await page.getByLabel('Chủ đề cần hỗ trợ', { exact: true }).selectOption('handbook');
+  await page.getByLabel('Bạn chưa rõ điều gì?', { exact: true }).fill('Tôi tìm công thức đã duyệt ở đâu?');
+  await page.getByRole('button', { name: 'Xác nhận gửi quản lý', exact: true }).click();
+  await expect(page.getByTestId('help-requests').locator('tbody tr')).toHaveCount(1);
+  await page.reload(); await expect(page.getByTestId('help-requests').locator('tbody tr')).toHaveCount(1);
+  await page.goto('/?preview=support-admin');
+  await expect(page.getByRole('heading', { name: 'Theo dõi hướng dẫn & hỗ trợ' })).toBeVisible();
+  await page.getByLabel('Người hướng dẫn của Nhân viên mẫu An', { exact: true }).selectOption('990000005');
+  await page.getByRole('button', { name: 'Xem yêu cầu: Tôi tìm công thức đã duyệt ở đâu?' }).click();
+  await page.getByRole('button', { name: 'Nhận xử lý', exact: true }).click();
+  await page.getByLabel('Nội dung giải đáp', { exact: true }).fill('Vào Sổ tay nội bộ, chọn nhóm Công thức và kiểm tra phiên bản đã duyệt.');
+  await page.getByRole('button', { name: 'Gửi trả lời', exact: true }).click();
+  await expect(page.getByTestId('help-requests')).toContainText('chờ bạn xác nhận');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `../artifacts/agent-playwright/${info.project.name}-support-admin.png`, fullPage: true });
+  await page.goto('/?preview=support'); await expect(guide).toContainText('Người hướng dẫn: Nhân viên mẫu Em');
+  await page.getByRole('button', { name: 'Xem yêu cầu: Tôi tìm công thức đã duyệt ở đâu?' }).click();
+  await page.getByRole('button', { name: 'Tôi đã hiểu — đóng yêu cầu', exact: true }).click();
+  await expect(page.getByTestId('help-requests')).toContainText('Đã giải đáp');
+  await page.getByRole('button', { name: 'Tôi vẫn chưa rõ — mở lại', exact: true }).click();
+  await expect(page.getByTestId('help-requests')).toContainText('Mới gửi');
+  await page.getByText('Nhật ký xử lý', { exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Chi tiết yêu cầu' })).toContainText('Nhân viên xác nhận đã hiểu');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `../artifacts/agent-playwright/${info.project.name}-support-employee.png`, fullPage: true });
+});
+test('lỗi đọc hỗ trợ không hiện số liệu 0 hay báo đã hoàn thành', async ({ page }) => {
+  await page.goto('/?preview=support&failSupport=1');
+  await expect(page.getByRole('alert')).toContainText('Chưa tải được dữ liệu hỗ trợ', { timeout: 30000 });
+  await expect(page.getByTestId('help-requests')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Tải lại', exact: true })).toBeVisible();
+});

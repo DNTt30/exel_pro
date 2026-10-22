@@ -19,6 +19,7 @@ import { normalizeShift, getShiftHours, calculateStaffingGap } from '../../utils
 import { isOpsManager, canPickStore } from '../../lib/authSession';
 import { visibleDeptIds } from '../../utils/dataScope';
 import WeekFlowBar from '../../components/WeekFlowBar';
+import StoreHoursBudget from '../../components/schedule/StoreHoursBudget';
 import { weekRecordKey, isWeekLocked } from '../../utils/scheduleWeek';
 import { analyzeWeek } from '../../utils/scheduleConflicts';
 import ConflictPanel from '../../components/schedule/ConflictPanel';
@@ -433,6 +434,7 @@ export default function Schedule() {
 
       <div className="print:hidden px-2 pt-2">
         <WeekFlowBar storeId={flowStore} weekDate={currentWeek} />
+        <StoreHoursBudget stores={stores.filter(s => allowedFlow.has(s.id) && (flowStore === 'ALL' || s.id === flowStore))} employees={employees} schedule={weekSchedule} week={currentWeek} />
         <ConflictPanel findings={conflictFindings} />
       </div>
 
@@ -611,6 +613,7 @@ export default function Schedule() {
                 variant="primary" onClick={() => setShowAIScheduler(true)}
                 className="text-xs"
                 title="Chọn ca nhân viên đã đăng ký và kiểm tra khung giờ thiếu người"
+                data-testid="open-scheduler"
               >
                 <Sparkles size={13} className="shrink-0" />
                 <span>Gợi ý xếp lịch</span>
@@ -806,6 +809,7 @@ export default function Schedule() {
                 disabled={tableZoom <= 0.6}
                 className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
                 title="Thu nhỏ bảng (Zoom out)"
+                aria-label="Thu nhỏ bảng lịch"
               >
                 <ZoomOut size={14} />
               </button>
@@ -825,6 +829,7 @@ export default function Schedule() {
                 disabled={tableZoom >= 1.4}
                 className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
                 title="Phóng to bảng (Zoom in)"
+                aria-label="Phóng to bảng lịch"
               >
                 <ZoomIn size={14} />
               </button>
@@ -855,6 +860,7 @@ export default function Schedule() {
 
         <div className="overflow-x-auto excel-table-container touch-auto">
           <table
+            data-testid="current-schedule" aria-label={`Lịch ca tuần ${currentWeek}`}
             className="w-full text-left border-collapse origin-top-left transition-[zoom] duration-150"
             style={{ zoom: tableZoom }}
           >

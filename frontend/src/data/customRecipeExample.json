@@ -1,0 +1,11 @@
+{
+  "name": "Ví dụ cà phê do người dùng cung cấp",
+  "baseIngredientName": "cà phê",
+  "baseAmount": 20,
+  "baseUnit": "g",
+  "components": [
+    { "name": "Nước lượt 1", "amount": 20, "unit": "ml" },
+    { "name": "Nước lượt 2", "amount": 45, "unit": "ml" }
+  ],
+  "notes": "Ví dụ tùy chỉnh, chưa phải công thức mẫu đã duyệt trong Sổ tay."
+}

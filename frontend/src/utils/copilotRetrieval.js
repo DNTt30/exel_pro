@@ -1,5 +1,6 @@
 import { stripVi } from './textSearch';
 import { handbookScopeLabel, publishedKnowledge } from './handbookKnowledge';
+import { recipeSpecText } from './recipeCatalog';
 export const RAG_MAX_CHARS = 6000;
 export const RAG_MAX_CHUNKS = 4;
 export const HISTORY_MAX_CHARS = 2400;
@@ -37,7 +38,7 @@ export function retrieveHandbook(question, history = [], { entries = [], storeId
   const index = publishedKnowledge(entries, storeIds).map(entry => indexedChunk(
     `${entry.category === 'recipe' ? 'recipe.' : ''}knowledge.${entry.id}`,
     `${entry.title} — ${handbookScopeLabel(entry)}`, {
-      content: entry.content, source: entry.source_doc, scope: handbookScopeLabel(entry), revision: entry.revision,
+      content: [entry.content,recipeSpecText(entry.recipe_spec)].filter(Boolean).join('\n'), source: entry.source_doc, scope: handbookScopeLabel(entry), revision: entry.revision,
     }, [entry.title, ...(entry.aliases || [])]));
   const averageLength = index.reduce((sum, item) => sum + item.length, 0) / (index.length || 1);
   const documentFrequency = new Map();

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { sessionPersistence, setRememberSession } from '../lib/sessionStorage';
+import { sessionPersistence, setRememberSession, getRememberedEmpId, setRememberedEmpId } from '../lib/sessionStorage';
 
 const memoryStorage = () => {
   const values = new Map();
@@ -22,6 +22,13 @@ describe('remember session storage', () => {
     sessionStorage.clear(); // A new tab has no previous tab's session.
     expect(sessionPersistence.getItem('ofc-supabase-auth')).toBeNull();
   });
+  it('remembers and clears the last employee id in localStorage', () => {
+    expect(getRememberedEmpId()).toBe('');
+    setRememberedEmpId(' 260512001 ');
+    expect(getRememberedEmpId()).toBe('260512001');
+    setRememberedEmpId('');
+    expect(getRememberedEmpId()).toBe('');
+  });
   it('persists a remembered session across a new tab', () => {
     setRememberSession(true);
     sessionPersistence.setItem('ofc-supabase-auth','remembered');
@@ -42,5 +49,12 @@ describe('remember session storage', () => {
     expect(() => setRememberSession(false)).not.toThrow();
     expect(() => sessionPersistence.removeItem('ofc-supabase-auth')).not.toThrow();
     expect(sessionPersistence.getItem('ofc-supabase-auth')).toBeNull();
+  });
+  it('remembers and clears the last employee id in localStorage', () => {
+    expect(getRememberedEmpId()).toBe('');
+    setRememberedEmpId(' 260512001 ');
+    expect(getRememberedEmpId()).toBe('260512001');
+    setRememberedEmpId('');
+    expect(getRememberedEmpId()).toBe('');
   });
 });

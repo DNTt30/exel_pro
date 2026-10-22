@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { recipeSpecSchema } from './recipeCatalog';
 
 
 export const HANDBOOK_CATEGORIES = [
@@ -16,7 +17,8 @@ export const handbookDraftSchema = z.object({
   aliases: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
   store_id: z.string().trim().min(1).nullable(),
   images: z.array(z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(png|jpg|webp)$/)).max(3).default([]),
-});
+  recipe_spec: recipeSpecSchema.nullable().optional(),
+}).refine(d => !d.recipe_spec || d.category === 'recipe', { message: 'Bảng định lượng chỉ dùng cho tài liệu công thức.', path:['recipe_spec'] });
 export const handbookScopeLabel = entry => entry.store_id ? `Cửa hàng ${entry.store_id}` : 'Toàn đơn vị';
 // Only approved current text enters retrieval. Images are visual references, not OCR input.
 export function publishedKnowledge(entries = [], storeIds = []) {

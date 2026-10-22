@@ -19,3 +19,5 @@ export * from './api/workspace';
 export * from './api/workspaceRoles';
 export * from './api/notifications';
 export * from './api/registrationDeadlines';
+export * from './api/scheduleDrafts';
+export * from './api/employeeSupport';

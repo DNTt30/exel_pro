@@ -182,6 +182,21 @@ export async function ensureAuthSession(user, { password, restoreOnly = false } 
     if (!restoreOnly) await supabase.auth.updateUser({ data: meta }).catch(() => {});
     return { ok: true, session: current.session };
   }
+  if (restoreOnly && current?.session && currentEmail && currentEmail !== email) {
+    return { ok: false, reason: 'SESSION_MISMATCH', mismatch: true };
+  }
+  if (restoreOnly && !current?.session && typeof supabase.auth?.refreshSession === 'function') {
+    try {
+      const { data: refreshed } = await withTimeout(
+        supabase.auth.refreshSession(),
+        8000,
+        'timeout-refresh-session'
+      );
+      if (refreshed?.session && refreshed?.session?.user?.email === email) {
+        return { ok: true, session: refreshed.session };
+      }
+    } catch { /* ignore refresh error */ }
+  }
   if (restoreOnly) return { ok: false, reason: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
   if (typeof password !== 'string' || !password) return { ok: false, reason: 'Vui lòng nhập mật khẩu' };
   if (current?.session && currentEmail !== email) {

@@ -277,7 +277,7 @@ export default function Stores() {
                     <StoreDemandFields
                       demand={formData.demand}
                       onChange={demand => setFormData({ ...formData, demand })}
-                      onSuggest={staffing => setFormData({ ...formData, staffing })}
+                      onSuggest={staffing => setFormData({ ...formData, staffing: { ...staffing, weeklyHoursLimit: formData.staffing?.weeklyHoursLimit } })}
                     />
                   </div>
                   <div>
@@ -393,7 +393,7 @@ export default function Stores() {
                       <StoreDemandFields
                         demand={formData.demand}
                         onChange={demand => setFormData({ ...formData, demand })}
-                        onSuggest={staffing => setFormData({ ...formData, staffing })}
+                        onSuggest={staffing => setFormData({ ...formData, staffing: { ...staffing, weeklyHoursLimit: formData.staffing?.weeklyHoursLimit } })}
                       />
                     </div>
                     <div>

@@ -17,6 +17,8 @@ import { usePushNotification } from '../../hooks/usePushNotification';
 import { requiredPasswordPath } from '../../utils/authNavigation';
 import { useWorkspaceBranding } from '../../hooks/useWorkspaceBranding';
 import { canConfigureWorkspace } from '../../utils/workspaceBranding';
+import { remembersSession } from '../../lib/sessionStorage';
+import { ADMIN_SESSION_MAX_MS, UNREMEMBERED_SESSION_MAX_MS } from '../../data/constants';
 
 export default function AppLayout() {
   const branding = useWorkspaceBranding();
@@ -26,6 +28,19 @@ export default function AppLayout() {
   const currentWeek = useStore(state => state.currentWeek);
   const isInitializing = useStore(state => state.isInitializing);
   const authWarning = useStore(state => state.authWarning);
+  const syncStatus = useStore(state => state.syncStatus);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isNavActive = (link, isActive) => isActive || (link.to === '/admin/settings' && pathname === '/admin/roles');
@@ -44,8 +59,11 @@ export default function AppLayout() {
   logoutRef.current = handleLogout;
   useEffect(() => {
     if (!user) return undefined;
-    const IDLE_LIMIT_MS = 20 * 60 * 1000;
-    const ABSOLUTE_LIMIT_MS = 12 * 60 * 60 * 1000;
+    const isRemembered = remembersSession();
+    const IDLE_LIMIT_MS = 60 * 60 * 1000;
+    const ABSOLUTE_LIMIT_MS = isRemembered ? ADMIN_SESSION_MAX_MS : UNREMEMBERED_SESSION_MAX_MS;
+    const MAX_TIMEOUT_MS = 2_147_483_647;
+    // Khi người dùng bật "Ghi nhớ đăng nhập", duy trì phiên 30 ngày thay vì ngắt sau 12h/20p.
     let idleTimer = null;
     let expiredTimer = null;
     const forceLogout = (reason) => () => {
@@ -58,15 +76,21 @@ export default function AppLayout() {
       idleTimer = setTimeout(forceLogout('Phiên hết hạn do không hoạt động — vui lòng đăng nhập lại.'), IDLE_LIMIT_MS);
     };
     const events = ['pointerdown', 'keydown', 'visibilitychange'];
-    events.forEach((ev) => window.addEventListener(ev, resetIdle, { passive: true }));
-    resetIdle();
+    if (!isRemembered) {
+      events.forEach((ev) => window.addEventListener(ev, resetIdle, { passive: true }));
+      resetIdle();
+      // Idle timer chỉ kích hoạt khi không chọn ghi nhớ đăng nhập
+    }
+    // Idle timer chỉ kích hoạt khi không chọn ghi nhớ đăng nhập
     if (user.loginAt) {
       const remainMs = user.loginAt + ABSOLUTE_LIMIT_MS - Date.now();
       if (remainMs <= 0) {
-        forceLogout('Phiên đăng nhập đã quá 12 giờ — vui lòng đăng nhập lại.')();
+        forceLogout('Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại.')();
         return undefined;
       }
-      expiredTimer = setTimeout(forceLogout('Phiên đăng nhập đã quá 12 giờ — vui lòng đăng nhập lại.'), remainMs);
+      if (remainMs <= MAX_TIMEOUT_MS) {
+        expiredTimer = setTimeout(forceLogout('Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại.'), remainMs);
+      }
     }
     return () => {
       if (idleTimer) clearTimeout(idleTimer);
@@ -86,6 +110,7 @@ export default function AppLayout() {
       title: 'VẬN HÀNH',
       items: [
         { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
+        { to: '/admin/support', icon: <HelpCircle size={17} />, label: 'Hướng dẫn & hỗ trợ' },
         { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca', badge: pendingSwapsCount, badgeColor: 'bg-amber-400 text-slate-950 font-bold' },
         { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
         { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B', badge: pendingFeedbacksCount, badgeColor: 'bg-rose-400 text-white font-bold' },
@@ -111,6 +136,7 @@ export default function AppLayout() {
       items: [
         { to: '/employee/profile',   icon: <User size={17} />,         label: 'Hồ sơ của tôi' },
         { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
+        { to: '/employee/support', icon: <HelpCircle size={17} />, label: 'Hướng dẫn & hỗ trợ' },
         { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
         { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
         { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },
@@ -128,12 +154,14 @@ export default function AppLayout() {
         { to: '/admin/schedule', label: 'Lịch ca', icon: CalendarDays, badge: pendingSwapsCount },
         { to: '/admin/timesheet', label: 'Chấm công', icon: Clock },
         { to: '/admin/feedback', label: 'Bù công', icon: FileText, badge: pendingFeedbacksCount },
+        { to: '/admin/shelves', label: 'Kệ & Date', icon: Rows3 },
       ]
     : [
         { to: '/employee/home', label: 'Trang chủ', icon: Home },
         { to: '/employee/schedule', label: 'Lịch ca', icon: CalendarDays },
         { to: '/employee/timesheet', label: 'Chấm công', icon: Clock },
         { to: '/employee/feedback', label: 'Bù công', icon: FileText },
+        { to: '/employee/shelves', label: 'Kệ & Date', icon: Rows3 },
       ];
 
   // QW-5: Auto-close helper — chỉ một drawer mở tại một thời điểm
@@ -215,7 +243,7 @@ export default function AppLayout() {
           )}
           <button onClick={openHelp} className="hidden sm:flex p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="Hướng dẫn"><HelpCircle size={18} /></button>
           <NotificationBell pushStatus={pushStatus} onPushSubscribe={pushSubscribe} onPushUnsubscribe={pushUnsubscribe} />
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-50 border border-blue-100 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-100/90 border border-slate-200/80 pl-1 sm:pl-2 pr-1.5 sm:pr-3 py-1 rounded-full ml-0.5 sm:ml-1" title={user?.name}>
             <div className="w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={12} />}
             </div>
@@ -228,6 +256,13 @@ export default function AppLayout() {
         {isInitializing && (<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-100 overflow-hidden"><div className="h-full w-1/3 bg-blue-500 animate-pulse" /></div>)}
       </header>
 
+      {/* Cảnh báo ngoại tuyến (Offline) — cho phép xem bản lưu Lịch làm & Bảng công */}
+      {(!isOnline || syncStatus === 'offline') && (
+        <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-900 text-[11px] sm:text-xs font-semibold print:hidden flex items-center justify-between gap-2">
+          <span>📴 <strong>Chế độ xem Offline:</strong> Thiết bị đang mất mạng, hiển thị Lịch làm & Bảng công từ bản lưu gần nhất. Hệ thống sẽ tự đồng bộ khi có mạng lại.</span>
+        </div>
+      )}
+
       {/* Cảnh báo phiên dữ liệu chưa xác thực — RLS sẽ chặn ngầm ghi/đọc */}
       {authWarning && (
         <div className="px-4 py-2 bg-amber-50 border-b border-amber-300 text-amber-900 text-[11px] sm:text-xs font-semibold print:hidden">
@@ -236,7 +271,7 @@ export default function AppLayout() {
       )}
 
       {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden print:overflow-visible print:h-auto print:block relative">
+      <div className="flex min-h-0 flex-1 overflow-hidden print:overflow-visible print:h-auto print:block relative">
         {mobileMenuOpen && (<div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} />)}
 
         {/* ── Sidebar (blue gradient) ── */}
@@ -249,7 +284,7 @@ export default function AppLayout() {
 
           {/* User block */}
           <div className="px-4 pt-5 pb-4 border-b border-white/10 hidden md:flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white text-blue-700 flex items-center justify-center font-black text-base shadow-lg flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white text-slate-900 flex items-center justify-center font-black text-base shadow-lg flex-shrink-0">
               {user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />}
             </div>
             <div className="min-w-0 flex-1">
@@ -262,15 +297,15 @@ export default function AppLayout() {
           <nav className="flex-1 px-2.5 py-3 space-y-3.5 overflow-y-auto">
             {sections.map((section, sIdx) => (
               <div key={sIdx} className="space-y-1">
-                <div className="px-3 pt-1 pb-0.5 text-[10px] font-black uppercase tracking-wider text-blue-200/50">
+                <div className="px-3 pt-1 pb-0.5 text-[10px] font-black uppercase tracking-wider text-white/45">
                   {section.title}
                 </div>
                 {section.items.map((link) => (
                   <NavLink key={link.to} to={link.to} onClick={() => setMobileMenuOpen(false)}
-                    className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all group ${isNavActive(link, isActive) ? 'bg-white text-blue-700 shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                    className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all group ${isNavActive(link, isActive) ? 'bg-white text-slate-900 shadow-md' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
                   >
                     {({ isActive }) => (<>
-                      <span className={`flex-shrink-0 transition-colors ${isNavActive(link, isActive) ? 'text-blue-600' : 'text-white/50 group-hover:text-white/90'}`}>{link.icon}</span>
+                      <span className={`flex-shrink-0 transition-colors ${isNavActive(link, isActive) ? 'text-indigo-600' : 'text-white/55 group-hover:text-white/90'}`}>{link.icon}</span>
                       <span className="truncate flex-1">{link.label}</span>
                       {link.badge > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 shadow-2xs ${link.badgeColor || 'bg-amber-400 text-slate-950 font-bold'}`}>
@@ -318,7 +353,7 @@ export default function AppLayout() {
         </aside>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full bg-slate-50 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full bg-slate-50 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0 print:p-0 print:m-0 print:bg-white print:overflow-visible print:h-auto print:block flex flex-col">
           {/* Skeleton khi chưa có dữ liệu người dùng — khi đã có user thì Outlet luôn giữ mount */}
           {isInitializing && !user ? (isManager ? <AdminPageSkeleton /> : <EmployeePageSkeleton />) : <Outlet />}
         </main>
@@ -332,7 +367,7 @@ export default function AppLayout() {
               className={({ isActive }) =>
                 `relative flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
                   isActive
-                    ? 'text-blue-600 font-extrabold scale-105'
+                    ? 'text-indigo-600 bg-indigo-50/70 font-extrabold scale-105'
                     : 'text-slate-500 hover:text-slate-900 font-semibold'
                 }`
               }

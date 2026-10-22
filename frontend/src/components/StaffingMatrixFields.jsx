@@ -38,6 +38,12 @@ export default function StaffingMatrixFields({ staffing, onChange }) {
 
   return (
     <div className="space-y-1.5">
+      <label className="block text-sm text-slate-700">Hạn mức giờ cửa hàng / tuần
+        <input type="number" min="0" step="0.5" placeholder="Ví dụ: 224" data-testid="store-weekly-hours-limit"
+          value={cfg.weeklyHoursLimit ?? ''} onChange={e => onChange({ ...cfg, weeklyHoursLimit: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+          className="ml-2 w-28 rounded border border-slate-300 p-2" />
+      </label>
+      <p className="text-xs text-slate-500">Áp dụng mỗi tuần. Để trống nếu chưa đặt hạn mức; 0 nghĩa là không cấp giờ. Tính giờ ca đã xếp tại cửa hàng, gồm nhân viên hỗ trợ.</p>
       {renderRow('weekday', 'T2–T6')}
       {renderRow('weekend', 'T7–CN')}
     </div>

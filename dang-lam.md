@@ -1,6 +1,10 @@
 # Đang làm
 
-Cập nhật: 19/10/2026. Đây là các việc còn dở, không phải danh sách tính năng đã phát hành.
+Cập nhật: 21/10/2026. Đây là các việc còn dở, không phải danh sách tính năng đã phát hành.
+
+- [ ] Admin kiểm tra đề nghị **Pha cốt cà phê** trong Sổ tay → Chờ duyệt: 20g → 20ml lượt 1 + 45ml lượt 2, nguồn là ví dụ người dùng. Chưa duyệt thì không đưa vào bộ chọn mẫu đã công bố; vẫn tính được trong Tùy chỉnh. Milo/Nestea đọc bản Sổ tay hiện có. Hướng dẫn [RECIPE_CATALOG.md](docs/RECIPE_CATALOG.md).
+
+- [ ] VN0500 tuần 26/10: nháp revision 1 đã lưu nhưng chưa có đăng ký ca nên 0 ca mới/thiếu 21 khung ca. Cần nhân viên đăng ký và quản lý xem/tạo lại nháp. Frontend, migrations, bot Auth/API đã phát hành và kiểm chứng ngày 21/10 theo yêu cầu deploy; chi tiết [hướng dẫn](docs/AGENT_SCHEDULING.md). Chưa E2E giao diện quản lý bằng tài khoản người dùng thật.
 
 Đã phát hành chống double-click/spam TÚ mini (database + Edge + frontend): khóa gửi tức thì, cách 3 giây, server tối đa 10 yêu cầu Gemini/60 giây/tài khoản. 125 test liên quan và kiểm thử PostgreSQL đồng thời đạt; 15 file public đã đối chiếu. Khi vận hành theo dõi mức giới hạn này có phù hợp nhu cầu, chưa thử spam bằng tài khoản production thật.
 

@@ -8,6 +8,7 @@ vi.mock('../services/api/handbook', () => ({ handbookApi: mock }));
 import KnowledgeLibrary from '../components/handbook/KnowledgeLibrary';
 import RecipeQuickModal from '../components/modals/RecipeQuickModal';
 import { useStore } from '../store/useStore';
+import { sampleRecipeEntries } from '../sandbox/recipeFixture';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const initial = useStore.getState();
 const doc = { id: 'doc', title: 'Trà thử nghiệm', category: 'recipe', content: 'Size L: 250ml trà, thêm đá.', store_id: 'A', revision: 1, images: [], is_active: true, published_at: '2026-10-17' };
@@ -60,6 +61,18 @@ it('staff sees only the published reader and no draft/editor actions', async () 
   expect(findButton('Thêm tài liệu')).toBeUndefined(); expect(findButton('Sửa')).toBeUndefined();
   expect(container.textContent).toContain('250ml');
   expect(container.textContent).not.toContain('Duyệt toàn bộ');
+});
+
+it.each(['admin', 'STFT'])('opens the ratio calculator for %s without publishing handbook edits', async role => {
+  useStore.setState({ user: { id: role, role, dept: 'A' } });
+  await mount(role === 'admin');
+  await click('Tính nhanh tỷ lệ');
+  const result = container.querySelector('[data-testid="recipe-result"]');
+  expect(result.textContent).toContain('80 ml');
+  expect(result.textContent).toContain('180 ml');
+  expect(result.textContent).toContain('260 ml');
+  expect(mock.submit).not.toHaveBeenCalled();
+  expect(mock.review).not.toHaveBeenCalled();
 });
 
 it('bulk approval is hidden from managers', async () => {
@@ -143,4 +156,29 @@ it('reader has no bundled recipes when the database is empty or fails', async ()
   mock.getKnowledge.mockRejectedValue(new Error('Source unavailable')); await click('Tải lại');
   expect(container.querySelector('[role=alert]').textContent).toBe('Source unavailable');
   expect(container.querySelector('details')).toBeNull();
+});
+
+it('manager edits structured quantities through the same confirmed proposal, not direct publication', async () => {
+  const milo={...sampleRecipeEntries[1],store_id:'A'};
+  mock.getAll.mockResolvedValue([milo]);
+  await mount(); await click('Sửa');
+  expect(container.querySelector('[data-testid="recipe-base"]').value).toBe('600');
+  await fill('[data-testid="recipe-base"]','1200');
+  await act(async()=>container.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(container.querySelector('[role="dialog"]').textContent).toContain('1200 g');
+  expect(mock.submit).not.toHaveBeenCalled();
+  await click(container.querySelector('input[type="checkbox"]')); await click('Gửi Admin duyệt');
+  expect(mock.submit).toHaveBeenCalledWith(expect.objectContaining({recipe_spec:expect.objectContaining({baseAmount:1200})}),milo,{confirmed:true});
+  expect(mock.submit.mock.calls[0][0].content).not.toContain('600g');
+  expect(mock.review).not.toHaveBeenCalled();
+});
+
+it('reloads approved recipes on calculator open and hides results when the fresh source fails', async()=>{
+  useStore.setState({user:{id:'recipe-reader',role:'STFT',dept:'A'}});
+  mock.getKnowledge.mockResolvedValue(sampleRecipeEntries);
+  await mount(false);
+  mock.getKnowledge.mockRejectedValue(new Error('Connection lost'));
+  await click('Tính nhanh tỷ lệ');
+  expect(container.querySelector('[data-testid="recipe-result"]')).toBeNull();
+  expect(container.querySelector('[data-testid="recipe-calculator"]').textContent).toContain('Không tải được công thức mẫu');
 });

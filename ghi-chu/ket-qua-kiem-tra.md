@@ -1,8 +1,63 @@
+## 2026-10-22 — Lịch toàn cửa hàng và Dashboard mobile
+
+Chi tiết: `docs/MOBILE_LAYOUT_20261022.md`. Sửa tiếng Việt lỗi mã; mặc định lịch toàn cửa hàng, mobile xem đồng nghiệp theo ngày; Dashboard hai cột KPI, khung cuộn vừa màn hình. 2 test component và 14 Playwright đạt; build đạt, deploy Published.
+
+## 2026-10-21 — Quỹ giờ cửa hàng và Dashboard
+
+Chi tiết: `docs/STORE_WEEKLY_HOURS.md`. Vitest toàn bộ 1.020 đạt/7 bỏ qua; thêm 4 test API đạt; nhóm liên quan chạy lại 44 đạt. Playwright 10/10 desktop/mobile. Build đạt sau khi giới hạn RAYON_NUM_THREADS=2. Không đặt hạn mức vào dữ liệu thật. Đã deploy; đối chiếu 20 tài nguyên public đạt, trang đăng nhập desktop/mobile đạt; chạy lại 2 ca quỹ giờ đạt.
+
 # Kết quả kiểm tra và việc đã hoàn thành
 
-Cập nhật: 19/10/2026.
+Cập nhật: 21/10/2026.
 Trạng thái: Ghi nhận theo thời điểm; không dùng kết quả cũ để khẳng định code hiện tại hoặc production đã đạt.
 Nguồn: Kết quả công cụ trong phiên làm việc và [docs/HANDBOOK_PUBLICATION.md](../docs/HANDBOOK_PUBLICATION.md).
+
+## Bộ chọn công thức cùng nguồn Sổ tay — phát hành 21/10/2026
+
+Nguồn: thiết kế người dùng yêu cầu chọn món, lưu dữ liệu, đồng bộ Sổ tay, phân quyền, ghi nhớ và kiểm thử từng mẫu; sau đó yêu cầu tiếp tục. Hướng dẫn [RECIPE_CATALOG.md](../docs/RECIPE_CATALOG.md).
+
+- Bộ chọn đọc các bản đã duyệt: tự điền, nhãn theo nguyên liệu, phạm vi/revision/ngày công bố, mở nguồn, chỉnh tạm/khôi phục, nhớ lựa chọn và đếm số lần chọn theo tài khoản/phạm vi, tìm kiếm khi trên 5 mẫu; Tùy chỉnh luôn cuối. Không lưu định lượng vào localStorage hay dùng nguồn cũ khi tải thất bại.
+- JSON `handbook_entries.recipe_spec` đi cùng bản ghi và payload duyệt; thêm/sửa/gỡ dùng quyền, CAS, lịch sử và admin_logs có sẵn. Sổ tay, máy tính và nguồn truy xuất TÚ mini dùng cùng định lượng. Mẫu viết cứng cũ đã bỏ khỏi runtime. Khi đổi tài liệu bằng client cũ không gửi spec, định lượng cũ được vô hiệu hóa nếu văn bản đổi.
+- Đối chiếu chỉ đọc production xác nhận Milo 600g → 800/1000ml; Nestea 400g → 1000/2000ml. Adapter chỉ đọc một dòng pha rõ ràng, không lẫn 250ml theo ly hoặc Milo nóng. Sửa tài liệu sẽ chuyển dòng pha thành bảng định lượng, bỏ dòng trùng khỏi nội dung để tránh hai nguồn số liệu.
+- Không tìm thấy tỷ lệ pha cốt trong tài liệu cà phê đã duyệt. Đã tạo đúng một đề nghị **Pha cốt cà phê** từ ví dụ người dùng, `confirmed_at=NULL`, `pending_review`; chưa công bố. Nhân viên không thấy mẫu này trước khi Admin duyệt. Tùy chỉnh vẫn có ví dụ riêng được ghi rõ chưa duyệt.
+- Đã áp dụng hai migration `20261022000000_handbook_recipe_spec.sql`, `20261022000001_coffee_recipe_proposal.sql` sau sao lưu schema. Hash tên/nội dung/revision/trạng thái các tài liệu đã công bố trước–sau không đổi; không tự sửa số liệu đang áp dụng.
+- Frontend **Published**; `FRONTEND_RELEASE_OK` 18 assets, báo cáo `artifacts/release/frontend-verified-20261021T090633Z.json`. Public login Edge desktop/mobile không có pageerror; chưa E2E tài khoản quản lý thật/duyệt thật.
+- **1018 passed / 7 skipped**, 96 file đạt/2 bỏ qua. **8 Playwright passed (37,4 giây)** cho bot và tính tỷ lệ trên desktop/mobile; đã xem ảnh mobile. Lint không lỗi, còn 2 import cũ; build đạt, còn cảnh báo chunk lớn. Python compile và diff whitespace đạt.
+- `test_recipe_catalog_db.py` đạt trên PostgreSQL disposable: quyền nhân viên/quản lý/Admin, ngoài phạm vi, validation, không lộ bản chờ duyệt, revision/nhật ký, client cũ, seed chờ duyệt và chạy lặp không trùng. Cụm đã dừng. Không thêm dịch vụ trả phí.
+
+## Phát hành bot VN0500 và tính tỷ lệ — 21/10/2026
+
+Nguồn: người dùng yêu cầu “deploy đi”, thay yêu cầu chưa deploy trước đó. Phần “chưa triển khai” trong các kết quả lịch sử bên dưới đã được thay bằng trạng thái này.
+
+- Frontend `npm run deploy` → **Published**. Đối chiếu **18 tài nguyên public** với build đạt `FRONTEND_RELEASE_OK`; báo cáo `artifacts/release/frontend-verified-20261021T044845Z.json`. Edge headless tải trang đăng nhập public trên desktop 1440×1000 và mobile 390×844, không có pageerror. Công cụ tỷ lệ đã có trong bundle Sổ tay công khai.
+- Đã sao lưu public schema và áp dụng hai migration nháp/scope. Auth bot VN0500 được cấp role `schedule_bot`, credentials mã hóa DPAPI ngoài repo. Lần kiểm chứng đầu phát hiện production dùng `week_date` kiểu date, khác text ở schema cũ; đã bổ sung migration `20261021000001_schedule_bot_week_types.sql`, kiểm thử local đạt rồi áp dụng, giữ nguyên quyền và dữ liệu lịch.
+- `AUTH_POSTGREST_OK`: JWT có role bot, đọc đúng VN0500 với **19 nhân viên**, từ chối đọc trực tiếp employees/schedules/schedule_weeks/attendance và từ chối cửa hàng ngoài scope. Không dùng tài khoản quản lý hoặc service-role để chạy bot.
+- CLI thật tạo và đọc lại nháp tuần **2026-10-26**, revision **1**. Chạy lần hai trả `existing-draft`, vẫn revision 1. Do chưa có đăng ký ca, **0 ca mới và thiếu 21 khung ca**; không báo đủ người, không tự bịa ca, không ghi/công bố lịch chính thức. Quản lý cần nhận đăng ký rồi tạo lại nháp trong UI.
+- PostgreSQL disposable chạy lại toàn bộ baseline/operational/draft/bot suite đạt với migration tương thích kiểu ngày. Cụm local đã dừng. Kết quả frontend trước phát hành: 1010 passed/7 skipped, Playwright sandbox 6 passed. Không thêm dịch vụ trả phí.
+- Chưa E2E luồng mở nháp trên giao diện quản lý bằng tài khoản người dùng thật; việc xác minh backend thật ở đây dùng bot Auth/PostgREST. Không tích hợp mô hình cho bot; CLI/Playwright vẫn là kịch bản cố định.
+
+## Quyền bot VN0500 và tính nhanh tỷ lệ — kiểm chứng local ngày 21/10/2026 (trước phát hành)
+
+Nguồn: yêu cầu thực hiện nốt, bổ sung phép tính cà phê và câu trả lời chọn cửa hàng **VN0500** của người dùng. Hướng dẫn cập nhật tại [AGENT_SCHEDULING.md](../docs/AGENT_SCHEDULING.md).
+
+- Đã bổ sung migration vai trò `schedule_bot` không kế thừa `authenticated`, scope cửa hàng riêng, RPC chỉ trả cột cần xếp lịch và lịch ba tuần liên quan. Bot không có quyền đọc trực tiếp bảng nghiệp vụ, ghi lịch chính thức/chấm công hoặc duyệt. Quyền nháp của người quản lý giữ nguyên. Snapshot nguồn lưu theo đúng cửa hàng; server từ chối nhân viên ngoài cửa hàng trong cả đề xuất và nguồn.
+- CLI dùng Supabase Auth/RPC và cùng engine xếp lịch, đọc lại sau lưu. Chạy lại giữ nguyên nháp đã có, kể cả sửa của quản lý. Đã kiểm thử bằng client giả lập; chưa gọi Auth/PostgREST thật. Script cấp bot/lưu credentials DPAPI ngoài repo được chuẩn bị nhưng chưa thực thi các cờ ghi remote.
+- Sổ tay/Tra công thức có **Tính nhanh tỷ lệ**, chỉnh lượng gốc/đích/thành phần, thêm/bớt thành phần, hỗ trợ dấu phẩy thập phân. 20g → 20ml + 45ml; 80g → **80ml + 180ml**, tổng **260ml** nước thêm vào. TÚ mini nhận mẫu câu này và tính cục bộ, không gọi mô hình; không xem là agent hiểu mọi câu tự do hay công thức chuẩn mới được duyệt.
+- Suite frontend cuối: **1010 passed / 7 skipped**, 95 file đạt/2 bỏ qua. Kiểm thử quản lý và nhân viên đều mở được máy tính mà không gửi sửa/duyệt Sổ tay. `npm run build` và `npm run build:gh` đạt; lint không lỗi, còn 2 cảnh báo import cũ tại Login; build còn cảnh báo chunk lớn. Python scripts compile đạt, `git diff --check` đạt. Bundle production không chứa fixture/entry sandbox.
+- Playwright/Edge: **6 passed (34,6 giây)** trên desktop/mobile sau sửa snapshot theo cửa hàng; gồm đọc/lưu/sửa/reload nháp, chạy lại không trùng, thiếu nhân sự/lỗi storage, tính tỷ lệ và đầu vào sai. Đã xem ảnh mobile của máy tính tỷ lệ.
+- PostgreSQL disposable: `test_schedule_bot_db.py` đạt toàn bộ baseline/operational, draft CAS/RLS và bot scope. Xác nhận từ chối ngoài phạm vi, chặn đọc bảng/ghi lịch chính thức, thu hồi scope, chỉ cột cần thiết; snapshot lịch và trạng thái tuần không đổi. Cụm local đã dừng.
+- **Chưa deploy hoặc tạo tài khoản thật**, tuân thủ yêu cầu ban đầu. Supabase preflight chỉ đọc xác nhận VN0500 hoạt động, hai bảng mới chưa tồn tại. Phát hành frontend/migrations và xác minh Auth/PostgREST remote còn chờ đợt triển khai được phép; không báo bot đã dùng backend thật. Không chạm dữ liệu lịch/công production, không thêm dịch vụ trả phí.
+
+## Bot tạo lịch nháp — kiểm chứng local ngày 20/10/2026
+
+Nguồn: yêu cầu nâng cấp exel_pro để bot đọc nhân viên/lịch và tạo nháp; kết quả công cụ trong phiên. Hướng dẫn: [AGENT_SCHEDULING.md](../docs/AGENT_SCHEDULING.md).
+
+- Tái sử dụng hộp thoại và engine xếp lịch đăng ký; thêm lưu/mở/sửa đề xuất riêng, giới hạn số ca và số người từng ca/ngày. Kiểm tra trùng giờ, nghỉ giữa ca, ranh giới tuần, phiên bản nguồn và phiên bản nháp. Không tự áp dụng/nộp/duyệt lịch.
+- Môi trường DEV riêng: 5 nhân viên giả, một tuần lịch sẵn và đăng ký tuần sau; Supabase client bị tắt. Bot chỉ lưu localStorage sandbox, không có nút áp dụng. Production build không chứa entry/fixture sandbox (đã kiểm tra output).
+- Frontend toàn bộ: **993 passed, 7 skipped**, 92 file đạt/2 bỏ qua. `npm run build` đạt; `npm run lint` không lỗi, còn 2 cảnh báo import không dùng có sẵn trong Login. Build còn cảnh báo chunk lớn. `git diff --check` đạt.
+- Playwright/Edge headless: **4 passed (34,6 giây)**, desktop/mobile. Đọc danh sách và lịch, tạo 30 ca/5 người (6 ca, 48 giờ/người), sửa/lưu/reload, chạy lại không trùng, báo thiếu và lỗi storage; không request ngoài localhost và không đổi lịch gốc. Sandbox Windows bị treo lúc dọn tiến trình ở lần đầu; đã chạy lại ngoài sandbox và kết thúc exit 0.
+- Migration API nháp đã chạy trên PostgreSQL local với auth/RLS thật từ migrations repo: deny anon/staff/ngoài cửa hàng; chặn sửa trực tiếp; kiểm tra đầu vào, CAS hai kết nối đồng thời (một thành công/một conflict), chỉ một bản ghi; snapshot `schedules` và `schedule_weeks` không đổi. Harness operational hiện có cũng đạt. Cụm local đã dừng sau kiểm tra.
+- **Chưa deploy**, chưa áp dụng migration lên Supabase production, chưa gọi PostgREST/Auth staging bằng tài khoản thật. Không tạo tài khoản bot production hay dịch vụ trả phí. Kịch bản là tự động cố định, chưa tích hợp AI hiểu ngôn ngữ tự nhiên. Các file ML và CLI đang thay đổi từ trước được giữ nguyên.
 
 ## Bộ nhớ — hoàn tất ngày 18/10/2026
 

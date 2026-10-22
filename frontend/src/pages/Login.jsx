@@ -1,41 +1,48 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { signedInPath } from '../utils/authNavigation';
 import { requestAdminOtp, verifyAdminOtp } from '../lib/adminOtp';
+import { getRememberedEmpId, setRememberedEmpId, remembersSession } from '../lib/sessionStorage';
 import ForgotPasswordModal from '../components/modals/ForgotPasswordModal';
 import { useWorkspaceBranding } from '../hooks/useWorkspaceBranding';
-import { 
+import {
   LogIn,
-  CalendarDays,
   Eye,
   EyeOff,
   ShieldCheck,
-  User, 
+  User,
   KeyRound,
-  Home, 
-  Clock, 
+  Clock,
   ShieldAlert,
-  Zap,
-  Shield,
-  Sparkles
+  Sparkles,
+  CalendarCheck2,
+  RefreshCw,
+  LockKeyhole,
+  X
 } from 'lucide-react';
 
 export default function Login() {
   const branding = useWorkspaceBranding();
   const location = useLocation();
-  const [empId, setEmpId] = useState('');
+  const navigate = useNavigate();
+
+  const user = useStore(state => state.user);
+  const login = useStore(state => state.login);
+
+  const [savedEmpId, setSavedEmpId] = useState(() => getRememberedEmpId());
+  const [empId, setEmpId] = useState(() => getRememberedEmpId());
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(() => remembersSession());
   const [error, setError] = useState(location.state?.authError || '');
   const [submitting, setSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
-  const [particles, setParticles] = useState([]);
-  const containerRef = useRef(null);
-  const passwordRef = useRef(null);
   const [recoveryNotice, setRecoveryNotice] = useState('');
+
+  const empInputRef = useRef(null);
+  const passwordRef = useRef(null);
 
   // ── 2FA OTP ──
   const [otpStep, setOtpStep] = useState(false);
@@ -44,8 +51,12 @@ export default function Login() {
   const [otpNote, setOtpNote] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
-  const login = useStore(state => state.login);
-  const navigate = useNavigate();
+  // Tự động chuyển thẳng vào ứng dụng nếu người dùng đã có phiên đăng nhập hợp lệ
+  useEffect(() => {
+    if (user && !user.isPasswordExpired && !otpStep && !submitting) {
+      navigate(signedInPath(user), { replace: true });
+    }
+  }, [user, otpStep, submitting, navigate]);
 
   // Đồng hồ thời gian thực
   useEffect(() => {
@@ -99,15 +110,23 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
-    if (!empId.trim()) {
+    const cleanId = empId.trim();
+    if (!cleanId) {
       setError('Vui lòng nhập mã nhân viên');
       return;
     }
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(empId.trim(), password, { rememberMe });
-      navigate(signedInPath(user), { replace: true });
+      const loggedInUser = await login(cleanId, password, { rememberMe });
+      if (rememberMe) {
+        setRememberedEmpId(cleanId);
+        setSavedEmpId(cleanId);
+      } else {
+        setRememberedEmpId('');
+        setSavedEmpId('');
+      }
+      navigate(signedInPath(loggedInUser), { replace: true });
     } catch (err) {
       if (err.code === 'OTP_REQUIRED') {
         setOtpStep(true);
@@ -121,249 +140,253 @@ export default function Login() {
     }
   };
 
-  // Click creates warm sparkles on background
-  const handleBackgroundClick = useCallback((e) => {
-    if (containerRef.current && containerRef.current.contains(e.target)) return;
-
-    const newParticle = {
-      id: Date.now() + Math.random(),
-      x: e.clientX,
-      y: e.clientY,
-      color: ['#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fef08a'][Math.floor(Math.random() * 5)]
-    };
-    setParticles(prev => [...prev.slice(-15), newParticle]);
-    setTimeout(() => {
-      setParticles(prev => prev.filter(p => p.id !== newParticle.id));
-    }, 1000);
-  }, []);
+  const handleClearRememberedId = () => {
+    setRememberedEmpId('');
+    setSavedEmpId('');
+    setEmpId('');
+    setPassword('');
+    setError('');
+    requestAnimationFrame(() => empInputRef.current?.focus());
+  };
 
   return (
-    <div 
-      className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-x-hidden select-none bg-[#070a13]"
-      onClick={handleBackgroundClick}
+    <div
+      className="min-h-[100dvh] w-full flex items-center justify-center p-3 sm:p-6 lg:p-8 relative overflow-hidden bg-[#120d24] text-slate-100"
       style={{
         backgroundImage: `
-          radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.22) 0%, transparent 45%),
-          radial-gradient(circle at 85% 25%, rgba(168, 85, 247, 0.2) 0%, transparent 40%),
-          radial-gradient(circle at 50% 85%, rgba(6, 182, 212, 0.16) 0%, transparent 50%),
-          radial-gradient(circle at 75% 75%, rgba(236, 72, 153, 0.14) 0%, transparent 40%),
-          radial-gradient(ellipse 90% 70% at 50% -20%, rgba(129, 140, 248, 0.18) 0%, transparent 60%)
-        `,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+          radial-gradient(circle at 18% 18%, rgba(99, 102, 241, 0.22) 0%, transparent 45%),
+          radial-gradient(circle at 82% 28%, rgba(236, 72, 153, 0.16) 0%, transparent 48%),
+          radial-gradient(circle at 50% 92%, rgba(251, 146, 60, 0.14) 0%, transparent 52%),
+          linear-gradient(180deg, #0f0c20 0%, #1a1233 55%, #26173e 100%)
+        `
       }}
     >
-      {/* ── Cosmic Ambient Starfield & Nebula Glow ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-60">
-        <div className="absolute top-[8%] left-[12%] w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse shadow-[0_0_8px_#38bdf8]" />
-        <div className="absolute top-[18%] left-[28%] w-1 h-1 bg-white rounded-full animate-ping shadow-[0_0_6px_#fff]" style={{ animationDuration: '3s' }} />
-        <div className="absolute top-[35%] left-[8%] w-1 h-1 bg-purple-300 rounded-full animate-pulse" />
-        <div className="absolute top-[12%] right-[18%] w-1.5 h-1.5 bg-pink-300 rounded-full animate-pulse shadow-[0_0_8px_#f472b6]" style={{ animationDuration: '4s' }} />
-        <div className="absolute top-[28%] right-[32%] w-1 h-1 bg-cyan-200 rounded-full animate-pulse" />
-        <div className="absolute top-[75%] left-[16%] w-1 h-1 bg-indigo-300 rounded-full animate-ping shadow-[0_0_6px_#818cf8]" style={{ animationDuration: '5s' }} />
-        <div className="absolute top-[82%] right-[22%] w-1.5 h-1.5 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.5s' }} />
-        <div className="absolute top-[65%] right-[10%] w-1 h-1 bg-purple-200 rounded-full animate-pulse" />
-        <div className="absolute top-[48%] right-[5%] w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_#22d3ee]" />
-      </div>
+      {/* Quầng sáng Lo-Fi dịu mắt phía sau */}
+      <div className="pointer-events-none absolute -top-36 -left-36 w-[28rem] h-[28rem] rounded-full bg-indigo-500/15 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-36 -right-36 w-[30rem] h-[30rem] rounded-full bg-rose-500/15 blur-[140px]" />
 
-      {/* ── Soft Floating Nebula Orbs (No Glare, Calming Cosmic Depth) ── */}
-      <div className="absolute -top-32 -left-32 w-[32rem] h-[32rem] bg-indigo-600/15 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-[34rem] h-[34rem] bg-purple-600/15 rounded-full blur-[150px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-cyan-600/10 rounded-full blur-[180px] pointer-events-none" />
-
-      {/* ── Custom Animations ── */}
-      <style>{`
-        @keyframes shimmer-ray {
-          0% { transform: translateX(-150%) skewX(-20deg); }
-          50%, 100% { transform: translateX(250%) skewX(-20deg); }
-        }
-        @keyframes orbit-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes sparkle-burst {
-          0% { transform: scale(0) rotate(0deg); opacity: 1; }
-          100% { transform: scale(2.2) rotate(120deg); opacity: 0; }
-        }
-        .btn-shimmer-effect {
-          position: relative;
-          overflow: hidden;
-        }
-        .btn-shimmer-effect::after {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 40%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-          transform: translateX(-150%) skewX(-20deg);
-          animation: shimmer-ray 3.5s infinite ease-in-out;
-        }
-      `}</style>
-
-      {/* ── Stardust Sparkles on Background Click ── */}
-      {particles.map(p => (
-        <div 
-          key={p.id}
-          className="fixed pointer-events-none rounded-full z-50"
-          style={{
-            left: p.x - 12,
-            top: p.y - 12,
-            width: 24,
-            height: 24,
-            background: `radial-gradient(circle, ${p.color} 0%, transparent 70%)`,
-            animation: 'sparkle-burst 1s ease-out forwards'
-          }}
-        />
-      ))}
-
-      {/* ── Main Container (Cosmic Frosted Glass Container) ── */}
-      <div 
-        ref={containerRef}
-        style={{
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-          textRendering: 'optimizeLegibility'
-        }}
-        className="relative z-10 w-full max-w-[1040px] min-h-[580px] rounded-[28px] sm:rounded-[36px] overflow-hidden shadow-[0_25px_80px_-15px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.12)] grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] bg-slate-900/80 backdrop-blur-2xl border border-white/10 transition-all text-white"
+      {/* ── Khung chính (Twilight Horizon Card) ── */}
+      <div
+        className="relative z-10 w-full max-w-[1000px] rounded-3xl overflow-hidden shadow-[0_28px_80px_-15px_rgba(8,5,20,0.85)] grid grid-cols-1 lg:grid-cols-[1.08fr_1fr] bg-[#18122B]/90 backdrop-blur-xl border border-purple-200/15"
       >
-        
-        {/* ── LEFT COSMIC ORBIT PANEL ── */}
-        <div className="relative hidden lg:flex flex-col justify-between p-8 xl:p-9 bg-gradient-to-br from-indigo-950/60 via-slate-900/80 to-purple-950/60 backdrop-blur-xl border-r border-white/10 overflow-hidden text-white">
-          
-          {/* Subtle Ambient Radial Glow */}
-          <div className="absolute -top-16 -left-16 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+        {/* ── BANNER MINH HỌA TRÊN ĐIỆN THOẠI (Mobile Twilight Art) ── */}
+        <div className="relative lg:hidden h-36 w-full overflow-hidden flex flex-col justify-between p-4 border-b border-purple-200/10"
+          style={{
+            background: 'linear-gradient(180deg, #161130 0%, #2c1b4d 52%, #58285f 82%, #833864 100%)'
+          }}
+        >
+          {/* Tranh SVG phong cảnh núi & trăng khuyết trên Mobile */}
+          <svg viewBox="0 0 600 180" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 w-full h-full">
+            <defs>
+              <radialGradient id="mobMoonGlow" cx="78%" cy="32%" r="35%">
+                <stop offset="0%" stopColor="#fde68a" stopOpacity="0.45" />
+                <stop offset="55%" stopColor="#f472b6" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#2c1b4d" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <rect width="600" height="180" fill="url(#mobMoonGlow)" />
+            {/* Các ngôi sao nhỏ */}
+            <circle cx="75" cy="34" r="1.5" fill="#fef3c7" opacity="0.8" />
+            <circle cx="160" cy="24" r="1.2" fill="#e0e7ff" opacity="0.6" />
+            <circle cx="280" cy="40" r="1.6" fill="#fbcfe8" opacity="0.7" />
+            <circle cx="365" cy="22" r="1.3" fill="#fef3c7" opacity="0.75" />
+            <circle cx="535" cy="35" r="1.4" fill="#e0e7ff" opacity="0.7" />
+            {/* Mặt trăng khuyết Lo-Fi */}
+            <path d="M465 26 A20 20 0 1 0 486 54 A16 16 0 1 1 465 26 Z" fill="#fef08a" opacity="0.92" />
+            {/* Dãy núi xa */}
+            <path d="M0 142 L95 96 L195 130 L310 86 L430 128 L525 94 L600 124 L600 180 L0 180 Z" fill="#2d1948" opacity="0.82" />
+            {/* Dãy núi gần */}
+            <path d="M0 156 L130 116 L245 148 L385 108 L495 144 L600 118 L600 180 L0 180 Z" fill="#18122B" />
+          </svg>
 
-          {/* Top Status Bar */}
-          <div className="relative z-10 flex items-center justify-between pb-2">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-cyan-300 text-[11px] font-black tracking-wider shadow-2xs border border-white/15">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
-              </span>
-              <span className="max-w-[200px] truncate" title={branding.appName}>{branding.appName}</span>
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#140e26]/70 backdrop-blur-md border border-purple-200/15 text-amber-200 text-xs font-semibold">
+              {branding.logoDataUrl ? (
+                <img src={branding.logoDataUrl} alt="" className="h-4 w-4 shrink-0 object-contain rounded" />
+              ) : (
+                <Sparkles size={12} className="text-amber-300" />
+              )}
+              <span className="truncate max-w-[180px]">{branding.appName}</span>
             </div>
-
             {currentTime && (
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-slate-200 font-mono text-[11px] font-bold shadow-2xs border border-white/15">
-                <Clock size={13} className="text-cyan-400" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#140e26]/70 backdrop-blur-md border border-purple-200/15 text-purple-100 font-mono text-[11px]">
+                <Clock size={11} className="text-pink-300" />
                 <span>{currentTime}</span>
               </div>
             )}
           </div>
 
-          {/* Minh họa Cosmic Orbit Schedule Widget */}
-          <div className="relative z-10 flex flex-col items-center text-center my-auto py-2">
-            
-            <div aria-hidden="true" className="w-full max-w-[345px] mb-5 rounded-2xl shadow-[0_12px_40px_-10px_rgba(79,70,229,0.25)] border border-white/15 bg-white/[0.06] backdrop-blur-md p-5 text-left transition-all hover:bg-white/[0.09]">
-              <div className="flex items-center justify-between mb-3.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/25 border border-indigo-400/40 flex items-center justify-center text-cyan-300 shadow-2xs">
-                    <Sparkles size={17} />
-                  </div>
-                  <div>
-                    <div className="text-xs font-black text-white leading-tight">Điều Phối Thời Gian</div>
-                    <div className="text-[10px] font-medium text-slate-300">Tối ưu hóa nhịp ca làm</div>
-                  </div>
-                </div>
-                <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">Cosmic Engine</span>
-              </div>
-
-              {/* Weekly Shift Cycle in Cosmic Colors */}
-              <div className="space-y-1.5">
-                <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-slate-400 pb-1 border-b border-white/10">
-                  <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span className="text-indigo-300">T7</span><span className="text-purple-300">CN</span>
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  <div className="h-7 rounded-lg bg-indigo-500/25 border border-indigo-400/35 text-cyan-200 flex items-center justify-center text-[10px] font-black">6-14</div>
-                  <div className="h-7 rounded-lg bg-cyan-500/25 border border-cyan-400/35 text-cyan-200 flex items-center justify-center text-[10px] font-black">14-22</div>
-                  <div className="h-7 rounded-lg bg-indigo-500/25 border border-indigo-400/35 text-cyan-200 flex items-center justify-center text-[10px] font-black">6-14</div>
-                  <div className="h-7 rounded-lg bg-purple-500/25 border border-purple-400/35 text-purple-200 flex items-center justify-center text-[10px] font-black">22-6</div>
-                  <div className="h-7 rounded-lg bg-indigo-500/25 border border-indigo-400/35 text-cyan-200 flex items-center justify-center text-[10px] font-black">6-14</div>
-                  <div className="h-7 rounded-lg bg-pink-500/25 border border-pink-400/35 text-pink-200 flex items-center justify-center text-[10px] font-black">14-22</div>
-                  <div className="h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-[9px] font-bold">OFF</div>
-                </div>
-                <div className="flex items-center justify-between pt-1.5 text-[10.5px]">
-                  <span className="text-slate-400 font-medium">Chu kỳ vận hành tuần</span>
-                  <span className="font-mono font-bold text-cyan-300">24/7 Linh hoạt</span>
-                </div>
-              </div>
-            </div>
-
-            <h1 className="text-[25px] xl:text-[27px] font-[900] text-white tracking-tight leading-tight">
-              Quản Lý Ca Làm Thông Minh
-            </h1>
-            <p className="text-[13px] text-cyan-300 mt-1.5 font-bold tracking-tight">
-              Tối ưu hóa thời gian, nâng tầm năng suất
-            </p>
-
-            {/* Badges */}
-            <div className="flex flex-wrap justify-center gap-2.5 mt-4">
-              <span className="px-3.5 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md shadow-2xs border border-white/15 text-[11.5px] font-bold text-slate-200 flex items-center gap-1.5 hover:border-cyan-400/40 transition-colors">
-                <Zap size={13} className="text-amber-400 fill-amber-400" />
-                <span>Nhanh chóng</span>
-              </span>
-              <span className="px-3.5 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md shadow-2xs border border-white/15 text-[11.5px] font-bold text-slate-200 flex items-center gap-1.5 hover:border-emerald-400/40 transition-colors">
-                <Shield size={13} className="text-emerald-400" />
-                <span>Bảo mật</span>
-              </span>
-              <span className="px-3.5 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md shadow-2xs border border-white/15 text-[11.5px] font-bold text-slate-200 flex items-center gap-1.5 hover:border-purple-400/40 transition-colors">
-                <Sparkles size={13} className="text-purple-400" />
-                <span>Trợ lý AI</span>
-              </span>
-            </div>
+          <div className="relative z-10">
+            <p className="text-xs font-semibold text-pink-200/90 tracking-wide">Không gian làm việc & Điều phối lịch</p>
           </div>
-
-          {/* Bottom Footer Status */}
-          <div className="relative z-10 flex items-center justify-between text-xs pt-4 mt-auto font-medium border-t border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/50" />
-              <span className="text-slate-300 text-[11.5px] font-bold">Hệ thống sẵn sàng</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-200 text-[11px] font-bold bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/15 shadow-2xs">
-              <span className="w-4 h-4 border border-white/20 rounded flex items-center justify-center text-[7.5px] font-black text-cyan-300">v2</span>
-              <span>Phiên bản Vũ trụ</span>
-            </div>
-          </div>
-
         </div>
 
-        {/* ── RIGHT LOGIN FORM PANEL (Sleek Dark Glassmorphism) ── */}
-        <div className="bg-slate-900/90 backdrop-blur-2xl p-8 sm:p-10 xl:p-12 flex flex-col justify-between relative text-white">
-          
-          <div>
-            {/* Header Greeting */}
-            <div className="flex flex-col items-start gap-3 mb-7">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center shadow-2xs shrink-0 text-cyan-300">
-                  <Sparkles size={24} strokeWidth={2.2} />
-                </div>
-                <div>
-                  <h2 className="text-[23px] sm:text-[25px] font-[900] text-white tracking-tight leading-snug">
-                    Chào mừng trở lại!
-                  </h2>
-                  <p className="text-[13px] text-slate-400 font-medium mt-0.5">
-                    Đăng nhập vào không gian làm việc của bạn.
-                  </p>
-                </div>
-              </div>
+        {/* ── CỘT TRÁI (DESKTOP): TRANH PHONG CẢNH TWILIGHT HORIZON LO-FI ── */}
+        <div
+          className="relative hidden lg:flex flex-col justify-between p-9 border-r border-purple-200/10 overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, #130f29 0%, #241744 45%, #4c2259 78%, #7a3160 100%)'
+          }}
+        >
+          {/* Tranh nền SVG Chân trời Chạng vạng (Twilight Horizon Artwork) */}
+          <svg
+            viewBox="0 0 520 640"
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 w-full h-full"
+          >
+            <defs>
+              {/* Quầng sáng chân trời hoàng hôn ấm */}
+              <radialGradient id="horizonGlow" cx="50%" cy="62%" r="55%">
+                <stop offset="0%" stopColor="#fb923c" stopOpacity="0.35" />
+                <stop offset="45%" stopColor="#f472b6" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="#1e163b" stopOpacity="0" />
+              </radialGradient>
+              {/* Mặt trời / Mặt trăng chiều tà */}
+              <linearGradient id="twilightSun" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#fef08a" stopOpacity="0.95" />
+                <stop offset="55%" stopColor="#fb923c" stopOpacity="0.88" />
+                <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.78" />
+              </linearGradient>
+              {/* Sương mù chân trời */}
+              <linearGradient id="mistLayer" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f472b6" stopOpacity="0" />
+                <stop offset="100%" stopColor="#161029" stopOpacity="0.95" />
+              </linearGradient>
+            </defs>
 
-              <span className="order-first max-w-full px-2.5 py-1 rounded-md bg-white/[0.08] border border-white/15 text-[10px] font-black tracking-wider shadow-2xs text-cyan-300">
-                <span className="inline-flex max-w-[240px] items-center gap-1.5" title={branding.appName}>
-                  {branding.logoDataUrl && <img src={branding.logoDataUrl} alt="" className="h-5 w-5 shrink-0 object-contain rounded" />}
-                  <span className="truncate">{branding.appName}</span>
-                </span>
-              </span>
+            {/* Ánh sáng hoàng hôn tỏa nhẹ */}
+            <rect width="520" height="640" fill="url(#horizonGlow)" />
+
+            {/* Các ngôi sao & chòm sao trên đỉnh trời */}
+            <circle cx="68" cy="78" r="1.6" fill="#fef3c7" opacity="0.85" />
+            <circle cx="142" cy="52" r="1.2" fill="#e0e7ff" opacity="0.65" />
+            <circle cx="220" cy="92" r="1.8" fill="#fbcfe8" opacity="0.75" />
+            <circle cx="310" cy="60" r="1.3" fill="#fef3c7" opacity="0.8" />
+            <circle cx="415" cy="84" r="1.7" fill="#e0e7ff" opacity="0.7" />
+            <circle cx="462" cy="48" r="1.2" fill="#fde68a" opacity="0.75" />
+            <circle cx="95" cy="148" r="1.3" fill="#fbcfe8" opacity="0.6" />
+            <circle cx="370" cy="138" r="1.4" fill="#fef3c7" opacity="0.65" />
+
+            {/* Đường sao băng mảnh */}
+            <line x1="350" y1="74" x2="398" y2="96" stroke="#fde68a" strokeWidth="1.2" strokeLinecap="round" opacity="0.55" />
+
+            {/* Vòng quỹ đạo thời gian mảnh quanh mặt trăng/mặt trời */}
+            <circle cx="260" cy="245" r="88" fill="none" stroke="#fbcfe8" strokeWidth="0.9" strokeDasharray="4 7" opacity="0.35" />
+            <ellipse cx="260" cy="245" rx="118" ry="38" fill="none" stroke="#fde68a" strokeWidth="1" opacity="0.28" transform="rotate(-14 260 245)" />
+
+            {/* Mặt trời lặn / Trăng tròn ấm áp nơi chân trời */}
+            <circle cx="260" cy="245" r="46" fill="url(#twilightSun)" />
+
+            {/* Mây chiều Lo-Fi mỏng */}
+            <path d="M70 225 Q95 215 120 223 Q145 212 170 225 Z" fill="#fbcfe8" opacity="0.18" />
+            <path d="M335 198 Q365 186 395 196 Q420 188 445 198 Z" fill="#fde68a" opacity="0.16" />
+
+            {/* Lớp núi thứ 1 (Xa nhất - Tím sương mù) */}
+            <path d="M0 370 L85 302 L175 348 L275 278 L380 342 L455 296 L520 335 L520 640 L0 640 Z" fill="#371c4b" opacity="0.78" />
+
+            {/* Lớp núi thứ 2 (Trung cảnh - Tím chàm đậm) */}
+            <path d="M0 408 L65 362 L158 398 L242 332 L345 392 L432 344 L520 388 L520 640 L0 640 Z" fill="#231438" opacity="0.92" />
+
+            {/* Lớp đồi thông & chân trời gần nhất */}
+            <path d="M0 446 L112 396 L218 434 L318 386 L422 430 L520 398 L520 640 L0 640 Z" fill="#150e26" />
+
+            {/* Phản chiếu ánh trăng trên mặt hồ yên ả */}
+            <rect x="0" y="446" width="520" height="194" fill="url(#mistLayer)" />
+            <line x1="225" y1="452" x2="295" y2="452" stroke="#fdba74" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
+            <line x1="236" y1="462" x2="284" y2="462" stroke="#fbcfe8" strokeWidth="1.2" strokeLinecap="round" opacity="0.28" />
+            <line x1="246" y1="471" x2="274" y2="471" stroke="#fde68a" strokeWidth="1" strokeLinecap="round" opacity="0.2" />
+          </svg>
+
+          {/* Thanh trạng thái trên cùng */}
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#150f28]/70 backdrop-blur-md border border-purple-200/15 text-amber-200 text-xs font-semibold shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+              <span className="max-w-[200px] truncate" title={branding.appName}>{branding.appName}</span>
             </div>
 
-            {/* Error Message */}
+            {currentTime && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#150f28]/70 backdrop-blur-md border border-purple-200/15 text-purple-100 font-mono text-xs font-medium">
+                <Clock size={13} className="text-pink-300" />
+                <span>{currentTime}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Nội dung giới thiệu đặt trên nền phong cảnh chiều tà */}
+          <div className="relative z-10 mt-auto pt-36">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/15 border border-pink-300/25 text-pink-200 text-[11px] font-semibold mb-3">
+              <Sparkles size={12} className="text-amber-300" />
+              <span>Nhịp nhàng · Trực quan · Dịu mắt</span>
+            </div>
+
+            <h1 className="text-2xl font-extrabold text-white tracking-tight leading-snug drop-shadow-sm">
+              Không Gian Điều Phối Ca Làm
+            </h1>
+            <p className="text-sm text-purple-100/80 mt-2 max-w-sm leading-relaxed">
+              Quản lý lịch làm việc, đối soát chấm công và tra cứu công thức mượt mà kể cả khi ngoại tuyến.
+            </p>
+
+            {/* 3 Thẻ tính năng kính mờ ấm áp */}
+            <div className="w-full mt-6 grid grid-cols-3 gap-2.5 text-left">
+              <div className="p-3 rounded-2xl bg-white/[0.06] backdrop-blur-md border border-purple-200/15">
+                <CalendarCheck2 size={16} className="text-amber-300 mb-1.5" />
+                <div className="text-xs font-bold text-white">Lịch & Công</div>
+                <div className="text-[11px] text-purple-200/75 mt-0.5">Xem cả khi mất mạng</div>
+              </div>
+              <div className="p-3 rounded-2xl bg-white/[0.06] backdrop-blur-md border border-purple-200/15">
+                <RefreshCw size={16} className="text-pink-300 mb-1.5" />
+                <div className="text-xs font-bold text-white">Ghi nhớ phiên</div>
+                <div className="text-[11px] text-purple-200/75 mt-0.5">Mở app vào thẳng</div>
+              </div>
+              <div className="p-3 rounded-2xl bg-white/[0.06] backdrop-blur-md border border-purple-200/15">
+                <LockKeyhole size={16} className="text-indigo-300 mb-1.5" />
+                <div className="text-xs font-bold text-white">Bảo mật 2 lớp</div>
+                <div className="text-[11px] text-purple-200/75 mt-0.5">An toàn tài khoản</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Chân trang cột trái */}
+          <div className="relative z-10 flex items-center justify-between text-xs pt-5 mt-5 border-t border-purple-200/10 text-purple-200/70">
+            <span className="font-medium">Sẵn sàng đồng bộ đám mây</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-white/[0.06] border border-purple-200/15 text-purple-100 font-semibold">
+              Workspace v4.4
+            </span>
+          </div>
+        </div>
+
+        {/* ── CỘT PHẢI: BIỂU MẪU ĐĂNG NHẬP ── */}
+        <div className="p-6 sm:p-10 flex flex-col justify-between bg-[#18122B]/95">
+          <div>
+            {/* Tiêu đề & nhận diện đơn vị */}
+            <div className="mb-6">
+              <div className="hidden lg:inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-purple-950/60 border border-purple-300/20 text-amber-200 text-xs font-semibold mb-4 max-w-full">
+                {branding.logoDataUrl ? (
+                  <img src={branding.logoDataUrl} alt="" className="h-4 w-4 shrink-0 object-contain rounded" />
+                ) : (
+                  <Sparkles size={13} className="shrink-0 text-amber-300" />
+                )}
+                <span className="truncate max-w-[240px]" title={branding.appName}>{branding.appName}</span>
+              </div>
+
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                Chào mừng trở lại
+              </h2>
+              <p className="text-sm text-purple-200/70 mt-1">
+                Nhập mã nhân viên và mật khẩu để vào không gian làm việc của bạn.
+              </p>
+            </div>
+
+            {/* Thông báo lỗi */}
             {error && (
-              <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in duration-200 shadow-2xs">
+              <div
+                role="alert"
+                data-testid="login-error"
+                className="mb-5 p-3.5 rounded-xl bg-rose-950/70 border border-rose-400/40 text-rose-100 text-xs font-medium flex items-center justify-between gap-2.5"
+              >
                 <div className="flex items-center gap-2.5">
-                  <ShieldAlert size={17} className="shrink-0 text-rose-500" />
+                  <ShieldAlert size={17} className="shrink-0 text-rose-400" />
                   <span>{error}</span>
                 </div>
                 {error.includes('cấu hình') && (
@@ -382,7 +405,7 @@ export default function Login() {
                       } catch {}
                       window.location.reload();
                     }}
-                    className="shrink-0 px-2.5 py-1 bg-white border border-rose-300 hover:bg-rose-100 rounded-lg text-[11px] font-bold text-rose-800 cursor-pointer shadow-xs transition-colors"
+                    className="shrink-0 px-2.5 py-1 bg-rose-900/80 border border-rose-400/40 hover:bg-rose-800 rounded-lg text-[11px] font-semibold text-rose-100 cursor-pointer transition-colors"
                   >
                     Làm mới cache
                   </button>
@@ -390,15 +413,15 @@ export default function Login() {
               </div>
             )}
 
-            {/* ── 2FA OTP Step ── */}
+            {/* ── Bước xác thực 2FA OTP ── */}
             {otpStep ? (
-              <form onSubmit={submitOtp} className="space-y-4 animate-in fade-in duration-200">
-                <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-400/30 text-center">
-                  <div className="w-11 h-11 mx-auto rounded-xl bg-blue-600 text-white flex items-center justify-center mb-2 shadow-sm">
+              <form onSubmit={submitOtp} className="space-y-4">
+                <div className="p-4 rounded-2xl bg-[#221a3a]/80 border border-purple-300/20 text-center">
+                  <div className="w-11 h-11 mx-auto rounded-xl bg-amber-400/15 border border-amber-300/30 text-amber-200 flex items-center justify-center mb-2">
                     <ShieldCheck size={22} />
                   </div>
                   <p className="text-sm font-bold text-white mb-1">Xác Thực Bảo Mật 2FA</p>
-                  <p className="text-xs text-slate-500">Mã xác nhận đã gửi qua Telegram Admin.</p>
+                  <p className="text-xs text-purple-200/75">Mã xác nhận gồm 6 chữ số đã gửi qua Telegram Admin.</p>
                 </div>
 
                 <div>
@@ -408,23 +431,25 @@ export default function Login() {
                     autoComplete="one-time-code"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="block w-full px-4 py-3 text-center text-2xl font-black tracking-[0.4em] border-2 border-slate-700 rounded-xl focus:ring-4 focus:ring-cyan-500/20 focus:border-cyan-400 bg-slate-800 text-white outline-none shadow-2xs"
+                    className="block w-full px-4 py-3 text-center text-2xl font-bold tracking-[0.4em] border border-purple-300/25 rounded-xl focus:ring-2 focus:ring-pink-400/30 focus:border-pink-400 bg-[#120d22] text-white outline-none"
                     placeholder="······"
                     autoFocus
                     required
                   />
                 </div>
 
-                {otpNote && <div className="text-xs text-slate-500 text-center font-medium">{otpNote}</div>}
+                {otpNote && <div className="text-xs text-purple-200/75 text-center">{otpNote}</div>}
 
                 <button
                   type="submit"
                   disabled={otpBusy || otpCode.length !== 6}
-                  style={{ background: branding.primaryColor }}
-                  className="btn-shimmer-effect w-full py-3.5 rounded-xl text-white font-black text-sm tracking-wider shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #db2777 100%)'
+                  }}
+                  className="w-full py-3 rounded-xl text-white font-bold text-sm tracking-wide shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
                 >
                   {otpBusy ? (
-                    <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    <span role="status">Đang đăng nhập…</span>
                   ) : (
                     <LogIn size={16} />
                   )}
@@ -436,148 +461,197 @@ export default function Login() {
                     type="button"
                     onClick={() => sendOtp(true)}
                     disabled={otpBusy || cooldown > 0}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    className="text-xs font-semibold text-pink-300 hover:text-pink-200 cursor-pointer disabled:opacity-50"
                   >
                     {cooldown > 0 ? `Gửi lại (${cooldown}s)` : 'Gửi lại mã'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setOtpStep(false); setOtpCode(''); setError(''); }}
-                    className="text-xs font-semibold text-slate-400 hover:text-slate-700 cursor-pointer"
+                    className="text-xs font-semibold text-purple-200/70 hover:text-white cursor-pointer"
                   >
                     ← Quay lại
                   </button>
                 </div>
               </form>
             ) : (
-              /* ── Standard Login Form (Razor-Sharp, High Contrast) ── */
-              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
-                
-                {/* Employee ID */}
+              /* ── Biểu mẫu đăng nhập chuẩn ── */
+              <form
+                onSubmit={handleLogin}
+                aria-label="Đăng nhập Lịch Ca"
+                data-testid="login-form"
+                className="space-y-4"
+              >
+                {/* Thẻ gợi ý tài khoản đã lưu (nếu có) */}
+                {savedEmpId && empId === savedEmpId && (
+                  <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#231b3d]/80 border border-purple-300/20 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-amber-300 shrink-0 shadow-[0_0_6px_#fcd34d]" />
+                      <span className="text-purple-100/90 truncate">
+                        Tài khoản gần đây: <strong className="text-white font-bold font-mono">{savedEmpId}</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearRememberedId}
+                      className="inline-flex items-center gap-1 text-pink-300 hover:text-pink-200 font-semibold shrink-0 ml-2 cursor-pointer"
+                      title="Đổi tài khoản khác"
+                    >
+                      <X size={13} />
+                      <span>Đổi mã</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Mã nhân viên */}
                 <div>
-                  <label className="block text-[11.5px] font-[800] text-slate-300 uppercase tracking-wider mb-2">
-                    MÃ NHÂN VIÊN / TÀI KHOẢN
+                  <label
+                    htmlFor="login-employee-id"
+                    className="block text-xs font-semibold text-purple-100/90 mb-1.5"
+                  >
+                    Mã nhân viên / Tài khoản
                   </label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-600 transition-colors">
-                      <User size={18} strokeWidth={2.2} />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-300/60">
+                      <User size={17} />
                     </div>
                     <input
+                      ref={empInputRef}
                       type="text"
                       value={empId}
+                      id="login-employee-id"
+                      data-testid="login-employee-id"
+                      autoComplete="username"
                       onChange={e => setEmpId(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 sm:py-3.5 text-[14px] bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20 rounded-xl outline-none font-semibold text-white transition-all placeholder:text-slate-500 placeholder:font-normal shadow-2xs"
-                      placeholder="Nhập mã nhân viên (VD: admin hoặc 2511004004)"
+                      className="block w-full pl-10 pr-4 py-3 text-sm bg-[#120e22]/90 border border-purple-300/20 hover:border-purple-300/35 focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 rounded-xl outline-none font-medium text-white transition-all placeholder:text-purple-300/40"
+                      placeholder="Nhập mã 9 chữ số hoặc admin"
                       required
                     />
                   </div>
                 </div>
 
-                {/* Password */}
+                {/* Mật khẩu */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-[11.5px] font-[800] text-slate-300 uppercase tracking-wider">
-                      MẬT KHẨU
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="login-password"
+                      className="block text-xs font-semibold text-purple-100/90"
+                    >
+                      Mật khẩu
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowForgotModal(true)}
-                      className="text-[11.5px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer transition-colors"
+                      className="text-xs font-semibold text-pink-300 hover:text-pink-200 hover:underline cursor-pointer transition-colors"
                     >
                       Quên mật khẩu?
                     </button>
                   </div>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-600 transition-colors">
-                      <KeyRound size={18} strokeWidth={2.2} />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-300/60">
+                      <KeyRound size={17} />
                     </div>
                     <input
                       ref={passwordRef}
+                      id="login-password"
+                      data-testid="login-password"
+                      autoComplete="current-password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-11 py-3 sm:py-3.5 text-[14px] bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20 rounded-xl outline-none font-semibold text-white transition-all placeholder:text-slate-500 placeholder:font-normal shadow-2xs"
+                      className="block w-full pl-10 pr-11 py-3 text-sm bg-[#120e22]/90 border border-purple-300/20 hover:border-purple-300/35 focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20 rounded-xl outline-none font-medium text-white transition-all placeholder:text-purple-300/40"
                       placeholder="Nhập mật khẩu"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-purple-300/60 hover:text-white transition-colors cursor-pointer"
                       title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
-                      {showPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
                   </div>
                 </div>
 
-                {/* Remember Me Checkbox */}
-                <div className="flex items-center pt-1">
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-                    <div className="relative flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={e => setRememberMe(e.target.checked)}
-                        className="peer appearance-none w-[18px] h-[18px] border border-slate-600 hover:border-slate-500 rounded-md bg-slate-800 checked:bg-cyan-500 checked:border-cyan-500 cursor-pointer transition-all shadow-2xs"
-                      />
-                      <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    </div>
-                    <span className="text-[13px] font-semibold text-slate-300 group-hover:text-white transition-colors">
-                      Ghi nhớ đăng nhập
+                {/* Ghi nhớ đăng nhập */}
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={e => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-purple-300/30 bg-[#120e22] text-pink-500 focus:ring-pink-400/30 cursor-pointer accent-pink-500"
+                    />
+                    <span className="text-xs font-medium text-purple-100/85">
+                      Duy trì đăng nhập trên thiết bị này
                     </span>
                   </label>
                 </div>
 
-                {/* Submit Button with Animated Shimmer Light */}
+                {/* Nút Đăng nhập Twilight Gradient */}
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ background: branding.primaryColor }}
-                  className="btn-shimmer-effect relative w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:from-indigo-600 hover:to-pink-600 text-white font-black text-[14px] tracking-wider shadow-[0_4px_20px_rgba(99,102,241,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] hover:shadow-[0_6px_24px_rgba(168,85,247,0.5)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all mt-6"
+                  data-testid="login-submit"
+                  aria-label={submitting ? 'Đang đăng nhập' : 'Đăng nhập'}
+                  aria-busy={submitting}
+                  style={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #db2777 100%)'
+                  }}
+                  className="w-full py-3.5 px-4 rounded-xl text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-950/60 hover:brightness-110 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-all mt-2"
                 >
                   {submitting ? (
                     <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <LogIn size={17} strokeWidth={2.5} />
+                      <LogIn size={17} />
                       <span>ĐĂNG NHẬP</span>
                     </>
                   )}
                 </button>
               </form>
             )}
-
           </div>
 
-          {/* Footer Versions (Clean, crisp border, ample breathing room) */}
-          <div className="mt-8 pt-5 border-t border-slate-200 flex items-center justify-between text-[11.5px] font-bold">
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <KeyRound size={14} className="text-blue-600" />
-              <span>v4.2.3</span>
+          {/* Chân trang cột phải */}
+          <div className="mt-8 pt-4 border-t border-purple-200/10 flex items-center justify-between text-xs text-purple-200/60">
+            <div className="flex items-center gap-1.5">
+              <KeyRound size={13} className="text-amber-300" />
+              <span>v4.4</span>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-700">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
-                <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
-                <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
-              </svg>
-              <span className="max-w-[180px] truncate" title={branding.organizationName}>{branding.organizationName || 'Không gian làm việc'}</span>
-            </div>
+            <span className="max-w-[200px] truncate" title={branding.organizationName}>
+              {branding.organizationName || 'Không gian làm việc'}
+            </span>
           </div>
-          {branding.contactEmail && <a href={`mailto:${branding.contactEmail}`} className="mt-4 block text-center text-xs text-slate-600 break-all">Liên hệ hỗ trợ: {branding.contactEmail}</a>}
-
+          {branding.contactEmail && (
+            <a
+              href={`mailto:${branding.contactEmail}`}
+              className="mt-3 block text-center text-xs text-purple-200/70 hover:text-pink-300 break-all transition-colors"
+            >
+              Liên hệ hỗ trợ: {branding.contactEmail}
+            </a>
+          )}
         </div>
-
       </div>
 
-      {recoveryNotice && <div role="status" className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{recoveryNotice}</div>}
+      {recoveryNotice && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-xl border border-emerald-500/40 bg-emerald-950/90 p-3 text-sm text-emerald-200 shadow-lg"
+        >
+          {recoveryNotice}
+        </div>
+      )}
       <ForgotPasswordModal
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
         initialEmpId={empId}
         onSuccess={(id, warning) => {
-          setEmpId(id); setPassword(''); setError(''); setOtpStep(false);
+          setEmpId(id);
+          setPassword('');
+          setError('');
+          setOtpStep(false);
           setRecoveryNotice(warning || 'Đã đổi mật khẩu. Hãy đăng nhập bằng mật khẩu mới.');
           requestAnimationFrame(() => passwordRef.current?.focus());
         }}

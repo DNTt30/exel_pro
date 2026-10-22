@@ -1,15 +1,13 @@
 /**
  * EmployeeChangePassword.jsx
- * Trang bắt buộc đổi mật khẩu cho nhân viên khi:
- *  - Còn dùng mật khẩu mặc định (forced: true, reason: 'default')
- *  - Admin yêu cầu đổi (must_change_password flag)
+ * Trang đổi mật khẩu cho nhân viên (bắt buộc khi dùng mật khẩu mặc định hoặc tự đổi từ Hồ sơ).
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hasPasswordNumberOrSymbol, validateNewPassword } from '../../utils/passwordPolicy';
 import { signedInPath } from '../../utils/authNavigation';
 import { useStore } from '../../store/useStore';
-import { KeyRound, Eye, EyeOff, AlertTriangle, Lock } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, AlertTriangle, Lock, ArrowLeft } from 'lucide-react';
 
 export default function EmployeeChangePassword() {
   const navigate = useNavigate();
@@ -18,13 +16,13 @@ export default function EmployeeChangePassword() {
 
   const forced = !!user?.mustChangePassword;
 
-  const [oldPw, setOldPw]       = useState('');
-  const [newPw, setNewPw]       = useState('');
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
-  const [showOld, setShowOld]   = useState(false);
-  const [showNew, setShowNew]   = useState(false);
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const isExpired = !!user?.isPasswordExpired;
 
   const handleSubmit = async (e) => {
@@ -50,48 +48,55 @@ export default function EmployeeChangePassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden">
-
-        {/* Header */}
-        <div className={`px-6 py-5 ${isExpired ? 'bg-red-600' : 'bg-amber-500'}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-              {isExpired ? <AlertTriangle size={20} className="text-white" /> : <Lock size={20} className="text-white" />}
-            </div>
-            <div>
-              <div className="text-white font-black text-base">
-                {isExpired ? 'Mật khẩu đã hết hạn' : 'Cần đổi mật khẩu'}
-              </div>
-              <div className="text-white/80 text-xs">
-                {isExpired
-                  ? 'Mật khẩu mặc định đã quá 7 ngày. Vui lòng liên hệ quản lý.'
-                  : 'Vui lòng đặt mật khẩu riêng để bảo vệ tài khoản của bạn.'}
-              </div>
-            </div>
+    <div className="min-h-[75vh] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xl w-full max-w-md overflow-hidden">
+        {/* Header dịu mắt, đồng bộ với SecurityChangePassword */}
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center gap-3.5">
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0 ${
+              isExpired
+                ? 'bg-gradient-to-tr from-rose-500 to-red-600'
+                : 'bg-gradient-to-tr from-blue-600 to-indigo-600'
+            }`}
+          >
+            {isExpired ? <AlertTriangle size={20} /> : <Lock size={20} />}
+          </div>
+          <div>
+            <h1 className="text-slate-900 font-extrabold text-base leading-tight">
+              {isExpired ? 'Mật khẩu đã hết hạn' : forced ? 'Cần đổi mật khẩu lần đầu' : 'Đổi mật khẩu tài khoản'}
+            </h1>
+            <p className="text-slate-500 text-xs mt-0.5">
+              {isExpired
+                ? 'Mật khẩu mặc định đã quá 7 ngày. Vui lòng liên hệ quản lý.'
+                : 'Thiết lập mật khẩu cá nhân an toàn để bảo vệ tài khoản.'}
+            </p>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
-            👤 <strong>{user?.name}</strong> · {user?.id}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2.5">
+            <span>👤 <strong>{user?.name}</strong></span>
+            <span className="font-mono text-slate-500">{user?.id}</span>
           </div>
 
-          {/* Mật khẩu cũ — nếu không phải expired thì nhập 1 */}
+          {/* Mật khẩu hiện tại */}
           {!isExpired && (
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Mật khẩu hiện tại</label>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Mật khẩu hiện tại</label>
               <div className="relative">
                 <input
                   type={showOld ? 'text' : 'password'}
                   value={oldPw}
                   onChange={e => setOldPw(e.target.value)}
                   placeholder="Nhập mật khẩu hiện tại (mặc định: 1)"
-                  className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-3.5 py-2.5 pr-10 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                 />
-                <button type="button" onClick={() => setShowOld(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => setShowOld(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
                   {showOld ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
@@ -100,28 +105,34 @@ export default function EmployeeChangePassword() {
 
           {/* Mật khẩu mới */}
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Mật khẩu mới</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">Mật khẩu mới</label>
             <div className="relative">
               <input
                 type={showNew ? 'text' : 'password'}
                 value={newPw}
                 onChange={e => setNewPw(e.target.value)}
                 placeholder="Tối thiểu 8 ký tự, có số hoặc ký tự đặc biệt"
-                className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3.5 py-2.5 pr-10 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
               />
-              <button type="button" onClick={() => setShowNew(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <button
+                type="button"
+                onClick={() => setShowNew(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
                 {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-            {/* Strength indicator */}
             {newPw.length > 0 && (
-              <div className="mt-1 flex gap-1">
+              <div className="mt-1.5 flex gap-1">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
-                    i < (newPw.length >= 12 ? 4 : newPw.length >= 10 ? 3 : newPw.length >= 8 ? 2 : 1)
-                      ? 'bg-emerald-400' : 'bg-slate-200'
-                  }`} />
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${
+                      i < (newPw.length >= 12 ? 4 : newPw.length >= 10 ? 3 : newPw.length >= 8 ? 2 : 1)
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-200'
+                    }`}
+                  />
                 ))}
               </div>
             )}
@@ -129,36 +140,36 @@ export default function EmployeeChangePassword() {
 
           {/* Xác nhận mật khẩu */}
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Xác nhận mật khẩu mới</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">Xác nhận mật khẩu mới</label>
             <input
               type="password"
               value={confirmPw}
               onChange={e => setConfirmPw(e.target.value)}
               placeholder="Nhập lại mật khẩu mới"
-              className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:ring-2 outline-none ${
+              className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-2 outline-none ${
                 confirmPw && confirmPw !== newPw
-                  ? 'border-red-300 focus:ring-red-400'
-                  : 'border-slate-300 focus:ring-blue-500'
+                  ? 'border-rose-300 focus:ring-rose-400/20 focus:border-rose-500'
+                  : 'border-slate-300 focus:ring-blue-500/20 focus:border-blue-500'
               }`}
             />
           </div>
 
           {/* Yêu cầu */}
-          <div className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2 space-y-0.5">
-            <div className={newPw.length >= 8 ? 'text-emerald-600' : ''}>
+          <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2.5 space-y-1">
+            <div className={newPw.length >= 8 ? 'text-emerald-600 font-semibold' : ''}>
               {newPw.length >= 8 ? '✓' : '○'} Tối thiểu 8 ký tự
             </div>
-            <div className={hasPasswordNumberOrSymbol(newPw) ? 'text-emerald-600' : ''}>
+            <div className={hasPasswordNumberOrSymbol(newPw) ? 'text-emerald-600 font-semibold' : ''}>
               {hasPasswordNumberOrSymbol(newPw) ? '✓' : '○'} Có ít nhất 1 chữ số hoặc ký tự đặc biệt
             </div>
-            <div className={confirmPw && confirmPw === newPw ? 'text-emerald-600' : ''}>
+            <div className={confirmPw && confirmPw === newPw ? 'text-emerald-600 font-semibold' : ''}>
               {confirmPw && confirmPw === newPw ? '✓' : '○'} Mật khẩu xác nhận khớp
             </div>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2 flex items-start gap-2">
-              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-3.5 py-2.5 flex items-start gap-2">
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -166,17 +177,20 @@ export default function EmployeeChangePassword() {
           <button
             type="submit"
             disabled={loading || !newPw || !confirmPw}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-black rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <KeyRound size={16} />
-            {loading ? 'Đang lưu...' : 'Đổi mật khẩu ngay'}
+            <span>{loading ? 'Đang lưu...' : 'Cập nhật mật khẩu'}</span>
           </button>
 
-          {/* Không cho phép bỏ qua nếu forced */}
           {!forced && (
-            <button type="button" onClick={() => navigate(-1)}
-              className="w-full text-xs text-slate-400 hover:text-slate-600 text-center py-1">
-              Bỏ qua lần này
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 text-center py-1.5 cursor-pointer"
+            >
+              <ArrowLeft size={13} />
+              <span>Quay lại</span>
             </button>
           )}
         </form>

@@ -13,6 +13,7 @@ export default function ShiftInput({
   readOnly = false,
   isDraft: _isDraft = false,
   empName = '',
+  empId = '',
   dayLabel = ''
 }) {
 
@@ -58,13 +59,13 @@ export default function ShiftInput({
     const match = shiftCode.match(/^(\d+)/);
     const startH = match ? parseInt(match[1], 10) : 12;
     if (startH >= 5 && startH < 12) {
-      cellBg = '#22c55e'; // Xanh lá ca sáng
+      cellBg = '#059669'; // Xanh ngọc ca sáng
       cellText = '#ffffff';
     } else if (startH >= 12 && startH < 18) {
-      cellBg = '#3b82f6'; // Xanh biển ca chiều
+      cellBg = '#2563eb'; // Xanh biển ca chiều
       cellText = '#ffffff';
     } else {
-      cellBg = '#ef4444'; // Đỏ/tím ca đêm
+      cellBg = '#be123c'; // Đỏ trầm ca đêm
       cellText = '#ffffff';
     }
     displayLabel = shiftCode;
@@ -244,9 +245,10 @@ export default function ShiftInput({
 
   // Render input mode vs read/nav mode
   return (
-    <div className="relative w-full h-full flex items-center justify-center">
+    <div data-testid={empId ? `shift-${empId}-${dayLabel}` : undefined} className="relative w-full h-full flex items-center justify-center">
       {isEditing ? (
         <input
+          aria-label={`Sửa ca ${empName} ${dayLabel}`}
           ref={(el) => { if(el) el.focus(); }}
           type="text"
           className="w-full h-full text-center px-0.5 py-0 border-2 border-blue-500 outline-none text-xs font-bold text-gray-900 bg-white z-30"
@@ -259,6 +261,8 @@ export default function ShiftInput({
         <div
           ref={cellRef}
           id={`cell-${rowIndex}-${colIndex}`}
+          role={readOnly ? undefined : 'button'}
+          aria-label={`Ca ${empName} ${dayLabel}: ${isUnset ? 'Chưa xếp' : displayLabel}${isUnconfirmedReg ? ' (đăng ký chưa chốt)' : ''}`}
           tabIndex={readOnly ? -1 : 0}
           onKeyDown={handleKeyDown}
           onClick={handleClick}
@@ -346,6 +350,7 @@ export default function ShiftInput({
                 onClick={() => setShowMobilePicker(false)} 
                 className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
                 title="Đóng"
+                aria-label="Đóng bảng chọn ca"
               >
                 <X size={15} />
               </button>

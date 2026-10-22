@@ -10,6 +10,7 @@ import { sanitizeAiInput, sanitizeAiOutput } from './aiGuard';
 import { answerClockQuery } from './copilotClock';
 import { createCopilotRequest } from './copilotRequest';
 import { answerUsageQuery, routeUsageQuery } from './copilotUsage';
+import { answerRecipeCalculationQuery } from './recipeCalculator';
 
 
 const DAY_CODE_BY_JS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -834,6 +835,11 @@ export async function askGeminiCopilot(question, context = {}, chatHistory = [],
       return guard.reason;
     }
     const cleanQuestion = guard.text;
+    const recipeAnswer = answerRecipeCalculationQuery(cleanQuestion);
+    if (recipeAnswer) {
+      if (onChunk) onChunk(recipeAnswer);
+      return recipeAnswer;
+    }
 
     const clockAnswer = answerClockQuery(cleanQuestion);
     if (clockAnswer) {

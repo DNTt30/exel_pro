@@ -7,7 +7,8 @@ export const MA_RE = /^\d{9}$/;
 
 // Thời gian phiên & realtime
 /** Thời gian tối đa phiên admin tính từ lúc đăng nhập (ms). */
-export const ADMIN_SESSION_MAX_MS = 12 * 60 * 60 * 1000; // 12 giờ
+export const ADMIN_SESSION_MAX_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày
+export const UNREMEMBERED_SESSION_MAX_MS = 12 * 60 * 60 * 1000; // 12 giờ
 /** Debounce cho realtime Supabase trước khi tải lại dữ liệu (ms). */
 export const REALTIME_DEBOUNCE_MS = 300;
 /** Timeout tối đa mỗi nhánh tải dữ liệu bootstrap (ms). */
@@ -50,6 +51,7 @@ export function getRoleBadgeInfo(roleOrType) {
 
 // Cấu hình quy chuẩn & ngưỡng cảnh báo giờ làm việc (Schedule Rules)
 export const SCHEDULE_RULES = {
+  MAX_CONFIGURABLE_SHIFTS_PER_WEEK: 7,
   // Quy chuẩn Part-time (STPT)
   STPT_MIN_HOURS_PER_WEEK: 16,    // Tối thiểu 16 giờ/tuần
   STPT_MAX_HOURS_PER_WEEK: 23,    // Ngưỡng tuần tối đa ~23 giờ (tương đương 91h/tháng)
@@ -112,7 +114,11 @@ export function normalizeStaffingConfig(raw) {
   const flat = raw && raw['6-14'] != null ? raw : null;
   const weekday = cloneShiftCounts(raw?.weekday || flat, DEFAULT_STAFFING_MATRIX.weekday);
   const weekend = cloneShiftCounts(raw?.weekend || flat, DEFAULT_STAFFING_MATRIX.weekend);
-  return { weekday, weekend };
+  const limit = raw?.weeklyHoursLimit;
+  if (limit != null && limit !== '' && (!Number.isFinite(Number(limit)) || Number(limit) < 0)) {
+    throw new Error('Hạn mức giờ cửa hàng phải là số không âm hoặc để trống.');
+  }
+  return { weekday, weekend, ...(limit != null && limit !== '' ? { weeklyHoursLimit: Number(limit) } : {}) };
 }
 
 export function getStaffingMatrix(store, dayKey) {

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sessionPersistence } from './sessionStorage';
+import { isAgentSandbox } from './agentSandbox';
 
 // Supabase config với fallback an toàn
 const DEFAULT_SUPABASE_URL = 'https://plitfdjzuealjxbylwxy.supabase.co';
@@ -13,7 +14,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Khởi tạo Supabase Client
-export const supabase = (supabaseUrl && supabaseAnonKey)
+export const supabase = (!isAgentSandbox && supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,

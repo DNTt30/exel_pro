@@ -78,6 +78,17 @@ describe('forced password routes', () => {
     </Routes></MemoryRouter>);
     expect(container.textContent).toBe('/login');
   });
+  it.each([
+    [{ id: '260512001', role: 'employee', isPasswordExpired: false }, '/employee/home'],
+    [{ id: 'admin', role: 'admin', isManager: true }, '/admin/dashboard'],
+  ])('auto-redirects a returning signed-in user away from /login (%j)', async (user, expected) => {
+    useStore.setState({ user });
+    await mount(<MemoryRouter initialEntries={['/login']}><Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="*" element={<Location />} />
+    </Routes></MemoryRouter>);
+    expect(container.textContent).toBe(expected);
+  });
 });
 
 describe('password forms use the real store action', () => {

@@ -325,6 +325,7 @@ export default function Employees() {
             <input 
               type="text" 
               placeholder="Tìm theo tên hoặc mã..."
+              aria-label="Tìm nhân viên theo tên hoặc mã" data-testid="employee-search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-44 sm:w-56 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none"
@@ -332,6 +333,7 @@ export default function Employees() {
             {search && (
               <button 
                 onClick={() => setSearch('')}
+                aria-label="Xóa tìm kiếm nhân viên"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer"
               >
                 <X size={13} />
@@ -353,7 +355,7 @@ export default function Employees() {
       </div>
 
       <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
-        <table className="w-full border-collapse text-left">
+        <table data-testid="employee-list" aria-label="Danh sách nhân viên" className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-slate-100/80 text-left border-b border-slate-200 sticky top-0 z-10 text-xs font-bold text-slate-600">
               <th className="p-3">Mã NV</th>
@@ -374,6 +376,7 @@ export default function Employees() {
                     maxLength={9}
                     className="w-full p-1.5 border border-blue-300 rounded bg-white font-mono text-xs outline-none" 
                     placeholder="Mã 9 số" 
+                    aria-label="Mã nhân viên mới"
                     value={formData.id} 
                     onChange={e => setFormData({...formData, id: e.target.value.replace(/\D/g, '')})} 
                   />
@@ -383,7 +386,7 @@ export default function Employees() {
                     type="text" 
                     className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs font-semibold outline-none" 
                     placeholder="Họ và tên" 
-                    value={formData.name} 
+                    aria-label="Họ và tên nhân viên mới" value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                   />
                   <input type="email" aria-label="Email khôi phục nhân viên mới" placeholder="Gmail khôi phục"
@@ -393,7 +396,7 @@ export default function Employees() {
                 <td className="p-2.5">
                   <select 
                     className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-medium disabled:bg-slate-100" 
-                    value={formData.dept}
+                    aria-label="Cửa hàng nhân viên" value={formData.dept}
                     disabled={!pickStore}
                     onChange={e => setFormData({...formData, dept: e.target.value})}
                   >
@@ -404,7 +407,7 @@ export default function Employees() {
                 <td className="p-2.5">
                   <select 
                     className="w-full p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-bold text-slate-700" 
-                    value={formData.role} 
+                    aria-label="Vai trò nhân viên" value={formData.role}
                     onChange={e => handleRoleChange(e.target.value)}
                   >
                     {availableRoles.map(r => (
@@ -416,14 +419,14 @@ export default function Employees() {
                   <input 
                     type="number" 
                     className="w-20 p-1.5 border border-blue-300 rounded bg-white text-xs outline-none font-mono" 
-                    value={formData.maxH} 
+                    aria-label="Giới hạn giờ mỗi tuần" value={formData.maxH}
                     onChange={e => setFormData({...formData, maxH: Number(e.target.value)})} 
                   />
                 </td>
                 <td className="p-2.5"></td>
                 <td className="p-2.5 text-right whitespace-nowrap">
-                  <button onClick={handleSaveAdd} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded font-bold mr-1 cursor-pointer" title="Lưu"><Save size={15} /></button>
-                  <button onClick={() => setIsAdding(false)} className="text-slate-600 bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded font-bold cursor-pointer" title="Hủy"><X size={15} /></button>
+                  <button onClick={handleSaveAdd} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded font-bold mr-1 cursor-pointer" aria-label="Lưu nhân viên" title="Lưu"><Save size={15} /></button>
+                  <button onClick={() => setIsAdding(false)} className="text-slate-600 bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded font-bold cursor-pointer" aria-label="Hủy sửa nhân viên" title="Hủy"><X size={15} /></button>
                 </td>
               </tr>
             )}
@@ -433,14 +436,14 @@ export default function Employees() {
               const reminder = emp.isActive !== false && workPlanReminder(profiles[emp.id]?.workPlanUntil);
               
               return (
-                <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={emp.id} data-testid={`employee-${emp.id}`} className="hover:bg-slate-50 transition-colors">
                   <td className="p-3 font-mono font-bold text-slate-700">{emp.id}</td>
                   <td className="p-3">
                     {editingId === emp.id ? (
                       <input 
                         type="text" 
                         className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs font-bold outline-none" 
-                        value={formData.name} 
+                        aria-label="Họ và tên nhân viên" value={formData.name}
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
                     ) : <button type="button" onClick={() => setProfileTarget(emp.id)} title={`Xem hồ sơ ${emp.name}`} className="text-left font-bold text-blue-700 hover:underline">{emp.name}</button>}
@@ -463,7 +466,7 @@ export default function Employees() {
                     {editingId === emp.id ? (
                       <select 
                         className="w-full p-1.5 border border-blue-400 rounded bg-yellow-50 text-xs font-semibold outline-none disabled:bg-slate-100" 
-                        value={formData.dept}
+                        aria-label="Cửa hàng nhân viên" value={formData.dept}
                         disabled={!pickStore}
                         onChange={e => setFormData({...formData, dept: e.target.value})}
                       >
@@ -476,7 +479,7 @@ export default function Employees() {
                     {editingId === emp.id ? (
                       <select 
                         className="w-full p-1.5 border border-blue-400 rounded bg-white text-xs font-bold text-slate-700" 
-                        value={formData.role}
+                        aria-label="Vai trò nhân viên" value={formData.role}
                         disabled={Boolean(emp.workspaceRoleId)}
                         title={emp.workspaceRoleId ? 'Đổi vai trò tại Cài đặt đơn vị → Vai trò' : ''}
                         onChange={e => handleRoleChange(e.target.value)}
@@ -497,7 +500,7 @@ export default function Employees() {
                       <input 
                         type="number" 
                         className="w-20 p-1.5 border border-blue-400 rounded bg-white text-xs outline-none font-mono" 
-                        value={formData.maxH} 
+                        aria-label="Giới hạn giờ mỗi tuần" value={formData.maxH}
                         onChange={e => setFormData({...formData, maxH: Number(e.target.value)})} 
                       />
                     ) : <span className="text-slate-600 font-mono font-bold">{emp.maxH || (emp.type === 'STPT' ? 23 : 48)}h</span>}
@@ -546,8 +549,8 @@ export default function Employees() {
                   <td className="p-3 text-right whitespace-nowrap">
                     {editingId === emp.id ? (
                       <>
-                        <button onClick={handleSaveEdit} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1.5 rounded mr-1 cursor-pointer" title="Lưu"><Save size={15} /></button>
-                        <button onClick={() => setEditingId(null)} className="text-slate-500 bg-slate-100 hover:bg-slate-200 p-1.5 rounded cursor-pointer" title="Hủy"><X size={15} /></button>
+                        <button onClick={handleSaveEdit} className="text-emerald-700 bg-emerald-100 hover:bg-emerald-200 p-1.5 rounded mr-1 cursor-pointer" aria-label="Lưu nhân viên" title="Lưu"><Save size={15} /></button>
+                        <button onClick={() => setEditingId(null)} className="text-slate-500 bg-slate-100 hover:bg-slate-200 p-1.5 rounded cursor-pointer" aria-label="Hủy sửa nhân viên" title="Hủy"><X size={15} /></button>
                       </>
                     ) : (
                       <>
@@ -569,16 +572,16 @@ export default function Employees() {
                         </button>
                         )}
                         {canEditEmps && (
-                        <><button onClick={() => setResetTarget(emp)} title="Đặt lại mật khẩu" className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 mr-1"><KeyRound size={14} /></button>
+                        <><button onClick={() => setResetTarget(emp)} aria-label="Đặt lại mật khẩu nhân viên" title="Đặt lại mật khẩu" className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 mr-1"><KeyRound size={14} /></button>
             <button onClick={() => handleToggleActive(emp)} className={`${emp.isActive === false ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-500 hover:bg-slate-100'} p-1.5 rounded transition-colors mr-1 cursor-pointer`} title={emp.isActive === false ? 'Mở lại tài khoản' : 'Vô hiệu hóa (nghỉ việc)'}>
                           {emp.isActive === false ? <Unlock size={15} /> : <Lock size={15} />}
                         </button></>
                         )}
                         {canEditEmps && (
-                        <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" title="Sửa thông tin"><Edit2 size={15} /></button>
+                        <button onClick={() => { setEditingId(emp.id); setFormData({ ...emp, role: emp.role || emp.type || 'STFT' }); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 cursor-pointer" aria-label="Sửa thông tin nhân viên" title="Sửa thông tin"><Edit2 size={15} /></button>
                         )}
                         {canEditEmps && emp.isActive !== false && (
-                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" title="Ngưng hoạt động (giữ lịch sử)"><Trash2 size={15} /></button>
+                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer" aria-label="Ngưng hoạt động nhân viên" title="Ngưng hoạt động (giữ lịch sử)"><Trash2 size={15} /></button>
                         )}
                       </>
                     )}

@@ -20,12 +20,42 @@ export default function CloudSyncBadge() {
   const authWarning = useStore(s => s.authWarning);
 
   const [, setTick] = useState(0);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
-  // Tự động cập nhật nhãn thời gian timeAgo mỗi 5 giây
+  // Tự động cập nhật nhãn thời gian timeAgo mỗi 5 giây & theo dõi trạng thái mạng
   useEffect(() => {
     const timer = setInterval(() => setTick(t => t + 1), 5000);
-    return () => clearInterval(timer);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline);
+      window.addEventListener('offline', onOffline);
+    }
+    return () => {
+      clearInterval(timer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+      }
+    };
   }, []);
+
+  if (!isOnline || syncStatus === 'offline') {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-full px-2.5 py-1 shadow-2xs"
+        title={lastSyncedAt ? `Đang xem dữ liệu lưu trên máy (đồng bộ lần cuối ${timeAgo(lastSyncedAt)}). Tự động đồng bộ lại khi có mạng.` : 'Thiết bị đang ngoại tuyến (Offline).'}
+      >
+        <span className="h-2 w-2 rounded-full bg-amber-500" />
+        <span>Offline · Bản lưu</span>
+        {lastSyncedAt && (
+          <span className="hidden md:inline font-medium text-amber-700/90 border-l border-amber-200 pl-1.5 text-[10px]">
+            {timeAgo(lastSyncedAt)}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   if (syncStatus === 'loading' || syncStatus === 'saving') {
     return (

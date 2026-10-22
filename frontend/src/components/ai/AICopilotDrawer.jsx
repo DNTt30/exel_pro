@@ -5,6 +5,8 @@ import { addAdminLog } from '../../services/api/logs';
 import { useStore } from '../../store/useStore';
 import { askGeminiCopilot } from '../../utils/aiSchedulerEngine';
 import { answerClockQuery } from '../../utils/copilotClock';
+import { routeDirectoryQuery, answerDirectoryQuery } from '../../utils/copilotDirectory';
+import { getEmployees } from '../../services/api';
 import { answerUsageQuery, routeUsageQuery } from '../../utils/copilotUsage';
 import { isOpsManager } from '../../lib/authSession';
 import { scopeCopilotContext, copilotScopeKey } from '../../utils/copilotScope';
@@ -18,6 +20,7 @@ import { decideAssistantAgent } from '../../services/api';
 import { routePersonalQuery, answerPersonalQuery } from '../../utils/decisionRouting';
 import RecipeQuickModal from '../modals/RecipeQuickModal';
 import ConfirmModal from '../modals/ConfirmModal';
+import AnswerFeedback from './AnswerFeedback';
 
 /**
  * Simple inline Markdown renderer — hỗ trợ **bold**, *italic*, `code`, bullet lists và newlines.
@@ -185,6 +188,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
     if (retrying && chatHistory.at(-1)?.sender === 'user' && chatHistory.at(-1)?.text === query) chatHistory.pop();
 
     const t0 = Date.now();
+    let responseStoreId = activeStoreId;
     let model = 'local-engine';
     let aiReply = '';
     let err = '';
@@ -196,6 +200,15 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         model = 'local-clock';
         setMessages(prev => trimMessagesBuffer([...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]));
         return; // finally still records this answer, with no LLM/handbook call.
+      }
+      const directoryRoute = routeDirectoryQuery(query);
+      if (directoryRoute) {
+        aiReply = await answerDirectoryQuery(directoryRoute, { ...startSnapshot, storeId: activeStoreId }, getEmployees);
+        if (request.signal.aborted || sessionEpoch !== useStore.getState()._sessionEpoch || user !== useStore.getState().user) return;
+        if (directoryRoute.storeId && scopeCopilotContext({ ...startSnapshot, storeId: 'ALL' }).copilotAccess.storeIds.includes(directoryRoute.storeId)) responseStoreId = directoryRoute.storeId;
+        model = 'local-employee-directory';
+        setMessages(prev => trimMessagesBuffer([...prev, { id: 'ai_' + Date.now(), sender: 'ai', text: aiReply }]));
+        return;
       }
       const usageRoute = routeUsageQuery(query, chatHistory);
       if (usageRoute) {
@@ -293,14 +306,14 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
         setIsTyping(false);
       }
       if (!request.signal.aborted && sessionEpoch === useStore.getState()._sessionEpoch && user === useStore.getState().user) useStore.getState().logAiTurn?.({
-        conversationId: `ai_${user?.id || 'anon'}_${activeStoreId}`,
-        storeId: activeStoreId,
+        conversationId: `ai_${user?.id || 'anon'}_${responseStoreId}`,
+        storeId: responseStoreId,
         userMessage: query,
         assistantResponse: aiReply,
         intent: inferAiIntent(query),
         model,
         latencyMs: Date.now() - t0,
-        contextUsed: { storeId: activeStoreId, currentWeek, empCount: contextData.employees.length },
+        contextUsed: { storeId: responseStoreId, currentWeek, ...(model !== 'local-employee-directory' ? { empCount: contextData.employees.length } : {}) },
         error: err || null
 
       });
@@ -398,7 +411,7 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
 
         {/* Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5 sm:space-y-4 bg-slate-50/50">
-          {messages.map((m) => {
+          {messages.map((m, messageIndex) => {
             const isAI = m.sender === 'ai';
             const isStreamingThis = isStreaming && streamingMsgIdRef.current === m.id;
             return (
@@ -433,6 +446,10 @@ function CopilotConversation({ isOpen, onClose, currentWeek, storeId }) {
                       className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 text-slate-700">Mở Sổ tay</a>
                   </div>}
                   {/* Copy button for AI messages */}
+                  {isAI && m.text && !m.isError && !isStreamingThis && <AnswerFeedback user={user}
+                    messageKey={`${activeStoreId || 'personal'}:${m.id}`}
+                    question={messages.slice(0, messageIndex).findLast(item => item.sender === 'user')?.text || ''}
+                    answer={m.text} onClarify={setInputText} />}
                   {isAI && m.text && !isStreamingThis && (
                     <button
                       type="button"

@@ -1,6 +1,6 @@
 # Quy tắc xếp lịch
 
-Cập nhật: 18/10/2026.
+Cập nhật: 21/10/2026.
 Trạng thái: Quyết định hiện hành; mức hoàn thành phải đối chiếu kiểm thử và phát hành.
 Nguồn: Yêu cầu chỉ xếp ca NV đăng ký và các trả lời xác nhận của người dùng về giới hạn đêm, giờ nghỉ, quyền ghi đè.
 
@@ -11,6 +11,8 @@ Nguồn: Yêu cầu chỉ xếp ca NV đăng ký và các trả lời xác nhậ
 - Với vượt giờ, thiếu giờ nghỉ và vượt giới hạn đêm: chặn theo quy tắc; Admin được ghi đè trong phạm vi cho phép, bắt buộc lý do và nhật ký. Không suy rộng ngoại lệ này sang mọi lỗi hoặc mọi quyền.
 - Người có thể chi viện được đưa ra để quản lý quyết định, không tự kéo người OFF từ cửa hàng khác.
 - Dữ liệu lịch, phân biệt chưa xếp/OFF, cửa hàng gốc và `covering_store` phải giữ theo [AGENTS.md](../AGENTS.md). Định mức giờ dùng các hằng số và hàm chung hiện có.
+- Luồng bot thử nghiệm 20/10 lưu đề xuất vào bản nháp riêng, không ghi lịch chính thức. Giới hạn số ca cấu hình theo tuần không thay thế giới hạn giờ/ca hiện có. Nháp thiếu người được giữ để xem xét với thông báo rõ; trùng giờ/vượt giới hạn chặn lưu trên UI. API nháp chưa deploy; xem [hướng dẫn](../docs/AGENT_SCHEDULING.md) và kết quả local.
+- Ngày 21/10, người dùng chọn phạm vi bot thật là **VN0500**, sau đó yêu cầu deploy. Bot dùng quyền riêng chỉ đọc dữ liệu xếp lịch và lưu nháp; không cấp quyền quản lý để thay thế. Đã triển khai, kiểm chứng Auth/API thật; chạy lại CLI giữ nguyên revision 1. Nháp tuần 26/10 chưa có ca vì thiếu đăng ký, không tự điền ca hoặc công bố.
 
 ## Quyết định đã thay thế
 

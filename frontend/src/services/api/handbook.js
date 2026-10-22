@@ -7,6 +7,7 @@ function failure(error) {
   if (error?.code === '42501') return new Error('Bạn không có quyền thực hiện thao tác này.');
   if (message.includes('CONFIRM_REQUIRED')) return new Error('Hãy xác nhận nội dung và định lượng trước khi tiếp tục.');
   if (message.includes('REASON_REQUIRED')) return new Error('Hãy nhập lý do ít nhất 5 ký tự.');
+  if (message.includes('INVALID_RECIPE')) return new Error('Định lượng công thức không hợp lệ. Kiểm tra nguyên liệu, lượng gốc, thành phần và đơn vị.');
   return new Error('Không tải/lưu được Sổ tay. Kiểm tra kết nối và migration Sổ tay đã được áp dụng.', { cause: error });
 }
 async function rows(table, published = false) {

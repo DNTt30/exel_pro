@@ -1,4 +1,4 @@
-﻿import * as api from '../../services/api';
+import * as api from '../../services/api';
 import {
   assertCanManageStaff,
   assertWeekEditable,
@@ -13,7 +13,7 @@ import { describeDiff } from '../../utils/appLogs';
 import { notifyTelegram } from '../../utils/telegram';
 import { mergeAiSchedule } from '../../utils/shiftHelper';
 import { toast } from '../../utils/toast'; // utils layer — tránh store → components/ui dependency
-import { getCurrentMondayWeek } from '../../data/constants';
+import { getCurrentMondayWeek, WEEK_DAYS } from '../../data/constants';
 import { copyScheduleVersion, scheduleVersion, withScheduleVersion } from '../../utils/scheduleVersion';
 import { scheduleRuleViolations, SEVERITY } from '../../utils/scheduleConflicts';
 import { offsetWeek } from '../../utils/employeeSkills';
@@ -163,6 +163,7 @@ export const createScheduleSlice = (set, get) => {
   }),
 
   ensureWeeksLoaded: async (weekKeys = []) => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const unique = [...new Set(weekKeys.filter(Boolean))];
     const missing = unique.filter(k => get().schedule[k] === undefined);
     if (missing.length === 0) return;
@@ -171,6 +172,7 @@ export const createScheduleSlice = (set, get) => {
   },
 
   loadAttendanceRange: async (fromDate, toDate) => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     const request = ++attendanceRequest;
     const epoch = get()._sessionEpoch;
     try {
@@ -181,7 +183,9 @@ export const createScheduleSlice = (set, get) => {
       set({ attendance: map });
     } catch (e) {
       console.error('[loadAttendanceRange] Không tải được dữ liệu chấm công:', e);
-      toast.error('Không tải được dữ liệu chấm công. Vui lòng tải lại trang.');
+      if (!Object.keys(get().attendance || {}).length) {
+        toast.error('Không tải được dữ liệu chấm công. Vui lòng tải lại trang.');
+      }
     }
   },
 
@@ -316,6 +320,7 @@ export const createScheduleSlice = (set, get) => {
     const epoch = get()._sessionEpoch;
     const revision = get()._scheduleRevision;
     set({ currentWeek: week });
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     try {
       const scheds = await api.getSchedulesByWeek(week);
       if (epoch !== get()._sessionEpoch || revision !== get()._scheduleRevision || get()._pendingScheduleWrites) return;
@@ -327,8 +332,12 @@ export const createScheduleSlice = (set, get) => {
       }));
     } catch (err) {
       console.error('[setCurrentWeek] Lỗi khi tải lịch của tuần:', err);
-      if (epoch === get()._sessionEpoch && get().currentWeek === week) set({ currentWeek: prevWeek });
-      toast.error(`Không thể tải lịch tuần ${week}. Vui lòng thử lại.`);
+      if (epoch === get()._sessionEpoch && get().currentWeek === week && !get().schedule?.[week]) {
+        set({ currentWeek: prevWeek });
+        toast.error(`Không thể tải lịch tuần ${week}. Vui lòng thử lại.`);
+  
+      }
+
     }
   },
 
@@ -427,9 +436,24 @@ export const createScheduleSlice = (set, get) => {
         change = { ...newShiftData, expect_version: scheduleVersion(get().schedule[newShiftData.week]?.[newShiftData.empId]) };
       }
       const saved = await api.resolveFeedbackAtomic(feedbackId, status, resolutionNote, change);
+      let clearedAttKey = null;
+      if (epoch === get()._sessionEpoch && status === 'approved' && newShiftData?.empId && newShiftData?.week && newShiftData?.day) {
+        const dayIdx = WEEK_DAYS.indexOf(newShiftData.day);
+        if (dayIdx >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(newShiftData.week)) {
+          const [y, m, d] = newShiftData.week.split('-').map(Number);
+          const dt = new Date(y, m - 1, d + dayIdx);
+          const workDate = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+          const attKey = `${newShiftData.empId}|${workDate}`;
+          if (get().attendance?.[attKey]) {
+            clearedAttKey = attKey;
+            void api.deleteAttendanceCell?.(newShiftData.empId, workDate)?.catch?.(() => {});
+          }
+        }
+      }
       if (epoch !== get()._sessionEpoch) return;
 
       set(state => ({
+        attendance: clearedAttKey ? updateAttendanceMap(state.attendance, clearedAttKey, null) : state.attendance,
         schedule: saved?.week_date && saved?.emp_id ? { ...state.schedule,
           [saved.week_date]: { ...state.schedule[saved.week_date], [saved.emp_id]: withScheduleVersion(saved.shifts, saved.version) }
         } : state.schedule,

@@ -24,7 +24,8 @@ if remote_index != local_index:
 paths = ['index.html', '404.html', 'sw.js']
 paths += [p.split('/exel_pro/', 1)[-1] for p in re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"', local_index.decode())]
 for pattern in ['KnowledgeLibrary-*.js', 'HandbookManager-*.js', 'Handbook-*.js', 'AICopilotDrawer-*.js',
-                'WorkspaceSettings-*.js', 'WorkspaceSettingsLayout-*.js', 'WorkspaceRoles-*.js']:
+                'WorkspaceSettings-*.js', 'WorkspaceSettingsLayout-*.js', 'WorkspaceRoles-*.js',
+                'EmployeeHome-*.js', 'EmployeeSchedule-*.js', 'AppLayout-*.js', 'Dashboard-*.js', 'Stores-*.js', 'AISchedulerModal-*.js', 'Schedule-*.js', 'Employees-*.js', 'Login-*.js', 'useStore-*.js']:
     paths += [path.relative_to(DIST).as_posix() for path in (DIST / 'assets').glob(pattern)]
 
 def verify(path):

@@ -1,7 +1,7 @@
 # Quyền và công bố Sổ tay
 
-Cập nhật: 19/10/2026.
-Trạng thái: Quyết định hiện hành; database và frontend đã phát hành. 98 tài liệu nhập đang chờ Admin duyệt ở lần kiểm tra sau phát hành; chưa xác minh upload ảnh/Gemini thật.
+Cập nhật: 21/10/2026.
+Trạng thái: Quyết định hiện hành; database và frontend đã phát hành. Ghi nhận 98 tài liệu chờ duyệt là lịch sử của lần nhập, đã được thay bằng kết quả 19/10; ngày 21/10 bổ sung đề nghị pha cốt cà phê chờ Admin duyệt. Chưa xác minh upload ảnh/Gemini thật.
 Nguồn: Người dùng chọn phạm vi toàn đơn vị/từng cửa hàng, nhập văn bản kèm ảnh tùy chọn và yêu cầu Admin duyệt thay đổi của quản lý.
 
 - Chỉ cần hai phạm vi tài liệu: toàn đơn vị và từng cửa hàng.
@@ -14,6 +14,8 @@ Nguồn: Người dùng chọn phạm vi toàn đơn vị/từng cửa hàng, nh
 - Quyết định bổ sung 19/10: người dùng yêu cầu nút **Duyệt toàn bộ**. Admin được duyệt các đề nghị thêm/sửa đang lọc sau khi xác nhận nội dung/định lượng; đề nghị gỡ vẫn duyệt riêng. Thay thế giới hạn duyệt từng bản trước đó, không thay đổi quyền nhân viên/quản lý và không tự bấm duyệt thay người dùng.
 
 ## Quyết định đã thay thế
+
+Nâng cấp 21/10: mẫu tính tỷ lệ lưu ngay tại `handbook_entries.recipe_spec`, cùng phạm vi/revision/lịch sử gửi-duyệt-gỡ của tài liệu. Nhân viên chỉ đọc bản đã duyệt và tính hoặc tùy chỉnh tạm; không được ghi mẫu. Quản lý đề nghị, Admin duyệt. Máy tính và dữ liệu tra cứu TÚ mini cùng đọc định lượng này. Không tự suy ra mẫu cà phê từ công thức pha ly: ví dụ người dùng được nhập thành đề nghị, chưa tự công bố. Chi tiết: [RECIPE_CATALOG.md](../docs/RECIPE_CATALOG.md).
 
 **Đã cũ:** cho quản lý công bố ngay tài liệu riêng của cửa hàng. Yêu cầu sau cùng và phương án đang thực hiện là **Admin duyệt các thay đổi của quản lý trước khi công bố**, cả tài liệu chung lẫn tài liệu cửa hàng.
 

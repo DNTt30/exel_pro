@@ -3,6 +3,7 @@ import { getShiftHours, normalizeShift, parseShiftTimeRange } from './shiftHelpe
 import { isEmployeeWeekLocked, isNightReady, managedStoreIds } from './employeeSkills';
 import { isWeekLocked, weekRecordKey } from './scheduleWeek';
 import { scheduleRuleViolations } from './scheduleConflicts';
+import { storeWeeklyHours, resolveStoreHoursLimit } from './storeHours';
 
 const fullTime = emp => ['STFT', 'CSR_NEW', 'SM', 'FULLTIME'].includes((emp.type || '').toUpperCase());
 const dayName = day => day === 'CN' ? 'Chủ nhật' : `Thứ ${day.slice(1)}`;
@@ -46,6 +47,8 @@ export function scheduleRegisteredShifts(employees, storeId, options, rules) {
     throw new Error('Tuần đang chờ duyệt hoặc đã duyệt, không thể xếp lại lịch.');
   }
   const source = options.existingSchedule || {};
+  const weeklyHoursLimit = resolveStoreHoursLimit(storeId, options);
+  const fixedStoreHours = storeWeeklyHours(employees, source, storeId);
   const result = Object.fromEntries(locals.map(emp => [emp.id, { ...source[emp.id] }]));
   const locked = new Set(employees.filter(emp => isEmployeeWeekLocked(emp, source[emp.id], options.scheduleWeeks, options.currentWeek)).map(emp => emp.id));
   const matrix = schedulerDemandByDay(options);
@@ -110,7 +113,10 @@ export function scheduleRegisteredShifts(employees, storeId, options, rules) {
   const used = new Set();
   const blockedReason = c => {
     if (used.has(c)) return 'đã chọn';
+    if (weeklyHoursLimit != null && fixedStoreHours + selected.reduce((sum, item) => sum + item.hours, 0) + c.hours > weeklyHoursLimit) return `vượt quỹ giờ cửa hàng ${weeklyHoursLimit}h/tuần`;
     const emp = c.emp;
+    if (counts[emp.id] >= (options.maxShiftsPerEmployee ?? SCHEDULE_RULES.MAX_CONFIGURABLE_SHIFTS_PER_WEEK)) return `đạt giới hạn ${options.maxShiftsPerEmployee ?? SCHEDULE_RULES.MAX_CONFIGURABLE_SHIFTS_PER_WEEK} ca/nhân viên/tuần`;
+    if (options.reviewOnly) return 'đăng ký chưa được chọn trong bản nháp';
     const violations = scheduleRuleViolations(emp, { ...(result[emp.id] || source[emp.id]), [c.day]: c.code }, options.previousWeekSchedule?.[emp.id], options.nextWeekSchedule?.[emp.id]);
     if (violations.length) return violations[0].code === 'OVER_MAX_HOURS' ? `vượt giới hạn giờ tuần: ${violations[0].message}` : violations[0].message;
     if (c.code === '22-6' && options.nightShiftVolunteers?.length && !options.nightShiftVolunteers.includes(emp.id)) return 'không thuộc nhóm ca đêm được chọn';

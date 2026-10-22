@@ -45,6 +45,7 @@ export async function addStore(store) {
   const payload = storeWritePayload(store);
   const { error } = await db().from('stores').insert([payload]);
   if (error) {
+    if (payload.staffing) throw error;
     if (isOptionalStoreColumnError(error.message)) {
       const retry = await db().from('stores').insert([stripOptionalStoreCols(payload)]);
       if (retry.error) throw retry.error;
@@ -56,8 +57,10 @@ export async function addStore(store) {
 
 export async function updateStore(id, updates) {
   const payload = storeWritePayload(updates);
-  const { error } = await db().from('stores').update(payload).eq('id', id);
+  const query = db().from('stores').update(payload).eq('id', id);
+  const { data, error } = await (payload.staffing ? query.select('id') : query);
   if (error) {
+    if (payload.staffing) throw error;
     if (isOptionalStoreColumnError(error.message)) {
       const rest = stripOptionalStoreCols(payload);
       if (Object.keys(rest).length === 0) return { extraFieldsLocalOnly: true };
@@ -67,6 +70,7 @@ export async function updateStore(id, updates) {
     }
     throw error;
   }
+  if (payload.staffing && !data?.length) throw new Error('Không lưu được cấu hình cửa hàng: không có quyền hoặc cửa hàng không còn tồn tại.');
 }
 
 export async function deleteStore(id) {

@@ -31,6 +31,7 @@ export default function Toolbar({
             <input 
               type="text" 
               placeholder="Tìm nhân viên / Mã NV..."
+              aria-label="Tìm nhân viên trong lịch" data-testid="schedule-search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-52 transition-all outline-none"
@@ -40,6 +41,7 @@ export default function Toolbar({
                 onClick={() => setSearch('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition-colors cursor-pointer"
                 title="Xóa tìm kiếm"
+                aria-label="Xóa tìm kiếm"
               >
                 <X size={12} />
               </button>
@@ -53,6 +55,7 @@ export default function Toolbar({
             <Filter size={13} className="text-slate-400 hidden sm:block" />
             <select 
               aria-label="Cửa hàng"
+              data-testid="schedule-store"
               value={filterDept}
               onChange={e => setFilterDept(e.target.value)}
               className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 transition-colors outline-none focus:ring-2 focus:ring-blue-500"
@@ -68,6 +71,7 @@ export default function Toolbar({
           <div className="flex items-center gap-1">
             <select 
               value={filterRole}
+              aria-label="Lọc vị trí nhân viên"
               onChange={e => setFilterRole(e.target.value)}
               className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 transition-colors outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -90,6 +94,7 @@ export default function Toolbar({
               }}
               className="p-1.5 hover:bg-slate-100 border border-slate-200 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
               title="Tuần trước"
+              aria-label="Tuần trước" data-testid="previous-week"
             >
               <ChevronLeft size={14} />
             </button>
@@ -97,6 +102,7 @@ export default function Toolbar({
             <div className="relative flex items-center">
               <select 
                 aria-label="Tuần"
+                data-testid="schedule-week"
                 value={currentWeek}
                 onChange={e => setCurrentWeek(e.target.value)}
                 className="border border-blue-200 text-blue-700 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-blue-50/80 hover:bg-blue-100/80 font-bold outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-colors"
@@ -141,6 +147,7 @@ export default function Toolbar({
               }}
               className="p-1.5 hover:bg-slate-100 border border-slate-200 rounded-md text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
               title="Tuần sau"
+              aria-label="Tuần sau" data-testid="next-week"
             >
               <ChevronRight size={14} />
             </button>
@@ -150,6 +157,7 @@ export default function Toolbar({
               <input 
                 type="date" 
                 title="Mở lịch chọn ngày"
+                aria-label="Chọn ngày để xem tuần"
                 className="w-7 h-7 opacity-0 absolute cursor-pointer z-10 inset-0"
                 onChange={(e) => {
                   if (!e.target.value) return;

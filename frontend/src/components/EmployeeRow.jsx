@@ -222,6 +222,7 @@ const EmployeeRow = memo(({
               readOnly={!canEditShifts}
               isDraft={isDraft}
               empName={emp.name}
+              empId={emp.id}
               dayLabel={day}
             />
           </td>

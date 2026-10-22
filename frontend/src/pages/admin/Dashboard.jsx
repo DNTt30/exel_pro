@@ -493,25 +493,25 @@ export default function Dashboard() {
   const depts = visibleStores.map(s => s.id).sort();
 
   return (
-    <div className="w-full min-h-full bg-slate-100/90 p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in duration-200">
+    <div className="w-full min-w-0 bg-slate-100/90 p-2 sm:p-6 lg:p-8 space-y-3 sm:space-y-6 animate-in fade-in duration-200">
       <ManagerActionList storeId={filterDept} />
 
       {/* Modern Full-width Header & Command Bar */}
-      <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div className="bg-white/95 backdrop-blur-md p-3 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="p-3 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-500/20 flex-shrink-0">
             <TrendingUp size={24} />
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight">
                 {branding.appName} — Tổng Quan Quản Trị
               </h1>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[11px] font-bold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Hệ Thống Trực Tuyến
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
+            <p className="hidden sm:block text-xs text-slate-500 font-medium mt-0.5">
               Theo dõi định mức giờ công Part-time (chu kỳ 26→25), nhân sự trực ca & cảnh báo hàng cận date
             </p>
           </div>
@@ -689,11 +689,26 @@ export default function Dashboard() {
             currentWeek={currentWeek}
             filterDept={filterDept}
             stores={visibleStores}
+            onShowOvertime={() => { setFilterOnlyOvertime(true); handleTabChange('analytics'); setTimeout(() => document.getElementById('pt-detail-table')?.scrollIntoView({ behavior: 'smooth' }), 0); }}
             scrollToChart={scrollToChart}
           />
 
-          <MonthConfirmWidget />
+          <MonthConfirmWidget employees={currentDeptEmployees} cycleKey={selectedMonthCycle} />
 
+
+        </div>
+      )}
+
+      {/* ── TAB 2: QUẢN TRỊ TRỢ LÝ AI (TÚ MINI) ── */}
+      {dashboardTab === 'ai' && (
+        <div className="animate-in fade-in duration-200">
+          <AICopilotAnalyticsWidget filterDept={filterDept} />
+        </div>
+      )}
+
+      {/* ── TAB 3: BÁO CÁO & DỮ LIỆU CHI TIẾT ── */}
+      {dashboardTab === 'analytics' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
           {/* Phân tích nhân sự & trạng thái cửa hàng */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="lg:col-span-1">
@@ -713,19 +728,6 @@ export default function Dashboard() {
               />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── TAB 2: QUẢN TRỊ TRỢ LÝ AI (TÚ MINI) ── */}
-      {dashboardTab === 'ai' && (
-        <div className="animate-in fade-in duration-200">
-          <AICopilotAnalyticsWidget filterDept={filterDept} />
-        </div>
-      )}
-
-      {/* ── TAB 3: BÁO CÁO & DỮ LIỆU CHI TIẾT ── */}
-      {dashboardTab === 'analytics' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
           {/* Visual Analytics & Forecast Charts - Có ID để cuộn mượt */}
           <div id="analytics-section">
         <DashboardCharts
@@ -767,7 +769,7 @@ export default function Dashboard() {
                 Danh Sách Theo Dõi Giờ Làm Part-Time ({viewMode === 'month' ? `Theo Tháng ${selectedMonthCycle.split('-')[1]}/${selectedMonthCycle.split('-')[0]}` : 'Theo Tuần'})
               </h2>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
+            <p className="hidden sm:block text-xs text-slate-500 font-medium mt-0.5">
               {viewMode === 'month'
                 ? 'Tự động kiểm tra và gắn cờ đỏ khi nhân sự Part-time vượt quá 91 giờ trong chu kỳ tháng'
                 : 'Xem chi tiết 7 ngày trong tuần, cảnh báo khi vượt 23h/tuần hoặc thiếu 16h/tuần'}
@@ -823,7 +825,7 @@ export default function Dashboard() {
 
         {/* Scrollable Spreadsheet Table */}
         <div className="overflow-x-auto max-h-[520px] border border-slate-200 rounded-xl bg-white shadow-2xs">
-          <table className="excel-table whitespace-nowrap text-xs min-w-full">
+          <table id="pt-detail-table" className="excel-table whitespace-nowrap text-xs min-w-full">
             <thead>
               <tr className="bg-slate-200 border-b border-slate-300 font-bold text-slate-700">
                 <th className="p-2 border-r border-slate-300 w-12 min-w-[48px] text-center sticky left-0 z-20 bg-slate-200">STT</th>

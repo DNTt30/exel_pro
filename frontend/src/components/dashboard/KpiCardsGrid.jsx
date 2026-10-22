@@ -6,13 +6,13 @@ import { AlertTriangle, CheckCircle2, Users, Clock, Building2, Package, PieChart
 export default function KpiCardsGrid({
   ptOvertimeList = [], allPTEmployees = [], viewMode = 'week', quickStats = {}, complianceStats = {},
   currentDeptEmployees = [], currentDeptTotalHours = 0, selectedMonthCycle = '',
-  currentWeek = '', filterDept = 'ALL', stores = [], scrollToChart,
+  currentWeek = '', filterDept = 'ALL', stores = [], scrollToChart, onShowOvertime,
 }) {
   return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div data-testid="dashboard-kpis" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
 
         {/* Card 1: Cảnh báo PT vượt định mức */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden ${
+        <div className={`p-3 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden ${
           ptOvertimeList.length > 0
             ? 'bg-white border-rose-200 shadow-sm'
             : 'bg-white border-slate-200/80 shadow-2xs'
@@ -29,7 +29,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${ptOvertimeList.length > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+              <span className={`text-xl sm:text-3xl font-black font-mono tracking-tight ${ptOvertimeList.length > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
                 {ptOvertimeList.length}
               </span>
               <span className="text-[11px] text-slate-500 font-semibold">/ {allPTEmployees.length} PT</span>
@@ -41,16 +41,16 @@ export default function KpiCardsGrid({
               {ptOvertimeList.length > 0 ? '⚠️ Vượt định mức' : '✅ Đạt chuẩn'}
             </span>
             <button
-              onClick={() => scrollToChart('shifts')}
+              onClick={onShowOvertime}
               className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 hover:underline cursor-pointer"
             >
-              Xem biểu đồ ↗
+              Xem danh sách vượt giờ ↗
             </button>
           </div>
         </div>
 
         {/* Card 2: Nhân sự & Hôm nay */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="p-3 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Trực Ca Hôm Nay</span>
@@ -59,7 +59,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-blue-700">{quickStats.empsWorkingToday}</span>
+              <span className="text-xl sm:text-3xl font-black font-mono text-blue-700">{quickStats.empsWorkingToday}</span>
               <span className="text-[11px] text-slate-500 font-semibold">/ {currentDeptEmployees.length} NV</span>
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function KpiCardsGrid({
         </div>
 
         {/* Card 3: Tổng giờ công đã xếp */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="p-3 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
@@ -88,7 +88,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-indigo-700">{currentDeptTotalHours.toLocaleString()}</span>
+              <span className="text-xl sm:text-3xl font-black font-mono text-indigo-700">{currentDeptTotalHours.toLocaleString()}</span>
               <span className="text-[11px] text-slate-500 font-semibold">giờ</span>
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function KpiCardsGrid({
         </div>
 
         {/* Card 4: Chuỗi Cửa hàng */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="p-3 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Cửa Hàng</span>
@@ -115,7 +115,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-slate-800">
+              <span className="text-xl sm:text-3xl font-black font-mono text-slate-800">
                 {filterDept === 'ALL' ? (stores.length || 3) : 1}
               </span>
               <span className="text-[11px] text-slate-500 font-semibold">
@@ -137,7 +137,7 @@ export default function KpiCardsGrid({
         </div>
 
         {/* Card 5: Kệ & Date */}
-        <Link to="/admin/shelves" className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden group block ${
+        <Link to="/admin/shelves" className={`p-3 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden group block ${
           quickStats.warningShelves > 0
             ? 'bg-white border-amber-200 shadow-sm hover:border-amber-400'
             : 'bg-white border-slate-200/80 shadow-2xs hover:border-blue-300'
@@ -154,7 +154,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${quickStats.warningShelves > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+              <span className={`text-xl sm:text-3xl font-black font-mono tracking-tight ${quickStats.warningShelves > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
                 {quickStats.warningShelves}
               </span>
               <span className="text-[11px] text-slate-500 font-semibold">kệ cảnh báo</span>
@@ -167,7 +167,7 @@ export default function KpiCardsGrid({
         </Link>
 
         {/* Card 6: Tỷ Lệ Tuân Thủ Part-Time */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="p-3 sm:p-5 rounded-2xl bg-white border border-emerald-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
@@ -178,7 +178,7 @@ export default function KpiCardsGrid({
               </div>
             </div>
             <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-700">
+              <span className="text-xl sm:text-3xl font-black font-mono tracking-tight text-emerald-700">
                 {complianceStats.complianceRate}%
               </span>
               <span className="text-[11px] text-slate-500 font-semibold">

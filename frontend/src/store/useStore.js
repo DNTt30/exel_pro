@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import * as api from '../services/api';
 import { bootstrapQueryPlan } from '../utils/dataScope';
 import { weekRecordKey } from '../utils/scheduleWeek';
-import { getCurrentMondayWeek, ADMIN_SESSION_MAX_MS, REALTIME_DEBOUNCE_MS, BOOTSTRAP_BRANCH_TIMEOUT_MS } from '../data/constants';
+import { getCurrentMondayWeek, ADMIN_SESSION_MAX_MS, UNREMEMBERED_SESSION_MAX_MS, REALTIME_DEBOUNCE_MS, BOOTSTRAP_BRANCH_TIMEOUT_MS } from '../data/constants';
 import { supabase } from '../lib/supabase';
 
 import { createAuthSlice, bindAuthSession, sessionUserFromEmp } from './slices/authSlice';
@@ -15,7 +15,38 @@ import { createWorkspaceSlice } from './slices/workspaceSlice';
 import { createWorkspaceRolesSlice } from './slices/workspaceRolesSlice';
 import { createScheduleOverrideSlice } from './slices/scheduleOverrideSlice';
 import { toast } from '../utils/toast';
-import { sessionPersistence } from '../lib/sessionStorage';
+import { sessionPersistence, remembersSession } from '../lib/sessionStorage';
+import { isAgentSandbox } from '../lib/agentSandbox';
+
+function sanitizePersistedUser(rawUser) {
+  let user = rawUser || null;
+  if (user && !user.loginAt) user = { ...user, loginAt: Date.now() };
+  if (user && user.id === 'admin') {
+    return {
+      ...user,
+      role: 'admin',
+      isManager: true,
+      jobTitle: user.jobTitle || 'Quản trị viên',
+      name: user.name === 'Cửa hàng trưởng' ? 'Quản trị viên' : (user.name || 'Quản trị viên')
+    };
+  }
+  if (user) {
+    return user.role === 'admin' ? null : { ...user, ...sessionUserFromEmp(user) };
+  }
+  return null;
+}
+
+function trimCachedSchedule(schedule, currentWeek) {
+  if (!schedule || typeof schedule !== 'object') return {};
+  const keys = Object.keys(schedule).sort().reverse();
+  const keep = new Set(keys.slice(0, 12));
+  if (currentWeek && schedule[currentWeek]) keep.add(currentWeek);
+  const out = {};
+  for (const k of keep) {
+    if (schedule[k]) out[k] = schedule[k];
+  }
+  return out;
+}
 
 export const useStore = create(
   persist(
@@ -52,6 +83,8 @@ export const useStore = create(
         let shelfTimer = null;
         let swapsTimer = null;
         let feedbacksTimer = null;
+        let weeksTimer = null;
+        let shelvesListTimer = null;
 
         // Lưu cleanup function vào store để initRealtime có thể gọi lại an toàn
         set({
@@ -61,6 +94,8 @@ export const useStore = create(
             clearTimeout(shelfTimer);
             clearTimeout(swapsTimer);
             clearTimeout(feedbacksTimer);
+            clearTimeout(weeksTimer);
+            clearTimeout(shelvesListTimer);
           }
         });
 
@@ -132,6 +167,36 @@ export const useStore = create(
               }).catch(console.error);
             }, REALTIME_DEBOUNCE_MS);
           })
+          // 5. Bảng phê duyệt tuần lịch (schedule_weeks): Đồng bộ tức thì khi AM/Admin duyệt hoặc mở khóa lịch
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_weeks' }, (payload) => {
+            if (!active()) return;
+            console.log('[Realtime] schedule_weeks changed:', payload);
+            if (weeksTimer) clearTimeout(weeksTimer);
+            weeksTimer = setTimeout(() => {
+              if (!active()) return;
+              api.getScheduleWeeks().then(weeks => {
+                if (!active()) return;
+                set({
+                  scheduleWeeks: Object.fromEntries((weeks || []).map(w => [weekRecordKey(w.storeId, w.weekDate), w])),
+                  lastSyncedAt: Date.now()
+                });
+              }).catch(console.error);
+            }, REALTIME_DEBOUNCE_MS);
+          })
+          // 6. Bảng phân công kệ hàng (shelves)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'shelves' }, (payload) => {
+            if (!active()) return;
+            console.log('[Realtime] shelves changed:', payload);
+            if (shelvesListTimer) clearTimeout(shelvesListTimer);
+            shelvesListTimer = setTimeout(() => {
+              if (!active()) return;
+              const plan = bootstrapQueryPlan(get().user);
+              api.getShelves(plan.shelves).then(shelves => {
+                if (!active()) return;
+                set({ shelves: shelves || [], lastSyncedAt: Date.now() });
+              }).catch(console.error);
+            }, REALTIME_DEBOUNCE_MS);
+          })
           .subscribe((status) => {
             if (!active()) return;
             console.log('[Supabase Realtime Status]:', status);
@@ -150,6 +215,10 @@ export const useStore = create(
       initializeData: async () => {
         const user = get().user;
         if (!user || get()._bootstrapping) return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          set({ isInitializing: false, _bootstrapping: false, syncStatus: 'offline', realtimeStatus: 'disconnected', authWarning: null });
+          return;
+        }
         const epoch = get()._sessionEpoch;
         const active = () => epoch === get()._sessionEpoch && Boolean(get().user);
         const week = get().currentWeek;
@@ -159,6 +228,7 @@ export const useStore = create(
         try {
           const authWarning = await bindAuthSession(user);
           if (!active()) return;
+          if (authWarning === 'SESSION_MISMATCH') { await get().logout(); return; }
           if (authWarning) { set({ authWarning }); throw new Error(authWarning); }
           set({ authWarning: null });
           void get().loadWorkspaceRoles();
@@ -188,13 +258,18 @@ export const useStore = create(
           if (!active()) return;
           let nextUser = get().user;
           if (nextUser.id === 'admin' || nextUser.role === 'admin') {
-            if (nextUser.id !== 'admin' || !nextUser.loginAt || Date.now() - nextUser.loginAt > ADMIN_SESSION_MAX_MS) {
+            const maxSessionMs = remembersSession() ? ADMIN_SESSION_MAX_MS : UNREMEMBERED_SESSION_MAX_MS;
+            if (nextUser.id !== 'admin' || (nextUser.loginAt && Date.now() - nextUser.loginAt > maxSessionMs)) {
               await get().logout(); return;
+            }
+            if (nextUser.id === 'admin') {
+              nextUser = { ...nextUser, loginAt: Date.now() };
             }
           } else {
             const fresh = employees.find(e => e.id === nextUser.id);
             if (fresh?.isActive === false) { await get().logout(); return; }
-            if (fresh) nextUser = { ...nextUser, ...sessionUserFromEmp(fresh) };
+            if (fresh) nextUser = { ...nextUser, ...sessionUserFromEmp(fresh), passwordChangedAt: fresh.passwordChangedAt || nextUser.passwordChangedAt, loginAt: Date.now() };
+            else nextUser = { ...nextUser, loginAt: Date.now() };
           }
           set(state => ({
             user: nextUser, employees, feedbacks, stores, shiftSwaps, shelves, shelfItems,
@@ -212,26 +287,78 @@ export const useStore = create(
       }
     }),
     {
-      name: 'schedule-storage',
+      name: isAgentSandbox ? 'agent-sandbox-session-v1' : 'schedule-storage',
       storage: createJSONStorage(() => sessionPersistence),
-      version: 5,
-      partialize: (state) => ({
-        currentWeek: state.currentWeek,
-        user: state.user
-      }),
+      version: 6,
+      partialize: (state) => {
+        if (!state.user) {
+          return {
+            currentWeek: state.currentWeek,
+            user: null
+          };
+        }
+        return {
+          currentWeek: state.currentWeek,
+          user: state.user,
+          schedule: trimCachedSchedule(state.schedule, state.currentWeek),
+          attendance: state.attendance || {},
+          employees: state.employees || [],
+          stores: state.stores || [],
+          scheduleWeeks: state.scheduleWeeks || {},
+          lastSyncedAt: state.lastSyncedAt || null
+        };
+      },
       migrate: (persisted) => {
-        let user = persisted?.user || null;
-        if (user && (user.id === 'admin' || user.role === 'admin')) {
-          user = {
-            ...user,
-            isManager: true,
-            jobTitle: user.jobTitle || 'Quản trị viên',
-            name: user.name === 'Cửa hàng trưởng' ? 'Quản trị viên' : (user.name || 'Quản trị viên')
+        const user = sanitizePersistedUser(persisted?.user);
+        if (!user) {
+          return {
+            currentWeek: persisted?.currentWeek || getCurrentMondayWeek(),
+            user: null,
+            schedule: {},
+            attendance: {},
+            employees: [],
+            stores: [],
+            scheduleWeeks: {},
+            lastSyncedAt: null
           };
         }
         return {
           currentWeek: persisted?.currentWeek || getCurrentMondayWeek(),
-          user
+          user,
+          schedule: persisted?.schedule || {},
+          attendance: persisted?.attendance || {},
+          employees: persisted?.employees || [],
+          stores: persisted?.stores || [],
+          scheduleWeeks: persisted?.scheduleWeeks || {},
+          lastSyncedAt: persisted?.lastSyncedAt || null
+        };
+      },
+      merge: (persisted, current) => {
+        const user = sanitizePersistedUser(persisted?.user);
+        if (!user) {
+          return {
+            ...current,
+            currentWeek: persisted?.currentWeek || current.currentWeek,
+            user: null,
+            schedule: {},
+            attendance: {},
+            employees: [],
+            stores: [],
+            scheduleWeeks: {},
+            lastSyncedAt: null
+          };
+        }
+        return {
+          ...current,
+          ...(persisted || {}),
+          currentWeek: persisted?.currentWeek || current.currentWeek,
+          user,
+          schedule: persisted?.schedule || current.schedule || {},
+          attendance: persisted?.attendance || current.attendance || {},
+          employees: persisted?.employees || current.employees || [],
+          stores: persisted?.stores || current.stores || [],
+          scheduleWeeks: persisted?.scheduleWeeks || current.scheduleWeeks || {},
+          lastSyncedAt: persisted?.lastSyncedAt || current.lastSyncedAt || null
         };
       },
     }

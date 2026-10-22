@@ -8,6 +8,9 @@ import Modal from '../modals/Modal';
 import Button from '../ui/Button';
 import { renderMarkdown } from '../ui/MarkdownText';
 import BulkHandbookApproval from './BulkHandbookApproval';
+import RecipeCalculator from './RecipeCalculator';
+import RecipeSpecFields from './RecipeSpecFields';
+import { legacyRecipeSpec, recipeSpecText, withoutLegacyMixingLine } from '../../utils/recipeCatalog';
 
 const input = 'mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-base text-slate-900';
 const emptyDraft = { title: '', category: 'recipe', content: '', source_doc: '', store_id: null, images: [], aliases: [] };
@@ -27,17 +30,18 @@ export function KnowledgeContent({ entry }) {
   return <div className="space-y-3">
     <p className="text-sm text-slate-500">{handbookScopeLabel(entry)}{entry.source_doc ? ` · Nguồn: ${entry.source_doc}` : ''}</p>
     <div className="break-words text-sm leading-relaxed text-slate-800">{renderMarkdown(entry.content)}</div>
+    {entry.recipe_spec && <div className="rounded-lg bg-emerald-50 p-3 text-sm whitespace-pre-line">{recipeSpecText(entry.recipe_spec)}</div>}
     {!!entry.images?.length && <div className="space-y-2">{entry.images.map(path => <Attachment key={path} path={path} />)}</div>}
   </div>;
 }
 
-export default function KnowledgeLibrary({ manage = false, recipesOnly = false }) {
+export default function KnowledgeLibrary({ manage = false, recipesOnly = false, initialCategory = 'all' }) {
   const user = useStore(s => s.user);
   // Remount on an identity/scope change; never retain another user's fetched drafts.
-  return <Library key={`${user?.id}:${appRoleOf(user)}:${user?.dept}:${manage}:${recipesOnly}`} user={user} manage={manage} recipesOnly={recipesOnly} />;
+  return <Library key={`${user?.id}:${appRoleOf(user)}:${user?.dept}:${manage}:${recipesOnly}:${initialCategory}`} user={user} manage={manage} recipesOnly={recipesOnly} initialCategory={initialCategory} />;
 }
 
-function Library({ user, manage, recipesOnly }) {
+function Library({ user, manage, recipesOnly, initialCategory }) {
   const stores = useStore(s => s.stores);
   const admin = isBuiltinStoreManager(user);
   const canEdit = manage && isOpsManager(user);
@@ -53,7 +57,7 @@ function Library({ user, manage, recipesOnly }) {
   const [tab, setTab] = useState('published');
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState('all');
-  const [category, setCategory] = useState(recipesOnly ? 'recipe' : 'all');
+  const [category, setCategory] = useState(recipesOnly ? 'recipe' : HANDBOOK_CATEGORIES.some(item => item.value === initialCategory) ? initialCategory : 'all');
   const [editor, setEditor] = useState(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [preview, setPreview] = useState(false);
@@ -62,6 +66,7 @@ function Library({ user, manage, recipesOnly }) {
   const [note, setNote] = useState('');
   const [dialogError, setDialogError] = useState('');
   const [bulkChanges, setBulkChanges] = useState(null);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
 
   async function refresh() {
     setLoading(true); setError('');
@@ -74,7 +79,9 @@ function Library({ user, manage, recipesOnly }) {
   useEffect(() => { refresh(); }, []); // Scope changes remount Library.
   function edit(entry = null, value = null) {
     setEditor({ existing: entry });
-    setDraft(value || (entry ? { ...entry, images: entry.images || [] } : { ...emptyDraft, store_id: !admin && depts.length === 1 ? depts[0] : null }));
+    const next = value || (entry ? { ...entry, images: entry.images || [] } : { ...emptyDraft, store_id: !admin && depts.length === 1 ? depts[0] : null });
+    const legacy = !next.recipe_spec && next.category === 'recipe' ? legacyRecipeSpec(next) : null;
+    setDraft(legacy ? {...next,recipe_spec:legacy,content:withoutLegacyMixingLine(next.content)} : next);
     setPreview(false); setConfirmed(false); setDialogError('');
   }
   function review(change, approve) {
@@ -137,7 +144,7 @@ function Library({ user, manage, recipesOnly }) {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-xl font-semibold text-slate-900">{canEdit ? 'Quản lý kiến thức' : recipesOnly ? 'Tra công thức' : 'Tra cứu Sổ tay'}</h2>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{canEdit ? 'Nhập nội dung → kiểm tra định lượng → Admin duyệt → nhân viên và TÚ mini tra cứu. Thêm, sửa và gỡ đều cần duyệt.' : 'Chỉ hiển thị tài liệu Admin đã công bố, dùng chung với tra nhanh và TÚ mini. Bấm Tải lại để lấy bản mới nhất.'}</p></div>
-      <div className="flex gap-2"><Button onClick={refresh} disabled={loading || busy}>Tải lại</Button>
+      <div className="flex flex-wrap gap-2"><Button data-testid="open-recipe-calculator" onClick={() => {setCalculatorOpen(true);refresh();}}>Tính nhanh tỷ lệ</Button><Button onClick={refresh} disabled={loading || busy}>Tải lại</Button>
         {canEdit && <Button variant="primary" onClick={() => edit()}>Thêm tài liệu</Button>}</div>
     </div>
     {notice && <p role="status" className="rounded-lg bg-slate-100 p-3 text-sm">{notice}</p>}
@@ -179,14 +186,20 @@ function Library({ user, manage, recipesOnly }) {
       </details>;
     })}
     {bulkChanges && <BulkHandbookApproval changes={bulkChanges} onClose={() => setBulkChanges(null)} onComplete={refresh} />}
+    <Modal isOpen={calculatorOpen} onClose={() => setCalculatorOpen(false)} title="Tính nhanh tỷ lệ công thức" maxWidth="max-w-2xl">{calculatorOpen && <RecipeCalculator entries={published} identity={`${user?.id}:${user?.dept}`} loading={loading} error={error} />}</Modal>
     <Modal isOpen={!!editor} onClose={() => setEditor(null)} closeDisabled={busy} title={preview ? 'Kiểm tra nội dung trước khi gửi duyệt' : editor?.existing ? 'Sửa tài liệu' : 'Thêm tài liệu'} maxWidth="max-w-2xl">
       {dialogError && <p role="alert" className="mb-3 text-sm text-red-700">{dialogError}</p>}
       {!preview ? <form onSubmit={showPreview} className="space-y-4">
         <label className="block text-sm">Tên tài liệu<input required maxLength={160} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} className={input} /></label>
-        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Loại tài liệu<select className={input} value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{HANDBOOK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></label>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Loại tài liệu<select className={input} value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value, recipe_spec: e.target.value === 'recipe' ? draft.recipe_spec : null })}>{HANDBOOK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></label>
           <label className="text-sm">Áp dụng cho<select className={input} value={draft.store_id || ''} onChange={e => setDraft({ ...draft, store_id: e.target.value || null })}><option value="">Toàn đơn vị</option>{storeOptions.map(s => <option key={s.id} value={s.id}>{s.id} — {s.name}</option>)}</select></label></div>
         <label className="block text-sm">Nội dung / định lượng<textarea required rows={10} maxLength={4000} className={input} value={draft.content} onChange={e => setDraft({ ...draft, content: e.target.value })} placeholder="Ghi rõ size, nguyên liệu, định lượng (ml/g…), các bước và lưu ý. Với quy định, ghi ngày bắt đầu áp dụng." /></label>
-        <p className="text-xs text-slate-500">{draft.content.length}/4.000 ký tự. TÚ mini đọc phần văn bản; hãy ghi đầy đủ nội dung quan trọng trong ảnh vào đây.</p>
+        <p className="text-xs text-slate-500">{draft.content.length}/4.000 ký tự. Với công thức có bảng định lượng bên dưới, phần này ghi các bước/lưu ý, tránh nhập lại định lượng khác với bảng.</p>
+        {draft.category === 'recipe' && <div className="space-y-3 rounded-lg border p-3">
+          <label className="flex gap-2 text-sm"><input type="checkbox" checked={!!draft.recipe_spec} onChange={e => setDraft({...draft,recipe_spec:e.target.checked ? {baseIngredientName:'',baseAmount:1,baseUnit:'g',components:[{name:'',amount:0,unit:'ml'}],notes:''} : null})} />Có định lượng dùng cho tính nhanh tỷ lệ</label>
+          {draft.recipe_spec && <RecipeSpecFields value={draft.recipe_spec} onChange={spec => setDraft({...draft,recipe_spec:spec})} />}
+          <p className="text-xs text-slate-500">Bảng định lượng được gửi và duyệt cùng tài liệu, dùng chung trong Sổ tay và máy tính. Mọi thay đổi đều lưu trong lịch sử duyệt.</p>
+        </div>}
         <label className="block text-sm">Nguồn / số văn bản (nếu có)<input className={input} maxLength={300} value={draft.source_doc || ''} onChange={e => setDraft({ ...draft, source_doc: e.target.value })} /></label>
         <label className="block text-sm">Tên gọi khác để tìm kiếm (mỗi dòng một tên, tối đa 20)<textarea rows={2} className={input} value={(draft.aliases || []).join('\n')} onChange={e => setDraft({ ...draft, aliases: e.target.value.split('\n') })} /></label>
         <label className="block text-sm">Ảnh minh họa (không bắt buộc, tối đa 3 ảnh, 5 MB/ảnh)<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || draft.images.length >= 3} onChange={upload} className="mt-2 block max-w-full text-sm" /></label>
@@ -202,7 +215,7 @@ function Library({ user, manage, recipesOnly }) {
         <h3 className="font-semibold">{(decision.entry || decision.change.payload).title}</h3>
         <KnowledgeContent entry={decision.entry || decision.change.payload} />
         {decision.change?.operation === 'archive' && <p className="text-sm text-red-700">Duyệt sẽ gỡ tài liệu khỏi Sổ tay và nguồn tra cứu mới của TÚ mini. Lý do: {decision.change.payload.reason}</p>}
-        {decision.change?.entry_id && decision.change.operation === 'upsert' && <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm">Đối chiếu bản trước</summary><p className="mt-2 whitespace-pre-wrap text-sm">{entries.find(e => e.id === decision.change.entry_id)?.content || 'Không còn bản trước; tải lại để kiểm tra.'}</p></details>}
+        {decision.change?.entry_id && decision.change.operation === 'upsert' && <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm">Đối chiếu bản trước</summary>{entries.find(e => e.id === decision.change.entry_id) ? <KnowledgeContent entry={entries.find(e => e.id === decision.change.entry_id)} /> : <p>Không còn bản trước; tải lại để kiểm tra.</p>}</details>}
         {(decision.archive || !decision.approve) && <label className="block text-sm">Lý do (ít nhất 5 ký tự)<textarea className={input} maxLength={1000} value={note} onChange={e => setNote(e.target.value)} /></label>}
         <Confirmation checked={confirmed} onChange={setConfirmed} />
         {dialogError && <p role="alert" className="text-sm text-red-700">{dialogError}</p>}

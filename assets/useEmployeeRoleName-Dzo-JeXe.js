@@ -1,0 +1,1 @@
+import{S as e,t}from"./useStore-D93P8Pl8.js";function n(n){return t(t=>e(t.employees.find(e=>e.id===n?.id)||n,t.workspaceRoles))}export{n as t};

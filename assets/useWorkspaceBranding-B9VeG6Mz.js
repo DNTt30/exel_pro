@@ -1,1 +1,0 @@
-import{T as e,t}from"./useStore-D93P8Pl8.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

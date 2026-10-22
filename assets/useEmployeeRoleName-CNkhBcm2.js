@@ -1,1 +1,0 @@
-import{M as e,t}from"./useStore-BETjPKvl.js";function n(n){return t(t=>e(t.employees.find(e=>e.id===n?.id)||n,t.workspaceRoles))}export{n as t};

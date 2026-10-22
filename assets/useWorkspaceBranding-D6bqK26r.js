@@ -1,1 +1,0 @@
-import{F as e,t}from"./useStore-BETjPKvl.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

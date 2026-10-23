@@ -1,0 +1,1 @@
+import{n as e}from"./index-BTpa3R_z.js";import{F as t}from"./useStore-B8WuX999.js";import{t as n}from"./KnowledgeLibrary-CT8g013X.js";var r=e(),i=t,a=Object.fromEntries(i.map(e=>[e.value,e]));function o(){return(0,r.jsx)(`div`,{className:`w-full min-w-0 p-3 sm:p-5`,children:(0,r.jsx)(n,{manage:!0})})}export{a as CATEGORY_MAP,i as CATEGORY_OPTIONS,o as default};

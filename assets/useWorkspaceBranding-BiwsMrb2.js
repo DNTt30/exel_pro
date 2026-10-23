@@ -1,0 +1,1 @@
+import{k as e,t}from"./useStore-Dfd52sSf.js";function n(){return t(e=>e.workspaceBranding)||e}export{n as t};

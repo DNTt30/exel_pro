@@ -110,7 +110,6 @@ export default function AppLayout() {
       title: 'VẬN HÀNH',
       items: [
         { to: '/admin/dashboard',  icon: <LayoutDashboard size={17} />, label: 'Dashboard' },
-        { to: '/admin/support', icon: <HelpCircle size={17} />, label: 'Hướng dẫn & hỗ trợ' },
         { to: '/admin/schedule',   icon: <CalendarDays size={17} />,    label: 'Lịch ca', badge: pendingSwapsCount, badgeColor: 'bg-amber-400 text-slate-950 font-bold' },
         { to: '/admin/timesheet',  icon: <Clock size={17} />,           label: 'Chấm công' },
         { to: '/admin/feedback',   icon: <FileText size={17} />,        label: 'Bù công C&B', badge: pendingFeedbacksCount, badgeColor: 'bg-rose-400 text-white font-bold' },
@@ -136,7 +135,6 @@ export default function AppLayout() {
       items: [
         { to: '/employee/profile',   icon: <User size={17} />,         label: 'Hồ sơ của tôi' },
         { to: '/employee/home',      icon: <Home size={17} />,         label: 'Trang chủ' },
-        { to: '/employee/support', icon: <HelpCircle size={17} />, label: 'Hướng dẫn & hỗ trợ' },
         { to: '/employee/schedule',  icon: <CalendarDays size={17} />, label: 'Lịch ca' },
         { to: '/employee/timesheet', icon: <Clock size={17} />,        label: 'Chấm công' },
         { to: '/employee/feedback',  icon: <FileText size={17} />,     label: 'Bù công C&B' },

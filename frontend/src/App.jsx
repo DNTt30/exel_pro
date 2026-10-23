@@ -29,7 +29,6 @@ const Handbook = lazy(() => import('./pages/shared/Handbook'));
 const HandbookManager = lazy(() => import('./pages/admin/HandbookManager'));
 const EmployeeChangePassword = lazy(() => import('./pages/employee/EmployeeChangePassword'));
 const EmployeeProfile = lazy(() => import('./pages/employee/EmployeeProfile'));
-const EmployeeSupport = lazy(() => import('./pages/shared/EmployeeSupport'));
 const WorkspaceSettings = lazy(() => import('./pages/admin/WorkspaceSettings'));
 const WorkspaceRoles = lazy(() => import('./pages/admin/WorkspaceRoles'));
 
@@ -227,8 +226,8 @@ function App() {
               {/* Employee Routes */}
               <Route path="employee/profile" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeProfile /></PrivateRoute>} />
               <Route path="employee/home" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeHome /></PrivateRoute>} />
-              <Route path="employee/support" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSupport /></PrivateRoute>} />
-              <Route path="admin/support" element={<PrivateRoute allowedRoles={['admin']}><EmployeeSupport /></PrivateRoute>} />
+              <Route path="employee/support" element={<Navigate to="/employee/home" replace />} />
+              <Route path="admin/support" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="employee/schedule" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeSchedule /></PrivateRoute>} />
               <Route path="employee/timesheet" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeTimesheet /></PrivateRoute>} />
               <Route path="employee/feedback" element={<PrivateRoute allowedRoles={['employee', 'admin']}><EmployeeFeedback /></PrivateRoute>} />

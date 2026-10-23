@@ -24,7 +24,6 @@ import {
   MapPin,
   ChevronRight,
   RefreshCw,
-  HelpCircle,
 } from 'lucide-react';
 
 const EMPTY = {};
@@ -156,15 +155,6 @@ export default function EmployeeHome() {
           <p className="text-slate-500">
             Tuần bắt đầu <strong className="text-slate-700 font-mono">{week}</strong> · <span className="hidden sm:inline">Số liệu theo lịch, không phải công thực tế.</span><span className="sm:hidden">Số liệu theo lịch.</span>
           </p>
-          <Link
-            to="/employee/support"
-            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/80 bg-indigo-50/80 hover:bg-indigo-100/80 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition-colors"
-            data-testid="open-employee-support"
-          >
-            <HelpCircle size={13} className="shrink-0" />
-            <span>Bắt đầu tại đây · Hướng dẫn & hỗ trợ</span>
-            <ChevronRight size={13} className="shrink-0" />
-          </Link>
         </div>
       </div>
 

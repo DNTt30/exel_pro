@@ -58,8 +58,8 @@ Script không đọc `.env`, tạo database mới trong cụm thử ở `artifac
 
 ## Kết quả kiểm tra (23/10/2026)
 
-- Toàn bộ Vitest: 101 file đạt, 2 file bỏ qua; 1.054 test đạt, 7 bỏ qua. Sau các sửa cuối ở bảng đăng ký/xác nhận công, chạy thêm bộ kiểm tra tập trung (kết quả cập nhật bên dưới).
+- Toàn bộ Vitest: 101 file đạt, 2 file bỏ qua; 1.054 test đạt, 7 bỏ qua. Sau các sửa cuối ở bảng đăng ký/xác nhận công, **59/59 test tập trung đạt** (5 file); không cộng hai số này vì có test trùng nhau. Có kiểm tra trang vẫn mở qua ngày 25, công thực tế bằng 0, đăng ký chưa xếp và xác nhận lại sau khi C&B xử lý.
 - Playwright cuối: **12/12 đạt** ở desktop 1440×1000 và mobile 390×844, chạy Edge headless. Có kiểm tra lưu rồi tải lại, phân công người hướng dẫn, trả lời/đóng/mở lại, thống kê đăng ký và không tràn màn hình. Các lần chạy đầu có lỗi fixture/HMR khi mã đang thay đổi; đã sửa fixture và chạy lại trọn 12 bài thành công.
 - Build production thành công, có cảnh báo chunk Schedule lớn hơn 500 kB. Lint không có lỗi; còn 1 cảnh báo import `Building2` không dùng trong `WorkspaceRoles.jsx` thuộc phần đang sửa đồng thời.
-- PostgreSQL cục bộ đã đạt lần kiểm tra đầu cho RLS, phạm vi cửa hàng, quyền sở hữu, chống trùng, revision, chu kỳ yêu cầu và nhật ký bất biến. Kết quả chạy cuối sau khi bổ sung kiểm tra nội dung gửi lại được ghi bên dưới.
+- PostgreSQL cục bộ lần cuối: **EMPLOYEE_SUPPORT_DB_OK**, database giữ lại `ofc_stability_test_2ac353ef6b86`. Đạt kiểm tra RLS, phạm vi cửa hàng, quyền sở hữu, chống trùng, từ chối gửi lại cùng UUID với nội dung khác, revision, chu kỳ yêu cầu và nhật ký bất biến. Server thử đã tự dừng.
 - Không chạy pilot với người thật, không ghi yêu cầu thử vào dữ liệu cửa hàng thật, không đổi tài khoản/mật khẩu, không tự thêm dịch vụ.

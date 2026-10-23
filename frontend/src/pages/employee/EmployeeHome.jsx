@@ -113,7 +113,7 @@ export default function EmployeeHome() {
   const registeredPct = Math.min(100 - assignedPct, Math.round((progress.registeredHours / Math.max(1, target)) * 100));
 
   return (
-    <div className="w-full min-w-0 max-w-6xl mx-auto p-2.5 sm:p-4 space-y-2.5 sm:space-y-3" data-testid="employee-home">
+    <div className="w-full min-w-0 max-w-full p-2.5 sm:p-4 space-y-2.5 sm:space-y-3" data-testid="employee-home">
       {/* ── Header Gọn Gàng (Tích hợp Chuyển tuần + Tuần bắt đầu + Hướng dẫn) ── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-3.5 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">

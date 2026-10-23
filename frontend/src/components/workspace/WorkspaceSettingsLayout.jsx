@@ -49,7 +49,7 @@ export default function WorkspaceSettingsLayout({ title, description, steps, chi
   const activeRolesCount = roles.filter(r => r.isActive).length;
 
   return (
-    <div data-workspace-settings className="w-full min-w-0 max-w-6xl mx-auto p-2.5 pb-28 sm:p-5 sm:pb-28 space-y-4">
+    <div data-workspace-settings className="w-full min-w-0 max-w-full p-2.5 pb-28 sm:p-5 sm:pb-28 space-y-4">
       {/* ── Banner Quản Trị Đơn Vị (Hiển thị Logo lớn + Trạng thái thương hiệu) ── */}
       <header
         style={{

@@ -78,7 +78,7 @@ function ProfileForm({ employeeId }) {
   if (!profile) return <div className="p-4"><p role="alert" className="text-sm text-rose-700">{error}</p><button className={`${buttonClass} mt-3`} onClick={() => setReload(x => x + 1)}>Thử lại</button></div>;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-2.5 sm:space-y-3.5 p-2.5 pb-6 sm:p-4">
+    <div className="w-full min-w-0 max-w-full space-y-2.5 sm:space-y-3.5 p-2.5 pb-6 sm:p-4">
       {/* ── Thẻ Định danh Cá nhân Gọn Gàng (Tối ưu Mobile 2x2) ── */}
       <header className="rounded-2xl bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 text-white p-3.5 sm:p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">

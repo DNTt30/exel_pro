@@ -65,7 +65,7 @@ export function AdminPageSkeleton() {
 /** Bố cục giả trang nhân viên (dọc, thẻ) */
 export function EmployeePageSkeleton() {
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
+    <div className="w-full max-w-full p-2.5 sm:p-4 space-y-3">
       <SkeletonLine w="w-1/3" h="h-3" />
       <SkeletonLine w="w-1/2" h="h-6" />
       <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-800 h-28 animate-pulse opacity-80" />
